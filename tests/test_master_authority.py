@@ -88,7 +88,7 @@ def test_runtime_code_cannot_mutate_master():
 
 
 def test_nested_sequences_are_immutable():
-    pins = master.get("regression_pins.pins.eq7_chi_MHz")
+    pins = master.get("regression_pins.unverified.pins.eq7_chi_MHz")
     assert isinstance(pins, tuple)
     with pytest.raises(TypeError):
         pins[0] = 0.0  # type: ignore[index]

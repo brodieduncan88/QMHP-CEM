@@ -283,14 +283,100 @@ def test_batch_report_records_environment_and_seed(object001_sweep, results_root
     assert report.environment.picogk_version == "2.3.0"
 
 
-def test_quantum_results_record_unavailable_quantities(object001_sweep, results_root):
+def test_quantum_results_are_populated_by_the_physics_models(
+    object001_sweep, results_root
+):
     _, outcomes = pipeline.run_sweep(
         object001_sweep, solver_name="mock", results_root=results_root
     )
     solved = [o for o in outcomes if o.quantum_results is not None]
     assert solved
     for outcome in solved:
-        assert outcome.quantum_results.unavailable
-        assert outcome.quantum_results.regression_status[
-            "physics_models_implemented"
-        ] is False
+        quantum = outcome.quantum_results
+        assert quantum.regression_status["physics_models_implemented"] is True
+        assert quantum.dressed_system["root_GHz"] == pytest.approx(
+            4.301974466, rel=1e-6
+        )
+        assert quantum.collision["omega24_GHz"] > 0
+        assert quantum.purcell["f8_weight"] > 0
+
+
+def test_quantum_results_still_record_what_is_unavailable(
+    object001_sweep, results_root
+):
+    """Coupling extraction and the tolerance ensemble are absent by default."""
+    _, outcomes = pipeline.run_sweep(
+        object001_sweep, solver_name="mock", results_root=results_root
+    )
+    quantum = outcomes[0].quantum_results
+    assert any("coupling_extraction" in entry for entry in quantum.unavailable)
+    assert any("tolerance" in entry for entry in quantum.unavailable)
+
+
+def test_collision_gate_now_adjudicates(object001_sweep, results_root):
+    """With the physics implemented, COLLISION returns a verdict, not INCOMPLETE."""
+    _, outcomes = pipeline.run_sweep(
+        object001_sweep, solver_name="mock", results_root=results_root
+    )
+    for outcome in outcomes:
+        if outcome.gate_report is None:
+            continue
+        collision = outcome.gate_report.by_id("COLLISION")
+        assert collision.status is GateStatus.PASS
+        assert collision.measured == pytest.approx(98.413, abs=0.01)
+
+
+def test_tolerance_gate_runs_when_samples_requested(object001_sweep, results_root):
+    report, outcomes = pipeline.run_sweep(
+        object001_sweep,
+        solver_name="mock",
+        results_root=results_root,
+        fixture="filter_pass",
+        tolerance_samples=4,
+    )
+    quantum = outcomes[0].quantum_results
+    assert quantum.tolerance["sample_count"] == 4
+    assert outcomes[0].gate_report.by_id("TOLERANCE").status is GateStatus.PASS
+
+
+def test_full_pass_is_blocked_only_by_coupling_extraction_and_hardware(
+    object001_sweep, results_root
+):
+    """Documents exactly what still blocks a PASS in v0.1.
+
+    Every computationally evaluable gate can now pass. What remains is
+    COUPLING_EXTRACTION — a HARD gate needing both an eigenmode and a black-box
+    extraction from a real EM solver, which the mock TEST_FIXTURE does not
+    supply — and the six hardware gates. So the mock pipeline tops out at
+    INCOMPLETE by construction, not by accident.
+    """
+    report, outcomes = pipeline.run_sweep(
+        object001_sweep,
+        solver_name="mock",
+        results_root=results_root,
+        fixture="filter_pass",
+        tolerance_samples=4,
+    )
+    assert report.batch_outcome is BatchOutcome.INCOMPLETE
+
+    gates = outcomes[0].gate_report
+    for gate_id in ("COLLISION", "P6E2_FILTER", "P4PRE_SPECTRAL", "TOLERANCE"):
+        assert gates.by_id(gate_id).status is GateStatus.PASS, gate_id
+
+    assert gates.by_id("COUPLING_EXTRACTION").status is GateStatus.NOT_EVALUATED
+    for gate_id in ("P6E6_JOINT", "P0D", "P1", "P3", "P5", "P7"):
+        assert gates.by_id(gate_id).status is GateStatus.HARDWARE_GATED, gate_id
+
+
+def test_no_feasible_design_still_reachable_with_real_physics(
+    object001_sweep, results_root
+):
+    """A hard computational FAIL still adjudicates the whole batch."""
+    report, _ = pipeline.run_sweep(
+        object001_sweep,
+        solver_name="mock",
+        results_root=results_root,
+        fixture="filter_fail",
+    )
+    assert report.batch_outcome is BatchOutcome.NO_FEASIBLE_DESIGN_FOUND
+    assert report.fail_count == 9

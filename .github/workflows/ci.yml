@@ -28,6 +28,9 @@ jobs:
       - name: Verify frozen master provenance
         run: uv run cem verify-master
 
+      - name: Verify vendored release bundle integrity
+        run: uv run python scripts/verify_reference_bundle.py
+
       - name: Run tests
         run: uv run pytest -q
 

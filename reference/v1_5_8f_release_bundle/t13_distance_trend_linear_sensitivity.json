@@ -1,0 +1,35 @@
+{
+ "R7_over_R3": {
+  "central": 1.222987429513898,
+  "lo": 1.0246311895780167,
+  "hi": 1.4645536110335753,
+  "P_gt_1": 0.98715,
+  "reps": 20000,
+  "seed": 13,
+  "method": "parametric binomial bootstrap on released S1 counts",
+  "hazard_convention": "linear",
+  "status": "RECOMPUTATION-FROM-RUN-RECORD / EXPLORATORY"
+ },
+ "R5_over_R3": {
+  "central": 0.9806861806522241,
+  "lo": 0.8258877822842455,
+  "hi": 1.1664251871769016,
+  "P_gt_1": 0.4146,
+  "reps": 20000,
+  "seed": 13,
+  "method": "parametric binomial bootstrap on released S1 counts",
+  "hazard_convention": "linear",
+  "status": "RECOMPUTATION-FROM-RUN-RECORD / EXPLORATORY"
+ },
+ "R7_over_R5": {
+  "central": 1.2470731755397295,
+  "lo": 0.993220517741111,
+  "hi": 1.5677105552758663,
+  "P_gt_1": 0.97235,
+  "reps": 20000,
+  "seed": 13,
+  "method": "parametric binomial bootstrap on released S1 counts",
+  "hazard_convention": "linear",
+  "status": "RECOMPUTATION-FROM-RUN-RECORD / EXPLORATORY"
+ }
+}

@@ -6,7 +6,6 @@ import numpy as np
 import pytest
 
 from contracts import master
-from models import PhysicsNotImplemented
 from models import tolerance
 
 SEED = 20260824
@@ -93,6 +92,43 @@ def test_wilson_interval_rejects_impossible_inputs():
         tolerance.wilson_interval(11, 10)
 
 
-def test_ensemble_evaluation_not_implemented():
-    with pytest.raises(PhysicsNotImplemented):
-        tolerance.evaluate_ensemble(SEED, 10)
+def test_ensemble_evaluation_produces_the_required_outputs():
+    """Spec §6.5 names exactly what a tolerance evaluation must report."""
+    result = tolerance.evaluate_ensemble(SEED, 12)
+    for key in (
+        "sample_count",
+        "seed",
+        "pass_count",
+        "fail_count",
+        "rejection_rate",
+        "confidence_interval",
+        "failure_reasons_by_category",
+    ):
+        assert key in result
+    assert result["sample_count"] == 12
+    assert result["seed"] == SEED
+    assert result["pass_count"] + result["fail_count"] + result["unscreened_count"] == 12
+
+
+def test_ensemble_is_reproducible_for_a_seed():
+    first = tolerance.evaluate_ensemble(SEED, 12)
+    second = tolerance.evaluate_ensemble(SEED, 12)
+    assert first["fail_count"] == second["fail_count"]
+    assert first["rejection_rate"] == second["rejection_rate"]
+
+
+def test_unscreened_devices_are_not_counted_as_passes_or_rejections():
+    """A device whose root escapes the bracket was never screened."""
+    result = tolerance.evaluate_ensemble(SEED, 12)
+    screened = result["pass_count"] + result["fail_count"]
+    assert result["screened_count"] == screened
+    if result["unscreened_count"]:
+        assert "root_not_bracketed" in result["failure_reasons_by_category"]
+
+
+def test_rejection_rate_is_consistent_with_the_frozen_reference():
+    """400 devices at the release seed should land near the frozen 6.66%."""
+    result = tolerance.evaluate_ensemble(20260725, 400)
+    reference = tolerance.reporting_reference()
+    low, high = result["confidence_interval"]
+    assert low <= reference["pooled_rejection_rate"] <= high

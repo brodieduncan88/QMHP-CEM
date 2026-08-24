@@ -1,4 +1,4 @@
-"""F8 Purcell model (spec §5.3). NOT IMPLEMENTED in v0.1.
+"""F8 Purcell model (spec §5.3).
 
 Executable definition (spec §4.5)::
 
@@ -6,11 +6,11 @@ Executable definition (spec §4.5)::
 
 The required quantity is the actual dressed transition matrix element::
 
-    |<dressed(1,0)| a |dressed(2,0)>|^2  ->  0.01182198
+    |<dressed(1,0)| a |dressed(2,0)>|^2
 
-The bare-admixture overlap (0.011815) is a DIFFERENT QUANTITY and must not be
+The bare-admixture overlap (0.011815) is a DIFFERENT QUANTITY and is not
 implemented as a substitute (spec §4.5, §5.3). :func:`assert_not_bare_admixture`
-exists so that a future implementation trips loudly if the two are confused.
+guards against the two being confused, and is applied to every computed weight.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from __future__ import annotations
 from typing import Any
 
 from contracts import master
-from models._stub import PhysicsNotImplemented
+from models import dressed_system
 
 
 def dressed_weight_pin() -> float:
@@ -51,27 +51,38 @@ def assert_not_bare_admixture(weight: float, rel_tol: float = 1e-4) -> None:
         )
 
 
-def purcell_weight() -> float:
-    """|<dressed(1,0)| a |dressed(2,0)>|^2. NOT IMPLEMENTED."""
-    raise PhysicsNotImplemented(
-        model="f8_purcell_weight",
-        spec_section="5.3",
-        regression_pins={"f8_dressed_weight": dressed_weight_pin()},
-        detail=(
-            "Compute the dressed transition matrix element. Do NOT implement "
-            f"the bare-admixture overlap ({bare_admixture_reference()}) as a "
-            "substitute."
-        ),
-    )
+def purcell_weight(
+    Nq: int = dressed_system.PRODUCTION_NQ,
+    Nph: int = dressed_system.PRODUCTION_NPH,
+) -> float:
+    """|<dressed(1,0)| a |dressed(2,0)>|² at the nominal operating point."""
+    weight = dressed_system.nominal_solution(Nq, Nph).purcell_weight()
+    assert_not_bare_admixture(weight)
+    return weight
 
 
-def purcell_rate(kappa_at_emission: float) -> float:
-    """Gamma_P = kappa(omega_if) * |<f|a|i>|^2. NOT IMPLEMENTED."""
-    raise PhysicsNotImplemented(
-        model="purcell_rate",
-        spec_section="5.3",
-        regression_pins={"f8_dressed_weight": dressed_weight_pin()},
-    )
+def purcell_rate(kappa_at_emission_Hz: float, weight: float | None = None) -> float:
+    """Gamma_P = kappa(omega_if) * |<f|a|i>|², in the units of ``kappa``.
+
+    Args:
+        kappa_at_emission_Hz: Resonator linewidth evaluated at the dressed
+            emission frequency. In QMHP-CEM v0.1 this is a SOLVED quantity that
+            must come from an EM solver; there is no default, because assuming
+            one would fabricate the very number the filter gate exists to test.
+        weight: F8 weight. Defaults to the computed nominal weight.
+    """
+    if weight is None:
+        weight = purcell_weight()
+    assert_not_bare_admixture(weight)
+    return kappa_at_emission_Hz * weight
+
+
+def emission_frequency_GHz(
+    Nq: int = dressed_system.PRODUCTION_NQ,
+    Nph: int = dressed_system.PRODUCTION_NPH,
+) -> float:
+    """Dressed |1> -> |2> emission frequency, the filter stopband target."""
+    return dressed_system.nominal_solution(Nq, Nph).dressed_f12_GHz
 
 
 def filter_constraint() -> dict[str, Any]:

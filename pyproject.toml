@@ -45,6 +45,7 @@ packages = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
+    "slow: slower physics solves (high-truncation ladder, large ensembles)",
     "planar: requires gdsfactory (optional extra)",
     "dotnet: requires the .NET 9 SDK and PicoGK",
     "palace: requires the Palace solver container",

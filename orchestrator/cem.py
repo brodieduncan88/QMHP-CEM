@@ -73,6 +73,7 @@ def cmd_sweep(args: argparse.Namespace) -> int:
             solver_name=args.solver,
             results_root=Path(args.results_root) if args.results_root else None,
             fixture=args.fixture,
+            tolerance_samples=args.tolerance_samples,
         )
     except SolverUnavailable as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -216,6 +217,15 @@ def build_parser() -> argparse.ArgumentParser:
             help="mock solver fixture (mock only)",
         )
         p.add_argument("--results-root", default=None, help="override results/ root")
+        p.add_argument(
+            "--tolerance-samples",
+            type=int,
+            default=0,
+            help=(
+                "ensemble size for the TOLERANCE gate (0 = skip). Each device "
+                "costs a full static solve plus a root search, ~50 ms."
+            ),
+        )
 
     p_generate = sub.add_parser("generate", help="expand a sweep into candidates")
     p_generate.add_argument("sweep", type=Path)

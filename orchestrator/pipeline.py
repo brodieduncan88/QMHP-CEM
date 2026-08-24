@@ -14,6 +14,7 @@ That is the correct v0.1 outcome, not a bug to work around.
 from __future__ import annotations
 
 import copy
+import hashlib
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,7 +38,8 @@ from evaluator import evaluate_candidate
 from geometry.package_picogk import driver as picogk_driver
 from models import PhysicsNotImplemented
 from models import collision as collision_model
-from models import dressed_system, purcell
+from models import dressed_system, purcell, tolerance
+from models.dressed_system import RootNotBracketed
 from orchestrator import environment, manifest
 from orchestrator.lifecycle import CandidateLifecycle
 from orchestrator.results_store import DEFAULT_RESULTS_ROOT, BatchStore
@@ -97,33 +99,79 @@ def build_candidates(sweep: SweepDefinition, base: Candidate) -> list[Candidate]
 # --- quantum step -----------------------------------------------------------
 
 
-def evaluate_quantum(candidate: Candidate, solver_results: SolverResults) -> QuantumResults:
+def evaluate_quantum(
+    candidate: Candidate,
+    solver_results: SolverResults,
+    tolerance_samples: int = 0,
+) -> QuantumResults:
     """Run the quantum-device layer for a candidate.
 
-    v0.1: every physics model is a stub, so this records what is unavailable
-    rather than substituting a value. The frozen reference numbers are NOT
-    copied into the result as if they had been computed for this candidate —
-    doing so would launder MASTER-FROZEN values into SOLVED evidence.
+    The dressed-system, Purcell and collision quantities are computed from the
+    frozen Branch-A device. Anything a model cannot supply is recorded in
+    ``unavailable`` rather than substituted.
+
+    Args:
+        tolerance_samples: Ensemble size for the TOLERANCE gate. Zero skips it,
+            which is the sweep default: each device costs a full static solve
+            plus a bracketed root search, so a 400-device ensemble per
+            candidate would dominate the run.
     """
     unavailable: list[str] = []
     dressed: dict[str, Any] = {}
-    collision: dict[str, Any] = {}
+    collision_block: dict[str, Any] = {}
     purcell_block: dict[str, Any] = {}
+    tolerance_block: dict[str, Any] = {}
 
     try:
-        dressed["root_GHz"] = dressed_system.solve_dressed_root()
-    except PhysicsNotImplemented as exc:
-        unavailable.append(f"dressed_system.root_GHz: {exc}")
+        spectrum = dressed_system.dressed_spectrum()
+        dressed.update(
+            {
+                "root_GHz": spectrum["root_GHz"],
+                "logical_pull_MHz": spectrum["logical_pull_MHz"],
+                "sink_pull_MHz": spectrum["sink_pull_MHz"],
+                "sink_logical_contrast_MHz": spectrum["sink_logical_contrast_MHz"],
+                "sink_line_GHz": spectrum["sink_line_GHz"],
+                "Nq": spectrum["Nq"],
+                "Nph": spectrum["Nph"],
+                "coupling_g_GHz": spectrum["coupling_g_GHz"],
+            }
+        )
+        purcell_block.update(
+            {
+                "f8_weight": spectrum["purcell_weight"],
+                "emission_GHz": spectrum["dressed_f12_GHz"],
+            }
+        )
+        collision_block.update(
+            {
+                "omega24_GHz": spectrum["omega24_GHz"],
+                "f_readout_GHz": spectrum["root_GHz"],
+            }
+        )
+    except (PhysicsNotImplemented, RootNotBracketed) as exc:
+        unavailable.append(f"dressed_system: {exc}")
 
-    try:
-        collision["omega24_GHz"] = collision_model.omega24()
-    except PhysicsNotImplemented as exc:
-        unavailable.append(f"collision.omega24_GHz: {exc}")
+    # Coupling extraction needs BOTH an eigenmode and a black-box value from
+    # the solver. The mock fixture supplies neither, so the gate correctly
+    # reports NOT-EVALUATED rather than passing on one extraction.
+    unavailable.append(
+        "dressed_system.coupling_extraction: requires eigenmode and black-box "
+        "extractions from an EM solver (spec §5.5); not available from "
+        f"solver {solver_results.solver.name!r}."
+    )
 
-    try:
-        purcell_block["f8_weight"] = purcell.purcell_weight()
-    except PhysicsNotImplemented as exc:
-        unavailable.append(f"purcell.f8_weight: {exc}")
+    if tolerance_samples > 0:
+        try:
+            tolerance_block = tolerance.evaluate_ensemble(
+                seed=_tolerance_seed(candidate), n_devices=tolerance_samples
+            )
+        except PhysicsNotImplemented as exc:
+            unavailable.append(f"tolerance: {exc}")
+    else:
+        unavailable.append(
+            "tolerance: ensemble not requested for this run "
+            "(--tolerance-samples 0)."
+        )
 
     return QuantumResults.model_validate(
         {
@@ -134,19 +182,30 @@ def evaluate_quantum(candidate: Candidate, solver_results: SolverResults) -> Qua
             "spectrum": {},
             "dressed_system": dressed,
             "purcell": purcell_block,
-            "collision": collision,
-            "tolerance": {},
+            "collision": collision_block,
+            "tolerance": tolerance_block,
             "regression_status": {
-                "physics_models_implemented": False,
+                "physics_models_implemented": True,
+                "reference": (
+                    "reference/v1_5_8f_release_bundle/"
+                    "qmhp_v158f_readout_replication.py"
+                ),
                 "note": (
-                    "QMHP-CEM v0.1 implements no physics models (spec §5). "
-                    "Regression pins are declared in master/ and are not "
-                    "reproduced by this release."
+                    "Dressed-system quantities are computed for the frozen "
+                    "Branch-A NOMINAL device, not for this candidate's "
+                    "geometry. Candidate geometry enters through the solver "
+                    "results, not through the device Hamiltonian."
                 ),
             },
             "unavailable": unavailable,
         }
     )
+
+
+def _tolerance_seed(candidate: Candidate) -> int:
+    """Deterministic per-candidate RNG seed, recorded in the manifest."""
+    digest = hashlib.sha256(candidate.candidate_id.encode()).hexdigest()
+    return int(digest[:8], 16)
 
 
 # --- per-candidate ----------------------------------------------------------
@@ -156,6 +215,7 @@ def run_candidate(
     adapter: SolverAdapter,
     store: BatchStore,
     run_id: str,
+    tolerance_samples: int = 0,
 ) -> CandidateOutcome:
     """Take one candidate through the full lifecycle."""
     lifecycle = CandidateLifecycle(candidate.candidate_id)
@@ -197,7 +257,7 @@ def run_candidate(
         )
 
     # -> QUANTUM_EVALUATED
-    quantum_results = evaluate_quantum(candidate, solver_results)
+    quantum_results = evaluate_quantum(candidate, solver_results, tolerance_samples)
     lifecycle.to(CandidateState.QUANTUM_EVALUATED)
     store.write_model(candidate_dir / "quantum_results.json", quantum_results)
     if quantum_results.unavailable:
@@ -250,6 +310,7 @@ def run_sweep(
     solver_name: str | None = None,
     results_root: Path | None = None,
     fixture: str = "default",
+    tolerance_samples: int = 0,
 ) -> tuple[BatchReport, list[CandidateOutcome]]:
     """Run a deterministic sweep end to end.
 
@@ -273,7 +334,10 @@ def run_sweep(
     store = BatchStore(bid, results_root)
     run_id = f"RUN-{bid}"
 
-    outcomes = [run_candidate(c, adapter, store, run_id) for c in candidates]
+    outcomes = [
+        run_candidate(c, adapter, store, run_id, tolerance_samples)
+        for c in candidates
+    ]
 
     counts = _count(outcomes)
     outcome = _batch_outcome(outcomes)
@@ -358,11 +422,11 @@ def _batch_notes(outcomes: list[CandidateOutcome], adapter: SolverAdapter) -> li
             f"eigenmode in this batch is SYNTHETIC and carries no evidentiary "
             f"weight."
         )
-    if any(o.quantum_results and o.quantum_results.unavailable for o in outcomes):
-        notes.append(
-            "Physics models are not implemented in v0.1 (spec §5), so gates "
-            "depending on the dressed system report INCOMPLETE."
-        )
+    notes.append(
+        "Dressed-system quantities are computed for the frozen Branch-A "
+        "NOMINAL device. Candidate geometry enters only through the solver "
+        "results; it does not perturb the device Hamiltonian."
+    )
     if any(o.geometry is not None and not o.geometry.generated for o in outcomes):
         notes.append(
             "Object 001 geometry was not generated; the PicoGK project requires "

@@ -43,19 +43,22 @@ physics and geometry generation are **not**.
 | `evaluator/` gate logic and evidence boundary | Implemented |
 | `solvers/` adapter boundary + deterministic mock | Implemented |
 | `orchestrator/` lifecycle, append-only store, manifests, CLI | Implemented |
-| `models/` physics (§5) | **Not implemented** — stubs raise, carrying their regression pins |
+| `models/` physics (§5) | **Implemented** and regression-tested against the frozen pins |
 | `geometry/chip_planar/` gdsfactory cells (§7.1) | **Not implemented** |
 | `geometry/package_picogk/` Object 001 (§7.2) | **Not implemented** — C# project skeleton only |
 | `solvers/palace`, `solvers/openems` | Wired; container invocation not implemented |
+| `reference/` vendored v1.5.8f release bundle | Vendored, 27/29 hash-verified |
 
-Because the physics models are stubs, a full sweep currently ends
-`INCOMPLETE`: gates that depend on the dressed system report `INCOMPLETE`
-rather than returning a value that was never computed. **That is the intended
-v0.1 behaviour, not a defect.**
+The physics reproduces the frozen dressed root **exactly** (4.301974466 GHz at
+1e-10), along with the static spectrum, the sink line and the dressed emission
+frequency. Three pins reproduce only to ~2e-6 and are **flagged, not absorbed**
+— see [`docs/regression-pins.md`](docs/regression-pins.md).
 
-Conventions that are *not* physics are implemented and tested: the tolerance
-RNG draw stream, the 13 MHz collision comparison, the 34/36 dB filter
-comparison, and the 10% coupling-extraction consistency rule.
+A mock sweep still tops out at `INCOMPLETE`, but now for a precise reason:
+`COUPLING_EXTRACTION` is a HARD gate requiring *both* an eigenmode and a
+black-box extraction from a real EM solver, which the mock `TEST_FIXTURE`
+cannot supply. Every other computationally evaluable gate adjudicates.
+Reaching `FEASIBLE_CANDIDATE_FOUND` requires Palace or openEMS.
 
 ---
 
@@ -77,6 +80,9 @@ uv run cem sweep sweeps/object001_grid.yaml --solver mock
 uv run cem report results/BATCH-<id>
 
 uv run pytest
+
+# Re-verify the vendored release bundle against its AMD-C manifest
+uv run python scripts/verify_reference_bundle.py
 ```
 
 ### CLI
@@ -89,6 +95,9 @@ uv run pytest
 | `cem evaluate <batch>` | Print gate outcomes for a batch |
 | `cem report <batch>` | Batch summary + manifest verification |
 | `cem verify-master` | Verify frozen provenance digests |
+
+Add `--tolerance-samples N` to run the TOLERANCE ensemble (0 = skip, the
+default; each device costs ~50 ms).
 
 Mock fixtures (`--fixture`) force specific downstream outcomes for testing:
 `default`, `filter_pass`, `filter_fail`, `collision_pass`, `collision_fail`,
@@ -143,6 +152,7 @@ QMHP-CEM/
 ├── sweeps/                 # deterministic sweep definitions
 ├── config/                 # seed candidates
 ├── docker/                 # solver container definitions
+├── reference/              # vendored upstream release bundle (read-only)
 ├── tests/
 ├── results/                # append-only batch outputs
 └── manifests/

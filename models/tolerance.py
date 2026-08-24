@@ -16,7 +16,6 @@ from typing import Any, Iterator
 import numpy as np
 
 from contracts import master
-from models._stub import PhysicsNotImplemented
 
 
 def convention() -> dict[str, Any]:
@@ -119,16 +118,64 @@ def wilson_interval(successes: int, trials: int, z: float = 1.959963984540054) -
 
 
 def evaluate_ensemble(seed: int, n_devices: int) -> dict[str, Any]:
-    """Evaluate candidate viability across the ensemble. NOT IMPLEMENTED.
+    """Evaluate candidate viability across the tolerance ensemble (spec §6.5).
 
-    Requires the static and dressed models to decide each drawn device.
+    Each drawn device is screened against the frozen 13 MHz collision gate.
+
+    Cost warning: every device requires a full static solve plus a bracketed
+    dressed-root search, roughly half a second each. A 400-device ensemble is
+    minutes, not seconds. Callers driving a sweep should size ``n_devices``
+    deliberately.
+
+    Returns the outputs spec §6.5 requires: sample count, seed, pass and fail
+    counts, rejection rate, confidence interval and failure reasons by
+    category. The finite-sample rate is NOT the underlying model probability;
+    the Wilson interval is reported alongside it for that reason.
     """
-    raise PhysicsNotImplemented(
-        model="tolerance_ensemble",
-        spec_section="5.4",
-        regression_pins=reporting_reference(),
-        detail=(
-            "The draw stream is implemented (draw_ensemble); per-device "
-            "evaluation requires models.fluxonium and models.dressed_system."
+    from models import collision
+    from models.dressed_system import RootNotBracketed
+
+    devices = draw_ensemble(seed, n_devices)
+    failures: dict[str, int] = {}
+    passed = 0
+
+    unscreened = 0
+    for device in devices:
+        try:
+            result = collision.screen(
+                EC_GHz=device["EC"], EJ_GHz=device["EJ"], EL_GHz=device["EL"]
+            )
+        except RootNotBracketed:
+            # Not a pass and not a collision rejection: this device was never
+            # screened. Counting it either way would misstate the rate.
+            unscreened += 1
+            failures["root_not_bracketed"] = failures.get("root_not_bracketed", 0) + 1
+            continue
+        if result["passes"]:
+            passed += 1
+        else:
+            failures["collision_below_13MHz"] = (
+                failures.get("collision_below_13MHz", 0) + 1
+            )
+
+    rejected = n_devices - passed - unscreened
+    screened = passed + rejected
+    low, high = wilson_interval(rejected, screened) if screened else (0.0, 1.0)
+
+    return {
+        "sample_count": n_devices,
+        "screened_count": screened,
+        "unscreened_count": unscreened,
+        "seed": seed,
+        "pass_count": passed,
+        "fail_count": rejected,
+        "rejection_rate": (rejected / screened) if screened else None,
+        "confidence_interval": [low, high],
+        "failure_reasons_by_category": failures,
+        "convention": convention(),
+        "note": (
+            "Finite-sample rate, not the underlying model probability. This "
+            "ensemble uses the QMHP-CEM normative RNG convention and does not "
+            "reproduce legacy AMD-C finite samples."
         ),
-    )
+    }
