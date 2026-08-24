@@ -1,0 +1,184 @@
+# QMHP-CEM machine-readable validation gates
+#
+# Generated from QMHP-CEM_v0.1_Spec.md §6. Frozen at runtime (spec §2.1).
+#
+# EVIDENCE RULE (§6.1): a gate may emit PASS only when its required evidence
+# class is available. A hardware-required gate shall NEVER emit PASS from
+# simulated values (§2.3).
+
+schema: qmhp-cem.validation-gates/0.1.0
+master_revision: v1.5.8f
+spec_version: 0.1.0
+
+allowed_statuses:
+  - PASS
+  - FAIL
+  - INCOMPLETE
+  - HARDWARE-GATED
+  - NOT-EVALUATED
+  - NOT-APPLICABLE
+  - EXTRACTION-INCONSISTENT
+
+allowed_batch_outcomes:
+  - FEASIBLE_CANDIDATE_FOUND
+  - NO_FEASIBLE_DESIGN_FOUND
+  - INCOMPLETE
+  - SOLVER_FAILURE
+  - BLOCKED
+
+evidence_classes:
+  - MASTER-FROZEN
+  - VERIFIED-COMPUTATIONAL
+  - ENGINEERING-SEED
+  - SOLVED
+  - MEASURED
+
+gates:
+
+  # --- §6.2 ---------------------------------------------------------------
+  - gate_id: COLLISION
+    title: "omega24 / readout collision screen"
+    kind: computational
+    severity: HARD
+    spec_section: "6.2"
+    required_evidence: [SOLVED]
+    hardware_required: false
+    threshold:
+      minimum_abs_omega24_minus_readout_MHz: 13.0
+      classification: MASTER-FROZEN
+    pass_condition: "abs(omega24 - f_readout) >= 13 MHz"
+    allowed_statuses: [PASS, FAIL, INCOMPLETE]
+
+  # --- §6.3 ---------------------------------------------------------------
+  - gate_id: P6E2_FILTER
+    title: "Purcell filter stopband at dressed emission frequency"
+    kind: computational_pre_hardware
+    severity: HARD
+    spec_section: "6.3"
+    required_evidence: [SOLVED]
+    hardware_required: false
+    threshold:
+      frequency_GHz: 3.395056
+      minimum_stopband_dB: 34.0
+      target_stopband_dB: 36.0
+      classification: MASTER-FROZEN
+    interpretation:
+      below_minimum: FAIL
+      at_or_above_minimum_below_target: "PASS, below design target"
+      at_or_above_target: "PASS, target met"
+    # This gate does NOT close hardware P6-E2 measurement.
+    closes_hardware_gate: false
+    allowed_statuses: [PASS, FAIL, INCOMPLETE]
+
+  # --- §6.4 ---------------------------------------------------------------
+  - gate_id: P4PRE_SPECTRAL
+    title: "Readout-side spectral pre-check"
+    kind: computational_pre_check
+    severity: SOFT
+    spec_section: "6.4"
+    required_evidence: [SOLVED]
+    hardware_required: false
+    # MUST NOT emit a claim that full P4 has passed.
+    may_claim_full_p4_pass: false
+    detects:
+      - package/eigenmode collision
+      - readout conflict
+      - candidate spectral inconsistency
+    allowed_statuses: [PASS, FAIL, INCOMPLETE, NOT-EVALUATED]
+
+  # --- §6.5 ---------------------------------------------------------------
+  - gate_id: TOLERANCE
+    title: "Manufacturing/device tolerance ensemble viability"
+    kind: computational
+    severity: SOFT
+    spec_section: "6.5"
+    required_evidence: [SOLVED]
+    hardware_required: false
+    required_outputs:
+      - sample_count
+      - seed
+      - pass_count
+      - fail_count
+      - rejection_rate
+      - confidence_interval
+      - failure_reasons_by_category
+    # A single finite-sample count must not be presented as the underlying
+    # model probability.
+    finite_sample_is_model_probability: false
+    allowed_statuses: [PASS, FAIL, INCOMPLETE, NOT-EVALUATED]
+
+  # --- §5.5 ---------------------------------------------------------------
+  - gate_id: COUPLING_EXTRACTION
+    title: "Eigenmode vs black-box-quantization coupling agreement"
+    kind: computational
+    severity: HARD
+    spec_section: "5.5"
+    required_evidence: [SOLVED]
+    hardware_required: false
+    threshold:
+      max_relative_disagreement: 0.10
+      classification: ENGINEERING-RULE
+    on_exceed: EXTRACTION-INCONSISTENT
+    silent_averaging_permitted: false
+    allowed_statuses: [PASS, INCOMPLETE, EXTRACTION-INCONSISTENT, NOT-EVALUATED]
+
+  # --- §6.6 / §6.7 hardware-gated objects ---------------------------------
+  # v0.1 has no MEASURED evidence objects. These can never emit PASS.
+  - gate_id: P6E6_JOINT
+    title: "P6-E6 joint acceptance (measured)"
+    kind: hardware
+    severity: HARD
+    spec_section: "6.6"
+    required_evidence: [MEASURED]
+    hardware_required: true
+    conditions_all_required:
+      - "measured f >= f_star"
+      - "p_induced <= 1e-3"
+      - "complete Pu <= 1e-2"
+      - "logical benefit confidence >= 0.95 at equal wall-clock"
+    allowed_statuses: [HARDWARE-GATED, NOT-EVALUATED, FAIL]
+
+  - gate_id: P0D
+    title: "Sink reset / process validation"
+    kind: hardware
+    severity: HARD
+    spec_section: "6.7"
+    required_evidence: [MEASURED]
+    hardware_required: true
+    allowed_statuses: [HARDWARE-GATED, NOT-EVALUATED, FAIL]
+
+  - gate_id: P1
+    title: "Direct unlocated bypass acceptance"
+    kind: hardware
+    severity: HARD
+    spec_section: "6.7"
+    required_evidence: [MEASURED]
+    hardware_required: true
+    allowed_statuses: [HARDWARE-GATED, NOT-EVALUATED, FAIL]
+
+  - gate_id: P3
+    title: "Trajectory coherence / bias"
+    kind: hardware
+    severity: HARD
+    spec_section: "6.7"
+    required_evidence: [MEASURED]
+    hardware_required: true
+    allowed_statuses: [HARDWARE-GATED, NOT-EVALUATED, FAIL]
+
+  - gate_id: P5
+    title: "Destination-resolved erasure conversion"
+    kind: hardware
+    severity: HARD
+    spec_section: "6.7"
+    required_evidence: [MEASURED]
+    hardware_required: true
+    allowed_statuses: [HARDWARE-GATED, NOT-EVALUATED, FAIL]
+
+  - gate_id: P7
+    title: "Unconditional logical advantage"
+    kind: hardware
+    severity: HARD
+    spec_section: "6.7"
+    required_evidence: [MEASURED]
+    hardware_required: true
+    allowed_statuses: [HARDWARE-GATED, NOT-EVALUATED, FAIL]

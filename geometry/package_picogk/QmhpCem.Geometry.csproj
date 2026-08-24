@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- QMHP-CEM Object 001 geometry generator (spec §7.2, §13.2).
+       .NET 9; PicoGK pinned EXACTLY at 2.3.0. A different PicoGK version is a
+       provenance change and must be recorded, not silently floated. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>QmhpCem.Geometry</RootNamespace>
+    <AssemblyName>QmhpCem.Geometry</AssemblyName>
+    <!-- Exact-version pinning: fail the restore rather than float. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- [2.3.0] is an exact-version range, not a minimum (spec §13.2). -->
+    <PackageReference Include="PicoGK" Version="[2.3.0]" />
+  </ItemGroup>
+
+  <!-- LEAP71 ShapeKernel sits above PicoGK and bridges low-level geometry
+       operations into the application-specific engineering model. Vendor it as
+       a submodule and record the exact Git revision in
+       geometry/package_picogk/driver.py (SHAPEKERNEL_REVISION) before use.
+  <ItemGroup>
+    <ProjectReference Include="../../external/ShapeKernel/ShapeKernel.csproj" />
+  </ItemGroup>
+  -->
+
+</Project>

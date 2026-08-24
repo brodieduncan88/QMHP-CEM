@@ -1,1 +1,221 @@
 # QMHP-CEM
+
+Computational Engineering Model software layer for the QMHP-CoPro research
+programme.
+
+**Specification:** [`QMHP-CEM_v0.1_Spec.md`](QMHP-CEM_v0.1_Spec.md)
+**Parent technical authority:** QMHP-CoPro v1.5.8f — Master Edition
+(Consolidated), ADOPTED MASTER — FROZEN RELEASE
+
+---
+
+## Scientific disclaimer
+
+> QMHP-CEM is computational-engineering infrastructure for the QMHP-CoPro
+> research programme. A candidate that passes computational gates has not
+> thereby passed hardware gates and has not demonstrated processor performance
+> or fault tolerance. Hardware-dependent gates remain HARDWARE-GATED until
+> legitimate measured evidence is supplied.
+
+**A computational PASS is not hardware validation.**
+
+QMHP-CEM does not exist to find a way to make QMHP work. It exists to answer:
+
+> Given the frozen QMHP requirements and a declared engineering candidate, what
+> can be computed now, what passes or fails those computational requirements,
+> and what remains hardware-gated?
+
+`NO FEASIBLE DESIGN FOUND` is a valid scientific and engineering outcome, and
+is reported as a successful batch rather than a software failure.
+
+---
+
+## Status: v0.1 scaffold
+
+The repository structure, frozen requirements layer, data contracts, gate
+evaluator, solver boundary and orchestrator are **implemented and tested**. The
+physics and geometry generation are **not**.
+
+| Layer | Status |
+|---|---|
+| `master/` frozen requirements + provenance | Implemented |
+| `contracts/` Pydantic v2 records | Implemented |
+| `evaluator/` gate logic and evidence boundary | Implemented |
+| `solvers/` adapter boundary + deterministic mock | Implemented |
+| `orchestrator/` lifecycle, append-only store, manifests, CLI | Implemented |
+| `models/` physics (§5) | **Not implemented** — stubs raise, carrying their regression pins |
+| `geometry/chip_planar/` gdsfactory cells (§7.1) | **Not implemented** |
+| `geometry/package_picogk/` Object 001 (§7.2) | **Not implemented** — C# project skeleton only |
+| `solvers/palace`, `solvers/openems` | Wired; container invocation not implemented |
+
+Because the physics models are stubs, a full sweep currently ends
+`INCOMPLETE`: gates that depend on the dressed system report `INCOMPLETE`
+rather than returning a value that was never computed. **That is the intended
+v0.1 behaviour, not a defect.**
+
+Conventions that are *not* physics are implemented and tested: the tolerance
+RNG draw stream, the 13 MHz collision comparison, the 34/36 dB filter
+comparison, and the 10% coupling-extraction consistency rule.
+
+---
+
+## Quick start
+
+```bash
+uv sync --dev
+
+# Verify the frozen master layer and its provenance digests
+uv run cem verify-master
+
+# Expand the canonical sweep without solving
+uv run cem generate sweeps/object001_grid.yaml
+
+# Acceptance command — the 3x3 Object 001 sweep, unattended
+uv run cem sweep sweeps/object001_grid.yaml --solver mock
+
+# Summarise a batch and re-verify its SHA-256 manifest
+uv run cem report results/BATCH-<id>
+
+uv run pytest
+```
+
+### CLI
+
+| Command | Purpose |
+|---|---|
+| `cem generate <sweep>` | Expand a sweep into candidates |
+| `cem simulate <sweep>` | Run candidates through a solver |
+| `cem sweep <sweep>` | Full deterministic sweep, end to end |
+| `cem evaluate <batch>` | Print gate outcomes for a batch |
+| `cem report <batch>` | Batch summary + manifest verification |
+| `cem verify-master` | Verify frozen provenance digests |
+
+Mock fixtures (`--fixture`) force specific downstream outcomes for testing:
+`default`, `filter_pass`, `filter_fail`, `collision_pass`, `collision_fail`,
+`no_feasible_design`.
+
+---
+
+## The evidence model
+
+Every decision-relevant value carries a classification (spec §2.2):
+
+| Class | Meaning |
+|---|---|
+| `MASTER-FROZEN` | Carried by the frozen v1.5.8f Master. Immutable at runtime. |
+| `VERIFIED-COMPUTATIONAL` | From the verified August 2026 computational cycle. Computational evidence, not hardware evidence. |
+| `ENGINEERING-SEED` | A CEM bootstrap assumption. **Never** experimentally validated, never a QMHP requirement. |
+| `SOLVED` | Produced by a numerical solver for a declared candidate. |
+| `MEASURED` | From actual hardware. **QMHP-CEM v0.1 does not manufacture these.** |
+
+### The hardware boundary
+
+No simulated or model-derived result may cause a hardware-gated gate to emit
+`PASS`. This is enforced in three independent places:
+
+1. `master/validation_gates.yaml` omits `PASS` from those gates' allowed statuses;
+2. `Gate.evaluate()` rejects any status outside the frozen allowed list;
+3. `GateResult` refuses to *construct* a `PASS` for a hardware-required gate
+   without `MEASURED` evidence.
+
+Defeating the boundary would require breaking all three. `P0d`, `P1`, `P3`,
+`P5`, `P6-E6` and `P7` all return `HARDWARE-GATED`.
+
+All Object 001 dimensions are `ENGINEERING-SEED` (spec §7.5). They are not
+validated QMHP hardware dimensions.
+
+---
+
+## Layout
+
+```
+QMHP-CEM/
+├── QMHP-CEM_v0.1_Spec.md   # the specification (authority level 2)
+├── master/                 # frozen machine-readable requirements (level 3)
+├── contracts/              # Pydantic v2 records + frozen-master loader
+├── models/                 # physics (spec §5) — stubs in v0.1
+├── evaluator/              # validation gates (spec §6)
+├── geometry/
+│   ├── chip_planar/        # gdsfactory planar cells (spec §7.1)
+│   └── package_picogk/     # PicoGK Object 001, C# (spec §7.2)
+├── solvers/                # adapter boundary + mock / palace / openems
+├── orchestrator/           # lifecycle, append-only store, manifests, CLI
+├── sweeps/                 # deterministic sweep definitions
+├── config/                 # seed candidates
+├── docker/                 # solver container definitions
+├── tests/
+├── results/                # append-only batch outputs
+└── manifests/
+```
+
+The logical separation between frozen requirements, contracts, physics models,
+geometry, solvers, evaluators, orchestration and immutable results is
+structural and must not be collapsed (spec §9).
+
+### Authority order
+
+1. QMHP-CoPro v1.5.8f Master Edition — scientific/technical authority
+2. `QMHP-CEM_v0.1_Spec.md` — software implementation authority
+3. `master/` machine-readable files
+4. Code
+5. Generated outputs
+
+Code may not alter a higher-authority object to make a test or candidate pass.
+
+---
+
+## What PicoGK is for
+
+PicoGK owns **physical geometry** — package bodies, enclosures, launches,
+cavities, thermal and shielding structures. It generates the geometry on which
+the physics is evaluated.
+
+It is not an EM solver, not a Hamiltonian solver, and not a QEC simulator.
+Thin-film mask/GDS work belongs in `geometry/chip_planar/` (gdsfactory);
+Hamiltonians and QEC belong in `models/`.
+
+---
+
+## Results and provenance
+
+Results are **append-only** (spec §11.3). A completed candidate result is never
+silently overwritten; a completed batch cannot be reopened.
+
+Every decision-relevant artifact is SHA-256 hashed into a per-batch
+`manifest.sha256` with deterministic ordering, and `cem report` re-verifies the
+tree against it. Each batch records its environment: OS, architecture, Python
+and uv versions, dependency lock hash, .NET/PicoGK/ShapeKernel versions, git
+commit, solver identity, RNG seed and UTC times.
+
+---
+
+## Environment
+
+| Component | Requirement |
+|---|---|
+| Python | 3.11+ with `uv` |
+| Pydantic | v2 |
+| .NET | 9 |
+| PicoGK | **2.3.0, pinned exactly** |
+| ShapeKernel | revision recorded in `geometry/package_picogk/driver.py` |
+
+`gdsfactory` is an optional extra (`uv sync --extra planar`) so that default CI
+stays light. Default CI requires **no** Palace, openEMS, HFSS, Sonnet, COMSOL
+or physical hardware (spec §12.8).
+
+If the .NET SDK is absent, geometry generation reports itself unavailable and
+the pipeline continues, recording plainly that no geometry was produced. It
+never fabricates an STL.
+
+---
+
+## Explicit non-goals for v0.1
+
+The 17-qubit tile; Bayesian, Pareto, genetic or AI-driven optimisation; full
+processor-performance or fault-tolerance claims; replacing hardware
+measurements with simulations; promoting simulation output to measured
+evidence; full P4, P6-E or P7 closure; microscopic Josephson-junction geometry
+in PicoGK; a complete fabrication process flow.
+
+Deterministic sweeps come first. Optimisation is deferred until the sweep
+methodology is trusted (spec §9 of the parent plan, spec §15 here).

@@ -1,0 +1,26 @@
+{
+  "schema": "qmhp-cem.provenance/0.1.0",
+  "qmhp_master_revision": "v1.5.8f",
+  "qmhp_master_status": "ADOPTED MASTER — FROZEN RELEASE",
+  "qmhp_master_date": "2026-08-24",
+  "qmhp_master_pdf_sha256": "c59c518b3956b752abe78437bfcd7d00b30c439da6fc95a7aba176156237499e",
+  "operative_base_v158e_sha256": "83aeb3a2d8ebcb8f627989557350d9c172ad5bc20c3edc561b8a5e091cc4b658",
+
+  "_note_master_pdf": "qmhp_master_pdf_sha256 is the SHA-256 of the frozen v1.5.8f Master PDF used to prepare QMHP-CEM_v0.1_Spec.md, carried verbatim from spec section 2.4. The PDF itself is not vendored in this repository. If the project later adopts a different rendered byte sequence as the canonical frozen Master, update this digest ONLY after explicitly verifying and recording the replacement. Do not silently substitute it.",
+
+  "cem_spec_version": "0.1.0",
+  "cem_spec_file": "QMHP-CEM_v0.1_Spec.md",
+  "cem_spec_sha256": "dd1386a44d99efbc90864dfa9c1015d5fb19a7ff37484722bc37dd3cbfd3267a",
+
+  "master_files": {
+    "qmhp_v158f_requirements.yaml": "262ec91a7de9121d32218fa893928aea68535e44321baf489df219e2679e61b2",
+    "validation_gates.yaml": "9827b49d009c50d85f8e3a713bf1b2b2f29141d85949c8f1fd2fa4a35b40fe69"
+  },
+  "_note_master_files": "Digests of the sibling machine-readable master files, excluding this file. Regenerate with: uv run python scripts/refresh_provenance.py",
+
+  "evidence_boundary": {
+    "measured_evidence_objects_present": false,
+    "hardware_gates_closable": false,
+    "statement": "QMHP-CEM v0.1 does not manufacture MEASURED values. No simulated or model-derived result may cause a hardware-gated gate to emit PASS."
+  }
+}

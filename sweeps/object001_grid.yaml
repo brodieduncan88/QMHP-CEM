@@ -1,0 +1,28 @@
+# Canonical v0.1 Object 001 integration sweep — spec §8.2/§8.3.
+#
+# This is NOT an optimisation study. It exists to prove that the complete
+# geometry -> solver -> physics -> gate loop runs unattended (spec §8.1).
+#
+# Exactly two ENGINEERING-SEED parameters vary; all other Object 001 seed
+# parameters remain at their §7.5 values. 3 x 3 = 9 candidates.
+#
+# Ordering is deterministic: cavity height is the outer loop (ascending),
+# bore diameter the inner loop (ascending), producing
+# QMHP-CEM-A-RF-000001 .. QMHP-CEM-A-RF-000009.
+
+schema: qmhp-cem.sweep/0.1.0
+name: object001_grid
+object_type: object001_single_device_package
+solver: mock
+base_candidate: config/object001_seed.yaml
+
+grid:
+  vacuum_cavity.height_above_chip_mm: [1.25, 1.50, 1.75]
+  launches.bore_diameter_mm: [2.25, 2.50, 2.75]
+
+ordering:
+  - vacuum_cavity.height_above_chip_mm
+  - launches.bore_diameter_mm
+
+# Recorded in every batch/candidate manifest (spec §5.4).
+rng_seed: 20260824

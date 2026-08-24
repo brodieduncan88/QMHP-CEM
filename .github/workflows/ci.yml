@@ -1,0 +1,52 @@
+# Default CI (spec §12.8).
+#
+# Must NOT require Palace, openEMS, HFSS, Sonnet, COMSOL or physical hardware.
+# The mock solver alone carries the pipeline check.
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  python:
+    name: python (uv run pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync locked environment
+        run: uv sync --locked --all-extras --dev
+
+      - name: Verify frozen master provenance
+        run: uv run cem verify-master
+
+      - name: Run tests
+        run: uv run pytest -q
+
+      - name: Acceptance — 3x3 Object 001 mock sweep
+        run: uv run cem sweep sweeps/object001_grid.yaml --solver mock
+
+  dotnet:
+    name: dotnet (PicoGK geometry)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      # Verifies the pinned PicoGK environment (spec §12.8).
+      - name: Restore
+        run: dotnet restore geometry/package_picogk/QmhpCem.Geometry.csproj
+
+      - name: Build
+        run: dotnet build geometry/package_picogk/QmhpCem.Geometry.csproj -c Release --no-restore
