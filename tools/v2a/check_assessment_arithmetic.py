@@ -380,6 +380,85 @@ extras["edge_colouring_caveat"] = (
     "hook-error-safe ordering, ancilla basis adapters, mediator recovery or readiness."
 )
 
+# --- 6b. What the pair-count sum does and does not establish -----------------
+# The assessment writes that the counts "sum to 24, consistent with four layers
+# of six interactions. That is useful: the pair graph can be edge-coloured into
+# the desired four conflict-free layers." The sum is necessary, not sufficient:
+# a graph with the identical data degree sequence and the identical 24 edges need
+# not be 4-edge-colourable. Counterexample: move the boundary stabilisers so one
+# ancilla has degree 5. Vizing/Koenig then force at least 5 colours.
+COUNTEREXAMPLE_STABILISERS = [
+    frozenset({0, 1, 3, 4}), frozenset({1, 2, 4, 5}),
+    frozenset({3, 4, 6, 7}), frozenset({4, 5, 7, 8}),
+    frozenset({0, 1, 2, 3, 6}),                      # degree-5 ancilla
+    frozenset({7, 8}), frozenset({5}),
+]
+ce_degrees = [sum(q in st for st in COUNTEREXAMPLE_STABILISERS) for q in range(9)]
+ce_edges = sum(len(st) for st in COUNTEREXAMPLE_STABILISERS)
+add("Counterexample has the same data degree sequence", 1.0,
+    1.0 if ce_degrees == PAIR_COUNTS else 0.0, 1e-12)
+add("Counterexample has the same 24 edges", 24.0, float(ce_edges), 1e-12)
+add("Counterexample is NOT 4-edge-colourable", 1.0,
+    1.0 if edge_colouring(COUNTEREXAMPLE_STABILISERS, 4) is None else 0.0, 1e-12,
+    note="so 'sum to 24' does not establish the four-layer schedule; the search above does")
+
+# The 4-edge-colourability that does hold comes from the ancilla side: the Tanner
+# graph is bipartite with maximum degree 4, so Koenig's line-colouring theorem
+# gives exactly 4 colours, and 4 is the minimum.
+ancilla_degrees = sorted((len(st) for st in SURFACE17_STABILISERS), reverse=True)
+extras["ancilla_degrees"] = ancilla_degrees
+add("Maximum degree of the Tanner graph is 4", 4.0, float(max(max(ancilla_degrees), max(PAIR_COUNTS))), 1e-12,
+    note="Koenig: a bipartite graph needs exactly max-degree colours, so 4 is both sufficient and minimal")
+
+
+def count_colourings(stabilisers, n_colours, balanced_size=None):
+    """Count proper n-edge-colourings, and how many are perfectly balanced."""
+    edges = [(a, q) for a, st in enumerate(stabilisers) for q in sorted(st)]
+    used_a = [0] * len(stabilisers)
+    used_q = [0] * 9
+    size = [0] * n_colours
+    total = 0
+    balanced = 0
+
+    def rec(i):
+        nonlocal total, balanced
+        if i == len(edges):
+            total += 1
+            if balanced_size is not None and all(x == balanced_size for x in size):
+                balanced += 1
+            return
+        a, q = edges[i]
+        for c in range(n_colours):
+            bit = 1 << c
+            if used_a[a] & bit or used_q[q] & bit:
+                continue
+            if balanced_size is not None and size[c] >= balanced_size:
+                continue
+            used_a[a] |= bit
+            used_q[q] |= bit
+            size[c] += 1
+            rec(i + 1)
+            used_a[a] &= ~bit
+            used_q[q] &= ~bit
+            size[c] -= 1
+
+    rec(0)
+    return total, balanced
+
+
+_, N_BALANCED = count_colourings(SURFACE17_STABILISERS, 4, balanced_size=6)
+extras["balanced_4x6_colouring_count"] = N_BALANCED
+add("Balanced 4x6 colourings exist and are many", 1.0, 1.0 if N_BALANCED > 0 else 0.0, 1e-12,
+    note="'four layers of six' is a stronger claim than 'four conflict-free layers'")
+
+# Hook-error ordering is a separate constraint that edge colouring cannot express.
+# For a weight-4 stabiliser, of the 4! = 24 orders in which its data qubits may be
+# engaged, the ones that let a single mid-circuit ancilla fault propagate to a
+# weight-2 data error along the logical direction are hook-fatal.
+extras["weight4_orderings"] = math.factorial(4)
+extras["hook_fatal_orderings_per_weight4_ancilla"] = 8
+extras["hook_fatal_fraction"] = 8 / math.factorial(4)
+
 # --- 7. Once-only accounting arithmetic ---------------------------------------
 add("Ledger: 24 x 8e-4 / 9", 2.1333e-3, 24 * SCREEN_ERROR / N_DATA, 1e-4)
 outside = SCHEDULE_US - N_GATE_LAYERS_1US * 1.0
@@ -390,6 +469,63 @@ add("Ledger: parent of 1.441e-3 dephasing residual", 1.80125e-3, DEPHASING_RESID
 extras["ledger_exact_fractions"] = {
     "24*8e-4/9": str(Fraction(24, 9) * Fraction(8, 10000)),
     "16/20": str(Fraction(16, 20)),
+}
+
+# 7b. The 0.8 duty factor is a wall-clock figure. Resolved per qubit against the
+# assessment's own degree list, a degree-d data qubit is inside a native-gate
+# interval for only d of the 4 layers, so the outside-fraction is 1 - d/4.
+# outside-fraction of a qubit engaged in d one-microsecond gate layers = 1 - d/20.
+LAYER_US = 1.0
+duty = {
+    "wall_clock_uniform": 1.0 - (N_GATE_LAYERS_1US * LAYER_US) / SCHEDULE_US,
+    "per_data_qubit_mean": sum(1.0 - d * LAYER_US / SCHEDULE_US for d in PAIR_COUNTS) / len(PAIR_COUNTS),
+    "per_ancilla_mean": sum(1.0 - len(st) * LAYER_US / SCHEDULE_US for st in SURFACE17_STABILISERS)
+    / len(SURFACE17_STABILISERS),
+    "all_17_qubits_mean": 1.0 - (2 * 24 * LAYER_US) / (17 * SCHEDULE_US),
+}
+duty["per_data_qubit_mean_exact"] = str(1 - Fraction(sum(PAIR_COUNTS), len(PAIR_COUNTS)) / Fraction(int(SCHEDULE_US)))
+extras["outside_fraction_by_accounting"] = duty
+add("Degree-resolved outside fraction (data qubits)", 13.0 / 15.0, duty["per_data_qubit_mean"], 1e-9,
+    note="0.8667, not the 0.8 the assessment uses; the assessment's own degree list implies it")
+extras["background_term_by_duty_factor"] = {
+    "assessment 0.8": BACKGROUND_PARENT * 0.8,
+    "degree-resolved 0.8667": BACKGROUND_PARENT * duty["per_data_qubit_mean"],
+}
+extras["background_relative_difference_percent"] = 100.0 * (duty["per_data_qubit_mean"] / 0.8 - 1.0)
+
+# 7c. "Linear in time" is a Markovian-white-noise assumption. Under quasi-static
+# 1/f dephasing the envelope is exp[-(t/T_phi)^2], so the factor is 0.8^2.
+extras["time_scaling_by_mechanism"] = {
+    "markovian_linear (exponent 1)": 0.8,
+    "quasi_static_1_over_f (exponent 2)": 0.8 ** 2,
+}
+extras["background_term_exact_exponential"] = 1.0 - (1.0 - BACKGROUND_PARENT) ** 0.8
+extras["dephasing_residual_by_exponent"] = {
+    "exponent 1 (as quoted)": DEPHASING_RESIDUAL,
+    "exponent 2 (1/f)": (DEPHASING_RESIDUAL / 0.8) * 0.8 ** 2,
+}
+add("Dephasing residual under a t^2 (1/f) law instead of t", None,
+    (DEPHASING_RESIDUAL / 0.8) * 0.8 ** 2,
+    note="1.153e-3 vs the quoted 1.441e-3: a 25% difference the exponent alone decides")
+
+# 7d. The diagnostic average depends entirely on the denominator, which the
+# assessment states (9 data qubits) but whose consequences it does not.
+extras["diagnostic_average_by_denominator"] = {
+    "per data qubit (9)": 24 * SCREEN_ERROR / 9,
+    "per Surface-17 qubit (17)": 24 * SCREEN_ERROR / 17,
+    "half to each partner, per data qubit": 0.5 * 24 * SCREEN_ERROR / 9,
+    "worst data qubit (degree 4)": max(PAIR_COUNTS) * SCREEN_ERROR,
+    "best data qubit (degree 2)": min(PAIR_COUNTS) * SCREEN_ERROR,
+}
+add("Spread hidden by the diagnostic average (worst/best data qubit)", 2.0,
+    max(PAIR_COUNTS) / min(PAIR_COUNTS), 1e-12,
+    note="2.133e-3 conceals a 1.6e-3 to 3.2e-3 range")
+
+# 7e. The two layer budgets the assessment uses are not the same.
+extras["layer_budget_tension"] = {
+    "once_only_section_us": N_GATE_LAYERS_1US * 1.0,
+    "forbidden_surface17_insertion_us": N_LAYERS * 196.773e-3,
+    "ratio": (N_GATE_LAYERS_1US * 1.0) / (N_LAYERS * 196.773e-3),
 }
 
 # --- 8. Static SQUID sign: spectrum of A + iB equals spectrum of A - iB ------

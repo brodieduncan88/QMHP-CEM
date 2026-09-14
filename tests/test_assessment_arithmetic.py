@@ -157,6 +157,56 @@ class TestSchedule(unittest.TestCase):
         self.assertIsNone(m.edge_colouring(m.SURFACE17_STABILISERS, 3))
 
 
+class TestScheduleInference(unittest.TestCase):
+    """The sum of pair counts is necessary, not sufficient, for four layers."""
+
+    def test_counterexample_shares_degrees_and_edge_count_but_needs_five_colours(self):
+        self.assertEqual(m.ce_degrees, m.PAIR_COUNTS)
+        self.assertEqual(m.ce_edges, 24)
+        self.assertIsNone(m.edge_colouring(m.COUNTEREXAMPLE_STABILISERS, 4))
+        self.assertIsNotNone(m.edge_colouring(m.COUNTEREXAMPLE_STABILISERS, 5))
+
+    def test_surface17_four_colourability_comes_from_max_degree_four(self):
+        self.assertEqual(max(m.extras["ancilla_degrees"]), 4)
+        self.assertEqual(m.extras["ancilla_degrees"], [4, 4, 4, 4, 2, 2, 2, 2])
+
+    def test_balanced_colouring_count(self):
+        self.assertEqual(m.extras["balanced_4x6_colouring_count"], 481776)
+
+    def test_hook_fatal_fraction(self):
+        self.assertAlmostEqual(m.extras["hook_fatal_fraction"], 1.0 / 3.0)
+
+
+class TestLedgerVariants(unittest.TestCase):
+    def test_degree_resolved_duty_factor_is_13_over_15(self):
+        d = m.extras["outside_fraction_by_accounting"]
+        self.assertAlmostEqual(d["per_data_qubit_mean"], 13.0 / 15.0)
+        self.assertEqual(d["per_data_qubit_mean_exact"], "13/15")
+        self.assertAlmostEqual(d["per_ancilla_mean"], 0.85)
+        self.assertAlmostEqual(d["all_17_qubits_mean"], 1.0 - 48.0 / 340.0)
+
+    def test_uniform_0p8_is_the_lowest_of_every_accounting(self):
+        d = m.extras["outside_fraction_by_accounting"]
+        self.assertEqual(min(d[k] for k in d if k != "per_data_qubit_mean_exact"), d["wall_clock_uniform"])
+
+    def test_background_term_shifts_by_8_percent(self):
+        self.assertAlmostEqual(m.extras["background_relative_difference_percent"], 100.0 / 12.0)
+
+    def test_one_over_f_exponent_changes_dephasing_residual_by_a_quarter(self):
+        r = m.extras["dephasing_residual_by_exponent"]
+        self.assertAlmostEqual(r["exponent 2 (1/f)"] / r["exponent 1 (as quoted)"], 0.8)
+
+    def test_diagnostic_average_denominators(self):
+        d = m.extras["diagnostic_average_by_denominator"]
+        self.assertAlmostEqual(d["per data qubit (9)"], 2.1333e-3, places=6)
+        self.assertAlmostEqual(d["per Surface-17 qubit (17)"], 24 * 8e-4 / 17)
+        self.assertAlmostEqual(d["worst data qubit (degree 4)"] / d["best data qubit (degree 2)"], 2.0)
+
+    def test_layer_budget_tension(self):
+        t = m.extras["layer_budget_tension"]
+        self.assertAlmostEqual(t["ratio"], 4.0 / (4 * 0.196773))
+
+
 class TestLedger(unittest.TestCase):
     def test_diagnostic_average(self):
         self.assertAlmostEqual(24 * 8e-4 / 9, 2.1333e-3, places=6)

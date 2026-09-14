@@ -22,7 +22,7 @@ capacitance matrix, the diagonalisation, the sweep outputs, the ledger inputs) a
 | Background parent term | 1.700×10⁻³ | 1.360×10⁻³ |
 | Dephasing residual | 1.441×10⁻³ (parent ≈ 1.80125×10⁻³) | ledger check |
 | Direct unlocated 2→0 bypass limit | 5 s⁻¹ | separate physical requirement |
-| Mediator lifetime stress sweep | 1.2 µs to 1 ms | loss stress domain |
+| Mediator lifetime stress sweep | 1.2 µs to 1 ms — the 1.2 µs low end is attributed to the Singh experiment as "traceable"; **no retrievable text confirms it** (see `references.md`) | loss stress domain |
 | Temperature stress sweep | 15 / 20 / 30 mK | thermal occupation |
 | Initial mediator population stress values | 0, 10⁻³, 10⁻² | non-equilibrium interpretation |
 | Crosstalk stress points | −80 / −60 / −50 / −40 dB, four quadrature phases | registration R2 |

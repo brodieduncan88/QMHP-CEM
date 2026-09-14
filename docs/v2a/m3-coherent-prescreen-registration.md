@@ -93,6 +93,21 @@ The assessment freezes the drive convention but not `ζ`. The M1 arithmetic
 code instead reports the coefficient `J` in `H/h = (J/2) Z⊗Z`, the same 62.1 kHz
 gives `T_π = 4.03 µs`, not 8.05 µs. Any revived M1 work must bind `ζ` explicitly.
 
+### R1c. SQUID junction-phase sign and flux allocation  (`BIND`)
+
+The audit's static test — reversing the imaginary hopping sign leaves the
+spectrum unchanged — has probability one of passing for any Hermitian matrix,
+because the reversed matrix is the complex conjugate and shares the characteristic
+polynomial. It therefore does not establish that the sign convention is right,
+and at fixed `f_C` with a real drive the two sign choices give transposed
+propagators. Bind explicitly:
+
+| Field | Value |
+|---|---|
+| R1c.1 Sign convention of the imaginary hopping / junction phase in the coded `H` | `BIND` |
+| R1c.2 Flux allocation across the SQUID junctions | `BIND` — the irrotational split (0.5/0.5 for a symmetric SQUID, per You–Sauls–Koch) or another declared allocation |
+| R1c.3 Statement that `f_C` is held constant for the entire propagation | `BIND` — this is what makes the `dΦ/dt` connection term vanish identically for this run |
+
 ## R2. Crosstalk convention  (`BIND` before execution)
 
 | Field | Value |
@@ -184,8 +199,13 @@ propagation used to claim a P4 result; any AMD-E observability calculation.
 ## R7. Admissible outcomes
 
 - **M3 retained** — at least one duration gives a numerically converged
-  conditional cycle with mediator return and a clearly usable coherent-error
-  window inside the registered domain.
+  conditional cycle with mediator return and coherent error inside a window
+  whose bound is **written here before the run** (`BIND`: the maximum
+  worst-input terminal loss and the maximum unwanted-sector disturbance that
+  count as "usable"). The assessment forbids choosing a coherent-error cutoff
+  after seeing the curves and then, in its summary, makes "a clearly usable
+  window" the criterion; the only way to honour the first is to bind the second
+  now.
 - **M3 redesign** — the registered one-tone mechanism cannot simultaneously
   obtain the required conditional phase, return the mediator, and keep unwanted
   logical/sink/higher-state disturbance acceptably small anywhere inside the
