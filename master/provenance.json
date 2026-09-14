@@ -1,0 +1,61 @@
+{
+  "schema": "qmhp-cem.provenance/0.1.0",
+  "qmhp_master_revision": "v1.5.8f",
+  "qmhp_master_status": "ADOPTED MASTER — FROZEN RELEASE",
+  "qmhp_master_date": "2026-08-24",
+  "qmhp_master_pdf_sha256": "c59c518b3956b752abe78437bfcd7d00b30c439da6fc95a7aba176156237499e",
+  "operative_base_v158e_sha256": "83aeb3a2d8ebcb8f627989557350d9c172ad5bc20c3edc561b8a5e091cc4b658",
+  "_note_master_pdf": "qmhp_master_pdf_sha256 is the SHA-256 of the frozen v1.5.8f Master PDF used to prepare QMHP-CEM_v0.1_Spec.md, carried verbatim from spec section 2.4. The PDF itself is not vendored in this repository. If the project later adopts a different rendered byte sequence as the canonical frozen Master, update this digest ONLY after explicitly verifying and recording the replacement. Do not silently substitute it.",
+  "master_pdf_verification": {
+    "status": "UNRESOLVED",
+    "statement": "qmhp_master_pdf_sha256 above matches NEITHER PDF shipped in the vendored v1.5.8f release bundle. It has not been verified against any artifact available to this repository. Per spec §2.4 it is carried verbatim and NOT substituted. Resolving which rendered byte sequence is canonical is a human decision.",
+    "recorded_digest": "c59c518b3956b752abe78437bfcd7d00b30c439da6fc95a7aba176156237499e",
+    "observed_bundle_pdfs": {
+      "QMHP-CoPro_v1_5_8f_Full_Edition.pdf": "1527953cffae03bf6aa44e7d4698c08e30585baf4b357d5e21d477defcc146d2",
+      "QMHP-CoPro_v1_5_8f_Master_Final.pdf": "7a01e25b5814420011b54b096619baef63441387ad0a3185f894693a71bd9445"
+    }
+  },
+  "operative_base_verification": {
+    "status": "DIGEST CONFIRMED, LABEL DISPUTED",
+    "statement": "operative_base_v158e_sha256 above is confirmed by the AMD-C manifest, but the manifest labels that digest 'base_v1_5_8e_109pp_provenance.pdf' — the PROVENANCE base — while the 117pp OPERATIVE base carries a different digest. The spec field name and the manifest label disagree. Field left unchanged pending a human decision.",
+    "spec_field_name": "operative_base_v158e_sha256",
+    "amdc_manifest_labels": {
+      "base_v1_5_8e_109pp_provenance.pdf": "83aeb3a2d8ebcb8f627989557350d9c172ad5bc20c3edc561b8a5e091cc4b658",
+      "base_v1_5_8e_117pp_operative.pdf": "d334cda822c07c212be1fac850a34debef5ea66ee45899e56b44e19154f86c6c"
+    }
+  },
+  "cem_spec_version": "0.1.0",
+  "cem_spec_file": "QMHP-CEM_v0.1_Spec.md",
+  "cem_spec_sha256": "dd1386a44d99efbc90864dfa9c1015d5fb19a7ff37484722bc37dd3cbfd3267a",
+  "master_files": {
+    "qmhp_v158f_requirements.yaml": "b4f92c4cd05b77258706577909f6d1bb17073468bd6cfbc8126ce37942a7adde",
+    "validation_gates.yaml": "9827b49d009c50d85f8e3a713bf1b2b2f29141d85949c8f1fd2fa4a35b40fe69"
+  },
+  "_note_master_files": "Digests of the sibling machine-readable master files, excluding this file. Regenerate with: uv run python scripts/refresh_provenance.py",
+  "evidence_boundary": {
+    "measured_evidence_objects_present": false,
+    "hardware_gates_closable": false,
+    "statement": "QMHP-CEM v0.1 does not manufacture MEASURED values. No simulated or model-derived result may cause a hardware-gated gate to emit PASS."
+  },
+  "reference_bundle": {
+    "path": "reference/v1_5_8f_release_bundle",
+    "integrity_manifest": "qmhp_v158f_amdc_manifest.json",
+    "entries_listed": 29,
+    "entries_verified": 27,
+    "entries_mismatched": 0,
+    "entries_listed_but_not_shipped": [
+      "base_v1_5_8e_117pp_operative.pdf",
+      "base_v1_5_8e_109pp_provenance.pdf"
+    ],
+    "declared_runtime": {
+      "python": "3.12.3",
+      "numpy": "2.4.4",
+      "scipy": "1.17.1",
+      "stim": "1.16.0",
+      "PyMatching": "2.4.0",
+      "matplotlib": "3.10.8"
+    },
+    "physics_authority": "qmhp_v158f_readout_replication.py",
+    "verify_with": "uv run python scripts/verify_reference_bundle.py"
+  }
+}

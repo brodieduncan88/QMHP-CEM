@@ -1,0 +1,47 @@
+# Object 001 seed candidate — spec §7.5.
+#
+# CLASSIFICATION: ENGINEERING-SEED.
+#
+# Every dimension below is a QMHP-CEM bootstrap engineering assumption
+# introduced because the frozen v1.5.8f Master does not define it. These are
+# NOT validated QMHP hardware dimensions, and must never be described as
+# experimentally validated or as frozen QMHP requirements (spec §2.2).
+
+schema: qmhp-cem.candidate/0.1.0
+candidate_id: QMHP-CEM-A-RF-000001
+object_type: object001_single_device_package
+master_revision: v1.5.8f
+classification: ENGINEERING-SEED
+created_utc: 2026-08-24T00:00:00Z
+parent_candidate_id: null
+
+parameters:
+  chip:
+    width_mm: 20.0
+    height_mm: 20.0
+    thickness_mm: 0.43
+
+  package:
+    outer_width_mm: 32.0
+    outer_height_mm: 32.0
+    body_height_mm: 5.0
+    floor_thickness_mm: 1.0
+
+  chip_recess:
+    xy_clearance_mm: 0.20
+    depth_mm: 0.45
+
+  vacuum_cavity:
+    width_mm: 22.0
+    height_mm: 22.0
+    height_above_chip_mm: 1.50
+
+  lid:
+    thickness_mm: 2.0
+
+  launches:
+    bore_diameter_mm: 2.50
+    count: 2
+
+  mounting:
+    hole_count: 4

@@ -1,0 +1,53 @@
+[project]
+name = "qmhp-cem"
+version = "0.1.0"
+description = "QMHP Computational Engineering Model — v0.1 engineering pipeline for the QMHP-CoPro research programme"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+
+# Spec §13.1. Exact resolved versions are pinned in uv.lock.
+dependencies = [
+    "pydantic>=2.7,<3",
+    "pyyaml>=6.0",
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "scikit-rf>=0.29",
+]
+
+[project.optional-dependencies]
+# gdsfactory pulls a large planar-EDA stack; it is required by spec §7.1 but
+# kept optional so that default CI (spec §12.8) stays light. Geometry tests
+# skip cleanly when it is absent.
+planar = ["gdsfactory>=8.0"]
+
+[project.scripts]
+cem = "orchestrator.cem:main"
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# Spec §9 requires these as distinct top-level layers. Do not collapse them.
+packages = [
+    "contracts",
+    "models",
+    "evaluator",
+    "geometry",
+    "solvers",
+    "orchestrator",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: slower physics solves (high-truncation ladder, large ensembles)",
+    "planar: requires gdsfactory (optional extra)",
+    "dotnet: requires the .NET 9 SDK and PicoGK",
+    "palace: requires the Palace solver container",
+    "openems: requires the openEMS solver container",
+]

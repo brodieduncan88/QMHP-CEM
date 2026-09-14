@@ -1,0 +1,97 @@
+{
+ "validation_gates": {
+  "branch_A_ledger_total": "8.500000e-3 exact",
+  "stabiliser_invariants": "d=3/5/7 PASS"
+ },
+ "bit_exact_reproduction": {
+  "A_ref_Pauli_d3": [
+   25000,
+   2380
+  ],
+  "A_m_twirlAD_d3": [
+   25000,
+   1950
+  ],
+  "A_m_free_d3": [
+   25000,
+   909
+  ],
+  "C_m_full_ts_d3": [
+   25000,
+   1414
+  ],
+  "A_m_twirlAD_d5": [
+   20000,
+   364
+  ],
+  "note": "29/39 grid rows bit-exact at declared seeds; 10 C-sensitivity rows within printed Wilson bands (RNG draw-order under-determined by listing)"
+ },
+ "headline_ratios": {
+  "matched_HR_d357": [
+   0.9415,
+   0.9225,
+   1.1502
+  ],
+  "free_bracket_HR_d357": [
+   0.4294,
+   0.1994,
+   0.1547
+  ],
+  "f_star": [
+   0.524,
+   0.598
+  ]
+ },
+ "t12_breakevens_scaled_tchk2us": {
+  "d3_f0.90": [
+   0.01125,
+   0.01034,
+   0.01228
+  ],
+  "d3_f1.00": [
+   0.01258,
+   0.01154,
+   0.0138
+  ],
+  "d5_f0.90": [
+   0.01121,
+   0.00981,
+   0.01265
+  ],
+  "d5_f1.00": [
+   0.01179,
+   0.01034,
+   0.01328
+  ],
+  "d3_f0.60": [
+   0.008536,
+   0.007558,
+   0.009441
+  ]
+ },
+ "ledger_ceiling": {
+  "Pu_headroom": 0.0015,
+  "after_An_like_sink_conversion": 0.00033,
+  "registered_P6E6_bar": 0.001
+ },
+ "t13": {
+  "R7_over_R3": [
+   1.223,
+   1.025,
+   1.465
+  ],
+  "P_R7R3_gt_1": 0.987,
+  "R5_over_R3": [
+   0.981,
+   0.826,
+   1.166
+  ],
+  "R7_over_R5": [
+   1.247,
+   0.993,
+   1.568
+  ],
+  "P_R7R5_gt_1": 0.972,
+  "status": "RECOMPUTATION-FROM-RUN-RECORD / EXPLORATORY, seed 13"
+ }
+}

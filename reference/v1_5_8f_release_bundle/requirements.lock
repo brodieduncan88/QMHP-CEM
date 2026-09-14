@@ -1,0 +1,6 @@
+matplotlib==3.10.8
+numpy==2.4.4
+PyMatching==2.4.0
+scipy==1.17.1
+stim==1.16.0
+# Runtime: Python 3.12.3
