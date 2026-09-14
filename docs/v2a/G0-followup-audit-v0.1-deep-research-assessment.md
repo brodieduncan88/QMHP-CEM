@@ -8,6 +8,7 @@
 | Citation keys | `[Key]` markers resolve in [`references.md`](references.md), which records for each cited work whether its identity and the attributed claim were confirmed |
 | Arithmetic | every stated number is reproduced by [`tools/v2a/check_assessment_arithmetic.py`](../../tools/v2a/check_assessment_arithmetic.py); inputs taken on report are listed in [`reported-not-reproduced.md`](reported-not-reproduced.md) |
 | Registration | the three items to freeze before M3 are given executable form in [`m3-coherent-prescreen-registration.md`](m3-coherent-prescreen-registration.md) |
+| Verification | [`verification.md`](verification.md) records what was independently reproduced, what it adds, and what is not verified. The text below is kept as received. |
 
 ## Executive disposition
 
