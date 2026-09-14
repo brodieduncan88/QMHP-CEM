@@ -361,8 +361,8 @@ def run_sweep(
             "environment": environment.record(
                 started_utc=started,
                 solver_name=name,
-                solver_version=adapter.version,
-                solver_identity=f"{adapter.name}@{adapter.version}",
+                solver_version=solver_version(adapter),
+                solver_identity=solver_identity(adapter),
                 ended_utc=datetime.now(timezone.utc),
             ).model_dump(mode="json"),
             "rng_seed": sweep.rng_seed,
@@ -404,6 +404,25 @@ def _terminal_state(status: GateStatus) -> CandidateState:
         GateStatus.HARDWARE_GATED: CandidateState.HARDWARE_GATED,
     }
     return direct.get(status, CandidateState.INCOMPLETE)
+
+
+def solver_version(adapter: SolverAdapter) -> str:
+    """The version of the solver that produced the numbers (spec §13.3).
+
+    For a container-backed adapter that is the solver's own version as read
+    from the image, not the adapter's; the adapter version is recorded in
+    every SolverResults regardless.
+    """
+    provenance = adapter.provenance() if hasattr(adapter, "provenance") else {}
+    return str(provenance.get("palace_version") or provenance.get("solver_version") or adapter.version)
+
+
+def solver_identity(adapter: SolverAdapter) -> str:
+    """Solver/container identity for the batch manifest (spec §13.3)."""
+    provenance = adapter.provenance() if hasattr(adapter, "provenance") else {}
+    if provenance.get("image_id"):
+        return f"{provenance.get('image', adapter.name)}@{provenance['image_id']}"
+    return f"{adapter.name}@{adapter.version}"
 
 
 def _count(outcomes: list[CandidateOutcome]) -> dict[GateStatus, int]:

@@ -1,0 +1,20 @@
+_____________     _______
+_____   __   \____ __   /____ ____________
+____   /_/  /  __ ` /  /  __ ` /  ___/ _ \
+___   _____/  /_/  /  /  /_/  /  /__/  __/
+  /__/     \___,__/__/\___,__/\____/\____/
+
+Palace v0.13.0
+Git changeset ID: 0123456789abcdef0123456789abcdef01234567
+Running with 1 MPI process
+Device configuration: cpu
+Memory configuration: host-std
+libCEED backend: /cpu/self/xsmm/blocked
+
+Reading mesh from file "mesh.msh"...
+Assembling system matrices, number of global unknowns: 12345
+Configuring SLEPc eigenvalue solver...
+ Found 4 converged eigenvalues
+Writing postprocessing results to "postpro"...
+Elapsed Time Report (s)
+  Total 4.20

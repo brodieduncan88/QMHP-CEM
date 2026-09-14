@@ -259,10 +259,24 @@ def test_unknown_solver_is_rejected():
         get_adapter("hfss")
 
 
-@pytest.mark.parametrize("name", ["palace", "openems"])
-def test_container_solvers_declare_themselves_unavailable(name):
+def test_openems_declares_itself_unavailable():
     with pytest.raises(SolverUnavailable):
-        get_adapter(name).preflight()
+        get_adapter("openems").preflight()
+
+
+def test_palace_preflight_raises_or_finds_a_real_image():
+    """v0.2: Palace runs where its container exists and fails clearly elsewhere.
+
+    Either outcome is correct; what is never correct is a silent substitute.
+    """
+    adapter = get_adapter("palace")
+    try:
+        adapter.preflight()
+    except SolverUnavailable as exc:
+        assert "will not silently substitute" in str(exc)
+    else:
+        identity = adapter.provenance()
+        assert identity.get("image_id", "").startswith("sha256:")
 
 
 def test_batch_report_records_synthetic_provenance(object001_sweep, results_root):

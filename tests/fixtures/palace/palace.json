@@ -1,0 +1,5 @@
+{
+  "GitTag": "v0.13.0",
+  "Problem": {"Type": "Eigenmode", "MPISize": 1, "OpenMPThreads": 1, "Device": "cpu"},
+  "ElapsedTime": {"Total (s)": 4.2}
+}
