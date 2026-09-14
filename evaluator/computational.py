@@ -214,14 +214,41 @@ class ToleranceGate(Gate):
 
         rate = quantum.tolerance["rejection_rate"]
         low, high = quantum.tolerance["confidence_interval"]
+
+        # models.tolerance returns rejection_rate None when nothing could be
+        # screened. No rate exists, so there is nothing to report and formatting
+        # it raises. NOT-EVALUATED is the honest status and is allowed here.
+        if rate is None:
+            return self._not_evaluated(
+                f"no device in the ensemble could be screened "
+                f"({quantum.tolerance.get('unscreened_count', 'all')} of "
+                f"{quantum.tolerance['sample_count']} draws unscreened), so no "
+                f"rejection rate was established (spec §6.5)."
+            )
+
+        # The rate is rejected/screened, so the denominator is the screened
+        # count, not the draw count. They differ whenever a draw is unscreened,
+        # and quoting the wrong one understates the rate's true basis.
+        screened = quantum.tolerance.get("screened_count")
+        unscreened = quantum.tolerance.get("unscreened_count") or 0
+        basis = (
+            f"{screened} screened of {quantum.tolerance['sample_count']} draws"
+            if screened is not None
+            else f"{quantum.tolerance['sample_count']} draws"
+        )
+        if unscreened:
+            basis += f" ({unscreened} unscreened)"
+
         return self._result(
             GateStatus.PASS,
             reason=(
-                f"ensemble rejection rate {rate:.4f} over "
-                f"{quantum.tolerance['sample_count']} draws "
+                f"ensemble rejection rate {rate:.4f} over {basis} "
                 f"(seed {quantum.tolerance['seed']}), 95% interval "
                 f"[{low:.4f}, {high:.4f}]. The finite-sample rate is not the "
-                f"underlying model probability (spec §6.5)."
+                f"underlying model probability (spec §6.5). TOLERANCE is SOFT "
+                f"and the frozen master sets no rejection-rate threshold, so "
+                f"this PASS records that the ensemble was evaluated and "
+                f"reported; it does not assert the rate meets a requirement."
             ),
             evidence_class=quantum.classification,
             measured=rate,

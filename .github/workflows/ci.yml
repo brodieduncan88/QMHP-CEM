@@ -21,6 +21,12 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          # Pin the interpreter. requires-python is >=3.11 and uv.lock carries
+          # forked resolutions, so the runner's default Python decides which
+          # dependency set is installed; on >=3.12 that is not the set this
+          # lock was verified against. Without this, whether CI is green
+          # depends on the runner image rather than on the commit.
+          python-version: "3.11"
 
       - name: Sync locked environment
         run: uv sync --locked --all-extras --dev
