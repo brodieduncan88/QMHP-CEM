@@ -1,6 +1,10 @@
 """Unit tests for tools/v2a/check_assessment_arithmetic.py (stdlib unittest).
 
-Run with:  python3 -m unittest discover -s tests -v
+Standard library only. This directory also holds the CEM suite, which does need
+the locked environment, so an unfiltered discover would try to import it too.
+
+Run with:  python3 -m unittest discover -s tests -p 'test_assessment_arithmetic.py' -v
+Or all suites together, in the locked environment:  uv run pytest
 """
 import math
 import os
