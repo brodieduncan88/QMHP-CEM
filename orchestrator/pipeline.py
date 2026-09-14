@@ -262,14 +262,14 @@ def run_candidate(
     store.write_model(candidate_dir / "quantum_results.json", quantum_results)
     if quantum_results.unavailable:
         notes.append(
-            f"{len(quantum_results.unavailable)} quantum quantities unavailable "
-            f"(physics models are stubs in v0.1)"
+            f"{len(quantum_results.unavailable)} quantum quantities unavailable: "
+            f"{', '.join(sorted(quantum_results.unavailable))}"
         )
 
     # -> GATES_EVALUATED -> terminal
     gate_report = evaluate_candidate(candidate, solver_results, quantum_results)
     lifecycle.to(CandidateState.GATES_EVALUATED)
-    lifecycle.to(CandidateState(gate_report.overall_status.value))
+    lifecycle.to(_terminal_state(gate_report.overall_status))
     store.write_model(candidate_dir / "gate_report.json", gate_report)
 
     return CandidateOutcome(
@@ -378,6 +378,32 @@ def run_sweep(
     manifest.write(store.batch_dir)
 
     return report, outcomes
+
+
+def _terminal_state(status: GateStatus) -> CandidateState:
+    """Map a rolled-up gate status onto a candidate lifecycle state.
+
+    The two vocabularies are deliberately different sizes. GateStatus (spec
+    §3.4) carries EXTRACTION-INCONSISTENT, NOT-EVALUATED and NOT-APPLICABLE;
+    the candidate lifecycle (spec §11.2) terminates only in PASS, FAIL,
+    INCOMPLETE or HARDWARE-GATED. Coercing one into the other by value raised
+    ValueError for any status outside that intersection and aborted the batch
+    before gate_report.json was written, losing the very result that explains
+    why. A disagreeing coupling extraction is a legitimate scientific outcome
+    and must be recorded, not crash the run.
+
+    EXTRACTION-INCONSISTENT, NOT-EVALUATED and NOT-APPLICABLE all mean the
+    candidate was not adjudicated, so they map to INCOMPLETE. The precise gate
+    status is preserved verbatim in gate_report.overall_status, which is what
+    the report and the manifest carry; nothing is flattened away on disk.
+    """
+    direct = {
+        GateStatus.PASS: CandidateState.PASS,
+        GateStatus.FAIL: CandidateState.FAIL,
+        GateStatus.INCOMPLETE: CandidateState.INCOMPLETE,
+        GateStatus.HARDWARE_GATED: CandidateState.HARDWARE_GATED,
+    }
+    return direct.get(status, CandidateState.INCOMPLETE)
 
 
 def _count(outcomes: list[CandidateOutcome]) -> dict[GateStatus, int]:

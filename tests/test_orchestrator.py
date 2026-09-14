@@ -380,3 +380,65 @@ def test_no_feasible_design_still_reachable_with_real_physics(
     )
     assert report.batch_outcome is BatchOutcome.NO_FEASIBLE_DESIGN_FOUND
     assert report.fail_count == 9
+
+
+# --- gate status -> candidate state -------------------------------------------
+#
+# GateStatus (spec §3.4) is larger than the candidate lifecycle (spec §11.2).
+# Coercing one into the other by value raised ValueError and aborted the batch
+# before the gate report was written.
+
+
+def test_every_gate_status_maps_to_a_terminal_candidate_state():
+    from contracts.common import CandidateState, GateStatus
+    from orchestrator.pipeline import _terminal_state
+
+    terminal = {
+        CandidateState.PASS,
+        CandidateState.FAIL,
+        CandidateState.INCOMPLETE,
+        CandidateState.HARDWARE_GATED,
+    }
+    for status in GateStatus:
+        assert _terminal_state(status) in terminal, status
+
+
+def test_unadjudicated_gate_statuses_map_to_incomplete():
+    """EXTRACTION-INCONSISTENT is a legitimate outcome, not a crash.
+
+    It, NOT-EVALUATED and NOT-APPLICABLE all mean the candidate was not
+    adjudicated. None of them is a member of CandidateState.
+    """
+    from contracts.common import CandidateState, GateStatus
+    from orchestrator.pipeline import _terminal_state
+
+    for status in (
+        GateStatus.EXTRACTION_INCONSISTENT,
+        GateStatus.NOT_EVALUATED,
+        GateStatus.NOT_APPLICABLE,
+    ):
+        with pytest.raises(ValueError):
+            CandidateState(status.value)  # the coercion that used to run
+        assert _terminal_state(status) is CandidateState.INCOMPLETE
+
+
+def test_direct_statuses_are_preserved():
+    from contracts.common import CandidateState, GateStatus
+    from orchestrator.pipeline import _terminal_state
+
+    assert _terminal_state(GateStatus.PASS) is CandidateState.PASS
+    assert _terminal_state(GateStatus.FAIL) is CandidateState.FAIL
+    assert _terminal_state(GateStatus.INCOMPLETE) is CandidateState.INCOMPLETE
+    assert _terminal_state(GateStatus.HARDWARE_GATED) is CandidateState.HARDWARE_GATED
+
+
+def test_terminal_state_is_reachable_from_gates_evaluated():
+    """Whatever the map returns must be a legal lifecycle transition."""
+    from contracts.common import CandidateState, GateStatus
+    from orchestrator.lifecycle import can_transition
+    from orchestrator.pipeline import _terminal_state
+
+    for status in GateStatus:
+        assert can_transition(
+            CandidateState.GATES_EVALUATED, _terminal_state(status)
+        ), status

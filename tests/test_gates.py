@@ -17,6 +17,7 @@ from evaluator.computational import (
     CollisionGate,
     CouplingExtractionGate,
     P6E2FilterGate,
+    ToleranceGate,
 )
 from evaluator.hardware import P0dGate, P1Gate, P3Gate, P5Gate, P6E6JointGate, P7Gate
 from models import collision as collision_model
@@ -307,3 +308,68 @@ def test_hard_fail_dominates_roll_up():
         ),
     ]
     assert roll_up(results) is GateStatus.FAIL
+
+
+# --- TOLERANCE reporting ------------------------------------------------------
+#
+# models.tolerance reports rejection_rate = rejected / screened and returns None
+# when nothing could be screened. The gate has to survive that and quote the
+# rate against the denominator it was actually computed over.
+
+
+def _tolerance_block(**overrides) -> dict:
+    block = {
+        "sample_count": 4,
+        "screened_count": 4,
+        "unscreened_count": 0,
+        "seed": 7,
+        "pass_count": 3,
+        "fail_count": 1,
+        "rejection_rate": 0.25,
+        "confidence_interval": [0.05, 0.70],
+        "failure_reasons_by_category": {},
+    }
+    block.update(overrides)
+    return block
+
+
+def _tolerance_result(**overrides):
+    return ToleranceGate().evaluate(
+        GateInputs(
+            candidate=None,
+            solver_results=None,
+            quantum_results=quantum(tolerance=_tolerance_block(**overrides)),
+        )
+    )
+
+
+def test_tolerance_not_evaluated_when_nothing_could_be_screened():
+    """A None rejection rate used to raise TypeError out of the format string."""
+    result = _tolerance_result(
+        screened_count=0, unscreened_count=4, pass_count=0, fail_count=0,
+        rejection_rate=None,
+    )
+    assert result.status is GateStatus.NOT_EVALUATED
+    assert "could be screened" in result.reason
+
+
+def test_tolerance_quotes_the_screened_count_as_the_denominator():
+    """The rate is rejected/screened, so 'over N draws' is the wrong basis."""
+    result = _tolerance_result(
+        screened_count=3, unscreened_count=1, pass_count=2, fail_count=1,
+        rejection_rate=1 / 3,
+    )
+    assert result.status is GateStatus.PASS
+    assert "3 screened of 4 draws" in result.reason
+    assert "1 unscreened" in result.reason
+
+
+def test_tolerance_pass_does_not_assert_a_threshold_was_met():
+    """TOLERANCE is SOFT and the frozen master sets no rejection-rate threshold.
+
+    A fully rejected ensemble still reports PASS, so the reason must say what
+    that PASS does and does not mean rather than let a reader infer compliance.
+    """
+    result = _tolerance_result(pass_count=0, fail_count=4, rejection_rate=1.0)
+    assert result.status is GateStatus.PASS
+    assert "no rejection-rate threshold" in result.reason
