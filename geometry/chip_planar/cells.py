@@ -25,10 +25,17 @@ class PlanarGeometryNotImplemented(NotImplementedError):
 
 
 def gdsfactory_available() -> bool:
-    """Whether the optional planar stack is importable."""
+    """Whether the optional planar stack is importable.
+
+    A broken or version-skewed install raises something other than ImportError
+    on import (gdsfactory pulls in kfactory, which raises PydanticUserError
+    when its pydantic is incompatible). Such a stack is just as unusable as an
+    absent one, so treat any import failure as unavailable rather than letting
+    it escape this probe and break collection of every test in the module.
+    """
     try:
         import gdsfactory  # noqa: F401
-    except ImportError:
+    except Exception:
         return False
     return True
 
@@ -37,11 +44,12 @@ def require_gdsfactory() -> Any:
     """Import gdsfactory or explain how to install it."""
     try:
         import gdsfactory
-    except ImportError as exc:
+    except Exception as exc:
         raise PlanarGeometryNotImplemented(
-            "gdsfactory is not installed. Planar geometry (spec §7.1) needs the "
-            "optional planar extra: pip install -e '.[planar]'. Default CI does "
-            "not require it (spec §12.8)."
+            "gdsfactory is not importable. Planar geometry (spec §7.1) needs the "
+            "optional planar extra: pip install -e '.[planar]'. An installed but "
+            "version-skewed stack fails here too. Default CI does not require it "
+            "(spec §12.8)."
         ) from exc
     return gdsfactory
 
