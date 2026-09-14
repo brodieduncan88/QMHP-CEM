@@ -171,6 +171,83 @@ extras["envelope_peak_multiplier_hann"] = 1.0 / hann_area_fraction()
 extras["envelope_peak_multiplier_gaussian_2sigma"] = 1.0 / gaussian_area_fraction(2.0)
 extras["envelope_peak_multiplier_gaussian_3sigma"] = 1.0 / gaussian_area_fraction(3.0)
 
+# --- 3b. Consequences the assessment states only qualitatively ---------------
+# (i) Matrix-element crossover at which the 150 ns rectangular cycle meets the
+#     cap under convention A: u_C = 1/(T n) = cap  ->  n* = 1/(T cap).
+N_C_CROSSOVER_A = 1.0 / (150e-9 * U_C_CAP_HZ)
+add("Crossover n_C at which 150 ns meets the cap (convention A)", 4.0 / 3.0, N_C_CROSSOVER_A, 1e-9,
+    note="exactly 4/3; assessment's 'toward 1.36' is above it, 1.300454 below it")
+
+# (ii) Envelope-corrected peak requirement. Under the on-resonance pulse-area
+#      theorem the rotation angle depends only on the integrated amplitude, so a
+#      smooth envelope of the same duration needs its peak raised by 1/eta,
+#      eta = (envelope area)/(peak x T). The assessment applies this only to the
+#      150 ns point; applied consistently it also bites at longer durations.
+ENVELOPES = {
+    "rectangular": 1.0,
+    "hann": hann_area_fraction(),
+    "gaussian_2sigma": gaussian_area_fraction(2.0),
+}
+envelope_cap_table = []
+for name, eta in ENVELOPES.items():
+    for conv in ("A", "B"):
+        for T_ns in DURATIONS_NS:
+            peak = u_c_for_cycle(T_ns * 1e-9, N_C, conv) / eta
+            envelope_cap_table.append({
+                "envelope": name, "convention": conv, "T_ns": T_ns,
+                "required_peak_u_C_MHz": peak / 1e6,
+                "within_5MHz_cap": peak <= U_C_CAP_HZ,
+            })
+extras["envelope_cap_table"] = envelope_cap_table
+breaches = {
+    (name, conv): [r["T_ns"] for r in envelope_cap_table
+                   if r["envelope"] == name and r["convention"] == conv and not r["within_5MHz_cap"]]
+    for name in ENVELOPES for conv in ("A", "B")
+}
+extras["durations_breaching_cap"] = {f"{n}/{c}": v for (n, c), v in breaches.items()}
+add("Cap breach, rectangular/convention A, is 150 ns only", 1.0,
+    1.0 if breaches[("rectangular", "A")] == [150] else 0.0, 1e-12)
+add("Cap breach, Hann/convention A, extends to 200 and 300 ns", 1.0,
+    1.0 if breaches[("hann", "A")] == [150, 200, 300] else 0.0, 1e-12,
+    note="the assessment applies the finite-edge argument only at 150 ns")
+add("Cap breach, Hann/convention B, still includes 150 ns", 1.0,
+    1.0 if 150 in breaches[("hann", "B")] else 0.0, 1e-12,
+    note="2/(2 T n) = 1/(T n): the Hann penalty exactly cancels the convention factor")
+
+# (iii) Cost of clamping at the cap instead of relaxing the duration. A
+#      rectangular pulse held at the cap for T rotates by theta = 2 pi u_cap n T;
+#      the mediator is left with P(1_C) = sin^2(theta/2).
+def residual_after_clamped_pulse(T_s: float, n: float, convention: str, cap: float = U_C_CAP_HZ) -> float:
+    f_r = cap * n if convention == "A" else 2.0 * cap * n
+    theta = 2.0 * math.pi * f_r * T_s
+    return math.sin(theta / 2.0) ** 2
+
+
+clamp_150 = residual_after_clamped_pulse(150e-9, N_C, "A")
+add("Mediator residual if 150 ns is clamped at the cap (convention A)", None, clamp_150,
+    note="under-rotation left in 1_C; compare the 8e-4 screen")
+extras["clamped_150ns_residual_vs_screen"] = clamp_150 / SCREEN_ERROR
+extras["clamped_150ns_underrotation_percent"] = 100.0 * (1.0 - U_C_CAP_HZ / u_c_for_cycle(150e-9, N_C, "A"))
+
+# (v) Unit and definition factors that are NOT the drive-prefactor factor of two.
+extras["conversion_factors"] = {
+    "MHz_to_Mrad_per_s": 2 * math.pi,
+    "drive_prefactor_A_over_B": 2.0,
+    "peak_coefficient_to_Rabi_frequency_convention_A": N_C,
+    "peak_coefficient_to_Rabi_frequency_convention_B": 2 * N_C,
+    "Rabi_defined_via_hbar_Omega_sigma_x_vs_hbar_Omega_over_2_sigma_x": 2.0,
+    "5_MHz_cap_in_Mrad_per_s": 2 * math.pi * 5.0,
+}
+# The same factor-of-two hazard the assessment flags for u_C applies to zeta:
+# H/h = zeta |22><22| gives T_pi = 1/(2 zeta); H/h = (J/2) Z Z gives T_pi = 1/(4 J).
+extras["zeta_convention_T_pi_us"] = {
+    "H/h = zeta |22><22|  (assessment)": t_pi_from_zeta(ZETA_DISPLAYED_HZ) * 1e6,
+    "H/h = (J/2) Z Z": 1.0 / (4.0 * ZETA_DISPLAYED_HZ) * 1e6,
+}
+extras["M1_shortfall_factor_range"] = [
+    zeta_from_t_pi(GATE_ALLOCATION_S) / zeta_from_t_pi(t * 1e-6) for t in M1_WAIT_RANGE_US
+]
+
 # --- 4. Thermal occupation --------------------------------------------------
 def bose_occupation(f_hz: float, T_k: float) -> float:
     x = H_PLANCK * f_hz / (K_B * T_k)
@@ -219,6 +296,18 @@ extras["crosstalk_table"] = [
     }
     for db in CROSSTALK_DB
 ]
+
+# (iv) An in-phase crosstalk term on the mediator's own drive is an amplitude
+#      error: theta -> 2 pi (1 + c), leaving P(1_C) = sin^2(pi c).
+def residual_from_amplitude_error(c: float) -> float:
+    return math.sin(math.pi * c) ** 2
+
+
+extras["residual_from_in_phase_crosstalk"] = {
+    f"{db} dB": residual_from_amplitude_error(amplitude_ratio_from_db(db)) for db in CROSSTALK_DB
+}
+add("Residual from an uncalibrated in-phase -40 dB crosstalk term", None,
+    residual_from_amplitude_error(1e-2), note="exceeds the 8e-4 screen on its own")
 
 # --- 6. Four-layer schedule: Surface-17 pair counts ------------------------
 # Rotated distance-3 surface code, data qubits 0..8 row-major. Four weight-4

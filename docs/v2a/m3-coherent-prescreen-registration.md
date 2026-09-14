@@ -40,16 +40,58 @@ approximation):
 
 Form A is the convention under which the assessment's own "≈5.13 MHz at 150 ns"
 arithmetic is correct, so it is the presumptive default; the choice is still the
-project's and must be written into R1.1. Whichever form is bound, the 150 ns point
-is registered as a **boundary/stress duration**, not a normal candidate, for two
-reasons that do not depend on the convention: the target Rabi scale at 150 ns
-(6.67 MHz) exceeds the 5.90 MHz nearest-line separation, and any smooth envelope
-needs a larger peak than a rectangle of the same area (Hann: 2.0×; Gaussian
-truncated at ±2σ: 1.67×), so the rectangular-pulse `u_C` above is a lower bound on
-the peak that the bound envelope will actually require.
+project's and must be written into R1.1.
 
-Values under both forms for every duration are produced by
-`tools/v2a/check_assessment_arithmetic.py` (`u_C_table`).
+**The cap is a joint constraint on convention *and* envelope, not on duration
+alone.** The `u_C` values in the table above are for a rectangular pulse. Under
+the on-resonance pulse-area theorem a smooth envelope of the same duration needs
+its peak raised by `1/η`, where `η` is the envelope's area as a fraction of
+`peak × T` (Hann: `η = 1/2`, so 2.00×; Gaussian truncated at ±2σ: 1.67×). Applying
+that consistently to the whole ladder gives the durations that breach a 5 MHz peak
+cap at `n_C = 1.300454`:
+
+| Envelope | Convention A (one-factor) | Convention B (two-factor) |
+|---|---|---|
+| rectangular | 150 ns | none |
+| Gaussian ±2σ | 150, 200 ns | none |
+| Hann (cos²) | 150, 200, 300 ns | 150 ns |
+
+Two consequences follow, and both are why R1.5 must be bound together with R1.1:
+
+- **The 150 ns breach survives the convention choice** once a Hann envelope is
+  used, because the Hann peak penalty (×2) exactly cancels the convention factor
+  (÷2): `2/(2 T n) = 1/(T n) = 5.126 MHz` either way. The boundary/stress label on
+  150 ns is therefore robust, which the assessment asserts but does not show.
+- **Under convention A the breach is not confined to 150 ns.** With a Hann
+  envelope 200 ns (7.69 MHz) and 300 ns (5.13 MHz) also exceed the cap. The
+  assessment applies its finite-edge argument only at the 150 ns point; if
+  convention A and a Hann envelope are bound together, the boundary/stress label
+  must extend to 200 and 300 ns, or the cap must be restated as a bound on
+  something other than the peak (R1.7).
+
+Clamping at the cap is not a soft alternative. Holding a rectangular 150 ns pulse
+at exactly 5 MHz under convention A under-rotates by 2.47 % and leaves
+`P(1_C) = 6.0×10⁻³` in the mediator, about 7.5× the 8×10⁻⁴ screen.
+
+Two further factors are routinely confused with the drive prefactor and are
+**not** it. They are separate `BIND` hazards:
+
+- `MHz → Mrad s⁻¹` is ×2π = 6.283, not ×2. The 5 MHz cap is 31.4 Mrad s⁻¹.
+- Writing the rotating-frame Hamiltonian as `ħΩ σ_x` rather than `(ħΩ/2) σ_x` and
+  calling the prefactor "the Rabi frequency" is an independent factor of two, on
+  top of whichever drive form R1.1 binds.
+
+Values under both forms for every duration, and the envelope-corrected cap table,
+are produced by `tools/v2a/check_assessment_arithmetic.py` (`u_C_table`,
+`envelope_cap_table`, `durations_breaching_cap`).
+
+### R1b. The static-ZZ convention carries the same hazard (`BIND`)
+
+The assessment freezes the drive convention but not `ζ`. The M1 arithmetic
+`T_π = 1/(2ζ)` holds only where `ζ` is the **full** conditional shift
+`(E₂₂ − E₂₀ − E₀₂ + E₀₀)/h`, equivalently `H/h = ζ|22⟩⟨22|` or `(hζ/4) Z⊗Z`. If the
+code instead reports the coefficient `J` in `H/h = (J/2) Z⊗Z`, the same 62.1 kHz
+gives `T_π = 4.03 µs`, not 8.05 µs. Any revived M1 work must bind `ζ` explicitly.
 
 ## R2. Crosstalk convention  (`BIND` before execution)
 
@@ -61,9 +103,29 @@ Values under both forms for every duration are produced by
 | R2.4 Stress points | `−80, −60, −50, −40 dB` → amplitude ratios `10⁻⁴, 10⁻³, 3.16×10⁻³, 10⁻²`. **Stress samples only, not a measured transfer function.** |
 | R2.5 Where the leaked drive lands | `BIND` — which operators (data-qubit charge operators, readout modes, mediator flux) receive `S_ij · u_C(t)` |
 
-If anyone reads the stress points as power dB (`10 log10`), the assumed leaked
-amplitude is wrong by the ratio itself (10⁻⁴ to 10⁻² at these points). The
-registration therefore states the definition literally rather than "dB".
+The hazard is **mixing** conventions, not `20 log10` versus `10 log10` as such: a
+consistently applied power definition `10 log10 |S|²` gives the identical dB
+figure and the identical amplitude. The failure mode is a number produced under
+one definition and consumed under the other, which squares or square-roots the
+amplitude (10⁻² becomes 10⁻⁴ at the −40 dB point). The registration therefore
+states the definition literally rather than writing "dB".
+
+Two further R2 items the stress grid does not by itself settle:
+
+- **Is crosstalk onto the mediator's own drive calibrated out?** `BIND`. An
+  uncalibrated in-phase −40 dB term is a 1 % amplitude error on the `2π` cycle
+  and leaves `P(1_C) = sin²(π·10⁻²) = 9.9×10⁻⁴` on its own, already above the
+  8×10⁻⁴ screen. Whether that counts against the screen depends entirely on this
+  binding.
+- **`S_ij` is not the ratio of Hamiltonian drive coefficients.** Converting a
+  port-to-port scattering coefficient into `u_j/u_C` needs the per-element
+  port-to-operator mapping (coupling capacitance, zero-point charge, matrix
+  element). R2.5 must state that mapping, or the dB figure is not yet a drive.
+- The four quadrature phases bracket the amplitude extremes of a single
+  interfering path. They do not cover several simultaneous paths, a phase that
+  rotates across the pulse band (at 150 ns the band is ~13 MHz, so a few ns of
+  differential delay is tens of degrees), or inductive crosstalk into `f_C`, which
+  is a different operator entirely.
 
 ## R3. Validity of the `f_C = 0.28 Φ₀` sensitivity point  (`BIND` before execution)
 
@@ -85,16 +147,17 @@ requires a separately registered gauge-consistent time-dependent Hamiltonian
 
 | `T` | `f_R = 1/T` | `f_R / Δ_min` (5.90 MHz) | Registered role |
 |---:|---:|---:|---|
-| 150 ns | 6.67 MHz | 1.13 | **boundary / stress** |
-| 200 ns | 5.00 MHz | 0.85 | candidate (same order as `Δ_min`) |
-| 300 ns | 3.33 MHz | 0.56 | candidate |
+| 150 ns | 6.67 MHz | 1.13 | **boundary / stress** under every convention-envelope pair |
+| 200 ns | 5.00 MHz | 0.85 | candidate; **boundary/stress if R1 binds convention A with a Hann or ±2σ Gaussian envelope** |
+| 300 ns | 3.33 MHz | 0.56 | candidate; **boundary/stress if R1 binds convention A with a Hann envelope** |
 | 400 ns | 2.50 MHz | 0.42 | candidate |
 | 500 ns | 2.00 MHz | 0.34 | candidate |
 | 650 ns | 1.54 MHz | 0.26 | candidate |
 | 800 ns | 1.25 MHz | 0.21 | candidate |
 
 No durations are added or removed after the first propagation. The ladder is a
-mechanism test, not a search.
+mechanism test, not a search. Which rows carry the boundary/stress label is
+decided by the R1 bindings **before** the run, not after seeing the results.
 
 ## R5. Exported quantities (per duration, per sector `ij ∈ {00, 02, 20, 22}`)
 

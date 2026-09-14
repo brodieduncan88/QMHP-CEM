@@ -63,6 +63,49 @@ class TestDriveConvention(unittest.TestCase):
         self.assertGreater(m.extras["envelope_peak_multiplier_gaussian_2sigma"], 1.0)
 
 
+class TestEnvelopeAndCapConsequences(unittest.TestCase):
+    """Consequences the assessment states only qualitatively."""
+
+    def test_crossover_matrix_element_is_four_thirds(self):
+        self.assertAlmostEqual(m.N_C_CROSSOVER_A, 4.0 / 3.0)
+        self.assertLess(m.N_C, m.N_C_CROSSOVER_A)      # 1.300454 -> outside the cap
+        self.assertGreater(m.N_C_ALT, m.N_C_CROSSOVER_A)  # 1.36 -> inside
+
+    def test_rectangular_breach_is_150ns_only(self):
+        self.assertEqual(m.extras["durations_breaching_cap"]["rectangular/A"], [150])
+        self.assertEqual(m.extras["durations_breaching_cap"]["rectangular/B"], [])
+
+    def test_hann_breach_extends_beyond_150ns_under_convention_A(self):
+        self.assertEqual(m.extras["durations_breaching_cap"]["hann/A"], [150, 200, 300])
+
+    def test_hann_penalty_cancels_the_convention_factor_at_150ns(self):
+        """2/(2 T n) == 1/(T n): 150 ns breaches under a Hann envelope either way."""
+        self.assertIn(150, m.extras["durations_breaching_cap"]["hann/B"])
+        rect_a = m.u_c_for_cycle(150e-9, m.N_C, "A")
+        hann_b = m.u_c_for_cycle(150e-9, m.N_C, "B") / m.hann_area_fraction()
+        self.assertAlmostEqual(rect_a, hann_b)
+
+    def test_clamping_at_the_cap_costs_more_than_the_screen(self):
+        self.assertAlmostEqual(m.residual_after_clamped_pulse(150e-9, m.N_C, "A"), 5.99e-3, places=4)
+        self.assertGreater(m.extras["clamped_150ns_residual_vs_screen"], 7.0)
+
+    def test_in_phase_crosstalk_at_minus_40dB_exceeds_the_screen(self):
+        self.assertGreater(m.residual_from_amplitude_error(1e-2), m.SCREEN_ERROR)
+        self.assertAlmostEqual(m.residual_from_amplitude_error(1e-2), 9.866e-4, places=6)
+
+    def test_zeta_carries_the_same_factor_of_two_hazard_as_u_C(self):
+        t = m.extras["zeta_convention_T_pi_us"]
+        self.assertAlmostEqual(t["H/h = zeta |22><22|  (assessment)"] / t["H/h = (J/2) Z Z"], 2.0)
+
+    def test_m1_shortfall_is_a_range_not_a_single_factor(self):
+        lo, hi = m.extras["M1_shortfall_factor_range"]
+        self.assertAlmostEqual(lo, 8.05, places=2)
+        self.assertAlmostEqual(hi, 8.37, places=2)
+
+    def test_mhz_to_mrad_conversion_is_two_pi_not_two(self):
+        self.assertAlmostEqual(m.extras["conversion_factors"]["MHz_to_Mrad_per_s"], 2 * math.pi)
+
+
 class TestThermal(unittest.TestCase):
     def test_bose_values(self):
         self.assertAlmostEqual(m.bose_occupation(m.F22_HZ, 0.015) / 1.78e-10, 1.0, places=2)
