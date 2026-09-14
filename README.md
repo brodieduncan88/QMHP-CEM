@@ -62,6 +62,34 @@ Reaching `FEASIBLE_CANDIDATE_FOUND` requires Palace or openEMS.
 
 ---
 
+## Audit record: V2A G0
+
+Separate from the CEM software layer, the repository carries the deep-research
+assessment of the QMHP-CoPro V2A G0 follow-up audit v0.1, with its arithmetic
+reproduced and its citations resolved.
+
+| Path | What it is |
+|---|---|
+| [`docs/v2a/`](docs/v2a/README.md) | The assessment as received, the M3 prescreen registration template, the verification record, the reference list and the inputs taken on report |
+| [`tools/v2a/check_assessment_arithmetic.py`](tools/v2a/check_assessment_arithmetic.py) | Reproduces every number stated in the assessment; exits non-zero on any mismatch |
+
+Its disposition: **physical G0 remains BLOCKED**; the M3 mechanism has a
+conditional go for one bounded, non-optimising coherent prescreen once the
+registration items are frozen. That assessment is about the V2A gate programme
+and does not alter the CEM gate definitions in `master/validation_gates.yaml`.
+
+Both checks run on the standard library alone, with no solver and no `uv`:
+
+```bash
+python3 tools/v2a/check_assessment_arithmetic.py
+python3 -m unittest discover -s tests -p 'test_assessment_arithmetic.py' -v
+```
+
+The pattern is needed because `tests/` also holds the CEM suite, which does
+need the locked environment. `uv run pytest` runs everything together.
+
+---
+
 ## Quick start
 
 ```bash
