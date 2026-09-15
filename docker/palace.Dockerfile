@@ -170,12 +170,22 @@ COPY --from=builder /opt/palace /opt/palace
 
 # Open MPI inside a `--network none` container sees only the loopback
 # interface; tell it so, and keep transports to shared memory and self.
+#
+# The adapter launches one MPI process; pin the BLAS and OpenMP thread
+# counts to one as well so a run is single-threaded end to end. The first
+# three committed records agreed on every printed frequency digit, but the
+# third differed from the first two in the last digits of the residual
+# quantities (Im{f}, Q, backward error, error indicators), the signature of
+# a threaded reduction order in the pthread OpenBLAS the runtime installs.
+# Pinning removes that source; the records that follow show what remains.
 ENV PATH="/opt/palace/bin:${PATH}" \
     OMPI_ALLOW_RUN_AS_ROOT=1 \
     OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
     OMPI_MCA_btl_vader_single_copy_mechanism=none \
     OMPI_MCA_btl=self,vader \
-    OMPI_MCA_oob_tcp_if_include=lo
+    OMPI_MCA_oob_tcp_if_include=lo \
+    OMP_NUM_THREADS=1 \
+    OPENBLAS_NUM_THREADS=1
 
 # Fail the build, not the first run, if the copied binary is missing a shared
 # library or the launcher cannot start. `ldd` exits non-zero for a binary it
