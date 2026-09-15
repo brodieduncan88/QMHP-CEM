@@ -1,0 +1,266 @@
+{
+  "adapter_version": "0.2.0-adapter",
+  "analytic_reference": [
+    {
+      "frequency_GHz": 9.635694545471965,
+      "label": "analytic_110",
+      "m": 1,
+      "multiplicity": 1,
+      "n": 1,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 15.235370800676153,
+      "label": "analytic_120",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 2,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 19.27138909094393,
+      "label": "analytic_220",
+      "m": 2,
+      "multiplicity": 1,
+      "n": 2,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 21.546068014099255,
+      "label": "analytic_130",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 3,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 22.47157905592814,
+      "label": "analytic_011",
+      "m": 0,
+      "multiplicity": 2,
+      "n": 1,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 23.4818050829498,
+      "label": "analytic_111",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 1,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 24.56629725719056,
+      "label": "analytic_230",
+      "m": 2,
+      "multiplicity": 2,
+      "n": 3,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 25.381918353963822,
+      "label": "analytic_021",
+      "m": 0,
+      "multiplicity": 2,
+      "n": 2,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 26.28050768181818,
+      "label": "analytic_121",
+      "m": 1,
+      "multiplicity": 4,
+      "n": 2,
+      "p": 1
+    }
+  ],
+  "candidate_sha256": "472c2e612261e97736d961b778ceaaa2a077f7255a0c2154f7e77a2829fb1f16",
+  "config": {
+    "Boundaries": {
+      "PEC": {
+        "Attributes": [
+          2
+        ]
+      }
+    },
+    "Domains": {
+      "Materials": [
+        {
+          "Attributes": [
+            1
+          ],
+          "LossTan": 0.0,
+          "Permeability": 1.0,
+          "Permittivity": 1.0
+        }
+      ],
+      "Postprocessing": {
+        "Probe": [
+          {
+            "Center": [
+              -4.18,
+              -5.9399999999999995,
+              3.15
+            ],
+            "Index": 1
+          },
+          {
+            "Center": [
+              3.74,
+              -1.9800000000000004,
+              3.8500000000000005
+            ],
+            "Index": 2
+          },
+          {
+            "Center": [
+              -6.82,
+              4.619999999999999,
+              3.5
+            ],
+            "Index": 3
+          }
+        ]
+      }
+    },
+    "Model": {
+      "L0": 0.001,
+      "Mesh": "mesh.msh",
+      "Refinement": {
+        "UniformLevels": 0
+      }
+    },
+    "Problem": {
+      "Output": "postpro",
+      "Type": "Eigenmode",
+      "Verbose": 2
+    },
+    "Solver": {
+      "Device": "CPU",
+      "Eigenmode": {
+        "N": 8,
+        "Save": 0,
+        "Target": 22.008824,
+        "Tol": 1e-06
+      },
+      "Linear": {
+        "KSPType": "GMRES",
+        "MaxIts": 400,
+        "Tol": 1e-08,
+        "Type": "Default"
+      },
+      "Order": 2
+    }
+  },
+  "config_file": "config.json",
+  "config_sha256": "49da80f3757dcceef848f510dfca1ced06f49d47b3d1d56bc120fe0d8e4b3bcd",
+  "effective": {
+    "characteristic_length_mm": 1.75,
+    "eigenmodes_requested": 8,
+    "probes_mm": [
+      [
+        -4.18,
+        -5.9399999999999995,
+        3.15
+      ],
+      [
+        3.74,
+        -1.9800000000000004,
+        3.8500000000000005
+      ],
+      [
+        -6.82,
+        4.619999999999999,
+        3.5
+      ]
+    ],
+    "target_GHz": 22.008824
+  },
+  "expected_solver_modes_GHz": [
+    22.47157905592814,
+    22.47157905592814,
+    23.4818050829498,
+    23.4818050829498,
+    24.56629725719056,
+    24.56629725719056,
+    25.381918353963822,
+    25.381918353963822
+  ],
+  "geometry_note": "No PicoGK geometry was generated; the solver domain is the empty vacuum cavity derived from the candidate parameters.",
+  "image": "qmhp-cem/palace:0.13.0",
+  "mesh": {
+    "boundary_triangle_count": 1362,
+    "characteristic_length_mm": 1.75,
+    "file": "mesh.msh",
+    "format": "msh2.2-ascii",
+    "gmsh_version": "4.15.2",
+    "node_count": 941,
+    "physical_groups": {
+      "pec_surfaces": 2,
+      "vacuum_volume": 1
+    },
+    "sha256": "727c22bd930e69267eea29fb131f296f58a10e18f09c515bafc2892d04c8a277",
+    "tetrahedron_count": 3479
+  },
+  "mpi_processes": 1,
+  "output_dir": "postpro",
+  "overrides": {
+    "domain": {
+      "mesh_length_mm": 1.75,
+      "x_max_mm": 11.0,
+      "x_min_mm": -11.0,
+      "y_max_mm": 11.0,
+      "y_min_mm": -11.0,
+      "z_max_mm": 7.0,
+      "z_min_mm": 0.0
+    },
+    "eigenmodes": 8,
+    "label": "aux_height-d7-L1",
+    "mesh_length_mm": 1.75,
+    "probes_mm": [
+      [
+        -4.18,
+        -5.9399999999999995,
+        3.15
+      ],
+      [
+        3.74,
+        -1.9800000000000004,
+        3.8500000000000005
+      ],
+      [
+        -6.82,
+        4.619999999999999,
+        3.5
+      ]
+    ],
+    "target_GHz": 22.008824
+  },
+  "runtime": "docker",
+  "solver_domain_mm": {
+    "mesh_length_mm": 1.75,
+    "x_max_mm": 11.0,
+    "x_min_mm": -11.0,
+    "y_max_mm": 11.0,
+    "y_min_mm": -11.0,
+    "z_max_mm": 7.0,
+    "z_min_mm": 0.0
+  },
+  "solver_domain_size_mm": [
+    22.0,
+    22.0,
+    7.0
+  ],
+  "solver_rules": {
+    "characteristic_mesh_length_rule": "min(cavity_width, cavity_height) / 12",
+    "domain": "empty vacuum cavity of Object 001 as a closed PEC box; chip, recess step, launches and lid are NOT modelled in this milestone. All requested modes are TM_mn0: independent of height_above_chip_mm, so the closed-form check verifies the X/Y extent and unit scaling, not the height.",
+    "eigenmode_backward_error_max_tolerance": 1e-06,
+    "eigenmode_target_fraction_of_analytic_fundamental": 0.85,
+    "eigenmodes_requested": 4,
+    "eigenvalue_tolerance": 1e-06,
+    "expected_relative_deviation": 0.0001,
+    "finite_element_order": 2,
+    "linear_solver_max_iterations": 400,
+    "linear_solver_tolerance": 1e-08
+  }
+}

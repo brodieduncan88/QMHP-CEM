@@ -98,10 +98,14 @@ RUN set -eux; \
 
 # Palace's superbuild fetches and builds its dependencies and installs
 # everything into CMAKE_INSTALL_PREFIX as part of `cmake --build`. Eigenmode
-# solves need SLEPc (or ARPACK); SLEPc is the maintained default. Optional
-# heavyweight packages are off to keep the build surface small. Headers,
-# CMake package files and the sources are removed afterwards so the runtime
-# stage copies only what the binary needs.
+# solves need SLEPc (or ARPACK); SLEPc is the maintained default. GSLIB
+# (Palace's default) is on because field probes (Domains.Postprocessing.Probe)
+# need it: without it Palace aborts on any probe with "InterpolationOperator
+# class requires MFEM_USE_GSLIB", as the first verification-campaign run
+# showed. It is a post-processing interpolation library and does not enter
+# the discretisation or the eigensolver. The other optional heavyweight
+# packages stay off. Headers, CMake package files and the sources are removed
+# afterwards so the runtime stage copies only what the binary needs.
 #
 # The compilers are named gcc/g++ rather than left to CMake's default cc/c++:
 # the superbuild hands CC through to libCEED's Makefile, which detects the
@@ -128,7 +132,7 @@ RUN set -eux; \
         -DPALACE_WITH_SUPERLU=ON \
         -DPALACE_WITH_STRUMPACK=OFF \
         -DPALACE_WITH_MUMPS=OFF \
-        -DPALACE_WITH_GSLIB=OFF \
+        -DPALACE_WITH_GSLIB=ON \
         -DPALACE_WITH_CUDA=OFF \
         -DPALACE_WITH_HIP=OFF; \
     cmake --build /opt/palace-build --parallel "${JOBS}"; \
@@ -203,6 +207,7 @@ LABEL org.qmhp.cem.solver="palace" \
       org.qmhp.cem.palace-version="${PALACE_VERSION}" \
       org.qmhp.cem.palace-commit="${PALACE_COMMIT}" \
       org.qmhp.cem.apt-snapshot="${APT_SNAPSHOT}" \
+      org.qmhp.cem.palace-gslib="ON" \
       org.qmhp.cem.spec="QMHP-CEM v0.2 §10.3" \
       org.opencontainers.image.title="qmhp-cem/palace" \
       org.opencontainers.image.description="Palace EM solver for QMHP-CEM, built from the pinned release tag"

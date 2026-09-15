@@ -1,0 +1,866 @@
+{
+  "adapter_version": "0.2.0-adapter",
+  "analytic_reference": [
+    {
+      "frequency_GHz": 9.635694545471965,
+      "label": "analytic_110",
+      "m": 1,
+      "multiplicity": 1,
+      "n": 1,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 15.235370800676153,
+      "label": "analytic_120",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 2,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 19.27138909094393,
+      "label": "analytic_220",
+      "m": 2,
+      "multiplicity": 1,
+      "n": 2,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 21.546068014099255,
+      "label": "analytic_130",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 3,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 24.56629725719056,
+      "label": "analytic_230",
+      "m": 2,
+      "multiplicity": 2,
+      "n": 3,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 28.092635684035145,
+      "label": "analytic_140",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 4,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 28.907083636415898,
+      "label": "analytic_330",
+      "m": 3,
+      "multiplicity": 1,
+      "n": 3,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 30.470741601352305,
+      "label": "analytic_240",
+      "m": 2,
+      "multiplicity": 2,
+      "n": 4,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 34.067324772727275,
+      "label": "analytic_340",
+      "m": 3,
+      "multiplicity": 2,
+      "n": 4,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 34.74199075840785,
+      "label": "analytic_150",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 5,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 36.69163168786248,
+      "label": "analytic_250",
+      "m": 2,
+      "multiplicity": 2,
+      "n": 5,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 38.54277818188786,
+      "label": "analytic_440",
+      "m": 4,
+      "multiplicity": 1,
+      "n": 4,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 39.72898638716886,
+      "label": "analytic_350",
+      "m": 3,
+      "multiplicity": 2,
+      "n": 5,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 41.44468932700916,
+      "label": "analytic_160",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 6,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 43.09213602819851,
+      "label": "analytic_260",
+      "m": 2,
+      "multiplicity": 2,
+      "n": 6,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 43.627462591349314,
+      "label": "analytic_450",
+      "m": 4,
+      "multiplicity": 2,
+      "n": 5,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 45.70611240202846,
+      "label": "analytic_360",
+      "m": 3,
+      "multiplicity": 2,
+      "n": 6,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 48.178472727359825,
+      "label": "analytic_170",
+      "m": 1,
+      "multiplicity": 3,
+      "n": 7,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 49.13259451438112,
+      "label": "analytic_460",
+      "m": 4,
+      "multiplicity": 2,
+      "n": 6,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 49.60277359585261,
+      "label": "analytic_270",
+      "m": 2,
+      "multiplicity": 2,
+      "n": 7,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 51.88980315857352,
+      "label": "analytic_370",
+      "m": 3,
+      "multiplicity": 2,
+      "n": 7,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 53.21486245303999,
+      "label": "analytic_560",
+      "m": 5,
+      "multiplicity": 2,
+      "n": 6,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 54.93191062254472,
+      "label": "analytic_180",
+      "m": 1,
+      "multiplicity": 4,
+      "n": 8,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 56.18527136807029,
+      "label": "analytic_280",
+      "m": 2,
+      "multiplicity": 2,
+      "n": 8,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 57.814167272831796,
+      "label": "analytic_660",
+      "m": 6,
+      "multiplicity": 1,
+      "n": 6,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 58.21427009022612,
+      "label": "analytic_380",
+      "m": 3,
+      "multiplicity": 2,
+      "n": 8,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 58.61164173459581,
+      "label": "analytic_570",
+      "m": 5,
+      "multiplicity": 2,
+      "n": 7,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 60.94148320270461,
+      "label": "analytic_480",
+      "m": 4,
+      "multiplicity": 2,
+      "n": 8,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 61.69854928861105,
+      "label": "analytic_190",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 9,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 62.81704305663889,
+      "label": "analytic_290",
+      "m": 2,
+      "multiplicity": 4,
+      "n": 9,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 64.27809982511073,
+      "label": "analytic_580",
+      "m": 5,
+      "multiplicity": 2,
+      "n": 8,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 64.63820404229776,
+      "label": "analytic_390",
+      "m": 3,
+      "multiplicity": 2,
+      "n": 9,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 67.10484747483935,
+      "label": "analytic_490",
+      "m": 4,
+      "multiplicity": 2,
+      "n": 9,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 67.44986181830376,
+      "label": "analytic_770",
+      "m": 7,
+      "multiplicity": 1,
+      "n": 7,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 68.13464954545455,
+      "label": "analytic_680",
+      "m": 6,
+      "multiplicity": 2,
+      "n": 8,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 68.47447534204792,
+      "label": "analytic_1100",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 10,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 69.4839815168157,
+      "label": "analytic_2100",
+      "m": 2,
+      "multiplicity": 2,
+      "n": 10,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 70.14891515057681,
+      "label": "analytic_590",
+      "m": 5,
+      "multiplicity": 2,
+      "n": 9,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 71.13466251317483,
+      "label": "analytic_3100",
+      "m": 3,
+      "multiplicity": 2,
+      "n": 10,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 72.42812595677565,
+      "label": "analytic_780",
+      "m": 7,
+      "multiplicity": 2,
+      "n": 8,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 73.38326337572497,
+      "label": "analytic_4100",
+      "m": 4,
+      "multiplicity": 2,
+      "n": 10,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 73.69889177157167,
+      "label": "analytic_690",
+      "m": 6,
+      "multiplicity": 2,
+      "n": 9,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 75.25718020090794,
+      "label": "analytic_1110",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 11,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 76.17685400338077,
+      "label": "analytic_2110",
+      "m": 2,
+      "multiplicity": 4,
+      "n": 11,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 77.08555636377572,
+      "label": "analytic_880",
+      "m": 8,
+      "multiplicity": 1,
+      "n": 8,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 77.68545300946943,
+      "label": "analytic_3110",
+      "m": 3,
+      "multiplicity": 4,
+      "n": 11,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 79.45797277433772,
+      "label": "analytic_6100",
+      "m": 6,
+      "multiplicity": 2,
+      "n": 10,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 79.74956264515949,
+      "label": "analytic_4110",
+      "m": 4,
+      "multiplicity": 2,
+      "n": 11,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 82.04498265944585,
+      "label": "analytic_1120",
+      "m": 1,
+      "multiplicity": 4,
+      "n": 12,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 82.32741028524818,
+      "label": "analytic_5110",
+      "m": 5,
+      "multiplicity": 2,
+      "n": 11,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 82.88937865401832,
+      "label": "analytic_2120",
+      "m": 2,
+      "multiplicity": 2,
+      "n": 12,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 83.16893890351162,
+      "label": "analytic_7100",
+      "m": 7,
+      "multiplicity": 2,
+      "n": 10,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 84.27790705210543,
+      "label": "analytic_3120",
+      "m": 3,
+      "multiplicity": 2,
+      "n": 12,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 85.37247118263942,
+      "label": "analytic_6110",
+      "m": 6,
+      "multiplicity": 2,
+      "n": 11,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 86.18427205639702,
+      "label": "analytic_4120",
+      "m": 4,
+      "multiplicity": 2,
+      "n": 12,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 86.72125090924769,
+      "label": "analytic_990",
+      "m": 9,
+      "multiplicity": 1,
+      "n": 9,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 87.25492518269863,
+      "label": "analytic_8100",
+      "m": 8,
+      "multiplicity": 2,
+      "n": 10,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 88.57504440909092,
+      "label": "analytic_5120",
+      "m": 5,
+      "multiplicity": 2,
+      "n": 12,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 88.83671423887337,
+      "label": "analytic_1130",
+      "m": 1,
+      "multiplicity": 4,
+      "n": 13,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 89.61713960409418,
+      "label": "analytic_2130",
+      "m": 2,
+      "multiplicity": 2,
+      "n": 13,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 90.90296053624327,
+      "label": "analytic_3130",
+      "m": 3,
+      "multiplicity": 2,
+      "n": 13,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 91.10134603292212,
+      "label": "analytic_011",
+      "m": 0,
+      "multiplicity": 2,
+      "n": 1,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 91.35578007820324,
+      "label": "analytic_111",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 1,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 91.41222480405692,
+      "label": "analytic_6120",
+      "m": 6,
+      "multiplicity": 2,
+      "n": 12,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 91.66579595636671,
+      "label": "analytic_9100",
+      "m": 9,
+      "multiplicity": 2,
+      "n": 10,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 91.86253405535182,
+      "label": "analytic_021",
+      "m": 0,
+      "multiplicity": 2,
+      "n": 2,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 92.11486561764877,
+      "label": "analytic_121",
+      "m": 1,
+      "multiplicity": 4,
+      "n": 2,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 92.67314264155249,
+      "label": "analytic_4130",
+      "m": 4,
+      "multiplicity": 4,
+      "n": 13,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 92.86774672521108,
+      "label": "analytic_221",
+      "m": 2,
+      "multiplicity": 2,
+      "n": 2,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 93.1173543787879,
+      "label": "analytic_031",
+      "m": 0,
+      "multiplicity": 2,
+      "n": 3,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 93.36629472776345,
+      "label": "analytic_131",
+      "m": 1,
+      "multiplicity": 4,
+      "n": 3,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 94.10916483133853,
+      "label": "analytic_231",
+      "m": 2,
+      "multiplicity": 4,
+      "n": 3,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 94.6556802551019,
+      "label": "analytic_7120",
+      "m": 7,
+      "multiplicity": 2,
+      "n": 12,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 94.84621668423313,
+      "label": "analytic_041",
+      "m": 0,
+      "multiplicity": 2,
+      "n": 4,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 94.90058539989575,
+      "label": "analytic_5130",
+      "m": 5,
+      "multiplicity": 2,
+      "n": 13,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 95.0906311052741,
+      "label": "analytic_141",
+      "m": 1,
+      "multiplicity": 4,
+      "n": 4,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 95.33441890883974,
+      "label": "analytic_331",
+      "m": 3,
+      "multiplicity": 2,
+      "n": 3,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 95.631537806852,
+      "label": "analytic_1140",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 14,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 95.82013378230997,
+      "label": "analytic_241",
+      "m": 2,
+      "multiplicity": 4,
+      "n": 4,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 96.35694545471965,
+      "label": "analytic_2140",
+      "m": 2,
+      "multiplicity": 3,
+      "n": 14,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 96.83753170510624,
+      "label": "analytic_9110",
+      "m": 9,
+      "multiplicity": 2,
+      "n": 11,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 97.02378348371019,
+      "label": "analytic_051",
+      "m": 0,
+      "multiplicity": 6,
+      "n": 5,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 97.26272598575825,
+      "label": "analytic_151",
+      "m": 1,
+      "multiplicity": 4,
+      "n": 5,
+      "p": 1
+    }
+  ],
+  "candidate_sha256": "472c2e612261e97736d961b778ceaaa2a077f7255a0c2154f7e77a2829fb1f16",
+  "config": {
+    "Boundaries": {
+      "PEC": {
+        "Attributes": [
+          2
+        ]
+      }
+    },
+    "Domains": {
+      "Materials": [
+        {
+          "Attributes": [
+            1
+          ],
+          "LossTan": 0.0,
+          "Permeability": 1.0,
+          "Permittivity": 1.0
+        }
+      ],
+      "Postprocessing": {
+        "Probe": [
+          {
+            "Center": [
+              -4.18,
+              -5.9399999999999995,
+              0.7424999999999999
+            ],
+            "Index": 1
+          },
+          {
+            "Center": [
+              3.74,
+              -1.9800000000000004,
+              0.9075
+            ],
+            "Index": 2
+          },
+          {
+            "Center": [
+              -6.82,
+              4.619999999999999,
+              0.825
+            ],
+            "Index": 3
+          }
+        ]
+      }
+    },
+    "Model": {
+      "L0": 0.001,
+      "Mesh": "mesh.msh",
+      "Refinement": {
+        "UniformLevels": 0
+      }
+    },
+    "Problem": {
+      "Output": "postpro",
+      "Type": "Eigenmode",
+      "Verbose": 2
+    },
+    "Solver": {
+      "Device": "CPU",
+      "Eigenmode": {
+        "N": 16,
+        "Save": 0,
+        "Target": 91.002153,
+        "Tol": 1e-06
+      },
+      "Linear": {
+        "KSPType": "GMRES",
+        "MaxIts": 400,
+        "Tol": 1e-08,
+        "Type": "Default"
+      },
+      "Order": 2
+    }
+  },
+  "config_file": "config.json",
+  "config_sha256": "79e3b59b613e6f367ae0748968ed1930b3ac34540cc8cb7f73bd86550e217b10",
+  "effective": {
+    "characteristic_length_mm": 0.5499999999999999,
+    "eigenmodes_requested": 16,
+    "probes_mm": [
+      [
+        -4.18,
+        -5.9399999999999995,
+        0.7424999999999999
+      ],
+      [
+        3.74,
+        -1.9800000000000004,
+        0.9075
+      ],
+      [
+        -6.82,
+        4.619999999999999,
+        0.825
+      ]
+    ],
+    "target_GHz": 91.002153
+  },
+  "expected_solver_modes_GHz": [
+    91.10134603292212,
+    91.10134603292212,
+    91.35578007820324,
+    91.35578007820324,
+    91.41222480405692,
+    91.41222480405692,
+    91.66579595636671,
+    91.66579595636671,
+    91.86253405535182,
+    91.86253405535182,
+    92.11486561764877,
+    92.11486561764877,
+    92.11486561764877,
+    92.11486561764877,
+    92.67314264155249,
+    92.67314264155249
+  ],
+  "geometry_note": "No PicoGK geometry was generated; the solver domain is the empty vacuum cavity derived from the candidate parameters.",
+  "image": "qmhp-cem/palace:0.13.0",
+  "mesh": {
+    "boundary_triangle_count": 8704,
+    "characteristic_length_mm": 0.5499999999999999,
+    "file": "mesh.msh",
+    "format": "msh2.2-ascii",
+    "gmsh_version": "4.15.2",
+    "node_count": 6474,
+    "physical_groups": {
+      "pec_surfaces": 2,
+      "vacuum_volume": 1
+    },
+    "sha256": "96e682af0a3f3a151af489cee9f776a636c1852779e17881b0d4d0772d10c4bc",
+    "tetrahedron_count": 26188
+  },
+  "mpi_processes": 1,
+  "output_dir": "postpro",
+  "overrides": {
+    "domain": {
+      "mesh_length_mm": 0.5499999999999999,
+      "x_max_mm": 11.0,
+      "x_min_mm": -11.0,
+      "y_max_mm": 11.0,
+      "y_min_mm": -11.0,
+      "z_max_mm": 1.65,
+      "z_min_mm": 0.0
+    },
+    "eigenmodes": 16,
+    "label": "object001_height-d1.65-L1",
+    "mesh_length_mm": 0.5499999999999999,
+    "probes_mm": [
+      [
+        -4.18,
+        -5.9399999999999995,
+        0.7424999999999999
+      ],
+      [
+        3.74,
+        -1.9800000000000004,
+        0.9075
+      ],
+      [
+        -6.82,
+        4.619999999999999,
+        0.825
+      ]
+    ],
+    "target_GHz": 91.002153
+  },
+  "runtime": "docker",
+  "solver_domain_mm": {
+    "mesh_length_mm": 0.5499999999999999,
+    "x_max_mm": 11.0,
+    "x_min_mm": -11.0,
+    "y_max_mm": 11.0,
+    "y_min_mm": -11.0,
+    "z_max_mm": 1.65,
+    "z_min_mm": 0.0
+  },
+  "solver_domain_size_mm": [
+    22.0,
+    22.0,
+    1.65
+  ],
+  "solver_rules": {
+    "characteristic_mesh_length_rule": "min(cavity_width, cavity_height) / 12",
+    "domain": "empty vacuum cavity of Object 001 as a closed PEC box; chip, recess step, launches and lid are NOT modelled in this milestone. All requested modes are TM_mn0: independent of height_above_chip_mm, so the closed-form check verifies the X/Y extent and unit scaling, not the height.",
+    "eigenmode_backward_error_max_tolerance": 1e-06,
+    "eigenmode_target_fraction_of_analytic_fundamental": 0.85,
+    "eigenmodes_requested": 4,
+    "eigenvalue_tolerance": 1e-06,
+    "expected_relative_deviation": 0.0001,
+    "finite_element_order": 2,
+    "linear_solver_max_iterations": 400,
+    "linear_solver_tolerance": 1e-08
+  }
+}

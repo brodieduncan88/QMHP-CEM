@@ -1,0 +1,266 @@
+{
+  "adapter_version": "0.2.0-adapter",
+  "analytic_reference": [
+    {
+      "frequency_GHz": 9.635694545471965,
+      "label": "analytic_110",
+      "m": 1,
+      "multiplicity": 1,
+      "n": 1,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 15.235370800676153,
+      "label": "analytic_120",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 2,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 19.27138909094393,
+      "label": "analytic_220",
+      "m": 2,
+      "multiplicity": 1,
+      "n": 2,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 20.624961993474823,
+      "label": "analytic_011",
+      "m": 0,
+      "multiplicity": 2,
+      "n": 1,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 21.546068014099255,
+      "label": "analytic_130",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 3,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 21.721242181769906,
+      "label": "analytic_111",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 1,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 23.762553972431885,
+      "label": "analytic_021",
+      "m": 0,
+      "multiplicity": 2,
+      "n": 2,
+      "p": 1
+    },
+    {
+      "frequency_GHz": 24.56629725719056,
+      "label": "analytic_230",
+      "m": 2,
+      "multiplicity": 2,
+      "n": 3,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 24.720078397520453,
+      "label": "analytic_121",
+      "m": 1,
+      "multiplicity": 4,
+      "n": 2,
+      "p": 1
+    }
+  ],
+  "candidate_sha256": "472c2e612261e97736d961b778ceaaa2a077f7255a0c2154f7e77a2829fb1f16",
+  "config": {
+    "Boundaries": {
+      "PEC": {
+        "Attributes": [
+          2
+        ]
+      }
+    },
+    "Domains": {
+      "Materials": [
+        {
+          "Attributes": [
+            1
+          ],
+          "LossTan": 0.0,
+          "Permeability": 1.0,
+          "Permittivity": 1.0
+        }
+      ],
+      "Postprocessing": {
+        "Probe": [
+          {
+            "Center": [
+              -4.18,
+              -5.9399999999999995,
+              3.4650000000000003
+            ],
+            "Index": 1
+          },
+          {
+            "Center": [
+              3.74,
+              -1.9800000000000004,
+              4.235
+            ],
+            "Index": 2
+          },
+          {
+            "Center": [
+              -6.82,
+              4.619999999999999,
+              3.85
+            ],
+            "Index": 3
+          }
+        ]
+      }
+    },
+    "Model": {
+      "L0": 0.001,
+      "Mesh": "mesh.msh",
+      "Refinement": {
+        "UniformLevels": 0
+      }
+    },
+    "Problem": {
+      "Output": "postpro",
+      "Type": "Eigenmode",
+      "Verbose": 2
+    },
+    "Solver": {
+      "Device": "CPU",
+      "Eigenmode": {
+        "N": 8,
+        "Save": 0,
+        "Target": 19.948176,
+        "Tol": 1e-06
+      },
+      "Linear": {
+        "KSPType": "GMRES",
+        "MaxIts": 400,
+        "Tol": 1e-08,
+        "Type": "Default"
+      },
+      "Order": 2
+    }
+  },
+  "config_file": "config.json",
+  "config_sha256": "28837f0a4125158ff2d18ca5cdbca788762e6c535ddf2bfaa73e59fede936b54",
+  "effective": {
+    "characteristic_length_mm": 1.8333333333333333,
+    "eigenmodes_requested": 8,
+    "probes_mm": [
+      [
+        -4.18,
+        -5.9399999999999995,
+        3.4650000000000003
+      ],
+      [
+        3.74,
+        -1.9800000000000004,
+        4.235
+      ],
+      [
+        -6.82,
+        4.619999999999999,
+        3.85
+      ]
+    ],
+    "target_GHz": 19.948176
+  },
+  "expected_solver_modes_GHz": [
+    20.624961993474823,
+    20.624961993474823,
+    21.546068014099255,
+    21.546068014099255,
+    21.721242181769906,
+    21.721242181769906,
+    23.762553972431885,
+    23.762553972431885
+  ],
+  "geometry_note": "No PicoGK geometry was generated; the solver domain is the empty vacuum cavity derived from the candidate parameters.",
+  "image": "qmhp-cem/palace:0.13.0",
+  "mesh": {
+    "boundary_triangle_count": 1252,
+    "characteristic_length_mm": 1.8333333333333333,
+    "file": "mesh.msh",
+    "format": "msh2.2-ascii",
+    "gmsh_version": "4.15.2",
+    "node_count": 865,
+    "physical_groups": {
+      "pec_surfaces": 2,
+      "vacuum_volume": 1
+    },
+    "sha256": "c9ec431d683f206612ab0b740f41fcd6dab69797635e9058be9d8c6397ab6650",
+    "tetrahedron_count": 3206
+  },
+  "mpi_processes": 1,
+  "output_dir": "postpro",
+  "overrides": {
+    "domain": {
+      "mesh_length_mm": 1.8333333333333333,
+      "x_max_mm": 11.0,
+      "x_min_mm": -11.0,
+      "y_max_mm": 11.0,
+      "y_min_mm": -11.0,
+      "z_max_mm": 7.7,
+      "z_min_mm": 0.0
+    },
+    "eigenmodes": 8,
+    "label": "aux_height-d7.7-L1",
+    "mesh_length_mm": 1.8333333333333333,
+    "probes_mm": [
+      [
+        -4.18,
+        -5.9399999999999995,
+        3.4650000000000003
+      ],
+      [
+        3.74,
+        -1.9800000000000004,
+        4.235
+      ],
+      [
+        -6.82,
+        4.619999999999999,
+        3.85
+      ]
+    ],
+    "target_GHz": 19.948176
+  },
+  "runtime": "docker",
+  "solver_domain_mm": {
+    "mesh_length_mm": 1.8333333333333333,
+    "x_max_mm": 11.0,
+    "x_min_mm": -11.0,
+    "y_max_mm": 11.0,
+    "y_min_mm": -11.0,
+    "z_max_mm": 7.7,
+    "z_min_mm": 0.0
+  },
+  "solver_domain_size_mm": [
+    22.0,
+    22.0,
+    7.7
+  ],
+  "solver_rules": {
+    "characteristic_mesh_length_rule": "min(cavity_width, cavity_height) / 12",
+    "domain": "empty vacuum cavity of Object 001 as a closed PEC box; chip, recess step, launches and lid are NOT modelled in this milestone. All requested modes are TM_mn0: independent of height_above_chip_mm, so the closed-form check verifies the X/Y extent and unit scaling, not the height.",
+    "eigenmode_backward_error_max_tolerance": 1e-06,
+    "eigenmode_target_fraction_of_analytic_fundamental": 0.85,
+    "eigenmodes_requested": 4,
+    "eigenvalue_tolerance": 1e-06,
+    "expected_relative_deviation": 0.0001,
+    "finite_element_order": 2,
+    "linear_solver_max_iterations": 400,
+    "linear_solver_tolerance": 1e-08
+  }
+}

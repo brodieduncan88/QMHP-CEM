@@ -1,0 +1,163 @@
+{
+  "batch_id": "PALACE-VERIFY-20260915T063014Z",
+  "campaign": "mesh-height-verification-v1",
+  "campaign_sha256": "249e1a12a4853850a3feb47d0caa619173d6fecb53a4b838dc3431afca66ba2d",
+  "complete": false,
+  "ended_utc": "2026-09-15T06:30:18.358030+00:00",
+  "environment": {
+    "architecture": "x86_64",
+    "dependency_lock_sha256": "107a13f00febe62d1e3dbee42ff0e65205746f04aa92fbb350d7aa03b003d498",
+    "dotnet_version": null,
+    "ended_utc": "2026-09-15T06:30:18.358030Z",
+    "git_commit": "d789d7208bbd3d63626a5f7bf499a3804b31e365",
+    "os": "Linux 6.17.0-1022-azure",
+    "picogk_version": "2.3.0",
+    "python_version": "3.11.16",
+    "shapekernel_revision": null,
+    "solver_identity": "qmhp-cem/palace:0.13.0@sha256:732526ecea92853418d2ed009475825063e400dc9fa06471d90d9c89e04cce9e",
+    "solver_version": "0.13.0+a61c8cbe0cac",
+    "started_utc": "2026-09-15T06:30:14.744195Z",
+    "uv_version": "(x86_64-unknown-linux-gnu)"
+  },
+  "execution": "palace",
+  "height": {
+    "aux_height": {
+      "delta_f_exact_GHz": -1.8466170624533156,
+      "f_exact_GHz": {
+        "7": 22.47157905592814,
+        "7.7": 20.624961993474823
+      },
+      "is_object001": false,
+      "label": "AUXILIARY taller box (22 x 22 x 7.0 mm against 7.7 mm); not a verification of Object 001",
+      "levels": {},
+      "reasons": [
+        "no run of this benchmark could be executed within the budget"
+      ],
+      "verdict": "BLOCKED"
+    },
+    "object001_height": {
+      "delta_f_exact_GHz": -9.061481190145642,
+      "f_exact_GHz": {
+        "1.5": 100.16282722306777,
+        "1.65": 91.10134603292212
+      },
+      "is_object001": true,
+      "label": "Object 001 box (22 x 22 x 1.5 mm against 1.65 mm)",
+      "levels": {},
+      "reasons": [
+        "no run of this benchmark could be executed within the budget"
+      ],
+      "verdict": "BLOCKED"
+    }
+  },
+  "mesh_convergence": {
+    "degenerate_pair": [
+      {
+        "run": "ladder-L1",
+        "status": "RUN_FAILED"
+      }
+    ],
+    "expected_analytic_GHz": [
+      9.635694545471965,
+      15.235370800676153,
+      15.235370800676153,
+      19.27138909094393
+    ],
+    "reasons": [
+      "0 of 1 levels converged; 3 required"
+    ],
+    "table": [
+      {
+        "analytic_GHz": [
+          9.635694545471965,
+          15.235370800676153,
+          15.235370800676153,
+          19.27138909094393
+        ],
+        "backward_error_max": null,
+        "backward_errors": [],
+        "dof": null,
+        "frequencies_GHz": [],
+        "max_abs_relative_analytic_error": null,
+        "max_abs_relative_change_vs_previous_level": null,
+        "mesh_length_mm": 1.8333333333333333,
+        "mesh_sha256": "7602c8c3815d1d76f670789328729389e2b83c978cce23e5557c9cfc48b2e3db",
+        "nodes": 443,
+        "palace_status": null,
+        "palace_total_s": null,
+        "relative_analytic_error": [],
+        "relative_change_vs_previous_level": null,
+        "run": "ladder-L1",
+        "runtime_s": null,
+        "status": "RUN_FAILED",
+        "tetrahedra": 1200
+      }
+    ],
+    "verdict": "INCOMPLETE"
+  },
+  "runs": {
+    "ladder-L1": {
+      "backward_error_max": null,
+      "backward_errors": [],
+      "config_sha256": "0f63c27c5cb57de81e74c37dddd83c377d2ca3c0c1d4717409cc9defec9843ba",
+      "dof": null,
+      "dof_estimate": 9840,
+      "failure": "PalaceRunFailed: Palace exited with code 1; command: docker run --rm --network none --hostname localhost --name qmhp-palace-RUN-PALACE-VERIFY-20260915T063014Z-ladder-L1-QMHP-CEM-A-RF-000001 --user 1001:1001 -e HOME=/tmp -v /home/runner/work/QMHP-CEM/QMHP-CEM/results/PALACE-VERIFY-20260915T063014Z/runs/ladder-L1/solver:/work -w /work qmhp-cem/palace:0.13.0 -np 1 config.json; log tail:\n\n\nVerification failed: (iodata.domains.postpro.probe.empty()) is false:\n --> InterpolationOperator class requires MFEM_USE_GSLIB!\n ... in function: palace::InterpolationOperator::InterpolationOperator(const palace::IoData&, mfem::ParMesh&)\n ... in file: /opt/palace-src/palace/fem/interpolator.cpp:64\n\n--------------------------------------------------------------------------\nMPI_ABORT was invoked on rank 0 in communicator MPI_COMM_WORLD\nwith errorcode 1.\n\nNOTE: invoking MPI_ABORT causes Open MPI to kill all MPI processes.\nYou may or may not see output from other processes, depending on\nexactly when Open MPI kills them.\n--------------------------------------------------------------------------",
+      "frequencies_GHz": [],
+      "mesh_length_mm": 1.8333333333333333,
+      "mesh_sha256": "7602c8c3815d1d76f670789328729389e2b83c978cce23e5557c9cfc48b2e3db",
+      "name": "ladder-L1",
+      "nodes": 443,
+      "palace_status": null,
+      "palace_total_s": null,
+      "runtime_s": null,
+      "status": "RUN_FAILED",
+      "tetrahedra": 1200,
+      "z_fraction": {}
+    }
+  },
+  "runs_selected": [
+    "ladder-L1",
+    "ladder-L2",
+    "ladder-L3",
+    "aux_height-d7-L1",
+    "aux_height-d7.7-L1",
+    "aux_height-d7-L2",
+    "aux_height-d7.7-L2",
+    "object001_height-d1.5-L1",
+    "object001_height-d1.65-L1",
+    "object001_height-d1.5-L2",
+    "object001_height-d1.65-L2"
+  ],
+  "schema": "qmhp-cem.palace-verify-summary/0.2.0",
+  "solver_provenance": {
+    "adapter_version": "0.2.0-adapter",
+    "image": "qmhp-cem/palace:0.13.0",
+    "image_id": "sha256:732526ecea92853418d2ed009475825063e400dc9fa06471d90d9c89e04cce9e",
+    "labels": {
+      "org.opencontainers.image.description": "Palace EM solver for QMHP-CEM, built from the pinned release tag",
+      "org.opencontainers.image.title": "qmhp-cem/palace",
+      "org.opencontainers.image.version": "24.04",
+      "org.qmhp.cem.apt-snapshot": "20260914T000000Z",
+      "org.qmhp.cem.palace-commit": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+      "org.qmhp.cem.palace-version": "0.13.0",
+      "org.qmhp.cem.solver": "palace",
+      "org.qmhp.cem.spec": "QMHP-CEM v0.2 \u00a710.3"
+    },
+    "mpi_processes": 1,
+    "palace_commit": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+    "palace_version": "0.13.0",
+    "reference": "qmhp-cem/palace:0.13.0",
+    "repo_digest": null,
+    "rootless_runtime": false,
+    "runtime": "docker",
+    "solver": "palace"
+  },
+  "started_utc": "2026-09-15T06:30:14.744195+00:00",
+  "statement": "Numerical verification of the empty PEC box only. Mesh convergence of the 22 x 22 x 1.5 mm box on three meshes, and height sensitivity through p >= 1 modes: the Object 001 box itself where the runner budget allows, and an auxiliary 22 x 22 x 7.0/7.7 mm box that verifies the Z pipeline and is not a verification of Object 001. All rules are ENGINEERING-RULEs of numerical verification, not frozen QMHP physical requirements. No mode splitting here is physical QMHP coupling.",
+  "verdicts": {
+    "height_sensitivity_aux": "BLOCKED",
+    "height_sensitivity_object001": "BLOCKED",
+    "mesh_convergence": "INCOMPLETE"
+  }
+}

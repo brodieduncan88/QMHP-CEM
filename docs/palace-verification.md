@@ -1,0 +1,138 @@
+# Palace mesh-refinement and height-sensitive verification (v0.2)
+
+The second bounded v0.2 milestone: numerical verification of the empty-cavity
+benchmark that the golden run established. It answers two questions the golden
+records cannot: does the answer converge under mesh refinement, and does the
+cavity height actually enter the calculation. Everything here is an
+ENGINEERING-RULE of numerical verification. Nothing is a frozen QMHP
+physical requirement, and nothing is evidence about the physical package.
+
+The campaign is defined in `solvers/palace/verification.py` (frozen into
+`campaign.json` with its sha256 in every record), executed by
+`scripts/palace_verify_campaign.py`, and run unattended by
+`.github/workflows/palace-verify.yml`. Records go to
+`results/PALACE-VERIFY-<UTC>/`, append-only; the five `PALACE-GOLDEN-*`
+records are not touched.
+
+## What is executed
+
+Each run goes through the unchanged adapter boundary
+`prepare → run → parse → validate_convergence`, with its mesh length, mode
+count, target and field probes set explicitly through `RunContext.extra`.
+Without those overrides the adapter is byte-for-byte the golden path (a test
+compares a fresh `prepare()` with the committed golden record).
+
+**Objective 1, mesh convergence.** The 22 × 22 × 1.5 mm box at
+h0 = 22/12 mm, h0/1.5 and h0/2, with the golden physics, order 2, tolerances
+and target. Four modes each: (1,1,0), the degenerate (1,2,0)/(2,1,0) pair,
+(2,2,0). Rules: finest-level relative analytic error ≤ 1e-4 for every mode,
+relative change between the final two levels ≤ 1e-4, and the unchanged
+backward-error rule. The pair is reported as both modes, their centre and
+their splitting per level; that splitting is the mesh breaking an exact
+degeneracy and is not physical coupling.
+
+**Objective 2, height sensitivity.** The four golden modes are TM_mn0 and
+do not depend on the height at all, so they verify nothing about Z. A
+height-sensitive verification needs p ≥ 1 modes, which for a box of height d
+start at f ≈ c/(2d):
+
+| Benchmark | Box | Heights | (0,1,1) mode | modes below it | Δf_exact |
+|---|---|---|---|---|---|
+| `object001_height` (Object 001) | 22 × 22 mm | 1.5 / 1.65 mm | 100.163 / 91.101 GHz | 154 / 127 | −9.061 GHz (−9.05 %) |
+| `aux_height` (auxiliary, not Object 001) | 22 × 22 mm | 7.0 / 7.7 mm | 22.472 / 20.625 GHz | 6 / 4 | −1.847 GHz (−8.22 %) |
+
+The analytic enumeration is range-aware (index bounds derived from the
+frequency ceiling), so the 154 modes below Object 001's first
+height-dependent mode are all accounted for; a fixed index cap would not do.
+
+The mesh rule for height runs is `min(min(a,b)/12, d/4, λ(f_target)/6)`: the
+shortest structure decides. It is applied to each height separately, so the
+two heights of one benchmark can carry different lengths at the same level
+(for the auxiliary box, d/4 = 1.75 mm at 7.0 mm but a/12 = 1.8333 mm at
+7.7 mm). Runs are therefore paired by refinement level, never by mesh
+length. Palace returns eigenvalues close to but not below its target, so the
+target is placed midway between the wanted mode and the highest analytic
+mode below it, and enough modes are requested to cover a 1 % window above
+the mode plus a margin. Three field probes are added per run; the fraction
+`Σ|E_z|²/Σ|E|²` over the probes classifies each computed mode as z-polarised
+(TM_mn0, height-independent) or not (p ≥ 1), independently of its frequency.
+That fraction separates p = 0 from p ≥ 1; it does not separate TE from TM
+at p ≥ 1 in a flat box, because a TM_mnp mode with p ≥ 1 has E_z ∝ cos(pπz/d),
+which is small near mid-height where the probes sit, while its transverse
+components scale with k_z/k_c ≫ 1. The recorded family label for such a
+mode reads "transverse", and the consistency check asks only that a p ≥ 1
+mode is not z-polarised. The selected (0,1,1) mode is TE-only, so its
+transverse classification is exact. Mode matching assigns computed modes to
+analytic ones by frequency within 2e-3 relative, honouring multiplicity, and
+records the probe family and whether it agrees; every decision is written to
+`mode_matching.json`.
+
+For the wanted mode, Δf_Palace = f(height 2) − f(height 1) is compared with
+Δf_exact. Rules: relative disagreement ≤ 1e-2, and |Δf_exact| at least 10×
+the numerical uncertainty, which is the change of the identified mode
+between the final two mesh levels; PASS needs two mesh levels at both
+heights. A single level is INCOMPLETE. A benchmark is BLOCKED when none of
+its runs could be launched within the budget, or when every launched run
+failed or timed out: that is a measured limit of the runner, not a skipped
+benchmark, and the failure of each attempt is recorded in the verdict.
+
+**The Object 001 box.** Resolving a 100 GHz mode in a 22 mm box to the
+declared rule (0.375 mm) meshes to about 545k degrees of freedom, above the
+declared runner budget of 400k, so that level is BLOCKED before Palace is
+launched and its mesh is kept as evidence. The campaign then makes one
+bounded exploratory attempt per height at d/3 (about 260k and 215k DOF, one
+hour each). Without refinement that benchmark can be at most INCOMPLETE, and
+in the executed campaigns both exploratory attempts ran out their one-hour
+budget on the GitHub-hosted runner, so the benchmark is BLOCKED with those
+timeouts as the measurement. The auxiliary box is what verifies the Z
+pipeline; it is labelled auxiliary everywhere and is not represented as
+verification of Object 001.
+
+## Execution configuration
+
+One MPI process, `OMP_NUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1` (the image
+pins both), GitHub-hosted `ubuntu-latest`. The workflow shares the golden
+workflow's layer cache, runs the campaign with `--record-pointer`, re-hashes
+the record (`cem verify-results`, a mismatch fails the job), uploads it,
+commits it to the branch, and fails the job if the campaign or the manifest
+check did not succeed.
+
+## Status
+
+Three records exist on the milestone branch, all produced by the
+`Palace verification campaign` workflow on GitHub-hosted `ubuntu-latest`
+with image `qmhp-cem/palace:0.13.0@sha256:f41ad915…` (Palace 0.13.0,
+commit a61c8cbe, GSLIB on), one MPI process, one thread:
+
+| record | workflow run | verdicts | note |
+|---|---|---|---|
+| `PALACE-VERIFY-20260915T063014Z` | 34937561169 (first attempt) | none | aborted after the first run by a report-rendering error, no manifest; kept as evidence of the fix |
+| `PALACE-VERIFY-20260915T065055Z` | 34937561169 | mesh PASS, aux INCOMPLETE, Object 001 INCOMPLETE | complete; `height_shift` then paired runs by mesh length, so the auxiliary levels never lined up; kept as executed |
+| `PALACE-VERIFY-20260915T091242Z` | 34951039973 | mesh PASS, aux PASS, Object 001 BLOCKED | complete; pairing by level |
+
+The Palace real frequencies of the two complete records agree to every
+printed digit (ten significant figures); their imaginary parts, Q values
+and residual columns differ at the 1e-10 GHz and 1e-11 level, so unlike the
+golden run the campaign `eig.csv` files are not byte-identical between
+executions.
+
+Mesh convergence, 22 × 22 × 1.5 mm box (record `…091242Z`):
+
+| level | lc (mm) | tets | DOF | max relative analytic error | change vs previous | pair splitting |
+|---|---|---|---|---|---|---|
+| L1 | 1.8333 | 1200 | 9848 | 4.72e-5 | – | 0.253 MHz |
+| L2 | 1.2222 | 2566 | 20936 | 6.75e-6 | 4.05e-5 | 0.057 MHz |
+| L3 | 0.9167 | 4561 | 36708 | 7.27e-6 | 1.40e-5 | 0.001 MHz |
+
+Height sensitivity, auxiliary 22 × 22 × 7.0/7.7 mm box, mode (0,1,1):
+Δf_Palace −1.84673 GHz against Δf_exact −1.84662 GHz at L2, relative
+disagreement 6.2e-5, numerical uncertainty 2.3e-3 GHz, |Δf_exact| 793× the
+uncertainty; the mode is identified twice at each height and level (square
+box degeneracy), classified transverse by the probes at every level. This
+verifies the Z pipeline; it is not a verification of Object 001.
+
+Height sensitivity, Object 001 box (1.5 mm against 1.65 mm): BLOCKED. The
+rule-level meshes (0.375 / 0.4125 mm, about 545k / 460k estimated DOF) exceed
+the 400k budget and were not launched; the exploratory d/3 meshes (0.5 /
+0.55 mm, about 261k / 215k estimated DOF) ran out their 3600 s budget in
+both campaigns. The meshes and the timeouts are the evidence.
