@@ -259,19 +259,26 @@ AUX = next(b for b in V.height_benchmarks() if b.name == "aux_height")
 
 def _height_results(bench: V.HeightBenchmark, errors_by_level: dict[float, tuple[float, float]], *,
                     status="CONVERGED", wrong_z=False, identify=True):
-    """Synthetic converged runs at both heights; errors are per (height1, height2)."""
+    """Synthetic converged runs at both heights; errors are per (height1, height2).
+
+    The second height gets a different mesh length at the same level, as the
+    declared rule does for the auxiliary box (d/4 = 1.75 against 22/12).
+    """
     results: dict[str, list[V.RunResult]] = {}
     decisions: dict[str, list[dict]] = {}
     for d in bench.heights_mm:
         box = bench.box(d)
         f_true = box.frequency(*bench.mode)
-        for lc, (e1, e2) in errors_by_level.items():
+        for level, (lc, (e1, e2)) in enumerate(errors_by_level.items(), start=1):
             err = e1 if d == bench.heights_mm[0] else e2
             f_used = bench.box(bench.heights_mm[0]).frequency(*bench.mode) if wrong_z else f_true
             freqs = sorted([f_used * (1 + err), f_used * (1 + err * 1.1), f_used * 1.04, f_used * 1.08])
-            name = f"{bench.name}-d{d:g}-L{lc}"
-            rr = V.RunResult(name=name, status=status, mesh_length_mm=lc, frequencies_GHz=freqs if status == "CONVERGED" else [],
-                             backward_error_max=1e-11, palace_status=status)
+            name = f"{bench.name}-d{d:g}-L{level}"
+            lc_here = lc if d == bench.heights_mm[0] else lc * 1.05
+            rr = V.RunResult(name=name, status=status, mesh_length_mm=lc_here, level=level,
+                             frequencies_GHz=freqs if status == "CONVERGED" else [],
+                             backward_error_max=1e-11, palace_status=status,
+                             failure=(None if status == "CONVERGED" else f"simulated {status}"))
             results.setdefault(f"{d:g}", []).append(rr)
             if identify and status == "CONVERGED":
                 decisions[name] = V.match_modes(freqs, box, max(freqs) * 1.05, {1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0})
@@ -295,8 +302,25 @@ def test_height_sensitivity_is_incomplete_with_one_level_or_no_identification():
     results, decisions = _height_results(AUX, {1.75: (3e-5, 4e-5), 1.1667: (8e-6, 1e-5)}, identify=False)
     assert V.height_shift(AUX, results, decisions)["verdict"] == V.INCOMPLETE
     results, decisions = _height_results(AUX, {1.75: (3e-5, 4e-5), 1.1667: (8e-6, 1e-5)}, status="NOT_CONVERGED")
-    assert V.height_shift(AUX, results, decisions)["verdict"] == V.INCOMPLETE
+    assert V.height_shift(AUX, results, decisions)["verdict"] == V.BLOCKED     # attempted, nothing converged
     assert V.height_shift(AUX, {}, {})["verdict"] == V.BLOCKED
+
+
+def test_height_runs_pair_by_level_even_with_different_mesh_lengths():
+    """The auxiliary rule gives d=7.0 lc=1.75 mm and d=7.7 lc=1.8333 mm at level 1; they must still pair."""
+    results, decisions = _height_results(AUX, {1.75: (3e-5, 4e-5), 1.1667: (8e-6, 1e-5)})
+    lengths = {r.mesh_length_mm for rs in results.values() for r in rs}
+    assert len(lengths) == 4                       # four distinct mesh lengths across two levels
+    out = V.height_shift(AUX, results, decisions)
+    assert out["verdict"] == V.PASS and set(out["levels"]) == {"L1", "L2"}
+
+
+def test_all_timed_out_attempts_are_a_measured_block():
+    obj = next(b for b in V.height_benchmarks() if b.is_object001)
+    results, decisions = _height_results(obj, {0.5: (0.0, 0.0)}, status="RUN_FAILED")
+    out = V.height_shift(obj, results, decisions)
+    assert out["verdict"] == V.BLOCKED
+    assert any("RUN_FAILED" in r for r in out["reasons"])
 
 
 def test_wrong_z_dimension_fails_the_height_benchmark():

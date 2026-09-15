@@ -69,7 +69,7 @@ def execute_run(adapter: PalaceSolver, candidate: Candidate, spec: V.RunSpec, ru
     """One run through the adapter boundary; never raises, always returns a RunResult."""
     solver_dir = run_dir / "solver"
     solver_dir.mkdir(parents=True, exist_ok=False)
-    rr = V.RunResult(name=spec.name, status="PREPARED", mesh_length_mm=spec.mesh_length_mm)
+    rr = V.RunResult(name=spec.name, status="PREPARED", mesh_length_mm=spec.mesh_length_mm, level=spec.level)
     decisions = None
     try:
         context = RunContext(run_id=run_id, work_dir=solver_dir, extra={"palace": spec.overrides()})
@@ -210,10 +210,10 @@ def render_report(campaign: V.Campaign, summary: dict) -> str:
         if "f_exact_GHz" in h and "mode" in h:
             L.append(f"- mode {tuple(h['mode'])}, heights {h.get('heights_mm')} mm, exact f {h['f_exact_GHz']}, "
                      f"Δf_exact {h['delta_f_exact_GHz']:+.5f} GHz ({h.get('delta_f_exact_relative', 0.0):+.3%})")
-        for lc, lv in h.get("levels", {}).items():
-            L.append(f"- lc {lc} mm: f_Palace {[round(x, 6) for x in lv['f_palace_GHz']]} GHz, Δf_Palace {lv['delta_f_palace_GHz']:+.5f} GHz")
+        for lvl, lv in h.get("levels", {}).items():
+            L.append(f"- {lvl} (lc {lv.get('mesh_length_mm')} mm): f_Palace {[round(x, 6) for x in lv['f_palace_GHz']]} GHz, Δf_Palace {lv['delta_f_palace_GHz']:+.5f} GHz")
         if "relative_disagreement" in h:
-            L.append(f"- finest level {h['finest_level_mm']:.4g} mm: Δf_Palace {h['delta_f_palace_GHz']:+.5f} vs Δf_exact {h['delta_f_exact_GHz']:+.5f} GHz, "
+            L.append(f"- finest level L{h.get('finest_level')}: Δf_Palace {h['delta_f_palace_GHz']:+.5f} vs Δf_exact {h['delta_f_exact_GHz']:+.5f} GHz, "
                      f"relative disagreement {h['relative_disagreement']:.3e}; numerical uncertainty {h['numerical_uncertainty_GHz']:.3e} GHz "
                      f"({h['uncertainty_source']}); |Δf_exact|/uncertainty = {h['shift_to_uncertainty_ratio']:.1f}")
         L.append("")

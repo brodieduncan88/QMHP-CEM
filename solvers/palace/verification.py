@@ -373,6 +373,7 @@ class RunResult:
     name: str
     status: str                                   # CONVERGED | NOT_CONVERGED | RUN_FAILED | BLOCKED | ERROR
     mesh_length_mm: float
+    level: int | None = None                      # refinement level within its benchmark
     nodes: int | None = None
     tetrahedra: int | None = None
     dof: int | None = None
@@ -578,68 +579,88 @@ def height_shift(
     delta_exact = f_exact[f"{d2:g}"] - f_exact[f"{d1:g}"]
     expected_count = 2 if (abs(box1.a_mm - box1.b_mm) < 1e-12 and bench.mode[0] != bench.mode[1]) else 1
 
+    # Runs pair up by refinement LEVEL, not by mesh length: the declared mesh
+    # rule is applied to each height separately and legitimately gives the two
+    # heights different lengths at the same level (d/4 for one, min(a,b)/12
+    # for the other).
     per_level: dict[int, dict[str, Any]] = {}
     executed = 0
+    converged = 0
     for key, box in ((f"{d1:g}", box1), (f"{d2:g}", box2)):
         for r in per_height.get(key, []):
             if r.status in ("BLOCKED",):
                 continue
             executed += 1
-            lvl = per_level.setdefault(r.mesh_length_mm, {})
+            level = r.level if r.level is not None else 0
+            lvl = per_level.setdefault(level, {})
             if r.status != "CONVERGED":
-                lvl[key] = {"status": r.status, "identified": []}
+                lvl[key] = {"status": r.status, "identified": [], "mesh_length_mm": r.mesh_length_mm,
+                            "failure": (r.failure or "")[:200]}
                 continue
+            converged += 1
             found = height_mode_frequencies(decisions.get(r.name, []), bench.mode, box)
-            lvl[key] = {"status": r.status, "identified": found, "mean_GHz": (sum(found) / len(found) if found else None)}
+            lvl[key] = {"status": r.status, "identified": found, "mesh_length_mm": r.mesh_length_mm,
+                        "mean_GHz": (sum(found) / len(found) if found else None)}
     base: dict[str, Any] = {
         "mode": list(bench.mode), "heights_mm": [d1, d2], "f_exact_GHz": f_exact,
         "delta_f_exact_GHz": delta_exact, "delta_f_exact_relative": delta_exact / f_exact[f"{d1:g}"],
         "levels": {}, "levels_executed": len(per_level), "levels_identified": 0,
     }
+    base["per_level"] = {str(k): v for k, v in sorted(per_level.items())}
     if executed == 0:
         return {**base, "verdict": BLOCKED,
                 "reasons": ["no run of this benchmark could be executed within the budget"]}
+    if converged == 0:
+        # Attempted for real and every attempt failed or timed out: the
+        # benchmark is blocked on this runner, and that is a measurement.
+        failures = [f"{key} L{level}: {v['status']} ({v.get('failure', '')[:90]})"
+                    for level, lvl in sorted(per_level.items()) for key, v in lvl.items()]
+        return {**base, "verdict": BLOCKED, "reasons": ["no attempted run converged within its budget"] + failures}
 
-    levels_ok: list[tuple[float, float, float]] = []   # (lc, mean_h1, mean_h2)
+    levels_ok: list[tuple[int, float, float, float]] = []   # (level, lc_max, mean_h1, mean_h2)
     reasons: list[str] = []
-    for lc in sorted(per_level, reverse=True):
-        lvl = per_level[lc]
+    for level in sorted(per_level):
+        lvl = per_level[level]
         a, b = lvl.get(f"{d1:g}"), lvl.get(f"{d2:g}")
         if not a or not b:
-            reasons.append(f"lc={lc:.4g} mm: only one height executed")
+            reasons.append(f"level {level}: only one height executed")
             continue
         if a["status"] != "CONVERGED" or b["status"] != "CONVERGED":
-            reasons.append(f"lc={lc:.4g} mm: {a['status']} / {b['status']}")
+            reasons.append(f"level {level}: {a['status']} / {b['status']}")
             continue
         if len(a["identified"]) != expected_count or len(b["identified"]) != expected_count:
             reasons.append(
-                f"lc={lc:.4g} mm: mode {bench.mode} identified {len(a['identified'])}/{len(b['identified'])} times, "
+                f"level {level}: mode {bench.mode} identified {len(a['identified'])}/{len(b['identified'])} times, "
                 f"{expected_count} expected at each height"
             )
             continue
-        levels_ok.append((lc, a["mean_GHz"], b["mean_GHz"]))
+        levels_ok.append((level, max(a["mesh_length_mm"], b["mesh_length_mm"]), a["mean_GHz"], b["mean_GHz"]))
 
     out: dict[str, Any] = {
         **base,
-        "levels": {f"{lc:.6g}": {"f_palace_GHz": [m1, m2], "delta_f_palace_GHz": m2 - m1} for lc, m1, m2 in levels_ok},
+        "levels": {
+            f"L{level}": {"mesh_length_mm": [per_level[level][f"{d1:g}"]["mesh_length_mm"], per_level[level][f"{d2:g}"]["mesh_length_mm"]],
+                          "f_palace_GHz": [m1, m2], "delta_f_palace_GHz": m2 - m1}
+            for level, _, m1, m2 in levels_ok
+        },
         "levels_identified": len(levels_ok),
     }
     if not levels_ok:
         out.update({"verdict": INCOMPLETE, "reasons": reasons or ["the wanted mode was not identified at both heights"]})
         return out
 
-    lc, m1, m2 = levels_ok[-1]        # finest level with both heights identified
+    level, lc, m1, m2 = levels_ok[-1]        # finest level with both heights identified
     delta_p = m2 - m1
     disagreement = abs(delta_p - delta_exact) / abs(delta_exact)
     out.update({
-        "finest_level_mm": lc, "delta_f_palace_GHz": delta_p,
+        "finest_level": level, "finest_level_mm": lc, "delta_f_palace_GHz": delta_p,
         "relative_disagreement": disagreement,
         "analytic_error_at_finest": [
             (m1 - f_exact[f"{d1:g}"]) / f_exact[f"{d1:g}"], (m2 - f_exact[f"{d2:g}"]) / f_exact[f"{d2:g}"]
         ],
     })
     if len(levels_ok) >= 2:
-        _, p1, p2 = levels_ok[-2]
+        _, _, p1, p2 = levels_ok[-2]
         u = max(abs(m1 - p1), abs(m2 - p2))
         out["numerical_uncertainty_GHz"] = u
         out["uncertainty_source"] = "max change of the identified mode between the final two mesh levels, over both heights"
