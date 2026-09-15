@@ -1,0 +1,35 @@
+{
+  "candidate_id": "QMHP-CEM-A-RF-000001",
+  "classification": "SOLVED",
+  "collision": {
+    "f_readout_GHz": 4.301974466427182,
+    "omega24_GHz": 4.400387626821858
+  },
+  "dressed_system": {
+    "Nph": 12,
+    "Nq": 10,
+    "coupling_g_GHz": 0.15,
+    "logical_pull_MHz": -9.507080402734402,
+    "root_GHz": 4.301974466427182,
+    "sink_line_GHz": 4.310695632311797,
+    "sink_logical_contrast_MHz": 18.228246287349315,
+    "sink_pull_MHz": 8.721165884614912
+  },
+  "master_revision": "v1.5.8f",
+  "purcell": {
+    "emission_GHz": 3.3950563617632405,
+    "f8_weight": 0.011822006351930783
+  },
+  "regression_status": {
+    "note": "Dressed-system quantities are computed for the frozen Branch-A NOMINAL device, not for this candidate's geometry. Candidate geometry enters through the solver results, not through the device Hamiltonian.",
+    "physics_models_implemented": true,
+    "reference": "reference/v1_5_8f_release_bundle/qmhp_v158f_readout_replication.py"
+  },
+  "schema": "qmhp-cem.quantum-results/0.1.0",
+  "spectrum": {},
+  "tolerance": {},
+  "unavailable": [
+    "dressed_system.coupling_extraction: requires eigenmode and black-box extractions from an EM solver (spec \u00a75.5); not available from solver 'palace'.",
+    "tolerance: ensemble not requested for this run (--tolerance-samples 0)."
+  ]
+}
