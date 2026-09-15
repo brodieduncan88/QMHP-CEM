@@ -210,6 +210,49 @@ def test_mesh_sizes_follow_the_ladder_rule(s1):
 
 
 @needs_gmsh
+def test_the_dof_formula_matches_a_committed_palace_run():
+    """The order-2 count is measured, and the measurement is checked against Palace.
+
+    The committed golden record carries both the mesh Palace solved and the
+    DegreesOfFreedom Palace itself reported. Counting edges and faces of that
+    mesh and applying the Nedelec order-2 formula must reproduce that number
+    exactly; if it does not, the dry run's solver-size column is not a
+    measurement and must not be reported as one.
+    """
+    import glob
+    records = sorted(glob.glob(str(REPO_ROOT / "results" / "PALACE-GOLDEN-*" / "QMHP-CEM-A-RF-000001")))
+    assert records, "no committed golden record to check against"
+    checked = 0
+    for record in records:
+        mesh = Path(record) / "solver" / "mesh.msh"
+        palace_json = Path(record) / "solver" / "postpro" / "palace.json"
+        if not (mesh.exists() and palace_json.exists()):
+            continue
+        lines = mesh.read_text().splitlines()
+        start = lines.index("$Elements")
+        count = int(lines[start + 1])
+        edges: set[tuple[int, int]] = set()
+        faces: set[tuple[int, ...]] = set()
+        tets = 0
+        for line in lines[start + 2 : start + 2 + count]:
+            parts = line.split()
+            if int(parts[1]) != 4:          # tetrahedra only
+                continue
+            tets += 1
+            tet = sorted(int(x) for x in parts[-4:])
+            for a in range(4):
+                for b in range(a + 1, 4):
+                    edges.add((tet[a], tet[b]))
+                faces.add(tuple(x for j, x in enumerate(tet) if j != a))
+        reported = json.loads(palace_json.read_text())["Problem"]["DegreesOfFreedom"]
+        assert 2 * len(edges) + 2 * len(faces) == reported, (
+            f"{record}: 2E+2F = {2 * len(edges) + 2 * len(faces)} but Palace reported {reported}"
+        )
+        checked += 1
+    assert checked >= 1
+
+
+@needs_gmsh
 def test_dry_run_small_cell_level_1(small, tmp_path):
     report = cmesh.dry_run(small, 1, tmp_path)
     assert report.aborted_reason is None
@@ -220,8 +263,11 @@ def test_dry_run_small_cell_level_1(small, tmp_path):
     assert all(v > 0 for v in report.triangles_by_tag.values())
     assert sum(report.tetrahedra_by_tag.values()) == report.tetrahedra
     assert report.min_gap_elements == pytest.approx(2.0)
-    assert report.dof_estimate_order2 == round(8.2 * report.tetrahedra)
-    assert report.dof_estimate_order1 == round(1.2 * report.tetrahedra)
+    # Measured, not estimated: the Nedelec space dimension is mesh topology.
+    assert report.dof_order1 == report.edges
+    assert report.dof_order2 == 2 * report.edges + 2 * report.faces
+    assert report.nodes - report.edges + report.faces - report.tetrahedra == 1  # Euler
+    assert report.dof_order2_cross_check_estimate == round(8.2 * report.tetrahedra)
     assert report.mesh_path.exists() and report.mesh_path.suffix == ".msh"
     head = report.mesh_path.read_text().splitlines()[:2]
     assert head[0] == "$MeshFormat" and head[1].startswith("2.2 0")
@@ -229,7 +275,9 @@ def test_dry_run_small_cell_level_1(small, tmp_path):
     json.dumps(d)
     assert d["physical_groups"] == cmesh.TAGS
     assert len(d["sha256"]) == 64
-    assert d["within_budget_order2"] == (d["dof_estimate_order2"] <= 250_000)
+    assert d["within_budget_order2"] == (d["measured"]["dof_order2"] <= 250_000)
+    assert set(d["measured"]) >= {"nodes", "tetrahedra", "edges", "faces", "dof_order1", "dof_order2"}
+    assert "estimate" in d["estimated"]["note"] and "Nothing in the disposition uses it" in d["estimated"]["note"]
 
 
 @needs_gmsh
@@ -287,6 +335,10 @@ def test_dry_run_committed_s1_level_1_within_600s(tmp_path):
     assert d["level"] == 1 and d["h_gap_mm"] == pytest.approx(0.01)
     assert d["physical_groups"] == cmesh.TAGS
     if d["aborted_reason"] is None:
-        assert d["tetrahedra"] > 0
-        assert all(d["triangles_by_tag"][k] > 0 for k in ("sheet_pec", "port_F1", "port_R1_a", "port_R1_b"))
+        m = d["measured"]
+        assert m["tetrahedra"] > 0 and m["edges"] > 0 and m["faces"] > 0
+        # Measured solver-space dimension, not an estimate.
+        assert m["dof_order1"] == m["edges"]
+        assert m["dof_order2"] == 2 * m["edges"] + 2 * m["faces"]
+        assert all(m["triangles_by_tag"][k] > 0 for k in ("sheet_pec", "port_F1", "port_R1_a", "port_R1_b"))
     assert Path(d["mesh_path"]).exists()

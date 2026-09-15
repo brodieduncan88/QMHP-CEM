@@ -18,6 +18,21 @@ bound.
 
 ## 2. Mode identification and hidden-mode screening
 
+**Scope of the assessment, stated before it is made.** The screen can speak
+only about modes **of the represented geometry** — the bounded chip cell as
+declared, with its declared conductors, substrate and PEC walls — and only
+**inside the declared frequency window**. It is silent about, and must never
+be reported as covering: modes of the full 22 × 22 × 1.5 mm Object 001 cavity
+outside the cell; modes of structures the declaration omits (feedline, Purcell
+filter, flux-bias line, wirebonds, superinductor array, the mediator, the
+second device, the second readout mode); anything above the ceiling or below
+the floor of the window; and non-linear or driven structure of any kind. A
+clean screen therefore reads "no unmodelled mode of the represented geometry
+was found in the window", never "there are no other modes". The V2A
+assessment's own warning applies unchanged: a five-node reduction being
+adequate over a band is a statement about that band and that reduction, not
+about the physical layout.
+
 - Route A classifies every eigenmode in the band by (i) the inductive
   participation of the F1 site (`p_mF`), (ii) the probe polarisation
   fractions at three declared probe points (over the pad, over the resonator
@@ -36,12 +51,16 @@ bound.
   identified with a declared structure.
 - The two screens are independent; a hidden mode found by one and not the
   other is itself a reportable disagreement.
+- Both screens are bounded by the scope above. Their negative result is
+  recorded together with the window, the represented geometry and the omitted
+  structures, so that a reader cannot mistake it for a statement about the
+  device.
 
 ## 3. Refinement ladders
 
 | ladder | levels | what converges | rule |
 |---|---|---|---|
-| Route A mesh | `h0`, `h0/1.5`, `h0/2` of the declared rule (gap-resolving size field: 2 elements across the narrowest declared gap at `h0`, box rule `min(a,b)/12` far from conductors) | eigenfrequencies, `p_mF`, derived `E_C` entries | frequencies: final-two-level relative change ≤ 1e-4 (existing rule); `E_C,FR`, `E_C,FF`: final-two-level relative change reported and used as the resolution floor `δ_A`; no threshold on `E_C` is invented |
+| Route A mesh | `h0`, `h0/1.5`, `h0/2` of the declared rule (gap-resolving size field: 2 elements across the narrowest declared gap at `h0`, box rule `min(a,b)/12` far from conductors) | eigenfrequencies, the site energy participation `p_mF`, and the derived invariants `{E_C,FF, f_R, g}` | frequencies: final-two-level relative change ≤ 1e-4 (existing rule); **participation: final-two-level relative change reported, and it is the dominant term in the resolution floor of `g`** — the measured propagation (`route-a-identifiability.md` §6) is that the relative error on `g` tracks the relative error on the participation roughly one-for-one and is nearly insensitive to the frequency error, so about 1 % on the participation is needed for a 1 % Route A floor on `g`; no threshold on the invariants is invented |
 | Route B mesh | its own `h0`, `h0/1.5` (minimum two levels; `h0/2` if the budget allows) | pole frequency, low-frequency capacitance slope, derived `E_C` | pole: ≤ 1e-4 relative change; `E_C`: change reported, floor `δ_B,mesh` |
 | Route B response fit | fit order `n`, `n+1`; adaptive sweep tolerance `1e-2`, `1e-3` | fitted `E_C`, `L_R` | change between the two tolerances and the two orders reported; floor `δ_B,fit`; `δ_B = max(δ_B,mesh, δ_B,fit)` |
 | Chip-cell size (suitability, not extraction) | box 4 × 4 mm and 6 × 6 mm at `h0` | `E_C,FF`, `E_C,FR`, readout frequency | change reported as the wall-proximity uncertainty of the bounded model; it is **not** part of the route disagreement and is listed under omitted effects |
@@ -97,26 +116,64 @@ with a coarser mesh: a coarser ladder is a new declared plan.
 
 ## 8. Measured outcome of step 1 (executed at checkpoint A)
 
-`scripts/coupled_candidate_check.py --sensitivity`, record
-`results/COUPLED-CHECKPOINT-A-20260915T224700Z`, gmsh 4.15.2, no Palace:
+### 8.1 What is measured and what is estimated
 
-| level | h near the gaps (mm) | h far (mm) | tets | DOF order 2 | DOF order 1 | mesh s |
-|---|---|---|---|---|---|---|
-| L1 | 0.0100 | 0.3333 | 85 233 | 698 911 | 102 280 | 6.1 |
-| L2 | 0.0067 | 0.2222 | 192 597 | 1 579 295 | 231 116 | 11.4 |
-| L3 | 0.0050 | 0.1667 | 373 091 | 3 059 346 | 447 709 | 19.7 |
+The dry run reports **mesh facts**: nodes, tetrahedra, edges, faces, surface
+elements per physical tag, the realised element size at the narrowest gap, the
+mesh digest and the wall clock. The **solver-space dimension is also a
+measurement, not an estimate**: for MFEM's Nédélec space on tetrahedra, which
+is what Palace assembles, the dimension is fixed by the mesh topology,
+
+```
+order 1 : DOF = edges
+order 2 : DOF = 2 × edges + 2 × faces
+```
+
+and both counts come from the mesh. The formula is checked against a real
+Palace solve rather than asserted: the committed golden mesh has 2083 edges
+and 2841 faces, so 2(2083 + 2841) = 9848, which is exactly the
+`Problem.DegreesOfFreedom` Palace reports for that run
+(`results/PALACE-GOLDEN-*/…/solver/postpro/palace.json`), and a test
+re-verifies it against the committed record. The count is the assembled space
+dimension before essential-boundary elimination, so it is an upper bound on
+the size Palace factorises, and it is the same quantity Palace itself prints.
+
+The **only estimated quantity** in the dry run is the per-tetrahedron
+cross-check: 8.2 DOF per tetrahedron, measured on the empty-box mesh family of
+the previous milestone and extrapolated here to a different mesh family. It is
+recorded in a separate `estimated` block and **nothing in the disposition uses
+it**.
+
+> **Correction.** The first checkpoint-A record
+> (`COUPLED-CHECKPOINT-A-20260915T225104Z`, preserved) reported the order-2
+> column from that per-tetrahedron ratio and labelled it "DOF est.". Measuring
+> it instead shows the ratio **overstates** the order-2 size of this mesh
+> family by about 28 % (699 k against 546 k at L1), and the old order-1 figure
+> rested on a 1.2 edges-per-tetrahedron guess that the measured edge count
+> replaces. The disposition is unchanged, and the earlier record is kept as
+> executed.
+
+### 8.2 The measured ladder
+
+`scripts/coupled_candidate_check.py --sensitivity`, record
+`results/COUPLED-CHECKPOINT-A-20260915T231511Z`, gmsh 4.15.2, no Palace:
+
+| level | h at the gaps (mm) | h far (mm) | tets | edges | faces | DOF order 2 | DOF order 1 | mesh s |
+|---|---|---|---|---|---|---|---|---|
+| L1 | 0.0100 | 0.3333 | 85 233 | 101 668 | 171 199 | 545 734 | 101 668 | 6.1 |
+| L2 | 0.0067 | 0.2222 | 192 597 | 228 572 | 386 714 | 1 230 572 | 228 572 | 11.4 |
+| L3 | 0.0050 | 0.1667 | 373 091 | 440 642 | 748 848 | 2 378 980 | 440 642 | 19.7 |
 
 The declared ladder therefore **exceeds the 250 000 DOF budget at order 2 at
 every level**, and at order 1 it fits only at L1 and L2. The 20 µm coupling
-gap is what sets the cost: an unadopted probe at 40 µm gives 51 328 tets
-(420 890 DOF at order 2), and shrinking the cell to 2 × 2 mm *raises* the
-count (123 007 tets) because the far-field size `min(a,b)/12` shrinks with
-the cell while the fine region does not. Execution of the coupled campaign is
-therefore BLOCKED on compute until the human review decides one of: a
-different seed geometry, order 1 with a two-level ladder, a different mesh
-rule, or a larger runner allowance (which needs approval and is not assumed
-here). The admission package itself is unaffected: the declaration is valid,
-its sources verify and its geometry is consistent.
+gap is what sets the cost: an unadopted probe at 40 µm gives 51 328 tets and
+330 024 DOF at order 2, and shrinking the cell to 2 × 2 mm *raises* the count
+(123 007 tets, 798 172 DOF) because the far-field size `min(a,b)/12` shrinks
+with the cell while the fine region does not. Execution of the coupled
+campaign is therefore BLOCKED on compute until the review decides; the options
+are set out in [`execution-proposal.md`](execution-proposal.md) and none is
+adopted here. The admission package itself is unaffected: the declaration is
+valid, its sources verify and its geometry is consistent.
 2. Route A ladder, then Route A inversion; Route B ladder, then Route B fit;
    the two run in separate workflow jobs writing separate records.
 3. Comparison, suitability report, per-interaction record, gate evaluation.

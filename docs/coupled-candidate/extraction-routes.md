@@ -120,23 +120,39 @@ unknowns `((C⁻¹)_FF, (C⁻¹)_FR, (C⁻¹)_RR, L_R)` in closed form:
 p_±F = (u_±F² / L_F) / (u_±F²/L_F + u_±R²/L_R)
 ```
 
-solved by the deterministic procedure in `models/coupling_extraction.py`
-(planned: `invert_participations`). For the full structure the same
-equations are solved in least squares with the sum rules as constraints; the
-residual is part of the resolution floor (definition §9). The declared
-`L_j` are then discarded: `E_C = (e²/2) C⁻¹` and `(E_C,RR, E_L,R)` are the
-route's output. The fluxonium's linear inductance never appears in the
+solved in closed form by `models/route_a_inversion.py` (`invert_two_node`),
+which is implemented and demonstrated on synthetic circuits with known
+parameters (`route-a-identifiability.md`). Two points that section establishes
+and that this one previously got wrong:
+
+- the two participations are **not** independent, because both sum rules hold,
+  so the data are three numbers, not four, and the system is exactly
+  determined rather than over-determined; the second participation is checked,
+  not consumed;
+- the readout node carries no lumped element, so `E_C,kR`, `E_C,RR` and `L_R`
+  are **not identifiable**: the route returns the gauge-invariant triple
+  `{E_C,F1F1, f_R1, g_F1R1}`, and shows any readout-node entry only in a
+  stated gauge.
+
+For the full structure the same equations are solved in least squares with the
+sum rules as constraints and one gauge fixed per readout node; the residual is
+part of the resolution floor (definition §9). The declared `L_j` are then
+discarded. The fluxonium's linear inductance never appears in the
 output; the harmonic mode near 2.75 GHz exists only inside the EM model.
 
 ### 2.4 Independent convergence evidence
 
 Route A carries its own ladder: at least three meshes (`h0`, `h0/1.5`,
 `h0/2` of the declared mesh rule) with the existing mesh-convergence rules
-(finest relative change ≤ 1e-4 for the frequencies) **and** a declared rule
-for the participations (relative change between the final two levels
-reported; the resolution floor of each derived `E_C,kl` is the change of that
-entry between the final two levels). Convergence is judged on the frequencies
-and on the derived `E_C`, not on the coupling coefficient alone.
+(finest relative change ≤ 1e-4 for the frequencies) **and** the energy
+participation, whose relative change between the final two levels is reported
+and is the dominant term in the resolution floor of `g`. The measured
+propagation (`route-a-identifiability.md` §6) is that the relative error on
+`g` tracks the relative error on the participation roughly one-for-one and is
+almost insensitive to the frequency error, so the participation is what the
+Route A ladder must be judged on; about 1 % relative is needed for a 1 %
+Route A floor on `g`. Convergence is judged on the frequencies, the
+participation and the derived invariants, never on the coupling alone.
 
 ## 3. Route B — driven-response / impedance extraction
 

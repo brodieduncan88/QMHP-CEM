@@ -72,18 +72,69 @@ DIST_MAX_MM = 0.3
 #: spacing is bounded by h_gap / 2 at the finest level (set per run).
 DISTANCE_SAMPLING_MIN = 20
 
-#: Order-2 DOF per tetrahedron, measured in the verification campaign
-#: (solvers.palace.verification.RULES), and the order-1 estimate.
+#: Order-2 DOF per tetrahedron, measured in the verification campaign on the
+#: EMPTY BOX (solvers.palace.verification.RULES). Kept only as a cross-check of
+#: the exact count below: extrapolating a per-tetrahedron ratio from one mesh
+#: family to another is an estimate, and this dry run does not rely on it.
 DOF_PER_TET_ORDER2 = float(RULES["dof_per_tetrahedron_estimate"])
-DOF_PER_TET_ORDER1 = 1.2
-DOF_ORDER1_NOTE = (
-    "order-1 Nedelec DOF = number of edges; 1.2 edges per tetrahedron is an "
-    "estimate for a large unstructured tetrahedral mesh, not a measured value"
+
+#: The solver-space dimension is not estimated: for MFEM's Nedelec space on
+#: tetrahedra, which is what Palace assembles for both the eigenmode and the
+#: driven problem, the dimension is fixed by the mesh topology,
+#:
+#:     order 1 : DOF = edges
+#:     order 2 : DOF = 2 * edges + 2 * faces
+#:
+#: and both counts are measured from the mesh. Checked against a committed
+#: Palace run: the golden 22 x 22 x 1.5 mm mesh has 2083 edges and 2841 faces,
+#: giving 2(2083 + 2841) = 9848, which is exactly the DegreesOfFreedom Palace
+#: reports in its own palace.json for that solve
+#: (results/PALACE-GOLDEN-*/QMHP-CEM-A-RF-000001/solver/postpro/palace.json).
+#: tests/test_coupled_mesh.py re-verifies this against the committed record.
+DOF_FORMULA_NOTE = (
+    "DOF = edges (order 1) and 2*edges + 2*faces (order 2) for MFEM Nedelec "
+    "spaces on tetrahedra; both are measured from the mesh topology, not "
+    "estimated. The count is the assembled space dimension before any "
+    "essential-boundary elimination, so it is an upper bound on the size "
+    "Palace factorises, and it is exactly what Palace reports as "
+    "Problem.DegreesOfFreedom."
 )
 
 #: Bounding-box tolerance used to classify fragmented faces (mm). OCC
 #: bounding boxes are enlarged by its own tolerance (~1e-7).
 _BBOX_TOL = 1.0e-6
+
+
+def _count_edges_and_faces() -> tuple[int, int]:
+    """Unique mesh edges and faces of the volume mesh, from gmsh.
+
+    These are mesh facts, and with them the Nedelec space dimension is a
+    measurement rather than an extrapolated ratio (see DOF_FORMULA_NOTE).
+    Falls back to counting from the tetrahedron connectivity if gmsh's edge
+    and face helpers are unavailable, so the count is never silently skipped.
+    """
+    import gmsh
+
+    try:
+        gmsh.model.mesh.createEdges()
+        gmsh.model.mesh.createFaces()
+        edge_tags, _ = gmsh.model.mesh.getAllEdges()
+        face_tags, _ = gmsh.model.mesh.getAllFaces(3)
+        if len(edge_tags) and len(face_tags):
+            return len(set(edge_tags)), len(set(face_tags))
+    except Exception:  # noqa: BLE001 - fall through to the explicit count
+        pass
+    edges: set[tuple[int, int]] = set()
+    faces: set[tuple[int, int, int]] = set()
+    _, tags, node_tags = gmsh.model.mesh.getElements(3)
+    for element_nodes in node_tags:
+        for i in range(0, len(element_nodes), 4):
+            tet = sorted(int(x) for x in element_nodes[i : i + 4])
+            for a in range(4):
+                for b in range(a + 1, 4):
+                    edges.add((tet[a], tet[b]))
+                faces.add(tuple(x for j, x in enumerate(tet) if j != a))  # type: ignore[arg-type]
+    return len(edges), len(faces)
 
 
 @dataclass(frozen=True)
@@ -96,11 +147,14 @@ class DryRunReport:
     h_far_mm: float
     nodes: int
     tetrahedra: int
+    edges: int
+    faces: int
     triangles_by_tag: dict[str, int]
     tetrahedra_by_tag: dict[str, int]
     min_gap_elements: float
-    dof_estimate_order2: int
-    dof_estimate_order1: int
+    dof_order2: int
+    dof_order1: int
+    dof_order2_cross_check_estimate: int
     within_budget_order2: bool
     within_budget_order1: bool
     dof_budget: int
@@ -121,18 +175,34 @@ class DryRunReport:
             "h0_gap_mm": self.h0_gap_mm,
             "h_gap_mm": self.h_gap_mm,
             "h_far_mm": self.h_far_mm,
-            "nodes": self.nodes,
-            "tetrahedra": self.tetrahedra,
-            "triangles_by_tag": dict(self.triangles_by_tag),
-            "tetrahedra_by_tag": dict(self.tetrahedra_by_tag),
-            "surface_elements_total": self.surface_elements_total,
+            "measured": {
+                "nodes": self.nodes,
+                "tetrahedra": self.tetrahedra,
+                "edges": self.edges,
+                "faces": self.faces,
+                "triangles_by_tag": dict(self.triangles_by_tag),
+                "tetrahedra_by_tag": dict(self.tetrahedra_by_tag),
+                "surface_elements_total": self.surface_elements_total,
+                "min_gap_elements": self.min_gap_elements,
+                "dof_order1": self.dof_order1,
+                "dof_order2": self.dof_order2,
+                "note": DOF_FORMULA_NOTE,
+            },
+            "estimated": {
+                "dof_order2_from_per_tetrahedron_ratio": self.dof_order2_cross_check_estimate,
+                "dof_per_tetrahedron_order2": DOF_PER_TET_ORDER2,
+                "ratio_to_measured": (
+                    self.dof_order2_cross_check_estimate / self.dof_order2
+                    if self.dof_order2 else None
+                ),
+                "note": (
+                    "cross-check only, and the only estimated quantity in this report: the "
+                    f"{DOF_PER_TET_ORDER2} DOF per tetrahedron was measured on the empty-box "
+                    "mesh family of the verification campaign and is extrapolated here to a "
+                    "different mesh family. Nothing in the disposition uses it."
+                ),
+            },
             "max_surface_elements": self.max_surface_elements,
-            "min_gap_elements": self.min_gap_elements,
-            "dof_estimate_order2": self.dof_estimate_order2,
-            "dof_estimate_order1": self.dof_estimate_order1,
-            "dof_per_tetrahedron_order2": DOF_PER_TET_ORDER2,
-            "dof_per_tetrahedron_order1": DOF_PER_TET_ORDER1,
-            "dof_order1_note": DOF_ORDER1_NOTE,
             "dof_budget": self.dof_budget,
             "within_budget_order2": self.within_budget_order2,
             "within_budget_order1": self.within_budget_order1,
@@ -324,6 +394,7 @@ def dry_run(
 
         node_tags, _, _ = gmsh.model.mesh.getNodes()
         n_nodes = len(node_tags)
+        n_edges, n_faces = _count_edges_and_faces()
         for dim, group in gmsh.model.getPhysicalGroups():
             name = gmsh.model.getPhysicalName(dim, group)
             count = 0
@@ -338,8 +409,10 @@ def dry_run(
         gmsh.finalize()
     wall = time.perf_counter() - t0
 
-    dof2 = round(DOF_PER_TET_ORDER2 * n_tets)
-    dof1 = round(DOF_PER_TET_ORDER1 * n_tets)
+    # Measured solver-space dimensions (see DOF_FORMULA_NOTE), not estimates.
+    dof2 = 2 * n_edges + 2 * n_faces
+    dof1 = n_edges
+    dof2_estimate = round(DOF_PER_TET_ORDER2 * n_tets)
     return DryRunReport(
         level=level,
         h0_gap_mm=h0_gap,
@@ -347,11 +420,14 @@ def dry_run(
         h_far_mm=h_far,
         nodes=n_nodes,
         tetrahedra=n_tets,
+        edges=n_edges,
+        faces=n_faces,
         triangles_by_tag=tris_by_tag,
         tetrahedra_by_tag=tets_by_tag,
         min_gap_elements=cell.min_gap_mm / h_gap,
-        dof_estimate_order2=dof2,
-        dof_estimate_order1=dof1,
+        dof_order2=dof2,
+        dof_order1=dof1,
+        dof_order2_cross_check_estimate=dof2_estimate,
         within_budget_order2=(aborted is None and dof2 <= dof_budget),
         within_budget_order1=(aborted is None and dof1 <= dof_budget),
         dof_budget=dof_budget,
@@ -367,8 +443,7 @@ def dry_run(
 
 __all__ = [
     "DIST_MAX_MM",
-    "DOF_ORDER1_NOTE",
-    "DOF_PER_TET_ORDER1",
+    "DOF_FORMULA_NOTE",
     "DOF_PER_TET_ORDER2",
     "LEVELS",
     "MODEL_NAME",

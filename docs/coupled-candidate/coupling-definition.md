@@ -87,11 +87,23 @@ meaning (section 3).
 
 ## 3. The extraction target
 
-**Both routes estimate the same object: the off-diagonal charging-energy
-matrix of the declared nodes, `E_C,kl` for `k ≠ l` (GHz), together with the
-diagonal `E_C,kk` and the bare linear-mode parameters `(E_C,RR, E_L,R)` of
-each readout node, all in the node basis of section 2.** These are
-circuit-level, convention-free quantities: the geometry alone decides them.
+**Both routes estimate the same object: the gauge-invariant triple of the
+declared circuit** — for S1, `{E_C,F1F1, f_R1, g_F1R1}`, and in general the
+fluxonium and mediator charging energies, each readout mode's bare frequency,
+and the coupling coefficient of every required pair.
+
+> **Correction (checkpoint A, after review).** This section first declared the
+> target to be the charging-energy matrix `E_C,kl` together with each readout
+> node's `(E_C,RR, E_L,R)`, and called those "circuit-level, convention-free
+> quantities". That is true of a node carrying a declared lumped branch, and
+> **false of a readout node**, which carries none: nothing in the EM model
+> fixes the scale of its node flux, so `E_C,kR`, `E_C,RR` and `L_R`
+> individually are conventions, not measurements. The coupling `g`, the bare
+> readout frequency and the fluxonium charging energy are invariant and are
+> the reportable outputs. The derivation, the witness and the demonstration
+> are in [`route-a-identifiability.md`](route-a-identifiability.md); the
+> reported coupling and every threshold are unchanged, because `g` was
+> invariant all along.
 
 From them the reported coupling coefficients follow by fixed algebra:
 
@@ -120,10 +132,13 @@ From them the reported coupling coefficients follow by fixed algebra:
 - **Readout ↔ readout, mediator ↔ readout** (parasitic): `J_kl = 8 E_C,kl`
   likewise, reported in MHz.
 
-The interaction matrix delivered by each route is therefore
-`{E_C,kl}` (symmetric, `|𝒩| × |𝒩|`) plus `{E_L,R}`; the COUPLING_EXTRACTION
-comparison is made on the derived per-pair coefficients (`g_kR` or `J_kl`)
-so that the existing `eigenmode_MHz` / `blackbox_MHz` semantics are kept.
+Each route therefore delivers, per required pair, the invariant coefficient
+(`g_kR` or `J_kl`) in MHz, together with the invariant diagonal quantities it
+can determine; the COUPLING_EXTRACTION comparison is made on those
+coefficients, so the existing `eigenmode_MHz` / `blackbox_MHz` semantics are
+kept. Matrix entries that depend on a readout-node normalisation are reported
+only alongside the gauge they are stated in, and are never compared between
+the routes.
 
 ## 4. What the target is *not*
 
@@ -132,6 +147,7 @@ so that the existing `eigenmode_MHz` / `blackbox_MHz` semantics are kept.
 | Circuit-level coupling `g_kR`, `J_kl` | **the target** (section 3) | EM extraction, both routes |
 | Transition-specific matrix elements, e.g. `⟨22,1_C\|n_C\|22,0_C⟩ = 1.300454` (reported) | derived from the diagonalised *nonlinear* circuit built with the extracted `E_C`; never extracted from EM | `models/` (static + dressed system), V2A registration |
 | Normal-mode splitting / hybridisation of the *linear* EM eigenmodes | Route A intermediate (section 3 of `extraction-routes.md`); it is not the coupling and is not compared as such | Route A only |
+| Readout-node matrix entries `E_C,kR`, `E_C,RR`, `L_R` | **not identifiable**: each depends on an arbitrary readout-node normalisation. Reported only in a stated gauge, never compared | `route-a-identifiability.md` |
 | Dispersive pulls `χ`, logical/sink pulls, sink line | outputs of the frozen dressed-system model; unchanged and still computed for the nominal device | `models/dressed_system.py` |
 | Effective gate interactions: static `ζ`, conditional mediator lines `f_22`, `Δ_min`, drive `u_C` | properties of the driven or dressed nonlinear spectrum; **not admitted** at this milestone, not targets, not acceptance quantities | V2A M3 registration, out of scope |
 
@@ -255,7 +271,8 @@ values are zero, is therefore only ever fed RESOLVED pairs
 | item | binding |
 |---|---|
 | `E_C` sign | `E_C = (e²/2) C⁻¹` with `C` the Maxwell matrix (positive diagonal, negative off-diagonal mutuals); off-diagonal `E_C,kl` is then **positive** for capacitive coupling |
-| `g_kR` | `8 E_C,kR n_zpf,R`, `n_zpf,R = (E_L,R/32 E_C,RR)^{1/4}`, magnitude reported |
+| `g_kR` | `8 E_C,kR n_zpf,R`, `n_zpf,R = (E_L,R/32 E_C,RR)^{1/4}`, magnitude reported. Gauge-invariant: in closed form `g = 2 e^{3/2}√(L_k φ_r) k /(h b^{1/4})` with no `L_R` (`route-a-identifiability.md` §2) |
+| readout-node gauge | the readout node flux has no scale until one is declared. Any matrix entry shown for a readout node states its gauge; the reported coefficients do not depend on it |
 | `J_kl` | `8 E_C,kl`, magnitude reported |
 | readout operator phase | `n_R = n_zpf,R (a + a†)`, matching the Master's `g n (a + a†)` |
 | fluxonium charge operator | `n = −i d/dφ` on the Master grid; the Master's `n12 = 0.659915` is the regression anchor |

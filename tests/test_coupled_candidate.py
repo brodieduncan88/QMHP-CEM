@@ -114,9 +114,15 @@ class _FakeReport:
 
     def as_dict(self) -> dict:
         tets = 20_000 * self.level
-        return {"level": self.level, "tetrahedra": tets, "nodes": tets // 5,
-                "dof_estimate_order2": int(8.2 * tets), "dof_estimate_order1": int(1.3 * tets),
-                "within_budget_order2": 8.2 * tets <= self.budget, "within_budget_order1": 1.3 * tets <= self.budget,
+        # Shape of a real report: MEASURED mesh counts and solver-space
+        # dimensions, with the per-tetrahedron ratio kept only as an estimate.
+        dof2, dof1 = int(8.2 * tets), int(1.3 * tets)
+        return {"level": self.level,
+                "measured": {"tetrahedra": tets, "nodes": tets // 5, "edges": dof1,
+                             "faces": (dof2 - 2 * dof1) // 2,
+                             "dof_order1": dof1, "dof_order2": dof2},
+                "estimated": {"dof_order2_from_per_tetrahedron_ratio": dof2},
+                "within_budget_order2": dof2 <= self.budget, "within_budget_order1": dof1 <= self.budget,
                 "dof_budget": self.budget, "mesh_path": str(self.out_dir / f"L{self.level}.msh")}
 
 
@@ -391,9 +397,9 @@ def test_check_script_dry_run_writes_disposition_input(check_script, fake_module
     assert "synthetic level-3 failure" in summary["dry_run"]["L3"]["error"]
     di = summary["disposition_input"]
     assert di["dof_budget"] == 250000
-    assert di["levels"]["L1"] == {"status": "OK", "dof_estimate_order2": 164000, "dof_estimate_order1": 26000,
+    assert di["levels"]["L1"] == {"status": "OK", "dof_order2": 164000, "dof_order1": 26000,
                                   "within_budget_order2": True, "within_budget_order1": True}
-    assert di["levels"]["L2"]["dof_estimate_order2"] == 328000 and di["levels"]["L2"]["within_budget_order2"] is False
+    assert di["levels"]["L2"]["dof_order2"] == 328000 and di["levels"]["L2"]["within_budget_order2"] is False
     assert di["levels"]["L2"]["within_budget_order1"] is True
     assert di["levels"]["L3"]["status"] == "ERROR"
     assert di["all_levels_within_budget_order2"] is False and di["all_levels_within_budget_order1"] is True

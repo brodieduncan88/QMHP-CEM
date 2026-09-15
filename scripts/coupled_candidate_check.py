@@ -149,15 +149,20 @@ def render_preview_svg(preview: dict[str, Any]) -> str:
 
 
 def _find_dof(report: dict[str, Any], order: int) -> int | None:
-    """Locate the DOF estimate for an element order in a dry-run report dict."""
-    key = f"dof_estimate_order{order}"
-    if key in report:
-        return int(report[key]) if report[key] is not None else None
-    nested = report.get("dof_estimate")
-    if isinstance(nested, dict):
-        for k in (f"order{order}", f"order_{order}", str(order), order):
-            if k in nested and nested[k] is not None:
-                return int(nested[k])
+    """Locate the MEASURED solver-space dimension for an element order.
+
+    The dry run measures it from the mesh topology (edges and faces); it is
+    not an estimate, and the estimated per-tetrahedron cross-check lives in
+    the report's ``estimated`` block and is never read here.
+    """
+    measured = report.get("measured")
+    if isinstance(measured, dict):
+        key = f"dof_order{order}"
+        if measured.get(key) is not None:
+            return int(measured[key])
+    key = f"dof_order{order}"
+    if report.get(key) is not None:
+        return int(report[key])
     for k, v in report.items():
         if "dof" in k.lower() and str(order) in k and isinstance(v, (int, float)):
             return int(v)
@@ -191,15 +196,15 @@ def disposition_input(dry: dict[str, dict[str, Any]], dof_budget: int) -> dict[s
     levels: dict[str, Any] = {}
     for name, entry in dry.items():
         if entry.get("status") != "OK":
-            levels[name] = {"status": "ERROR", "dof_estimate_order2": None, "dof_estimate_order1": None,
+            levels[name] = {"status": "ERROR", "dof_order2": None, "dof_order1": None,
                             "within_budget_order2": None, "within_budget_order1": None}
             continue
         rep = entry["report"]
         d2, d1 = _find_dof(rep, 2), _find_dof(rep, 1)
         levels[name] = {
             "status": "OK",
-            "dof_estimate_order2": d2,
-            "dof_estimate_order1": d1,
+            "dof_order2": d2,
+            "dof_order1": d1,
             "within_budget_order2": (d2 <= dof_budget) if d2 is not None else None,
             "within_budget_order1": (d1 <= dof_budget) if d1 is not None else None,
         }
@@ -243,12 +248,17 @@ def render_report(summary: dict[str, Any]) -> str:
     di = s.get("disposition_input")
     if di:
         lines += ["## Mesh dry run against the DOF budget", "",
-                  f"DOF budget {di['dof_budget']} (numerical-plan.md §6).", "",
-                  "| level | status | DOF est. order 2 | within budget | DOF est. order 1 | within budget |",
+                  f"DOF budget {di['dof_budget']} (numerical-plan.md §6). Mesh counts and the "
+                  "solver-space dimensions below are MEASURED: the dimension of MFEM's Nedelec "
+                  "space on tetrahedra is fixed by the mesh topology (edges for order 1, "
+                  "2*edges + 2*faces for order 2), checked against Palace's own reported "
+                  "DegreesOfFreedom on the committed golden record. No solver size here is "
+                  "extrapolated from a per-tetrahedron ratio.", "",
+                  "| level | status | DOF order 2 | within budget | DOF order 1 | within budget |",
                   "|---|---|---|---|---|---|"]
         for name, v in di["levels"].items():
-            lines.append(f"| {name} | {v['status']} | {v['dof_estimate_order2']} | {v['within_budget_order2']} | "
-                         f"{v['dof_estimate_order1']} | {v['within_budget_order1']} |")
+            lines.append(f"| {name} | {v['status']} | {v['dof_order2']} | {v['within_budget_order2']} | "
+                         f"{v['dof_order1']} | {v['within_budget_order1']} |")
         lines.append("")
         for name, entry in s["dry_run"].items():
             if entry.get("status") == "ERROR":
@@ -257,12 +267,13 @@ def render_report(summary: dict[str, Any]) -> str:
     sens = s.get("sensitivity")
     if sens:
         lines += ["## Sensitivity probe (UNADOPTED)", "", sens["statement"], "",
-                  "| variant | changes | tets | DOF est. order 2 | DOF est. order 1 |", "|---|---|---|---|---|"]
+                  "| variant | changes | tets | DOF order 2 | DOF order 1 |", "|---|---|---|---|---|"]
         for name, entry in sens["variants"].items():
             if entry["status"] == "OK":
                 rep = entry["report"]
                 lines.append(
-                    f"| {name} | {entry['changes']} | {rep.get('tetrahedra')} | {_find_dof(rep, 2)} | {_find_dof(rep, 1)} |"
+                    f"| {name} | {entry['changes']} | {rep.get('measured', {}).get('tetrahedra')} | "
+                    f"{_find_dof(rep, 2)} | {_find_dof(rep, 1)} |"
                 )
             else:
                 lines.append(f"| {name} | {entry['changes']} | - | - | {entry['error']} |")
@@ -471,7 +482,7 @@ def main(argv: list[str] | None = None) -> int:
         for name, entry in summary["dry_run"].items():
             if entry["status"] == "OK":
                 di = summary["disposition_input"]["levels"][name]
-                print(f"  {name}: DOF est. order 2 {di['dof_estimate_order2']}, order 1 {di['dof_estimate_order1']} "
+                print(f"  {name}: DOF order 2 {di['dof_order2']}, order 1 {di['dof_order1']} "
                       f"(budget {args.dof_budget})")
             else:
                 print(f"  {name}: ERROR {entry['error']}")
@@ -483,7 +494,7 @@ def main(argv: list[str] | None = None) -> int:
             for name, entry in summary["sensitivity"]["variants"].items():
                 if entry["status"] == "OK":
                     rep = entry["report"]
-                    print(f"  sensitivity {name}: DOF est. order 2 {_find_dof(rep, 2)}, order 1 {_find_dof(rep, 1)}")
+                    print(f"  sensitivity {name}: DOF order 2 {_find_dof(rep, 2)}, order 1 {_find_dof(rep, 1)}")
                 else:
                     print(f"  sensitivity {name}: {entry['error']}")
 
