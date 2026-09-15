@@ -99,6 +99,40 @@ check did not succeed.
 
 ## Status
 
-See `results/PALACE-VERIFY-*/report.md` for the executed campaign and its
-verdicts, and the pull request that introduced this milestone for the
-summary. Until a record exists on a branch, no verification claim is made.
+Three records exist on the milestone branch, all produced by the
+`Palace verification campaign` workflow on GitHub-hosted `ubuntu-latest`
+with image `qmhp-cem/palace:0.13.0@sha256:f41ad915…` (Palace 0.13.0,
+commit a61c8cbe, GSLIB on), one MPI process, one thread:
+
+| record | workflow run | verdicts | note |
+|---|---|---|---|
+| `PALACE-VERIFY-20260915T063014Z` | 34937561169 (first attempt) | none | aborted after the first run by a report-rendering error, no manifest; kept as evidence of the fix |
+| `PALACE-VERIFY-20260915T065055Z` | 34937561169 | mesh PASS, aux INCOMPLETE, Object 001 INCOMPLETE | complete; `height_shift` then paired runs by mesh length, so the auxiliary levels never lined up; kept as executed |
+| `PALACE-VERIFY-20260915T091242Z` | 34951039973 | mesh PASS, aux PASS, Object 001 BLOCKED | complete; pairing by level |
+
+The Palace real frequencies of the two complete records agree to every
+printed digit (ten significant figures); their imaginary parts, Q values
+and residual columns differ at the 1e-10 GHz and 1e-11 level, so unlike the
+golden run the campaign `eig.csv` files are not byte-identical between
+executions.
+
+Mesh convergence, 22 × 22 × 1.5 mm box (record `…091242Z`):
+
+| level | lc (mm) | tets | DOF | max relative analytic error | change vs previous | pair splitting |
+|---|---|---|---|---|---|---|
+| L1 | 1.8333 | 1200 | 9848 | 4.72e-5 | – | 0.253 MHz |
+| L2 | 1.2222 | 2566 | 20936 | 6.75e-6 | 4.05e-5 | 0.057 MHz |
+| L3 | 0.9167 | 4561 | 36708 | 7.27e-6 | 1.40e-5 | 0.001 MHz |
+
+Height sensitivity, auxiliary 22 × 22 × 7.0/7.7 mm box, mode (0,1,1):
+Δf_Palace −1.84673 GHz against Δf_exact −1.84662 GHz at L2, relative
+disagreement 6.2e-5, numerical uncertainty 2.3e-3 GHz, |Δf_exact| 793× the
+uncertainty; the mode is identified twice at each height and level (square
+box degeneracy), classified transverse by the probes at every level. This
+verifies the Z pipeline; it is not a verification of Object 001.
+
+Height sensitivity, Object 001 box (1.5 mm against 1.65 mm): BLOCKED. The
+rule-level meshes (0.375 / 0.4125 mm, about 545k / 460k estimated DOF) exceed
+the 400k budget and were not launched; the exploratory d/3 meshes (0.5 /
+0.55 mm, about 261k / 215k estimated DOF) ran out their 3600 s budget in
+both campaigns. The meshes and the timeouts are the evidence.
