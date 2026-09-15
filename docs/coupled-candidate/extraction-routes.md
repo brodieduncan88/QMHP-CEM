@@ -72,11 +72,23 @@ of the numerical plan, not from the solver's answer.
 
 For each mode `m` in the band: the eigenfrequency `f_m` (from `eig.csv`),
 its backward error (existing rule: ≤ 1e-6), and for each lumped inductive
-port `j` the **energy-participation ratio** `p_mj` = inductive energy stored
-in `L_j` divided by the total inductive energy of the mode (Palace's
-`port-EPR.csv`, see §5). Field probes (`probe-E.csv`) at declared points
-classify each mode (fluxonium-like, readout-like, other) independently of its
-frequency, as in the verification campaign.
+port `j` the **energy-participation ratio** `p_mj` as Palace v0.13.0 defines
+it (`port-EPR.csv`, §5):
+
+```
+p_mj = sign(Re I_mj) · ½ L_j |I_mj|² / (E_elec,m + E_cap,m),   I_mj = V_mj / (i ω_m L_j)
+```
+
+i.e. the inductive energy in `L_j` normalised by the mode's **electric-side**
+energy (field plus lumped-capacitor energy). For a lossless mode at resonance
+`E_elec + E_cap = E_mag + E_ind`, so this equals the inductive participation
+used in the inversion below; the record keeps `domain-E.csv` (`E_elec`,
+`E_mag`, `E_cap`, `E_ind` per mode) so that the equipartition
+`|E_elec + E_cap − E_mag − E_ind| / E_total` is checked per mode and reported
+(a mode violating it beyond the eigen tolerance is flagged, not used). Field
+probes (`probe-E.csv`) at declared points classify each mode (fluxonium-like,
+readout-like, other) independently of its frequency, as in the verification
+campaign.
 
 ### 2.3 Inversion to the node basis (the "participation-based" step)
 
@@ -131,33 +143,47 @@ and on the derived `E_C`, not on the coupling coefficient alone.
 ### 3.1 EM model
 
 Palace `Problem.Type = "Driven"` on the **same declared model** with the
-nonlinear element sites as **lumped ports without any inductance**
-(`R` reference only, so that the environment is excited and observed at the
-exact site the branch will occupy), and the readout feedline port present as a
-resistive 50 Ω lumped port at its declared reference plane. No lumped
-inductance is attached anywhere: the driven solve sees the passive
-capacitive/distributed environment only.
+nonlinear element sites as **purely resistive lumped ports** (`R > 0`,
+`L = C = 0`, which is what Palace v0.13.0 requires of an excited lumped port,
+§5), so that the environment is excited and observed at the exact site the
+branch will occupy, and the readout tap port present as a resistive lumped
+port at its declared reference plane. No lumped inductance is attached
+anywhere: the driven solve sees the passive capacitive/distributed
+environment, terminated by the declared port resistances, which the S→Z
+conversion below removes exactly.
 
-Every declared port is excited in turn (one excitation per driven solve, or
-Palace's multi-excitation form if the pinned version supports it, §5), over
-the decision band with the adaptive sweep of the numerical plan, and the
-complex port voltages and currents of **all** ports are recorded for each
-excitation. This is the "all required port excitations and complex response
-data" of the milestone: with `P` ports the record holds `P` excitations ×
-`P` responses × the frequency grid, as complex values.
+At v0.13.0 several excited ports superpose into one right-hand side and
+suppress `port-S.csv`, so the route runs **one Palace driven solve per
+excited port** (`P` solves for `P` ports), each over the decision band with
+the adaptive sweep of the numerical plan. For each solve the record keeps the
+generalised scattering column `S_ij(f)` for every port `i` (`|S| dB` and
+`arg S` degrees, 9 significant digits each, reconstructed to a complex value
+by the parser) and the complex port voltages and currents (`port-V.csv`,
+`port-I.csv`). This is the "all required port excitations and complex
+response data" of the milestone: with `P` ports the record holds `P`
+excitations × `P` responses × the frequency grid, as complex values, plus
+the incident amplitudes `V_inc`, `I_inc` of the excited port.
 
 ### 3.2 Data taken from the solve
 
-The complex impedance matrix on the frequency grid,
+The complex generalised scattering matrix `S(f)` assembled column by column
+from the `P` solves, with the diagonal reference matrix `R = diag(R_i)` of the
+declared port resistances (Palace references each port to its own `R_i`,
+§5). The impedance and admittance matrices of the linear environment follow
+exactly, for real references, from
 
 ```
-Z_ij(f) = V_i(f) / I_j(f)   with excitation on port j only,
+Z(f) = R^{1/2} (I + S(f)) (I − S(f))⁻¹ R^{1/2},      Y(f) = Z(f)⁻¹ ,
 ```
 
-or equivalently the admittance `Y(f) = Z(f)⁻¹`, and the scattering matrix
-`S(f)` on the ports' reference impedances (Palace's `port-S.csv`), which is
-kept as evidence but is not the fitted object. Adaptive-sweep error
-indicators and the linear-solver residual per frequency are recorded.
+so the port terminations are removed analytically and `Z`, `Y` describe the
+open environment between the port terminals. Palace's `port-V.csv` /
+`port-I.csv` are kept as evidence and used for a consistency check
+(`I_i = V_i / R_i` on every port, `V_j / V_inc,j` against `1 + S_jj`), but
+they are not the fitted object, because at v0.13.0 the reported current is
+the current through the port's own load, not an independent measurement.
+Adaptive-sweep error indicators, the number of sampled points and the
+linear-solver iteration counts per frequency are recorded.
 
 ### 3.3 Fit to the lumped model (the "black-box" step)
 
@@ -203,22 +229,42 @@ levels of each ladder. Route B never reads `eig.csv`; Route A never reads
 
 | | Route A | Route B |
 |---|---|---|
-| Palace problem | Eigenmode (generalised eigenproblem, shift-invert) | Driven (linear solves at many frequencies, adaptive) |
-| Lumped inductances in the EM model | attached, then removed analytically | never attached |
-| Primary data | real eigenfrequencies + inductive energy participations | complex port voltages/currents on a frequency grid |
+| Palace problem | Eigenmode (generalised eigenproblem, shift-invert) | Driven (linear solves at many frequencies, adaptive), one solve per excited port |
+| Lumped elements in the EM model | inductive ports, removed analytically | resistive ports, removed by the S→Z conversion |
+| Primary data | real eigenfrequencies + energy participations | complex generalised S columns on a frequency grid |
 | Extraction step | algebraic inversion of the normal-mode problem | rational fit of the admittance (poles, zeros, low-frequency slope) |
-| Numerical error sources | eigen-solver tolerance, mode identification, energy postprocessing | frequency sampling, adaptive error, fit conditioning |
+| Numerical error sources | eigen-solver tolerance, mode identification, energy postprocessing | frequency sampling, adaptive error, dB/degree quantisation, fit conditioning |
 | Reads the other route's output | no | no |
 
 They share the geometry and the conversion algebra (§1), which is why
 agreement is evidence about the numerical extraction, not about the physical
 model.
 
-## 5. Palace v0.13.0 features relied on
+## 5. Palace v0.13.0 features relied on (checked against the pinned tree)
 
-[This section is completed from the pinned documentation read in this
-checkpoint; every entry cites the file at tag v0.13.0. See the table in
-`README.md` §"Palace feature check" once filled.]
+Checked in this checkpoint against tag `v0.13.0` (commit
+`a61c8cbe0cacf496cde3c62e93085fae0d6299ac`, the commit the image is built
+from). File paths are relative to the Palace repository at that tag; line
+numbers refer to that revision. Nothing below was verified by executing
+Palace; column headers are transcribed from the format strings in the
+source.
+
+| feature | status at v0.13.0 | where |
+|---|---|---|
+| Lumped port with circuit `R`, `L`, `C` (exactly one of the circuit or surface sets nonzero), multi-element ports, planar rectangular elements, `Direction` within 1° of a bounding-box axis | supported | `docs/src/config/boundaries.md` L248-345; `palace/models/lumpedportoperator.cpp` L19-107; `palace/fem/lumpedelement.cpp` L23-59 |
+| Eigenmode solve with lumped inductive ports; `eig.csv` columns `m, Re{f} (GHz), Im{f} (GHz), Q, Error (Bkwd.), Error (Abs.)` | supported | `palace/drivers/eigensolver.cpp` L386-451 |
+| `port-EPR.csv` (`m, p[j]` for every port with `|L| > 0`), `p_mj = sign(Re I)·½L|I|²/(E_elec+E_cap)` | supported; normalisation is electric-side energy | `eigensolver.cpp` L335-358, L554-592; `palace/models/postoperator.cpp` L644-660; `docs/src/reference.md` L264-299 |
+| `domain-E.csv` with `E_elec, E_mag, E_cap, E_ind` per mode / frequency | supported | `palace/drivers/basesolver.cpp` L352-428 |
+| Driven solve, uniform or adaptive sweep (`MinFreq`, `MaxFreq`, `FreqStep` in GHz, `AdaptiveTol > 0`, `MinFreq > 0` required by lumped-port postprocessing) | supported | `docs/src/config/solver.md` L164-210; `drivensolver.cpp` L40-105, L390-403; `postoperator.cpp` L446-448 |
+| Excitation: an excited lumped port must be purely resistive; several excited ports superpose and **suppress `port-S.csv`**; a full matrix needs one run per excited port | partial (one run per excitation) | `drivensolver.cpp` L54-97, L651-680; `lumpedportoperator.cpp` L35-49; `docs/src/guide/problem.md` L58-99 |
+| `port-S.csv`: `f (GHz)` then `|S[i][j]| (dB)`, `arg(S[i][j]) (deg.)` per port `i` for the single excited `j`; generalised S referenced to each port's own `R_i` (`S_ij·√(R_j/R_i)`), unit incident power | supported (magnitude/phase only) | `drivensolver.cpp` L730-757; `postoperator.cpp` L527-550; `reference.md` L192-198 |
+| `port-V.csv`, `port-I.csv`: complex peak `V_i`, `I_i` for every port plus `V_inc`, `I_inc` of the excited port; `I_i` is the current through the port's own `R/L/C` branch | supported (load-terminated currents) | `drivensolver.cpp` L513-649; `postoperator.cpp` L430-471 |
+| `port-Z.csv`, `port-Y.csv` | **absent** (tree grep negative); Z/Y derived from S as in §3.2 | whole `palace/` tree at v0.13.0 |
+| Electrostatic `Terminal` boundaries → `terminal-C.csv` (Maxwell matrix, F), `terminal-Cinv.csv`, `terminal-Cm.csv` | supported; **not used as a route** (spec §5.5 names eigenmode and `Z(ω)`); available only as an optional informational cross-check that feeds neither route | `palace/drivers/electrostaticsolver.cpp` L124-231 |
+| Field probes (`Domains.Postprocessing.Probe`, GSLIB) → `probe-E.csv` `Re{E_x[k]} (V/m)` … | supported; the image is built with GSLIB; a probe outside the mesh yields 0.0 with a log warning (checked by the parser, not silently accepted) | `palace/fem/interpolator.cpp` L14-108; `basesolver.cpp` L578-660 |
+| Zero-thickness PEC sheets on internal surfaces (metal on substrate), materials with scalar or anisotropic permittivity | supported | `examples/cpw/cpw_lumped_uniform.json` L14-59; `docs/src/config/domains.md` L40-82 |
+| `Active: false` ports (postprocess-only surfaces) | supported (removes L, R and C contributions) | `lumpedportoperator.cpp` L499-621; CHANGELOG 0.13.0 |
+| Number format | 9 significant digits, dimensional units in headers | `basesolver.hpp` L36-44; `palace/utils/iodata.cpp` L562-618 |
 
 ## 6. Treatment of the nonlinear fluxonium
 
