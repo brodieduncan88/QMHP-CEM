@@ -391,13 +391,42 @@ class PalaceSolver(SolverAdapter):
         )
         candidate_sha256 = hashlib.sha256(canonical.encode()).hexdigest()
 
-        domain = palace_config.solver_domain(candidate)
-        mesh_record = palace_mesh.generate_box_mesh(domain, work_dir / MESH_FILENAME)
+        # Per-run overrides for verification campaigns (spec §15), carried on
+        # RunContext.extra["palace"]. Absent, every default below is the golden
+        # one and the prepared input is byte-identical to the golden path.
+        overrides = dict((run_context.extra or {}).get("palace") or {})
+        unknown = set(overrides) - {"domain", "mesh_length_mm", "eigenmodes", "target_GHz", "probes_mm", "label"}
+        if unknown:
+            raise ValueError(f"unknown Palace override(s): {sorted(unknown)}")
+        if overrides.get("domain") is not None:
+            domain = palace_config.SolverDomain.from_dict(overrides["domain"])
+        else:
+            domain = palace_config.solver_domain(candidate)
+        mesh_length = overrides.get("mesh_length_mm")
+        mesh_record = palace_mesh.generate_box_mesh(
+            domain, work_dir / MESH_FILENAME, characteristic_length_mm=mesh_length
+        )
+        eigenmodes = overrides.get("eigenmodes")
+        target_GHz = overrides.get("target_GHz")
+        probes_mm = overrides.get("probes_mm")
 
-        config = palace_config.build_config(MESH_FILENAME, domain, output_dir=OUTPUT_DIRNAME)
+        config = palace_config.build_config(
+            MESH_FILENAME, domain, output_dir=OUTPUT_DIRNAME,
+            eigenmodes=eigenmodes, target_GHz=target_GHz, probes_mm=probes_mm,
+        )
         config_path = work_dir / CONFIG_FILENAME
         config_path.write_text(json.dumps(config, indent=2, sort_keys=True) + "\n")
         config_sha256 = _sha256(config_path)
+        effective_target = float(config["Solver"]["Eigenmode"]["Target"])
+        effective_n = int(config["Solver"]["Eigenmode"]["N"])
+        if target_GHz is None:
+            analytic_ref = palace_config.analytic_reference(domain, count=8)
+            expected = palace_config.expected_solver_modes_GHz(domain, n_modes=effective_n)
+        else:
+            # A targeted run needs the complete spectrum around the target:
+            # everything up to a margin above the last expected mode.
+            expected = palace_config.expected_solver_modes_GHz(domain, n_modes=effective_n, target_GHz=effective_target)
+            analytic_ref = palace_config.analytic_reference_below(domain, f_max_GHz=max(expected) * 1.05)
 
         if geometry is not None and getattr(geometry, "generated", False):
             geometry_note = (
@@ -421,14 +450,22 @@ class PalaceSolver(SolverAdapter):
             "config_sha256": config_sha256,
             "config": config,
             "solver_rules": dict(palace_config.SOLVER_RULES),
-            "analytic_reference": palace_config.analytic_reference(domain, count=8),
-            "expected_solver_modes_GHz": palace_config.expected_solver_modes_GHz(domain),
+            "analytic_reference": analytic_ref,
+            "expected_solver_modes_GHz": expected,
             "geometry_note": geometry_note,
             "image": self.image,
             "runtime": self.runtime,
             "mpi_processes": self.mpi_processes,
             "output_dir": OUTPUT_DIRNAME,
         }
+        if overrides:
+            payload["overrides"] = {k: v for k, v in overrides.items()}
+            payload["effective"] = {
+                "characteristic_length_mm": mesh_record.characteristic_length_mm,
+                "eigenmodes_requested": effective_n,
+                "target_GHz": effective_target,
+                "probes_mm": probes_mm or [],
+            }
         return PreparedInput(
             candidate_id=candidate.candidate_id,
             run_id=run_context.run_id,
@@ -673,6 +710,7 @@ class PalaceSolver(SolverAdapter):
         artifacts = self._artifacts(raw)
 
         analytic = payload.get("analytic_reference") or []
+        expected = payload.get("expected_solver_modes_GHz") or []
         notes = [
             "Palace eigenmode solve of the EMPTY Object 001 vacuum cavity as a "
             "closed PEC box. The chip dielectric, recess step, launch bores and "
@@ -687,14 +725,22 @@ class PalaceSolver(SolverAdapter):
             f"{tolerance:g}. A mesh-refinement convergence campaign is deferred (spec §15).",
         ]
         if analytic and eigenmodes:
-            f_analytic = float(analytic[0]["frequency_GHz"])
+            # The first expected mode: the fundamental for the golden run, the
+            # first mode above the target for a targeted one.
+            f_analytic = float(expected[0]) if expected else float(analytic[0]["frequency_GHz"])
+            match = next((m for m in analytic if abs(float(m["frequency_GHz"]) - f_analytic) <= 1e-9 * f_analytic), analytic[0])
             f_solved = eigenmodes[0].frequency_GHz
             deviation = (f_solved - f_analytic) / f_analytic
+            height_note = (
+                " All requested modes are TM_mn0, so this checks the X/Y extent and "
+                "unit scaling, not the cavity height."
+                if all(int(m.get("p", 0)) == 0 for m in analytic[: max(1, len(expected))])
+                else " The expected modes include p >= 1, which depend on the cavity height."
+            )
             notes.append(
-                f"Analytic check: lowest mode {f_solved:.6f} GHz vs closed-form "
-                f"{analytic[0]['label']} {f_analytic:.6f} GHz, relative deviation "
-                f"{deviation:+.3e}. All requested modes are TM_mn0, so this checks "
-                f"the X/Y extent and unit scaling, not the cavity height."
+                f"Analytic check: first mode {f_solved:.6f} GHz vs closed-form "
+                f"{match['label']} {f_analytic:.6f} GHz, relative deviation "
+                f"{deviation:+.3e}.{height_note}"
             )
         if log.git_changeset:
             notes.append(f"Palace banner git changeset: {log.git_changeset}.")
@@ -740,6 +786,8 @@ class PalaceSolver(SolverAdapter):
             f"{OUTPUT_DIRNAME}/eig.csv": "eigenmodes_csv",
             f"{OUTPUT_DIRNAME}/domain-E.csv": "domain_energy_csv",
             f"{OUTPUT_DIRNAME}/palace.json": "palace_metadata",
+            f"{OUTPUT_DIRNAME}/probe-E.csv": "probe_E_csv",
+            f"{OUTPUT_DIRNAME}/error-indicators.csv": "error_indicators_csv",
         }
         artifacts: list[Artifact] = []
         candidates = [work / CONFIG_FILENAME, work / MESH_FILENAME, raw.log_path, raw.run_record_path]

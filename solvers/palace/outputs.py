@@ -191,6 +191,80 @@ def summarise_log(text: str) -> LogSummary:
     return out
 
 
+@dataclass(frozen=True)
+class ProbeSample:
+    mode_index: int
+    probe_index: int
+    E: tuple[complex, complex, complex]
+
+    @property
+    def intensity(self) -> float:
+        return sum(abs(c) ** 2 for c in self.E)
+
+
+_PROBE_COLUMN = re.compile(r"^(Re|Im)\{E_([xyz])\[(\d+)\]\}", re.IGNORECASE)
+
+
+def parse_probe_csv(path: Path) -> list[ProbeSample]:
+    """Parse Palace's ``probe-E.csv`` (eigenmode driver: one row per mode).
+
+    Columns are ``m`` then ``Re{E_x[i]} (V/m)``, ``Im{E_x[i]} (V/m)``, ... for
+    each probe index ``i`` and component. Header-driven; an absent file gives
+    an empty list because probes are optional.
+    """
+    path = Path(path)
+    if not path.exists():
+        return []
+    with path.open(newline="") as fh:
+        rows = [[c.strip() for c in row] for row in csv.reader(fh) if any(c.strip() for c in row)]
+    if len(rows) < 2:
+        return []
+    header = rows[0]
+    columns: dict[tuple[int, str, str], int] = {}
+    for i, name in enumerate(header):
+        m = _PROBE_COLUMN.match(name)
+        if m:
+            columns[(int(m.group(3)), m.group(2).lower(), m.group(1).lower())] = i
+    if not columns:
+        raise PalaceOutputError(f"{path} carries no Re{{E_x[i]}} probe columns: header {header}")
+    probe_indices = sorted({k[0] for k in columns})
+    samples: list[ProbeSample] = []
+    for row in rows[1:]:
+        try:
+            mode_index = int(float(row[0]))
+            for idx in probe_indices:
+                comps = []
+                for axis in ("x", "y", "z"):
+                    re_i = columns.get((idx, axis, "re"))
+                    im_i = columns.get((idx, axis, "im"))
+                    re_v = _to_float(row[re_i]) if re_i is not None else 0.0
+                    im_v = _to_float(row[im_i]) if im_i is not None else 0.0
+                    comps.append(complex(re_v, im_v))
+                samples.append(ProbeSample(mode_index, idx, (comps[0], comps[1], comps[2])))
+        except (ValueError, IndexError) as exc:
+            raise PalaceOutputError(f"{path}: unparseable probe row {row}: {exc}") from exc
+    return samples
+
+
+def z_polarisation_fraction(samples: list[ProbeSample]) -> dict[int, float | None]:
+    """Per mode, ``sum |E_z|^2 / sum |E|^2`` over all probes.
+
+    A TM_mn0 mode of a box has E purely along z everywhere, so its fraction is
+    1 wherever the field is non-zero; a TE mode with p >= 1 has E_z = 0 and
+    fraction 0; a TM mode with p >= 1 lies in between. ``None`` when every
+    probe saw a zero field (all probes on nodal planes).
+    """
+    total: dict[int, float] = {}
+    z_part: dict[int, float] = {}
+    for sample in samples:
+        total[sample.mode_index] = total.get(sample.mode_index, 0.0) + sample.intensity
+        z_part[sample.mode_index] = z_part.get(sample.mode_index, 0.0) + abs(sample.E[2]) ** 2
+    return {
+        mode: (z_part[mode] / total[mode] if total[mode] > 0 else None)
+        for mode in sorted(total)
+    }
+
+
 def read_metadata_json(path: Path) -> dict[str, Any]:
     """Palace's ``palace.json`` where present; empty dict where not."""
     path = Path(path)

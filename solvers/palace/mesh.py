@@ -80,12 +80,20 @@ def _require_gmsh():  # noqa: ANN202
     return gmsh
 
 
-def generate_box_mesh(domain: SolverDomain, output_path: Path) -> MeshRecord:
-    """Mesh the solver domain and write it to ``output_path``."""
+def generate_box_mesh(
+    domain: SolverDomain, output_path: Path, characteristic_length_mm: float | None = None
+) -> MeshRecord:
+    """Mesh the solver domain and write it to ``output_path``.
+
+    ``characteristic_length_mm`` overrides the domain's own value (its
+    explicit ``mesh_length_mm`` or, failing that, the in-plane rule).
+    """
     gmsh = _require_gmsh()
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    lc = domain.characteristic_length_mm
+    lc = float(characteristic_length_mm) if characteristic_length_mm is not None else domain.characteristic_length_mm
+    if lc <= 0:
+        raise ValueError("characteristic length must be positive")
 
     gmsh.initialize()
     try:
