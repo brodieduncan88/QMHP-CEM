@@ -46,33 +46,47 @@ frequency ceiling), so the 154 modes below Object 001's first
 height-dependent mode are all accounted for; a fixed index cap would not do.
 
 The mesh rule for height runs is `min(min(a,b)/12, d/4, λ(f_target)/6)`: the
-shortest structure decides, which for these boxes is four elements across the
-height. Palace returns eigenvalues close to but not below its target, so the
+shortest structure decides. It is applied to each height separately, so the
+two heights of one benchmark can carry different lengths at the same level
+(for the auxiliary box, d/4 = 1.75 mm at 7.0 mm but a/12 = 1.8333 mm at
+7.7 mm). Runs are therefore paired by refinement level, never by mesh
+length. Palace returns eigenvalues close to but not below its target, so the
 target is placed midway between the wanted mode and the highest analytic
 mode below it, and enough modes are requested to cover a 1 % window above
 the mode plus a margin. Three field probes are added per run; the fraction
 `Σ|E_z|²/Σ|E|²` over the probes classifies each computed mode as z-polarised
-(TM_mn0, height-independent) or transverse/mixed (p ≥ 1), independently of
-its frequency. Mode matching assigns computed modes to analytic ones by
-frequency within 2e-3 relative, honouring multiplicity, and records the probe
-family and whether it agrees; every decision is written to
+(TM_mn0, height-independent) or not (p ≥ 1), independently of its frequency.
+That fraction separates p = 0 from p ≥ 1; it does not separate TE from TM
+at p ≥ 1 in a flat box, because a TM_mnp mode with p ≥ 1 has E_z ∝ cos(pπz/d),
+which is small near mid-height where the probes sit, while its transverse
+components scale with k_z/k_c ≫ 1. The recorded family label for such a
+mode reads "transverse", and the consistency check asks only that a p ≥ 1
+mode is not z-polarised. The selected (0,1,1) mode is TE-only, so its
+transverse classification is exact. Mode matching assigns computed modes to
+analytic ones by frequency within 2e-3 relative, honouring multiplicity, and
+records the probe family and whether it agrees; every decision is written to
 `mode_matching.json`.
 
 For the wanted mode, Δf_Palace = f(height 2) − f(height 1) is compared with
 Δf_exact. Rules: relative disagreement ≤ 1e-2, and |Δf_exact| at least 10×
 the numerical uncertainty, which is the change of the identified mode
 between the final two mesh levels; PASS needs two mesh levels at both
-heights. A single level is INCOMPLETE; a benchmark none of whose runs could
-execute within the budget is BLOCKED.
+heights. A single level is INCOMPLETE. A benchmark is BLOCKED when none of
+its runs could be launched within the budget, or when every launched run
+failed or timed out: that is a measured limit of the runner, not a skipped
+benchmark, and the failure of each attempt is recorded in the verdict.
 
 **The Object 001 box.** Resolving a 100 GHz mode in a 22 mm box to the
 declared rule (0.375 mm) meshes to about 545k degrees of freedom, above the
 declared runner budget of 400k, so that level is BLOCKED before Palace is
 launched and its mesh is kept as evidence. The campaign then makes one
 bounded exploratory attempt per height at d/3 (about 260k and 215k DOF, one
-hour each). Without refinement that benchmark can be at most INCOMPLETE. The
-auxiliary box is what verifies the Z pipeline; it is labelled auxiliary
-everywhere and is not represented as verification of Object 001.
+hour each). Without refinement that benchmark can be at most INCOMPLETE, and
+in the executed campaigns both exploratory attempts ran out their one-hour
+budget on the GitHub-hosted runner, so the benchmark is BLOCKED with those
+timeouts as the measurement. The auxiliary box is what verifies the Z
+pipeline; it is labelled auxiliary everywhere and is not represented as
+verification of Object 001.
 
 ## Execution configuration
 
