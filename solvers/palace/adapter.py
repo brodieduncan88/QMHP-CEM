@@ -171,6 +171,29 @@ def _last_line(text: str) -> str:
     return lines[-1] if lines else "no output"
 
 
+def _first_digest(text: str) -> str | None:
+    """First registry digest from ``{{json .RepoDigests}}`` (a JSON list, or null).
+
+    A comma-separated plain string is accepted too, for a runtime whose
+    inspect output was produced with ``join``.
+    """
+    text = text.strip()
+    if not text or text == "null":
+        return None
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        parsed = text.split(",")
+    if isinstance(parsed, str):
+        parsed = parsed.split(",")
+    if not isinstance(parsed, list):
+        return None
+    for item in parsed:
+        if isinstance(item, str) and item.strip():
+            return item.strip()
+    return None
+
+
 def _container_name(run_id: str, candidate_id: str) -> str:
     raw = f"{CONTAINER_NAME_PREFIX}-{run_id}-{candidate_id}"
     return _CONTAINER_NAME_SAFE.sub("-", raw)[:128]
@@ -244,12 +267,16 @@ class PalaceSolver(SolverAdapter):
                 f"Start the {self.runtime} daemon, or run QMHP-CEM where one is available.",
             )
 
+        # RepoDigests is emitted as JSON rather than joined: on Docker 28 the
+        # `join` template function rejects the empty list a locally built
+        # image carries ("expected []string; got []interface {}"), observed
+        # on the first real run of this path.
         inspect = self._runtime(
             [
                 "image",
                 "inspect",
                 "--format",
-                "{{.Id}}\t{{join .RepoDigests \",\"}}\t{{json .Config.Labels}}",
+                "{{.Id}}\t{{json .RepoDigests}}\t{{json .Config.Labels}}",
                 self.image,
             ],
             timeout=60,
@@ -268,7 +295,7 @@ class PalaceSolver(SolverAdapter):
                 f"{self.runtime} image inspect returned no image ID for {self.image!r}",
                 "Rebuild the image and check `docker image inspect` works by hand.",
             )
-        repo_digest = digests.split(",")[0] if digests.strip() else None
+        repo_digest = _first_digest(digests)
         try:
             labels = json.loads(labels_json) if labels_json.strip() else {}
         except json.JSONDecodeError:

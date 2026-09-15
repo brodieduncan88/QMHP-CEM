@@ -79,7 +79,7 @@ jobs:
 
       - name: Image identity
         run: |
-          docker image inspect "$IMAGE" --format 'id={{.Id}}  repo-digests={{join .RepoDigests ","}}'
+          docker image inspect "$IMAGE" --format 'id={{.Id}}  repo-digests={{json .RepoDigests}}'
           docker image inspect "$IMAGE" --format '{{json .Config.Labels}}'
           docker run --rm --network none --entrypoint /bin/sh "$IMAGE" -c 'cat /opt/palace/PALACE_VERSION /opt/palace/PALACE_COMMIT'
           docker run --rm --network none "$IMAGE" --help | head -n 3

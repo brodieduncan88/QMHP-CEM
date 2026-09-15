@@ -333,8 +333,10 @@ class FakeRuntime:
             opts = '["name=seccomp,profile=builtin","name=rootless","name=cgroupns"]' if self.rootless else '["name=seccomp,profile=builtin"]'
             return subprocess.CompletedProcess(cmd, 0, opts + "\n", "")
         if sub == "image":
+            assert cmd[3] == "--format" and "{{json .RepoDigests}}" in cmd[4], cmd
             labels = json.dumps({"org.qmhp.cem.palace-version": "0.13.0", "org.qmhp.cem.palace-commit": "label-commit"})
-            return subprocess.CompletedProcess(cmd, 0, f"{IMAGE_ID}\t{self.digest}\t{labels}\n", "")
+            digests = json.dumps([self.digest] if self.digest else [])
+            return subprocess.CompletedProcess(cmd, 0, f"{IMAGE_ID}\t{digests}\t{labels}\n", "")
         if sub == "run" and "--entrypoint" in cmd:
             return subprocess.CompletedProcess(cmd, self.probe_rc, self.probe, "" if self.probe_rc == 0 else "exec failed")
         if sub == "run":
@@ -374,6 +376,25 @@ def test_preflight_reads_the_image_identity(fake_runtime):
     assert probe[:6] == ["docker", "run", "--rm", "--network", "none", "--entrypoint"]
     assert "printf 'version=%s\\ncommit=%s\\n'" in probe[-1]
     assert adapter.provenance()["palace_commit"] == TAG_COMMIT
+
+
+def test_preflight_handles_a_locally_built_image_without_a_registry_digest(fake_runtime):
+    """The golden image is built locally: RepoDigests is [] and the ID stands in."""
+    fake_runtime(digest=None)
+    adapter = PalaceSolver()
+    adapter.preflight()
+    assert adapter._identity.repo_digest is None
+    assert adapter._identity.digest_for_record == IMAGE_ID
+
+
+def test_first_digest_accepts_json_null_list_and_legacy_forms():
+    from solvers.palace.adapter import _first_digest
+
+    assert _first_digest("null") is None
+    assert _first_digest("[]") is None
+    assert _first_digest("") is None
+    assert _first_digest('["a@sha256:1", "b@sha256:2"]') == "a@sha256:1"
+    assert _first_digest("a@sha256:1,b@sha256:2") == "a@sha256:1"
 
 
 def test_preflight_probe_with_an_empty_commit_falls_back_to_the_label(fake_runtime):
