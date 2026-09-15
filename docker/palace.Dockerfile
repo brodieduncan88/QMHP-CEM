@@ -97,11 +97,27 @@ RUN set -eux; \
 # heavyweight packages are off to keep the build surface small. Headers,
 # CMake package files and the sources are removed afterwards so the runtime
 # stage copies only what the binary needs.
+#
+# The compilers are named gcc/g++ rather than left to CMake's default cc/c++:
+# the superbuild hands CC through to libCEED's Makefile, which detects the
+# compiler vendor from `$CC --version`, and Ubuntu's `cc` reports itself as
+# "cc (Ubuntu ...)" rather than "gcc". With the vendor undetected libCEED
+# drops -fPIC and its shared library fails to link (observed on the first
+# build of this file). Palace's own CI exports CC=gcc-12 for the same reason.
+# Optimisation flags go through CMAKE_C_FLAGS/CMAKE_CXX_FLAGS as Palace's
+# install notes describe; -O2 without -march=native keeps the binary
+# portable across runner CPUs.
+ENV CC=gcc CXX=g++ FC=gfortran
 RUN set -eux; \
     JOBS="${BUILD_JOBS:-$(nproc)}"; \
     cmake -S /opt/palace-src -B /opt/palace-build \
         -DCMAKE_INSTALL_PREFIX=/opt/palace \
         -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_C_COMPILER=gcc \
+        -DCMAKE_CXX_COMPILER=g++ \
+        -DCMAKE_Fortran_COMPILER=gfortran \
+        -DCMAKE_C_FLAGS="-O2" \
+        -DCMAKE_CXX_FLAGS="-O2" \
         -DPALACE_WITH_SLEPC=ON \
         -DPALACE_WITH_ARPACK=OFF \
         -DPALACE_WITH_SUPERLU=ON \
@@ -114,7 +130,7 @@ RUN set -eux; \
     test -x /opt/palace/bin/palace; \
     ls /opt/palace/bin/palace-*.bin; \
     rm -rf /opt/palace-src /opt/palace-build \
-           /opt/palace/include /opt/palace/share \
+           /opt/palace/include /opt/palace/share /opt/palace/opt \
            /opt/palace/lib/cmake /opt/palace/lib/pkgconfig \
            /opt/palace/lib64/cmake /opt/palace/lib64/pkgconfig
 
