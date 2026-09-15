@@ -402,3 +402,48 @@ def test_campaign_rejects_an_unknown_run_name(tmp_path, capsys):
     script = _load_script()
     assert script.main(["--prepare-only", "--results-root", str(tmp_path), "--only", "nope"]) == 2
     assert "unknown run name" in capsys.readouterr().err
+
+
+# --- the record must be written whatever happens ---------------------------------------
+
+
+def test_report_renders_for_a_blocked_or_empty_campaign():
+    """The first real run died in report rendering on a BLOCKED entry; never again."""
+    script = _load_script()
+    campaign = V.build_campaign()
+    summary = {"campaign_sha256": campaign.sha256(), "execution": "palace", "runs": {},
+               **script.evaluate(campaign, {}, {})}
+    text = script.render_report(campaign, summary)
+    assert "BLOCKED" in text and "INCOMPLETE" in text
+    assert summary["height"]["aux_height"]["verdict"] == V.BLOCKED
+    assert summary["height"]["aux_height"]["mode"] == [0, 1, 1]
+    failed = V.RunResult(name="ladder-L1", status="RUN_FAILED", mesh_length_mm=22 / 12, tetrahedra=1200, dof_estimate=9840,
+                         failure="PalaceRunFailed: Palace exited with code 1 | requires MFEM_USE_GSLIB")
+    summary = {"campaign_sha256": campaign.sha256(), "execution": "palace", "runs": {"ladder-L1": failed.as_dict()},
+               **script.evaluate(campaign, {"ladder-L1": failed}, {})}
+    assert "requires MFEM_USE_GSLIB" in script.render_report(campaign, summary)
+
+
+@needs_gmsh
+def test_record_survives_a_report_rendering_failure(monkeypatch, tmp_path):
+    script = _load_script()
+
+    def broken(campaign, summary):  # noqa: ANN001
+        raise KeyError("simulated rendering defect")
+
+    monkeypatch.setattr(script, "render_report", broken)
+    pointer = tmp_path / "ptr"
+    code = script.main(["--prepare-only", "--results-root", str(tmp_path / "results"), "--record-pointer", str(pointer),
+                        "--only", "ladder-L1"])
+    assert code == 0
+    root = Path(pointer.read_text().strip())
+    assert "Report rendering failed" in (root / "report.md").read_text()
+    assert json.loads((root / "summary.json").read_text())["complete"] is True
+    assert manifest.verify(root) == []                                    # the manifest was still written last
+
+
+def test_no_probes_campaign_is_distinct_and_probe_free():
+    with_probes, without = V.build_campaign(), V.build_campaign(probes=False)
+    assert without.name.endswith("-noprobes") and without.sha256() != with_probes.sha256()
+    assert all(r.probes for r in with_probes.runs) and not any(r.probes for r in without.runs)
+    assert all("probes_mm" not in r.overrides() for r in without.runs)

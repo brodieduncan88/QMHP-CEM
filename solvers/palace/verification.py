@@ -330,19 +330,24 @@ def analytic_design(benches: list[HeightBenchmark]) -> dict[str, Any]:
     return out
 
 
-def build_campaign() -> Campaign:
+def build_campaign(probes: bool = True) -> Campaign:
+    """The frozen campaign. ``probes=False`` drops the field probes from every
+    run (for an image built without GSLIB); the mode-family check then reports
+    'unknown' and matching rests on frequency alone, which the record states."""
     box = object001_box()
     benches = height_benchmarks()
     runs = [r for b in benches for r in height_runs_for(b)]
+    if not probes:
+        runs = [RunSpec(**{**asdict(r), "cavity": r.cavity, "probes": False}) for r in runs]
     # Object 001 exploratory attempts are the most expensive: run the cheap,
     # decisive auxiliary benchmark before them.
     runs.sort(key=lambda r: (0 if r.benchmark == "aux_height" else 1, r.level, r.name))
     return Campaign(
         schema=CAMPAIGN_SCHEMA,
-        name="mesh-height-verification-v1",
+        name="mesh-height-verification-v1" + ("" if probes else "-noprobes"),
         rules=dict(RULES),
         object001=box,
-        ladder=mesh_ladder(box),
+        ladder=[RunSpec(**{**asdict(r), "cavity": r.cavity, "probes": probes}) for r in mesh_ladder(box)],
         height_benchmarks=benches,
         height_runs=runs,
         analytic_design=analytic_design(benches),
@@ -586,9 +591,14 @@ def height_shift(
                 continue
             found = height_mode_frequencies(decisions.get(r.name, []), bench.mode, box)
             lvl[key] = {"status": r.status, "identified": found, "mean_GHz": (sum(found) / len(found) if found else None)}
+    base: dict[str, Any] = {
+        "mode": list(bench.mode), "heights_mm": [d1, d2], "f_exact_GHz": f_exact,
+        "delta_f_exact_GHz": delta_exact, "delta_f_exact_relative": delta_exact / f_exact[f"{d1:g}"],
+        "levels": {}, "levels_executed": len(per_level), "levels_identified": 0,
+    }
     if executed == 0:
-        return {"verdict": BLOCKED, "reasons": ["no run of this benchmark could be executed within the budget"],
-                "delta_f_exact_GHz": delta_exact, "f_exact_GHz": f_exact, "levels": {}}
+        return {**base, "verdict": BLOCKED,
+                "reasons": ["no run of this benchmark could be executed within the budget"]}
 
     levels_ok: list[tuple[float, float, float]] = []   # (lc, mean_h1, mean_h2)
     reasons: list[str] = []
@@ -610,10 +620,9 @@ def height_shift(
         levels_ok.append((lc, a["mean_GHz"], b["mean_GHz"]))
 
     out: dict[str, Any] = {
-        "mode": list(bench.mode), "heights_mm": [d1, d2], "f_exact_GHz": f_exact,
-        "delta_f_exact_GHz": delta_exact, "delta_f_exact_relative": delta_exact / f_exact[f"{d1:g}"],
+        **base,
         "levels": {f"{lc:.6g}": {"f_palace_GHz": [m1, m2], "delta_f_palace_GHz": m2 - m1} for lc, m1, m2 in levels_ok},
-        "levels_executed": len(per_level), "levels_identified": len(levels_ok),
+        "levels_identified": len(levels_ok),
     }
     if not levels_ok:
         out.update({"verdict": INCOMPLETE, "reasons": reasons or ["the wanted mode was not identified at both heights"]})

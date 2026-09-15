@@ -204,11 +204,12 @@ def render_report(campaign: V.Campaign, summary: dict) -> str:
             L.append(f"| {row['run']} | {row['status']} | | | | |")
     L.append("\n" + "; ".join(mc["reasons"]) + "\n")
     L.append("## Objective 2: height sensitivity (p >= 1 modes)\n")
-    for name, h in summary["height"].items():
+    for name, h in summary.get("height", {}).items():
         L.append(f"### {name}: {h['label']}\n")
         L.append(f"Verdict **{h['verdict']}**. " + "; ".join(h.get("reasons", [])) + "\n")
-        if "f_exact_GHz" in h:
-            L.append(f"- mode {tuple(h['mode'])}, heights {h['heights_mm']} mm, exact f {h['f_exact_GHz']}, Δf_exact {h['delta_f_exact_GHz']:+.5f} GHz ({h['delta_f_exact_relative']:+.3%})")
+        if "f_exact_GHz" in h and "mode" in h:
+            L.append(f"- mode {tuple(h['mode'])}, heights {h.get('heights_mm')} mm, exact f {h['f_exact_GHz']}, "
+                     f"Δf_exact {h['delta_f_exact_GHz']:+.5f} GHz ({h.get('delta_f_exact_relative', 0.0):+.3%})")
         for lc, lv in h.get("levels", {}).items():
             L.append(f"- lc {lc} mm: f_Palace {[round(x, 6) for x in lv['f_palace_GHz']]} GHz, Δf_Palace {lv['delta_f_palace_GHz']:+.5f} GHz")
         if "relative_disagreement" in h:
@@ -220,7 +221,7 @@ def render_report(campaign: V.Campaign, summary: dict) -> str:
     L.append("| run | role | status | lc (mm) | tets | DOF (est.) | DOF | Palace s | failure |")
     L.append("|---|---|---|---|---|---|---|---|---|")
     for spec in campaign.runs:
-        r = summary["runs"].get(spec.name)
+        r = summary.get("runs", {}).get(spec.name)
         if r is None:
             L.append(f"| {spec.name} | {spec.role} | not executed | {spec.mesh_length_mm:.4f} | | | | | |")
             continue
@@ -240,10 +241,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--record-pointer", default=None, metavar="FILE")
     parser.add_argument("--only", action="append", default=None, help="run only these run names (repeatable)")
     parser.add_argument("--prepare-only", action="store_true", help="mesh and estimate every run without launching Palace")
+    parser.add_argument("--no-probes", action="store_true",
+                        help="omit the field probes (an image built without GSLIB aborts on them); recorded in the campaign name")
     args = parser.parse_args(argv)
 
     started = datetime.now(timezone.utc)
-    campaign = V.build_campaign()
+    campaign = V.build_campaign(probes=not args.no_probes)
     candidate = load_golden()
     selected = [r for r in campaign.runs if not args.only or r.name in set(args.only)]
     if args.only:
@@ -276,6 +279,9 @@ def main(argv: list[str] | None = None) -> int:
     decisions: dict[str, list[dict]] = {}
 
     def write_record(final: bool) -> dict:
+        """Summary, report and manifest. Never raises: a defect in the
+        evaluation or the rendering is written into the record instead of
+        aborting the campaign, and the manifest is always the last file."""
         ended = datetime.now(timezone.utc)
         summary = {
             "schema": V.SUMMARY_SCHEMA,
@@ -298,15 +304,31 @@ def main(argv: list[str] | None = None) -> int:
                                            "table": [], "degenerate_pair": [], "verdict": "NOT-EVALUATED", "reasons": ["prepare-only"]}
             summary["height"] = {}
         else:
-            summary.update(evaluate(campaign, results, decisions))
-            env = environment.record(
-                started_utc=started, solver_name="palace",
-                solver_version=f"{provenance.get('palace_version')}+{str(provenance.get('palace_commit'))[:12]}",
-                solver_identity=f"{args.image}@{provenance.get('image_id')}", ended_utc=ended,
-            )
-            summary["environment"] = env.model_dump(mode="json")
+            try:
+                summary.update(evaluate(campaign, results, decisions))
+            except Exception as exc:  # noqa: BLE001 - recorded, never fatal
+                summary["evaluation_error"] = f"{exc.__class__.__name__}: {exc}\n{traceback.format_exc()}"
+                summary.setdefault("verdicts", {"mesh_convergence": "ERROR", "height_sensitivity_aux": "ERROR",
+                                                "height_sensitivity_object001": "ERROR"})
+                summary.setdefault("mesh_convergence", {"table": [], "degenerate_pair": [], "verdict": "ERROR", "reasons": [str(exc)],
+                                                        "expected_analytic_GHz": []})
+                summary.setdefault("height", {})
+            try:
+                env = environment.record(
+                    started_utc=started, solver_name="palace",
+                    solver_version=f"{provenance.get('palace_version')}+{str(provenance.get('palace_commit'))[:12]}",
+                    solver_identity=f"{args.image}@{provenance.get('image_id')}", ended_utc=ended,
+                )
+                summary["environment"] = env.model_dump(mode="json")
+            except Exception as exc:  # noqa: BLE001
+                summary["environment_error"] = f"{exc.__class__.__name__}: {exc}"
         (root / "summary.json").write_text(_dump(summary))
-        (root / "report.md").write_text(render_report(campaign, summary))
+        try:
+            report = render_report(campaign, summary)
+        except Exception as exc:  # noqa: BLE001 - the report is a convenience; the summary is the record
+            report = (f"# Palace verification campaign\n\nReport rendering failed: {exc.__class__.__name__}: {exc}\n\n"
+                      f"See summary.json for the record.\n\n```\n{traceback.format_exc()}```\n")
+        (root / "report.md").write_text(report)
         manifest.write(root)
         return summary
 

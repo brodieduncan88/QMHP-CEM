@@ -27,6 +27,10 @@ on:
         description: "Commit results/PALACE-VERIFY-* back to this branch"
         type: boolean
         default: true
+      no_probes:
+        description: "Omit field probes (only for an image built without GSLIB)"
+        type: boolean
+        default: false
   push:
     branches:
       - main
@@ -47,6 +51,7 @@ env:
   IMAGE: qmhp-cem/palace:0.13.0
   ONLY: ${{ inputs.only || '' }}
   COMMIT_RESULTS: ${{ github.event_name != 'workflow_dispatch' || inputs.commit_results }}
+  NO_PROBES: ${{ github.event_name == 'workflow_dispatch' && inputs.no_probes }}
 
 jobs:
   verify:
@@ -99,6 +104,7 @@ jobs:
         run: |
           args=()
           for name in $ONLY; do args+=(--only "$name"); done
+          if [ "$NO_PROBES" = "true" ]; then args+=(--no-probes); fi
           uv run python scripts/palace_verify_campaign.py --np 1 --results-root results --record-pointer "$RUNNER_TEMP/palace-verify-record" "${args[@]}"
 
       - name: Identify this run's record
