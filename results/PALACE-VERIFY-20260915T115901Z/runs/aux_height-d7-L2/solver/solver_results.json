@@ -1,0 +1,126 @@
+{
+  "artifacts": [
+    {
+      "path": "config.json",
+      "role": "palace_config",
+      "sha256": "49da80f3757dcceef848f510dfca1ced06f49d47b3d1d56bc120fe0d8e4b3bcd"
+    },
+    {
+      "path": "mesh.msh",
+      "role": "mesh",
+      "sha256": "9430261cca9d3df3af596b4ce8e48b899e8d8f7828b56885e65f929ace37ff7f"
+    },
+    {
+      "path": "palace_log.txt",
+      "role": "palace_log",
+      "sha256": "d817915e7362b113eb0ea82abd40a208a3616985f1c337a79f8237418a2e696d"
+    },
+    {
+      "path": "palace_run.json",
+      "role": "palace_run_record",
+      "sha256": "a57e722860fdecff785a1eb410e85e49ff85b4e3564265cb4a6519a8c538ee00"
+    },
+    {
+      "path": "postpro/domain-E.csv",
+      "role": "domain_energy_csv",
+      "sha256": "231b5a58cab0b5e00a5aea1be0c540f4c5e1b2405bcf6c835b2b2fb8d46be232"
+    },
+    {
+      "path": "postpro/eig.csv",
+      "role": "eigenmodes_csv",
+      "sha256": "ae021f55a53611c85578118e7878cfddd052a20fc1c78c87e2d496255a1674e2"
+    },
+    {
+      "path": "postpro/error-indicators.csv",
+      "role": "error_indicators_csv",
+      "sha256": "6e88dd5e548f02d0bc60da672cb34b91a47c6273fe727e07748d34f60914981a"
+    },
+    {
+      "path": "postpro/palace.json",
+      "role": "palace_metadata",
+      "sha256": "6be3e72532ca85231d61d43f2c7ecbbca4425a9c951e553ecc1113eb5c4704ed"
+    },
+    {
+      "path": "postpro/probe-B.csv",
+      "role": "palace_output",
+      "sha256": "66b54449c17d4c7e21314977a8e9884a2afa82111de5f478c0c0712274bd44d5"
+    },
+    {
+      "path": "postpro/probe-E.csv",
+      "role": "probe_E_csv",
+      "sha256": "5a2c1e5b1330134ae0731253ac14386246da922d7dd8536eaf2fc86ab21c772a"
+    }
+  ],
+  "candidate_id": "QMHP-CEM-A-RF-000001",
+  "convergence": {
+    "metric": "eigenmode_backward_error_max",
+    "status": "CONVERGED",
+    "tolerance": 1e-06,
+    "value": 2.591878202e-10
+  },
+  "eigenmodes": [
+    {
+      "frequency_GHz": 22.4722271,
+      "label": "palace_mode_1",
+      "quality_factor": 48098390520.0
+    },
+    {
+      "frequency_GHz": 22.47229508,
+      "label": "palace_mode_2",
+      "quality_factor": 84493146090.0
+    },
+    {
+      "frequency_GHz": 23.4824503,
+      "label": "palace_mode_3",
+      "quality_factor": 92862549660.0
+    },
+    {
+      "frequency_GHz": 23.48256976,
+      "label": "palace_mode_4",
+      "quality_factor": 25954178530.0
+    },
+    {
+      "frequency_GHz": 24.56688939,
+      "label": "palace_mode_5",
+      "quality_factor": 15294985100.0
+    },
+    {
+      "frequency_GHz": 24.56691498,
+      "label": "palace_mode_6",
+      "quality_factor": 14115093820.0
+    },
+    {
+      "frequency_GHz": 25.38291123,
+      "label": "palace_mode_7",
+      "quality_factor": 35903823200.0
+    },
+    {
+      "frequency_GHz": 25.38293071,
+      "label": "palace_mode_8",
+      "quality_factor": 17785278520.0
+    }
+  ],
+  "frequency_GHz": [],
+  "notes": [
+    "Palace eigenmode solve of the EMPTY Object 001 vacuum cavity as a closed PEC box. The chip dielectric, recess step, launch bores and lid are not modelled in this milestone.",
+    "Solver domain (mm, spec \u00a77.3 frame): {'x_min_mm': -11.0, 'x_max_mm': 11.0, 'y_min_mm': -11.0, 'y_max_mm': 11.0, 'z_min_mm': 0.0, 'z_max_mm': 7.0, 'mesh_length_mm': 1.1666666666666667}.",
+    "Mesh: 10692 tetrahedra, 2470 nodes, gmsh 4.15.2, sha256 9430261cca9d3df3\u2026.",
+    "Convergence: Palace's own stopping criterion was Solver.Eigenmode.Tol = 1e-06; the reported metric is the maximum a-posteriori backward error over the 8 requested mode(s) against the adapter rule 1e-06. A mesh-refinement convergence campaign is deferred (spec \u00a715).",
+    "Analytic check: first mode 22.472227 GHz vs closed-form analytic_011 22.471579 GHz, relative deviation +2.884e-05. The expected modes include p >= 1, which depend on the cavity height.",
+    "Palace banner git changeset: v0.13.0.",
+    "Palace ran with 1 MPI process(es).",
+    "palace.json GitTag: v0.13.0."
+  ],
+  "run_id": "RUN-PALACE-VERIFY-20260915T115901Z-aux_height-d7-L2",
+  "s_parameters": {},
+  "schema": "qmhp-cem.solver-results/0.1.0",
+  "solver": {
+    "classification": "SOLVED",
+    "command_line": "docker run --rm --network none --hostname localhost --name qmhp-palace-RUN-PALACE-VERIFY-20260915T115901Z-aux_height-d7-L2-QMHP-CEM-A-RF-000001 --user 1001:1001 -e HOME=/tmp -v /home/runner/work/QMHP-CEM/QMHP-CEM/results/PALACE-VERIFY-20260915T115901Z/runs/aux_height-d7-L2/solver:/work -w /work qmhp-cem/palace:0.13.0 -np 1 config.json",
+    "image_digest": "sha256:2440f8d0b04f6413bfd385b9c72e502d633c37eb0672a8fffbcc23d4a4064759",
+    "name": "palace",
+    "version": "0.13.0+a61c8cbe0cac"
+  },
+  "synthetic": false,
+  "z_parameters": {}
+}
