@@ -4,12 +4,13 @@ Palace is the sole primary EM solver for this milestone. This document says
 what the path does, what it records, how to run the proof, and what it does
 **not** yet claim.
 
-**Status first: no Palace run has been executed from this repository.** The
-environment that produced this code has no reachable Docker daemon, so the
-image was not built and the golden harness exits 2 here with that reason.
-Everything up to the container boundary is implemented and tested; the first
-`results/PALACE-GOLDEN-*` directory committed to this repository will be the
-proof, and until one exists there is none. See the last section.
+**Status first: one genuine Palace run has been executed and is committed.**
+`results/PALACE-GOLDEN-20260915T014639Z/` was produced by GitHub Actions run
+34918498363 on commit b79a170 (Palace v0.13.0 at commit a61c8cbe, image ID
+`sha256:cc87ec6b…`, one MPI process, 40.4 s). All four requested modes of the
+empty Object 001 box converged (max backward error 2.0e-11 against 1e-6) and
+agree with the closed form to within 4.7e-5 relative. The last section has
+the numbers; the record itself has everything else.
 
 ## What is solved
 
@@ -196,16 +197,45 @@ The image records what it contains, and the build fails, rather than the
 first run, if the copied binary is missing a shared library or the launcher
 cannot start.
 
-The Dockerfile has been written against Palace v0.13.0's documented build and
-the apt snapshot mechanics were verified on an Ubuntu 24.04 host, but the
-image itself has not been built from this checkout. The first build is the
-first test of it.
+The image was first built in GitHub Actions run 34917157266 (818 s for the
+superbuild on a 4-vCPU hosted runner; a cached rebuild takes under two
+minutes). The first attempt failed linking libCEED: Palace hands `CC`
+through to libCEED's Makefile, which detects the compiler vendor from
+`$CC --version`, and Ubuntu's `cc` does not say "gcc", so `-fPIC` was
+dropped. The Dockerfile now names gcc explicitly, as Palace's own CI does.
 
 ## Status of the proof in this repository
 
-**No Palace run has been executed from this checkout.** The environment that
-produced this code has no reachable Docker daemon, so the image was not built
-and `scripts/palace_golden_run.py` exits 2 here with that exact reason.
+**Executed.** `results/PALACE-GOLDEN-20260915T014639Z/` is the first real
+run, committed by the workflow (commit 878cd8a) from GitHub Actions run
+34918498363 on b79a170. What it records:
+
+| Item | Value |
+|---|---|
+| Solver | Palace 0.13.0, git changeset `v0.13.0`, commit `a61c8cbe0cacf496cde3c62e93085fae0d6299ac` |
+| Image | `qmhp-cem/palace:0.13.0`, ID `sha256:cc87ec6b397ec4e55b19984b112e1638d15dd3f18bd3cf9a3b594019ec474265`, no registry digest (built on the runner) |
+| Command | `docker run --rm --network none --hostname localhost --name qmhp-palace-… --user 1001:1001 -e HOME=/tmp -v …/solver:/work -w /work qmhp-cem/palace:0.13.0 -np 1 config.json` |
+| Mesh | gmsh 4.15.2, 1200 tetrahedra, 443 nodes, lc 1.8333 mm, sha256 `7602c8c3…` |
+| Config | sha256 `8f4675f0…`; order 2, 9848 degrees of freedom |
+| Convergence | SLEPc `CONVERGED_TOL`, 4 eigenpairs; max backward error 2.02e-11 against the 1e-6 rule |
+| Modes (GHz) | 9.635896, 15.235451, 15.235704, 19.272299 |
+| Closed form (GHz) | 9.635695, 15.235371, 15.235371, 19.271389 |
+| Relative deviation | 2.1e-5, 5.3e-6, 2.2e-5, 4.7e-5 (all within the 1e-4 expected and the 2 % gate) |
+| Wall time | 40.4 s in Palace; 43 s end to end |
+| Gates | overall `INCOMPLETE`: `COLLISION` PASS, `P4PRE_SPECTRAL` PASS, `P6E2_FILTER` INCOMPLETE (no S21), `COUPLING_EXTRACTION` and `TOLERANCE` NOT-EVALUATED, six hardware gates HARDWARE-GATED |
+
+The two PASS verdicts describe the empty box, which has no mode below 9.6 GHz
+and therefore nothing near the 4.30 GHz readout root: they say the pipeline
+runs, not that the package is right. The 3x3 sweep also ran in the same job
+(nine Palace solves, six minutes, every candidate `INCOMPLETE` for the same
+reason: no S-parameters, so `COUPLING_EXTRACTION` cannot close); it was
+uploaded as a workflow artifact and not committed.
+
+Two workflow runs failed before this one, both on the image, neither on
+Palace: run 34916148077 (libCEED without `-fPIC`, above) and run 34917157266
+(the image built, then `docker image inspect --format` rejected the
+`join` template on an image with no registry digest; the adapter now reads
+`RepoDigests` as JSON).
 
 What is tested, in default CI, without a container:
 
@@ -222,7 +252,8 @@ What is tested, in default CI, without a container:
 - the orchestrator's handling of an unavailable solver (batch refused) and a
   solver that fails mid-sweep (candidate `INCOMPLETE`, cause recorded).
 
-What is not tested anywhere yet: Palace itself. The real-execution test is
-marked `palace` and skips with the reason wherever the container is absent.
-Coverage ends at the container boundary; the fixtures are format fixtures
-and are not evidence of a run.
+Palace itself is exercised only in the golden-run workflow: the
+real-execution test is marked `palace`, ran there against the live container
+(1 passed), and skips with the reason wherever the container is absent. The
+fixtures under `tests/fixtures/palace/` are format fixtures and are not
+evidence of a run; the evidence is the committed record.

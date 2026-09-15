@@ -6,9 +6,11 @@
 #
 # The build needs outbound HTTPS to archive.ubuntu.com, snapshot.ubuntu.com,
 # github.com (Palace and most of its superbuild dependencies) and gitlab.com
-# (PETSc/SLEPc). It has not been executed from this checkout: no Docker
-# daemon is available where this file was written. The first build is the
-# first test of it, and docs/palace-execution.md says so.
+# (PETSc/SLEPc). First built in GitHub Actions (.github/workflows/
+# palace-golden.yml, run 34917157266: 818 s superbuild on a 4-vCPU runner,
+# image ID sha256:cc87ec6b...) after one fix, the explicit gcc below; the
+# resulting image executed the golden candidate in run 34918498363. See
+# docs/palace-execution.md for the record.
 #
 # Reproducibility levers, each pinned by default and overridable by build-arg:
 #   BASE_IMAGE      ubuntu:24.04 pinned by content digest, not by tag
