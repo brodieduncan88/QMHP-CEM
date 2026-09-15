@@ -11,8 +11,9 @@ Palace's eigenmode post-processing writes, under ``Problem.Output``:
 * ``palace.json`` — run metadata including the Palace git tag and MPI size,
   where the release writes it.
 
-The solver also prints a banner to stdout carrying its git changeset ID and
-MPI process count; the adapter captures stdout to ``palace.log`` and this
+The solver also prints a banner to stdout carrying its git changeset ID (the
+output of ``git describe``, so ``v0.13.0`` for a release-tag build) and the
+MPI process count; the adapter captures stdout to ``palace_log.txt`` and this
 module extracts those fields.
 
 Every parser here is header-driven and tolerant of column order and padding,
@@ -120,14 +121,27 @@ def parse_eig_csv(path: Path) -> EigenmodeTable:
     return EigenmodeTable(rows=parsed, columns=header, source=path)
 
 
+# Palace prints ``Git changeset ID: <git describe --tags --always --dirty>``.
+# For a build from a release tag that is the tag itself (``v0.13.0``); for a
+# build from an untagged commit it is ``<tag>-<n>-g<sha>`` or a bare sha. It
+# prints no separate "Palace vX.Y.Z" line, so the version is derived from a
+# leading ``vX.Y.Z`` in the changeset when present.
 _BANNER_PATTERNS = {
-    "git_changeset": re.compile(r"Git changeset ID:\s*([0-9a-fA-F]{7,40})"),
-    "version": re.compile(r"\bv?(\d+\.\d+\.\d+)\b"),
+    "git_changeset": re.compile(r"Git changeset ID:\s*(\S+)"),
+    "version_from_changeset": re.compile(r"^v?(\d+\.\d+\.\d+)"),
     "mpi_processes": re.compile(r"Running with\s+(\d+)\s+MPI process", re.IGNORECASE),
     "openmp_threads": re.compile(r"(\d+)\s+OpenMP thread", re.IGNORECASE),
     "libceed_backend": re.compile(r"libCEED backend:\s*(\S+)"),
     "device": re.compile(r"Device configuration:\s*(\S+)"),
 }
+# Palace's own stdout eigenvalue table carries "Bkwd. Error" / "Abs. Error"
+# column headings, so a bare word match on "error" would flag every
+# successful run. Only line-leading diagnostics count.
+_ERROR_LINE = re.compile(
+    r"^\s*(error|fatal|abort(ed|ing)?|mfem abort|exception|segmentation fault|"
+    r"petsc error|slepc error|\[[^\]]*\] \*\*\* process received signal)",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -155,18 +169,12 @@ class LogSummary:
 def summarise_log(text: str) -> LogSummary:
     """Pull identity fields and error lines out of Palace's stdout/stderr."""
     out = LogSummary()
-    head = text[:4000]
     m = _BANNER_PATTERNS["git_changeset"].search(text)
     if m:
         out.git_changeset = m.group(1)
-    # Version: only trust a match in the banner region near the changeset or
-    # the word 'Palace', to avoid picking a tolerance like 1.0e-6 elsewhere.
-    for line in head.splitlines():
-        if "palace" in line.lower() or "version" in line.lower():
-            v = _BANNER_PATTERNS["version"].search(line)
-            if v:
-                out.version = v.group(1)
-                break
+        v = _BANNER_PATTERNS["version_from_changeset"].match(out.git_changeset)
+        if v:
+            out.version = v.group(1)
     m = _BANNER_PATTERNS["mpi_processes"].search(text)
     if m:
         out.mpi_processes = int(m.group(1))
@@ -179,11 +187,7 @@ def summarise_log(text: str) -> LogSummary:
     m = _BANNER_PATTERNS["device"].search(text)
     if m:
         out.device = m.group(1)
-    out.error_lines = [
-        ln.strip()
-        for ln in text.splitlines()
-        if re.search(r"\b(error|abort|fatal|exception|segmentation)\b", ln, re.IGNORECASE)
-    ][:20]
+    out.error_lines = [ln.strip() for ln in text.splitlines() if _ERROR_LINE.search(ln)][:20]
     return out
 
 

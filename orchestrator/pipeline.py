@@ -43,7 +43,7 @@ from models.dressed_system import RootNotBracketed
 from orchestrator import environment, manifest
 from orchestrator.lifecycle import CandidateLifecycle
 from orchestrator.results_store import DEFAULT_RESULTS_ROOT, BatchStore
-from solvers import RunContext, SolverAdapter, SolverUnavailable, get_adapter
+from solvers import RunContext, SolverAdapter, get_adapter
 
 
 @dataclass
@@ -246,8 +246,12 @@ def run_candidate(
         solver_results = adapter.validate_convergence(adapter.parse(raw))
         lifecycle.to(CandidateState.SOLVED)
         store.write_model(solver_dir / "solver_results.json", solver_results)
-    except (SolverUnavailable, RuntimeError) as exc:
-        notes.append(f"solver failed: {exc}")
+    except Exception as exc:  # noqa: BLE001 - any solver failure is recorded, never hidden
+        # SolverUnavailable (spec §10.5), a run that did not complete, an
+        # output that could not be parsed, a convergence failure: every one
+        # of them ends this candidate as INCOMPLETE with the cause on record.
+        # Nothing here retries with another solver.
+        notes.append(f"solver failed ({type(exc).__name__}): {exc}")
         lifecycle.to(CandidateState.INCOMPLETE)
         return CandidateOutcome(
             candidate=candidate,

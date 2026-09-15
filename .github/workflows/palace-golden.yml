@@ -1,0 +1,153 @@
+# Palace golden run: the spec §10.3 proof of the v0.2 execution path.
+#
+# NOT part of default CI (spec §12.8): this job builds the pinned Palace
+# container from docker/palace.Dockerfile (Palace v0.13.0 and its superbuild
+# dependencies, roughly an hour on a hosted runner the first time; the layer
+# cache makes later runs minutes) and then executes the frozen golden
+# candidate in it. Every outcome writes results/PALACE-GOLDEN-<UTC>/ with the
+# execution record, the Palace log, the input and output hashes and the gate
+# report, and commits that directory back to the branch so the evidence is
+# in the repository whether the run succeeded or not.
+#
+# Runs on manual dispatch, and on a push to the v0.2 development branch that
+# touches the Palace path. The bot's own results commit does not match the
+# path filter and does not re-trigger it.
+
+name: Palace golden run
+
+on:
+  workflow_dispatch:
+    inputs:
+      mpi_processes:
+        description: "MPI processes for the Palace run"
+        default: "1"
+      commit_results:
+        description: "Commit results/PALACE-GOLDEN-* back to this branch"
+        type: boolean
+        default: true
+      run_sweep:
+        description: "Also run the 3x3 Object 001 sweep with Palace (uploaded as an artifact only)"
+        type: boolean
+        default: true
+  push:
+    branches: ["claude/v2a-audit-deep-research-96omim"]
+    paths:
+      - ".github/workflows/palace-golden.yml"
+      - "docker/palace.Dockerfile"
+      - "solvers/palace/**"
+      - "scripts/palace_golden_run.py"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: palace-golden-${{ github.ref }}
+  cancel-in-progress: true   # a newer push supersedes an older build; nothing is committed before the end
+
+env:
+  IMAGE: qmhp-cem/palace:0.13.0
+  MPI_PROCESSES: ${{ inputs.mpi_processes || '1' }}
+  COMMIT_RESULTS: ${{ inputs.commit_results == '' && 'true' || inputs.commit_results }}
+  RUN_SWEEP: ${{ inputs.run_sweep == '' && 'true' || inputs.run_sweep }}
+
+jobs:
+  golden:
+    name: build the image, run the golden candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      # The Palace superbuild needs several GB of scratch; hosted runners
+      # ship large toolchains this job never uses.
+      - name: Free runner disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the Palace image (pinned base, apt snapshot, Palace tag)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/palace.Dockerfile
+          tags: ${{ env.IMAGE }}
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image identity
+        run: |
+          docker image inspect "$IMAGE" --format 'id={{.Id}}  repo-digests={{join .RepoDigests ","}}'
+          docker image inspect "$IMAGE" --format '{{json .Config.Labels}}'
+          docker run --rm --network none --entrypoint /bin/sh "$IMAGE" -c 'cat /opt/palace/PALACE_VERSION /opt/palace/PALACE_COMMIT'
+          docker run --rm --network none "$IMAGE" --help | head -n 3
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.11"
+
+      - name: Install gmsh runtime libraries
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends libglu1-mesa libgl1 libxrender1 libxcursor1 libxft2 libxinerama1 libxfixes3 libxext6 libfontconfig1
+
+      - name: Sync locked environment
+        run: uv sync --locked --all-extras --dev
+
+      - name: Assert the mesher imports
+        run: uv run python -c "import gmsh; print('gmsh', gmsh.__version__)"
+
+      - name: Golden candidate run
+        id: golden
+        continue-on-error: true
+        run: uv run python scripts/palace_golden_run.py --np "$MPI_PROCESSES" --results-root results
+
+      - name: Execution record, gate report and Palace log
+        if: always()
+        run: |
+          shopt -s nullglob
+          for f in results/PALACE-GOLDEN-*/execution_record.json results/PALACE-GOLDEN-*/*/gate_report.json results/PALACE-GOLDEN-*/*/solver/palace_run.json results/PALACE-GOLDEN-*/*/solver/postpro/eig.csv results/PALACE-GOLDEN-*/*/solver/palace_log.txt; do
+            echo "::group::$f"; cat "$f"; echo; echo "::endgroup::"
+          done
+          for d in results/PALACE-GOLDEN-*/; do uv run python -c "from orchestrator import manifest; import sys; p=manifest.verify(sys.argv[1]); print('manifest', 'intact' if not p else p)" "$d"; done
+
+      - name: Real-execution test
+        if: always()
+        run: uv run pytest -q -rs -m palace tests/test_palace.py
+
+      - name: Object 001 3x3 sweep with Palace (artifact only, not committed)
+        if: env.RUN_SWEEP == 'true' && steps.golden.outcome == 'success'
+        continue-on-error: true
+        run: uv run cem sweep sweeps/object001_grid.yaml --solver palace --results-root sweep-results
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: palace-golden-${{ github.run_id }}
+          path: |
+            results/PALACE-GOLDEN-*
+            sweep-results
+          if-no-files-found: warn
+
+      - name: Commit the golden record to the branch
+        if: always() && env.COMMIT_RESULTS == 'true'
+        run: |
+          shopt -s nullglob
+          dirs=(results/PALACE-GOLDEN-*)
+          if [ "${#dirs[@]}" -eq 0 ]; then echo "no golden record to commit"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${dirs[@]}"
+          outcome="$(uv run python -c "import json,sys; print(json.load(open(sys.argv[1]))['outcome'])" "${dirs[0]}/execution_record.json")"
+          git commit -m "Record Palace golden run ${{ github.run_id }}: ${outcome}" -m "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          git pull --rebase --autostash origin "${{ github.ref_name }}"
+          git push origin "HEAD:${{ github.ref_name }}"
+
+      - name: Fail the job if the golden run did not succeed
+        if: steps.golden.outcome != 'success'
+        run: |
+          echo "golden run exit status: ${{ steps.golden.outcome }}"
+          exit 1

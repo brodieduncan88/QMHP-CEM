@@ -4,6 +4,13 @@ Palace is the sole primary EM solver for this milestone. This document says
 what the path does, what it records, how to run the proof, and what it does
 **not** yet claim.
 
+**Status first: no Palace run has been executed from this repository.** The
+environment that produced this code has no reachable Docker daemon, so the
+image was not built and the golden harness exits 2 here with that reason.
+Everything up to the container boundary is implemented and tested; the first
+`results/PALACE-GOLDEN-*` directory committed to this repository will be the
+proof, and until one exists there is none. See the last section.
+
 ## What is solved
 
 The **empty vacuum cavity of Object 001** as a closed perfect-electric-conductor
@@ -18,54 +25,105 @@ frame:
 
 The chip dielectric, the recess step, the two launch bores and the lid body are
 **not modelled**. That is deliberate. The empty box has a closed-form spectrum,
-so the very first Palace calculation can be checked against a number the
+so the very first Palace calculation can be checked against numbers the
 solver did not produce:
 
 ```
-f_mnp = (c/2) · sqrt((m/a)² + (n/b)² + (p/d)²)
-f_110 = 9.6357 GHz   for a = b = 22 mm, d = 1.5 mm
+f_mnp = (c/2) · sqrt((m/a)² + (n/b)² + (p/d)²)      at most one zero index
+f_110 = 9.6357 GHz            a = b = 22 mm
+f_120 = f_210 = 15.2354 GHz   degenerate pair for the square box
+f_220 = 19.2714 GHz
 ```
 
-`solvers/palace/analytic.py` computes this; the run record carries the
-comparison. A first-mesh agreement within 2 % (`GOLDEN_RELATIVE_TOLERANCE` in
-the harness) is the proof criterion for the execution path. It is not a
-validation gate and it says nothing about the physical package.
+The four modes Palace is asked for are all TM_mn0: their frequencies do not
+depend on the 1.5 mm cavity height at all. The check therefore verifies the
+X/Y extent, the mm→m unit scaling (`L0`) and the vacuum material. It is blind
+to the Z extent, and says so in the run record.
+
+`solvers/palace/analytic.py` computes the spectrum with multiplicities;
+`solvers/palace/config.py` turns it into the list of modes the solver should
+report, repeats included, and the run record carries the comparison.
+
+Two numbers govern the comparison, both `ENGINEERING-RULE`s in
+`solvers/palace/config.py`:
+
+| Rule | Value | Meaning |
+|---|---|---|
+| `GOLDEN_RELATIVE_TOLERANCE` | 2 % | Proof gate for the execution path. Catches a wrong box, unit or material; the harness exits 4 above it |
+| `SOLVER_RULES["expected_relative_deviation"]` | 1e-4 | What order-2 elements on the mesh rule `min(a, b)/12` should achieve. Above it the harness prints a warning and records it; the exit code does not change |
+
+Neither is a validation gate and neither says anything about the physical
+package.
 
 ## The boundary (spec §10.1), preserved
 
 | Step | `PalaceSolver` | Needs |
 |---|---|---|
-| `preflight()` | mesher importable → runtime on PATH → daemon reachable → image present → read the image's own `PALACE_VERSION` / `PALACE_COMMIT` | docker |
-| `prepare()` | derive the domain, mesh it with gmsh (MSH 2.2 ASCII, physical groups `vacuum`=1, `pec`=2), write `config.json`, hash both, compute the analytic reference | gmsh only |
-| `run()` | `docker run --rm --network none --user uid:gid -v work:/work -w /work IMAGE -np N config.json`, capture the log, write `palace_run.json` | docker + image |
+| `preflight()` | mesher importable → runtime on PATH → daemon reachable (and whether it is rootless) → image present → a container from the image runs and reports its own `PALACE_VERSION` / `PALACE_COMMIT` | docker |
+| `prepare()` | resolve the work directory, derive the domain, mesh it with gmsh (MSH 2.2 ASCII, physical groups `vacuum`=1, `pec`=2), write `config.json`, hash both, compute the analytic reference | gmsh only |
+| `run()` | the command below; capture the log; write `palace_run.json` on every outcome | docker + image |
 | `parse()` | read `postpro/eig.csv`, `postpro/palace.json`, the log; hash every artifact; build `SolverResults` | nothing |
 | `validate_convergence()` | inherited; rejects anything not `CONVERGED` | nothing |
 
+The command `run()` executes, verbatim in every run record:
+
+```
+docker run --rm --network none --hostname localhost \
+    --name qmhp-palace-<run_id>-<candidate_id> \
+    --user <uid>:<gid> -e HOME=/tmp -v <work_dir>:/work -w /work \
+    qmhp-cem/palace:0.13.0 -np <N> config.json
+```
+
+The hostname is pinned because Open MPI resolves the local hostname at
+start-up, and with no network the only name guaranteed to resolve inside the
+container is `localhost`.
+
+`--user` is omitted when the daemon is rootless (the caller already owns the
+mounted files) or when the adapter is constructed with `user=None`. The
+container is named so that a run which exceeds the timeout can be killed by
+name: `subprocess` only kills the CLI, not the container it started.
+
 `prepare()` works on a machine without Docker, so an input can be generated
 and inspected anywhere. `run()` refuses without the container and raises
-`SolverUnavailable` naming the remedy. Nothing falls back to the mock (spec §10.5).
+`SolverUnavailable` naming the remedy. A run that starts and then fails, times
+out, or cannot be started raises `PalaceRunFailed` **after** writing the log
+and the run record. Nothing falls back to the mock (spec §10.5); the
+orchestrator records any solver exception on the candidate as `INCOMPLETE`
+with its type and message, and never retries with another solver.
 
 ## What is recorded (spec §10.3, §13.3)
 
 | Field | Where |
 |---|---|
-| Palace version and git commit | image files `/opt/palace/PALACE_VERSION`, `PALACE_COMMIT`; `palace.json` `GitTag`; log banner — the first available wins, and a result with none is refused |
+| Palace version and git commit | image files `/opt/palace/PALACE_VERSION`, `PALACE_COMMIT` read by preflight; else image labels; else `palace.json` `GitTag`; else the log banner `Git changeset ID`. A result with none is refused |
 | Container image identity | `docker image inspect` ID (content-addressed) and registry digest where one exists; the batch environment record carries `image@id` |
 | Command line | verbatim, shell-quoted, in `SolverResults.solver.command_line` and `palace_run.json` |
 | Input hashes | candidate canonical JSON, `mesh.msh`, `config.json` |
-| Output hashes | every file under `postpro/`, the log, the run record; also as `SolverResults.artifacts` with roles |
-| Convergence | `eigenmode_backward_error_max`: the eigensolver's own backward error, maximum over the requested modes, against `Solver.Eigenmode.Tol` |
+| Output hashes | every file under `postpro/`, the log, the run record; also as `SolverResults.artifacts` with roles, paths relative to the work directory |
+| Convergence | see below |
 | Mesh | node and tetrahedron counts, gmsh version, characteristic length, hash |
-| Adapter rules | `SOLVER_RULES` in `solvers/palace/config.py`, copied into every `solver_input.json` |
+| Adapter rules | `SOLVER_RULES` in `solvers/palace/config.py`, copied into every `solver_input.json` and `palace_run.json` |
 
-The convergence figure is what Palace reports. It measures how well the
-eigensolver converged on the mesh it was given. It does **not** measure mesh
-convergence; that campaign is deferred (spec §15).
+Convergence has two layers, and the record names both. Palace's own stopping
+criterion is `Solver.Eigenmode.Tol` (1e-6): the SLEPc eigensolver iterates
+until every requested mode meets it, and a mode's presence in `eig.csv` is
+Palace's statement that it did. On top of that the adapter reports
+`eigenmode_backward_error_max`, the maximum of the a-posteriori backward
+errors Palace writes per mode, against the adapter rule
+`eigenmode_backward_error_max_tolerance` (also 1e-6). That is the figure in
+`SolverResults.convergence`. Palace's reference cavity example shows backward
+errors well below `Tol`, so the adapter rule is not expected to bind; if it
+does, the result is `NOT_CONVERGED` and `validate_convergence()` refuses it.
+
+Both layers measure how well the eigensolver converged on the mesh it was
+given. Neither measures mesh convergence; that campaign is deferred (spec §15).
 
 ## Running the proof
 
 ```bash
-# 1. Build the image (once). Pinned base digest, apt snapshot, Palace tag.
+# 1. Build the image (once). Needs outbound HTTPS to archive.ubuntu.com,
+#    snapshot.ubuntu.com, github.com and gitlab.com. Expect a long build:
+#    Palace's superbuild compiles MFEM, hypre, PETSc/SLEPc and the rest.
 docker build -f docker/palace.Dockerfile -t qmhp-cem/palace:0.13.0 .
 
 # 2. Install the mesher.
@@ -75,44 +133,96 @@ uv sync --extra palace            # plus: apt-get install libglu1-mesa (Linux)
 uv run python scripts/palace_golden_run.py
 ```
 
-Exit codes: `0` converged and within the analytic tolerance; `2` Palace cannot
-execute here (nothing is substituted); `3` ran but failed or did not converge;
-`4` converged but disagrees with the closed form; `5` golden digest mismatch.
+Exit codes: `0` converged and every requested mode within the golden
+tolerance; `2` Palace cannot execute here (nothing is substituted); `3` ran
+but failed, did not converge, or its output could not be parsed; `4` converged
+but a mode disagrees with the closed form; `5` golden digest mismatch; `6`
+Palace succeeded but the quantum/gate evaluation of its result raised.
 
-The run writes `results/PALACE-GOLDEN-<UTC>/` with `candidate.json`,
-`solver/{mesh.msh,config.json,solver_input.json,palace_log.txt,palace_run.json,solver_results.json,postpro/…}`,
-`execution_record.json` and a `manifest.sha256` over all of it.
+After a successful solve the harness takes the result through the same
+quantum-device layer and gate evaluation the sweep uses, and writes
+`quantum_results.json` and `gate_report.json` next to the candidate. A gate
+verdict on the empty box describes the empty box.
 
-The same path also runs under `uv run cem sweep sweeps/object001_grid.yaml
---solver palace`. That is nine eigenmode solves; this milestone does not
-optimise or expand it, and gates needing S-parameters report `INCOMPLETE`
-honestly because an eigenmode run produces none.
+The same thing runs unattended in GitHub Actions
+(`.github/workflows/palace-golden.yml`): it builds the image with a layer
+cache, runs the golden candidate, prints the execution record, gate report
+and Palace log into the job log, uploads everything as an artifact, and
+commits `results/PALACE-GOLDEN-<UTC>/` back to the branch whatever the
+outcome. It is not part of default CI (spec §12.8).
+
+The run writes:
+
+```
+results/PALACE-GOLDEN-<UTC>/
+├── QMHP-CEM-A-RF-000001/
+│   ├── candidate.json
+│   └── solver/
+│       ├── mesh.msh  config.json  solver_input.json
+│       ├── palace_log.txt  palace_run.json  solver_results.json
+│       └── postpro/  (eig.csv, domain-E.csv, palace.json, …)
+├── execution_record.json
+└── manifest.sha256
+```
+
+The same adapter is also wired to run under `uv run cem sweep
+sweeps/object001_grid.yaml --solver palace`. That is nine eigenmode solves of
+nine empty boxes; this milestone does not optimise or expand it, and it has
+not been executed either. In such a sweep the gates needing S-parameters
+report `INCOMPLETE` honestly because an eigenmode run produces none, and a
+`P4PRE_SPECTRAL` verdict computed from empty-box eigenmodes describes the
+empty box, not the package: the chip, recess, launches and lid that would
+move those modes are not in the model.
 
 ## Reproducibility of the image
 
 `docker/palace.Dockerfile` pins, by default:
 
 - the base by **content digest**, not tag;
-- the Ubuntu **package snapshot** (`APT_SNAPSHOT`), so the toolchain does not
-  float with the archive;
-- the **Palace release tag**, with an optional `PALACE_COMMIT` assertion that
-  fails the build if the tag has moved;
+- the Ubuntu **package snapshot** (`APT_SNAPSHOT`, via `APT::Snapshot`, on
+  both `update` and `install`), with a build-time check that apt really
+  resolved the snapshot; `ca-certificates` is the one package installed from
+  the live archive, because the snapshot host is HTTPS-only and the base
+  image has no CA bundle;
+- the **Palace release tag**, asserted to resolve to the commit
+  `a61c8cbe0cacf496cde3c62e93085fae0d6299ac`, so a moved tag fails the build;
 - Palace's own dependencies at the revisions its superbuild pins for that tag.
 
-The image records what it contains and the build fails, rather than the first
-run, if the copied binary is missing a shared library.
+The build inputs are therefore fixed. The resulting binaries are not
+guaranteed bit-identical across builds (timestamps, build paths and compiler
+nondeterminism are not controlled), which is why the adapter records the ID
+and digest of the image it actually ran rather than the Dockerfile's hash.
+The image records what it contains, and the build fails, rather than the
+first run, if the copied binary is missing a shared library or the launcher
+cannot start.
+
+The Dockerfile has been written against Palace v0.13.0's documented build and
+the apt snapshot mechanics were verified on an Ubuntu 24.04 host, but the
+image itself has not been built from this checkout. The first build is the
+first test of it.
 
 ## Status of the proof in this repository
 
 **No Palace run has been executed from this checkout.** The environment that
 produced this code has no reachable Docker daemon, so the image was not built
-and `scripts/palace_golden_run.py` exits 2 here with that exact reason. Every
-piece that does not need the container is tested: the analytic reference, the
-domain derivation, the mesher (live, deterministic), the config, the parsers
-on hand-authored format fixtures, `prepare()`, the run record, and the
-no-fallback guarantees. The real-execution test is marked `palace` and skips
-with the reason wherever the container is absent.
+and `scripts/palace_golden_run.py` exits 2 here with that exact reason.
 
-The first `results/PALACE-GOLDEN-*` directory committed to this repository is
-the proof. Until one exists, this path is implemented and tested up to the
-container boundary, and not beyond it.
+What is tested, in default CI, without a container:
+
+- the analytic reference, including the square-box degeneracy;
+- the domain derivation and the config document;
+- the mesher, live: gmsh imports (CI asserts it), meshes the domain, and
+  produces the same hash twice;
+- the parsers, on hand-authored fixtures in Palace v0.13.0's output format;
+- `prepare()`, and the run record it feeds;
+- `preflight()` and `run()` against a scripted fake `docker` CLI: the exact
+  argv, the `--user` and rootless handling, the identity probe, a non-zero
+  exit, a timeout (with the container kill), a runtime that cannot start, a
+  symlinked work directory, and the no-fallback guarantees;
+- the orchestrator's handling of an unavailable solver (batch refused) and a
+  solver that fails mid-sweep (candidate `INCOMPLETE`, cause recorded).
+
+What is not tested anywhere yet: Palace itself. The real-execution test is
+marked `palace` and skips with the reason wherever the container is absent.
+Coverage ends at the container boundary; the fixtures are format fixtures
+and are not evidence of a run.

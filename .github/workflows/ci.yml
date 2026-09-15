@@ -32,10 +32,16 @@ jobs:
       # mesher cannot import without it. This is a system library, not a
       # solver: default CI still requires no Palace container (spec §12.8).
       - name: Install gmsh runtime libraries
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends libglu1-mesa
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends libglu1-mesa libgl1 libxrender1 libxcursor1 libxft2 libxinerama1 libxfixes3 libxext6 libfontconfig1
 
       - name: Sync locked environment
         run: uv sync --locked --all-extras --dev
+
+      # The Palace path is exercised in CI up to the container boundary
+      # (mesh generation, config, parsers on fixtures). If gmsh cannot import,
+      # those tests would skip and CI would still be green, so assert it here.
+      - name: Assert the mesher imports
+        run: uv run python -c "import gmsh; print('gmsh', gmsh.__version__)"
 
       - name: Verify frozen master provenance
         run: uv run cem verify-master
@@ -44,7 +50,7 @@ jobs:
         run: uv run python scripts/verify_reference_bundle.py
 
       - name: Run tests
-        run: uv run pytest -q
+        run: uv run pytest -q -rs
 
       - name: Acceptance — 3x3 Object 001 mock sweep
         run: uv run cem sweep sweeps/object001_grid.yaml --solver mock

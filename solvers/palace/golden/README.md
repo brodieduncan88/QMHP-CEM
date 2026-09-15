@@ -11,4 +11,5 @@ It is the single input for the first real Palace execution
 The solver domain derived from it is the empty vacuum cavity, a closed PEC
 box of 22 × 22 × 1.5 mm in the spec §7.3 frame, whose closed-form fundamental
 is 9.6357 GHz (`solvers/palace/analytic.py`). That number is the check on the
-run, and it is not a QMHP requirement.
+first run, once one exists; it is not a QMHP requirement. No run has been
+executed from this repository yet (see `docs/palace-execution.md`).

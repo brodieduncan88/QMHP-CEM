@@ -46,7 +46,7 @@ physics and geometry generation are **not**.
 | `models/` physics (§5) | **Implemented** and regression-tested against the frozen pins |
 | `geometry/chip_planar/` gdsfactory cells (§7.1) | **Not implemented** |
 | `geometry/package_picogk/` Object 001 (§7.2) | **Not implemented** — C# project skeleton only |
-| `solvers/palace` | **v0.2 execution path implemented**: mesh, config, container run, parse, provenance. Tested to the container boundary; see [`docs/palace-execution.md`](docs/palace-execution.md) |
+| `solvers/palace` | **v0.2 execution path implemented, not yet executed**: mesh, config, container run, parse, provenance. Tested to the container boundary against a fake runtime; no Palace run exists yet. See [`docs/palace-execution.md`](docs/palace-execution.md) |
 | `solvers/openems` | Wired; container invocation not implemented |
 | `reference/` vendored v1.5.8f release bundle | Vendored, 27/29 hash-verified |
 
@@ -61,13 +61,17 @@ black-box extraction from a real EM solver, which the mock `TEST_FIXTURE`
 cannot supply. Every other computationally evaluable gate adjudicates.
 Reaching `FEASIBLE_CANDIDATE_FOUND` requires Palace or openEMS.
 
-**v0.2 (in progress):** the Palace execution path exists. `PalaceSolver`
-meshes the empty Object 001 vacuum cavity, runs the pinned container, parses
-the eigenmode output and records solver version, image identity, command line,
-input/output hashes and the solver's own convergence figure. The first real run
-is the golden candidate in `solvers/palace/golden/`, executed by
-`scripts/palace_golden_run.py` and checked against the closed-form fundamental
-(9.6357 GHz). See [`docs/palace-execution.md`](docs/palace-execution.md).
+**v0.2 (in progress):** the Palace execution path is implemented and
+**no Palace run has yet been executed from this repository**. When it runs,
+`PalaceSolver` meshes the empty Object 001 vacuum cavity, runs the pinned
+container, parses the eigenmode output and records solver version, image
+identity, command line, input/output hashes and the solver's own convergence
+figure. The first real run will be the golden candidate in
+`solvers/palace/golden/`, executed by `scripts/palace_golden_run.py` and
+checked against the closed-form spectrum of the empty box (fundamental
+9.6357 GHz). The container image has not been built here either: the
+environment that produced this code has no Docker daemon. See
+[`docs/palace-execution.md`](docs/palace-execution.md).
 
 ---
 

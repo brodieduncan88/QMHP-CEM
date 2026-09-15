@@ -9,8 +9,10 @@ two physical groups that Palace addresses by attribute number:
 The file is written as Gmsh MSH 2.2 ASCII, the format the MFEM reader inside
 Palace supports most conservatively, and ASCII so that the mesh hash is a
 function of geometry and version alone. Gmsh is run single-threaded with
-fixed algorithms so the same inputs give the same mesh on the same Gmsh
-release; the release is recorded next to the hash.
+fixed algorithms and an explicit random seed, so the same inputs give the
+same mesh with the same gmsh wheel on the same platform; the release is
+recorded next to the hash, and a different wheel or platform may legitimately
+give a different (equally valid) mesh with a different hash.
 
 gmsh is an optional dependency (``uv sync --extra palace``). When it is
 absent this module raises :class:`solvers.adapter.SolverUnavailable`, never a
@@ -94,6 +96,7 @@ def generate_box_mesh(domain: SolverDomain, output_path: Path) -> MeshRecord:
         gmsh.option.setNumber("Mesh.MaxNumThreads3D", 1)
         gmsh.option.setNumber("Mesh.Algorithm", 6)      # Frontal-Delaunay (2D)
         gmsh.option.setNumber("Mesh.Algorithm3D", 1)    # Delaunay (3D)
+        gmsh.option.setNumber("Mesh.RandomSeed", 1)     # gmsh's default, pinned explicitly
         gmsh.option.setNumber("Mesh.Optimize", 1)
         gmsh.option.setNumber("Mesh.OptimizeNetgen", 0)
         gmsh.option.setNumber("Mesh.CharacteristicLengthMin", lc)

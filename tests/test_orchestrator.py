@@ -246,12 +246,42 @@ def test_lifecycle_allows_early_termination_as_incomplete():
 # --- solver substitution (spec §10.5, §12.8) --------------------------------
 
 
-def test_unavailable_solver_fails_and_never_falls_back(object001_sweep, results_root):
-    with pytest.raises(SolverUnavailable):
+def test_unavailable_solver_fails_and_never_falls_back(monkeypatch, object001_sweep, results_root):
+    """Deterministic regardless of whether this machine has the Palace image."""
+    from solvers.palace.adapter import PalaceSolver
+
+    def unavailable(self):
+        raise SolverUnavailable("palace", "no container runtime in this test", "install one")
+
+    monkeypatch.setattr(PalaceSolver, "preflight", unavailable)
+    with pytest.raises(SolverUnavailable, match="will not silently substitute"):
         pipeline.run_sweep(
             object001_sweep, solver_name="palace", results_root=results_root
         )
     assert not results_root.exists() or not list(results_root.glob("BATCH-*"))
+
+
+def test_solver_failure_mid_sweep_ends_the_candidate_incomplete(monkeypatch, object001_sweep, results_root):
+    """A Palace run that dies after preflight is recorded, never replaced."""
+    from solvers.adapter import PreparedInput
+    from solvers.palace.adapter import PalaceRunFailed, PalaceSolver
+
+    def prepare(self, candidate, geometry, run_context):
+        return PreparedInput(candidate.candidate_id, run_context.run_id, run_context.work_dir, {}, [])
+
+    def run(self, prepared):
+        raise PalaceRunFailed("container exited with code 137")
+
+    monkeypatch.setattr(PalaceSolver, "preflight", lambda self: None)
+    monkeypatch.setattr(PalaceSolver, "prepare", prepare)
+    monkeypatch.setattr(PalaceSolver, "run", run)
+    report, outcomes = pipeline.run_sweep(
+        object001_sweep, solver_name="palace", results_root=results_root
+    )
+    assert report.solver == "palace"
+    assert {o.state for o in outcomes} == {CandidateState.INCOMPLETE}
+    assert all(any("PalaceRunFailed" in n and "code 137" in n for n in o.notes) for o in outcomes)
+    assert all(o.solver_results is None for o in outcomes)
 
 
 def test_unknown_solver_is_rejected():

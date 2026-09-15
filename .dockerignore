@@ -1,0 +1,4 @@
+# docker/palace.Dockerfile copies nothing from the build context: everything
+# it needs is cloned or installed inside the build. Sending the checkout
+# (results/, vendored PDFs, .git) to the daemon would only slow the build.
+*

@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from solvers.palace.analytic import rectangular_cavity_modes
+from solvers.palace.analytic import expected_solver_modes, rectangular_cavity_modes
 
 #: Gmsh physical-group tags. Palace addresses regions by these integers.
 VACUUM_ATTRIBUTE = 1
@@ -30,17 +30,43 @@ L0_MM_TO_M = 1.0e-3
 SOLVER_RULES: dict[str, Any] = {
     "finite_element_order": 2,
     "eigenmodes_requested": 4,
+    # Solver.Eigenmode.Tol: Palace's own stopping criterion (SLEPc relative
+    # residual on the shift-inverted problem). A mode's presence in eig.csv is
+    # Palace's statement that it converged.
     "eigenvalue_tolerance": 1.0e-6,
+    # Adapter check on top of Palace's: the a-posteriori backward error Palace
+    # writes per mode must not exceed this. Palace's reference cavity example
+    # shows backward errors ~100x below Tol, so this rarely binds; it is an
+    # ENGINEERING-RULE of QMHP-CEM, not Palace's criterion.
+    "eigenmode_backward_error_max_tolerance": 1.0e-6,
     "linear_solver_tolerance": 1.0e-8,
     "linear_solver_max_iterations": 400,
-    # Shift-and-invert target as a fraction of the analytic fundamental. Placing
-    # the target just below the first expected mode makes the eigensolver find
-    # the lowest modes first.
+    # Shift-and-invert target as a fraction of the closed-form fundamental of
+    # the EMPTY box. The target must lie strictly below the lowest physical
+    # mode of the domain actually solved; once a dielectric is added the
+    # fundamental drops and this rule must be revisited (a target above the
+    # fundamental would skip it silently).
     "eigenmode_target_fraction_of_analytic_fundamental": 0.85,
-    "characteristic_mesh_length_rule": "min(cavity_height_above_chip, cavity_width / 12)",
+    # In-plane resolution only. Every requested mode of the empty box is
+    # TM_mn0, independent of the cavity height, so the mesh size is tied to the
+    # in-plane wavelength rather than to the height; this keeps the mesh
+    # identical across a height sweep instead of confounding it.
+    "characteristic_mesh_length_rule": "min(cavity_width, cavity_height) / 12",
+    # What a first run on this mesh at this order should show against the
+    # closed form. Larger deviations are reported as a warning; the hard
+    # proof gate below is deliberately loose.
+    "expected_relative_deviation": 1.0e-4,
     "domain": "empty vacuum cavity of Object 001 as a closed PEC box; chip, "
-    "recess step, launches and lid are NOT modelled in this milestone",
+    "recess step, launches and lid are NOT modelled in this milestone. All "
+    "requested modes are TM_mn0: independent of height_above_chip_mm, so the "
+    "closed-form check verifies the X/Y extent and unit scaling, not the height.",
 }
+
+#: Hard proof gate for the golden run: |f_palace - f_exact| / f_exact must be
+#: below this or the harness exits 4. Loose on purpose (it catches a wrong
+#: box, a wrong L0 or a wrong permittivity, not a sub-optimal mesh); the
+#: expected deviation is SOLVER_RULES["expected_relative_deviation"].
+GOLDEN_RELATIVE_TOLERANCE = 0.02
 
 
 @dataclass(frozen=True)
@@ -64,8 +90,8 @@ class SolverDomain:
 
     @property
     def characteristic_length_mm(self) -> float:
-        a, _, d = self.size_mm
-        return min(d, a / 12.0)
+        a, b, _ = self.size_mm
+        return min(a, b) / 12.0
 
     def as_dict(self) -> dict[str, float]:
         return {
@@ -84,7 +110,10 @@ def solver_domain(candidate) -> SolverDomain:  # noqa: ANN001
     Frame (spec §7.3): origin at the centre of the chip's top surface, +Z
     toward the lid. The vacuum cavity is ``width_mm x height_mm`` in X/Y,
     centred, and extends from the chip top surface (z = 0) up to
-    ``height_above_chip_mm``, the underside of the lid.
+    ``height_above_chip_mm``, the underside of the lid. The package floor
+    around the recess sits 0.02 mm above that datum (recess depth minus chip
+    thickness); the empty-box abstraction ignores it, and no requested mode
+    depends on the height in any case.
     """
     cav = candidate.parameters.vacuum_cavity
     return SolverDomain(
@@ -98,12 +127,20 @@ def solver_domain(candidate) -> SolverDomain:  # noqa: ANN001
 
 
 def analytic_reference(domain: SolverDomain, count: int = 8) -> list[dict[str, Any]]:
+    """Distinct closed-form modes of the domain, each with its multiplicity."""
     a, b, d = domain.size_mm
     return [
         {"m": mode.m, "n": mode.n, "p": mode.p, "frequency_GHz": mode.frequency_GHz,
-         "label": mode.label}
+         "multiplicity": mode.multiplicity, "label": mode.label}
         for mode in rectangular_cavity_modes(a, b, d, count=count)
     ]
+
+
+def expected_solver_modes_GHz(domain: SolverDomain, n_modes: int | None = None) -> list[float]:
+    """What the solver should report for its first N modes, repeats included."""
+    a, b, d = domain.size_mm
+    n = n_modes or int(SOLVER_RULES["eigenmodes_requested"])
+    return expected_solver_modes(a, b, d, n)
 
 
 def build_config(mesh_filename: str, domain: SolverDomain, output_dir: str = "postpro") -> dict[str, Any]:
