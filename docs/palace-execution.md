@@ -4,13 +4,16 @@ Palace is the sole primary EM solver for this milestone. This document says
 what the path does, what it records, how to run the proof, and what it does
 **not** yet claim.
 
-**Status first: one genuine Palace run has been executed and is committed.**
-`results/PALACE-GOLDEN-20260915T014639Z/` was produced by GitHub Actions run
-34918498363 on commit b79a170 (Palace v0.13.0 at commit a61c8cbe, image ID
-`sha256:cc87ec6b…`, one MPI process, 40.4 s). All four requested modes of the
-empty Object 001 box converged (max backward error 2.0e-11 against 1e-6) and
-agree with the closed form to within 4.7e-5 relative. The last section has
-the numbers; the record itself has everything else.
+**Status first: genuine Palace runs have been executed and are committed.**
+Two records so far: `results/PALACE-GOLDEN-20260915T014639Z/` (GitHub Actions
+run 34918498363 on commit b79a170) and `results/PALACE-GOLDEN-20260915T015804Z/`
+(run 34919265099 on 25089ae), both Palace v0.13.0 at commit a61c8cbe, image
+ID `sha256:cc87ec6b…`, one MPI process, 40.4 s and 40.2 s inside Palace, and
+byte-identical in every solver output. All four requested modes of the empty
+Object 001 box converged (max backward error 2.0e-11 against 1e-6) and agree
+with the closed form to within 4.7e-5 relative. Any later change to the
+Palace path re-runs the workflow and appends another record. The last
+section has the numbers; the records have everything else.
 
 ## What is solved
 
@@ -168,12 +171,13 @@ results/PALACE-GOLDEN-<UTC>/
 
 The same adapter is also wired to run under `uv run cem sweep
 sweeps/object001_grid.yaml --solver palace`. That is nine eigenmode solves of
-nine empty boxes; this milestone does not optimise or expand it, and it has
-not been executed either. In such a sweep the gates needing S-parameters
-report `INCOMPLETE` honestly because an eigenmode run produces none, and a
-`P4PRE_SPECTRAL` verdict computed from empty-box eigenmodes describes the
-empty box, not the package: the chip, recess, launches and lid that would
-move those modes are not in the model.
+nine empty boxes; this milestone does not optimise or expand it. It ran once,
+as the last step of the golden-run job, and its output is a workflow artifact
+rather than a committed record. In such a sweep the gates needing
+S-parameters report `INCOMPLETE` honestly because an eigenmode run produces
+none, and a `P4PRE_SPECTRAL` verdict computed from empty-box eigenmodes
+describes the empty box, not the package: the chip, recess, launches and lid
+that would move those modes are not in the model.
 
 ## Reproducibility of the image
 
@@ -182,9 +186,10 @@ move those modes are not in the model.
 - the base by **content digest**, not tag;
 - the Ubuntu **package snapshot** (`APT_SNAPSHOT`, via `APT::Snapshot`, on
   both `update` and `install`), with a build-time check that apt really
-  resolved the snapshot; `ca-certificates` is the one package installed from
-  the live archive, because the snapshot host is HTTPS-only and the base
-  image has no CA bundle;
+  resolved the snapshot; `ca-certificates` and its dependency `openssl` are
+  the two packages installed from the live archive, because the snapshot
+  host is HTTPS-only and the base image has no CA bundle (neither is linked
+  by the Palace binary);
 - the **Palace release tag**, asserted to resolve to the commit
   `a61c8cbe0cacf496cde3c62e93085fae0d6299ac`, so a moved tag fails the build;
 - Palace's own dependencies at the revisions its superbuild pins for that tag.
@@ -223,6 +228,12 @@ run, committed by the workflow (commit 878cd8a) from GitHub Actions run
 | Relative deviation | 2.1e-5, 5.3e-6, 2.2e-5, 4.7e-5 (all within the 1e-4 expected and the 2 % gate) |
 | Wall time | 40.4 s in Palace; 43 s end to end |
 | Gates | overall `INCOMPLETE`: `COLLISION` PASS, `P4PRE_SPECTRAL` PASS, `P6E2_FILTER` INCOMPLETE (no S21), `COUPLING_EXTRACTION` and `TOLERANCE` NOT-EVALUATED, six hardware gates HARDWARE-GATED |
+
+`results/PALACE-GOLDEN-20260915T015804Z/` (run 34919265099 on 25089ae,
+commit c16567a) repeated the run from the cached image: the same image ID,
+the same mesh and config hashes, byte-identical `eig.csv` and
+`domain-E.csv`, identical gate verdicts; only the timestamps and the wall
+time (40.2 s in Palace) differ.
 
 The two PASS verdicts describe the empty box, which has no mode below 9.6 GHz
 and therefore nothing near the 4.30 GHz readout root: they say the pipeline

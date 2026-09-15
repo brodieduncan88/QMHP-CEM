@@ -184,7 +184,8 @@ def main(argv: list[str] | None = None) -> int:
     outcome = "UNKNOWN"
     exit_code = 0
     prepared = None
-    results = None
+    parsed = None      # what Palace produced, before validation: evidence, never a verdict
+    results = None     # set only once validate_convergence() has accepted it
     failure = None
     try:
         prepared = adapter.prepare(candidate, None, context)
@@ -194,8 +195,8 @@ def main(argv: list[str] | None = None) -> int:
         print("running Palace ...", flush=True)
         raw = adapter.run(prepared)
         print(f"palace exit: {raw.returncode} in {(raw.ended_utc - raw.started_utc).total_seconds():.1f}s")
-        results = adapter.parse(raw)
-        results = adapter.validate_convergence(results)
+        parsed = adapter.parse(raw)
+        results = adapter.validate_convergence(parsed)
         outcome = "CONVERGED"
     except (SolverUnavailable, PalaceRunFailed, PalaceOutputError) as exc:
         failure = f"{exc.__class__.__name__}: {exc}"
@@ -211,11 +212,14 @@ def main(argv: list[str] | None = None) -> int:
         exit_code = 3
 
     expected = list(prepared.payload.get("expected_solver_modes_GHz", [])) if prepared is not None else []
+    if parsed is not None:
+        # Written whether or not it was accepted: a NOT_CONVERGED parse is
+        # still the record of what Palace produced.
+        (solver_dir / "solver_results.json").write_text(_dump(parsed))
     analytic_check = None
     if results is not None:
-        (solver_dir / "solver_results.json").write_text(
-            json.dumps(results.model_dump(mode="json", by_alias=True), indent=2, sort_keys=True) + "\n"
-        )
+        # Only a validated result is compared with the closed form; an
+        # unconverged one keeps its NOT_CONVERGED outcome and exit code 3.
         analytic_check = analytic_comparison(results, expected)
         if analytic_check is not None and not analytic_check["within_tolerance"]:
             outcome = "ANALYTIC_MISMATCH"
@@ -236,7 +240,7 @@ def main(argv: list[str] | None = None) -> int:
     env = environment.record(
         started_utc=started,
         solver_name="palace",
-        solver_version=(results.solver.version if results else str(identity.get("palace_version"))),
+        solver_version=(parsed.solver.version if parsed else str(identity.get("palace_version"))),
         solver_identity=f"{args.image}@{identity.get('image_id')}",
         ended_utc=ended,
     )
@@ -249,8 +253,9 @@ def main(argv: list[str] | None = None) -> int:
         "golden_sha256": hashlib.sha256(GOLDEN.read_bytes()).hexdigest(),
         "solver_provenance": identity,
         "analytic_check": analytic_check,
-        "convergence": (results.convergence.model_dump() if results else None),
-        "eigenmodes_GHz": ([m.frequency_GHz for m in results.eigenmodes] if results else None),
+        "convergence": (parsed.convergence.model_dump() if parsed else None),
+        "eigenmodes_GHz": ([m.frequency_GHz for m in parsed.eigenmodes] if parsed else None),
+        "validated": results is not None,
         "expected_modes_GHz": expected or None,
         "gates": gates,
         "gate_failure": gate_failure,
@@ -282,10 +287,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"WARNING    : worst deviation {analytic_check['worst_relative_deviation']:.3e} exceeds the "
                   f"expected {EXPECTED_RELATIVE_DEVIATION:.0e} for this mesh and order; within the "
                   f"{GOLDEN_RELATIVE_TOLERANCE:.0%} proof gate, but look at the mesh before trusting the number.")
-    if results:
-        print(f"convergence: {results.convergence.metric} = {results.convergence.value:.3e} "
-              f"(tol {results.convergence.tolerance:.1e})")
-        print(f"solver     : {results.solver.name} {results.solver.version}  image {results.solver.image_digest}")
+    if parsed:
+        print(f"convergence: {parsed.convergence.status.value}: {parsed.convergence.metric} = "
+              f"{parsed.convergence.value:.3e} (tol {parsed.convergence.tolerance:.1e})")
+        print(f"solver     : {parsed.solver.name} {parsed.solver.version}  image {parsed.solver.image_digest}")
     if gates:
         print(f"gates      : overall {gates['overall_status']} (master {gates['master_revision']})")
         for g in gates["gates"]:

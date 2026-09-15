@@ -249,8 +249,9 @@ def run_candidate(
     except Exception as exc:  # noqa: BLE001 - any solver failure is recorded, never hidden
         # SolverUnavailable (spec §10.5), a run that did not complete, an
         # output that could not be parsed, a convergence failure: every one
-        # of them ends this candidate as INCOMPLETE with the cause on record.
-        # Nothing here retries with another solver.
+        # of them ends this candidate as INCOMPLETE. The cause is carried on
+        # the outcome and written into the batch report's notes by
+        # _batch_notes. Nothing here retries with another solver.
         notes.append(f"solver failed ({type(exc).__name__}): {exc}")
         lifecycle.to(CandidateState.INCOMPLETE)
         return CandidateOutcome(
@@ -485,4 +486,10 @@ def _batch_notes(outcomes: list[CandidateOutcome], adapter: SolverAdapter) -> li
         "A computational PASS is not hardware validation. Hardware-dependent "
         "gates remain HARDWARE-GATED until measured evidence is supplied."
     )
+    # A candidate that ended INCOMPLETE because its solver run failed has no
+    # solver_results.json to explain itself; the cause goes on the record here.
+    for o in outcomes:
+        for note in o.notes:
+            if note.startswith("solver failed"):
+                notes.append(f"{o.candidate.candidate_id}: {note}")
     return notes

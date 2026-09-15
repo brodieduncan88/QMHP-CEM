@@ -2,9 +2,9 @@
 #
 # NOT part of default CI (spec §12.8): this job builds the pinned Palace
 # container from docker/palace.Dockerfile (Palace v0.13.0 and its superbuild
-# dependencies, roughly an hour on a hosted runner the first time; the layer
-# cache makes later runs minutes) and then executes the frozen golden
-# candidate in it. Every outcome writes results/PALACE-GOLDEN-<UTC>/ with the
+# dependencies: 818 s for the superbuild on a 4-vCPU hosted runner in run
+# 34917157266, under two minutes once the layer cache is warm) and then
+# executes the frozen golden candidate in it. Every outcome writes results/PALACE-GOLDEN-<UTC>/ with the
 # execution record, the Palace log, the input and output hashes and the gate
 # report, and commits that directory back to the branch so the evidence is
 # in the repository whether the run succeeded or not.
@@ -47,8 +47,12 @@ concurrency:
 env:
   IMAGE: qmhp-cem/palace:0.13.0
   MPI_PROCESSES: ${{ inputs.mpi_processes || '1' }}
-  COMMIT_RESULTS: ${{ inputs.commit_results == '' && 'true' || inputs.commit_results }}
-  RUN_SWEEP: ${{ inputs.run_sweep == '' && 'true' || inputs.run_sweep }}
+  # On a push the inputs context is empty and both default to true; on a
+  # dispatch the boolean input is used as given. (A loose `== ''` test would
+  # not do: GitHub coerces both false and '' to 0, so unticking the box
+  # would have had no effect.)
+  COMMIT_RESULTS: ${{ github.event_name != 'workflow_dispatch' || inputs.commit_results }}
+  RUN_SWEEP: ${{ github.event_name != 'workflow_dispatch' || inputs.run_sweep }}
 
 jobs:
   golden:
@@ -142,7 +146,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "${dirs[@]}"
           outcome="$(uv run python -c "import json,sys; print(json.load(open(sys.argv[1]))['outcome'])" "${dirs[0]}/execution_record.json")"
-          git commit -m "Record Palace golden run ${{ github.run_id }}: ${outcome}" -m "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          git commit -m "Record Palace golden run ${{ github.run_id }}: ${outcome}, golden step ${{ steps.golden.outcome }}" -m "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           git pull --rebase --autostash origin "${{ github.ref_name }}"
           git push origin "HEAD:${{ github.ref_name }}"
 

@@ -282,6 +282,9 @@ def test_solver_failure_mid_sweep_ends_the_candidate_incomplete(monkeypatch, obj
     assert {o.state for o in outcomes} == {CandidateState.INCOMPLETE}
     assert all(any("PalaceRunFailed" in n and "code 137" in n for n in o.notes) for o in outcomes)
     assert all(o.solver_results is None for o in outcomes)
+    # The cause is on the batch record too, not only on the in-memory outcome.
+    for o in outcomes:
+        assert any(n.startswith(f"{o.candidate.candidate_id}: solver failed (PalaceRunFailed)") for n in report.notes)
 
 
 def test_unknown_solver_is_rejected():

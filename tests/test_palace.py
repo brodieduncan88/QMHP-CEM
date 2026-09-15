@@ -675,6 +675,52 @@ def test_golden_harness_exits_2_and_writes_nothing_when_palace_is_unavailable(mo
     assert "no daemon in this test" in capsys.readouterr().err
 
 
+@needs_gmsh
+def test_golden_harness_keeps_not_converged_and_skips_the_gates(monkeypatch, tmp_path, golden):
+    """A parse that validate_convergence rejects stays NOT_CONVERGED (exit 3).
+
+    It is written as evidence, but it is neither compared with the closed
+    form (which would have relabelled a missing mode ANALYTIC_MISMATCH) nor
+    taken through the gates.
+    """
+    script = _load_golden_script()
+    identity = ImageIdentity(reference="qmhp-cem/palace:test", image_id=IMAGE_ID, repo_digest=None,
+                             palace_version="0.13.0", palace_commit=TAG_COMMIT)
+    monkeypatch.setattr(PalaceSolver, "preflight", lambda self: None)
+    monkeypatch.setattr(PalaceSolver, "provenance", lambda self: {"image_id": IMAGE_ID, "repo_digest": None,
+                                                                   "palace_version": "0.13.0", "palace_commit": TAG_COMMIT})
+
+    def fake_run(self, prepared):
+        work = Path(prepared.work_dir)
+        out = work / OUTPUT_DIRNAME
+        out.mkdir()
+        shutil.copy(FIXTURES / "eig_not_converged.csv", out / "eig.csv")   # 2 of 4 modes, one over tolerance
+        shutil.copy(FIXTURES / "palace.json", out / "palace.json")
+        shutil.copy(FIXTURES / "palace_log.txt", work / LOG_FILENAME)
+        raw = PalaceRawOutput(
+            prepared=prepared, image=identity, command_line=["docker", "run", "fake"], returncode=0,
+            started_utc=datetime(2026, 9, 15, 3, 0, tzinfo=timezone.utc),
+            ended_utc=datetime(2026, 9, 15, 3, 0, 5, tzinfo=timezone.utc),
+            work_dir=work, log_path=work / LOG_FILENAME, output_dir=out, run_record_path=work / RUN_RECORD_FILENAME,
+        )
+        self._write_run_record(raw)
+        return raw
+
+    monkeypatch.setattr(PalaceSolver, "run", fake_run)
+    code = script.main(["--results-root", str(tmp_path / "results")])
+    assert code == 3
+    root = next((tmp_path / "results").glob("PALACE-GOLDEN-*"))
+    record = json.loads((root / "execution_record.json").read_text())
+    assert record["outcome"] == "NOT_CONVERGED"
+    assert record["validated"] is False
+    assert record["convergence"]["status"] == "NOT_CONVERGED"
+    assert record["analytic_check"] is None and record["gates"] is None
+    candidate_dir = root / golden.candidate_id
+    assert (candidate_dir / "solver" / "solver_results.json").exists()   # evidence of what Palace produced
+    assert not (candidate_dir / "gate_report.json").exists()
+    assert not (candidate_dir / "quantum_results.json").exists()
+
+
 def test_golden_harness_uses_the_shared_tolerance():
     script = _load_golden_script()
     assert script.GOLDEN_RELATIVE_TOLERANCE is pconfig.GOLDEN_RELATIVE_TOLERANCE

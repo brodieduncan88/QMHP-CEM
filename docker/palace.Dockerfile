@@ -7,10 +7,11 @@
 # The build needs outbound HTTPS to archive.ubuntu.com, snapshot.ubuntu.com,
 # github.com (Palace and most of its superbuild dependencies) and gitlab.com
 # (PETSc/SLEPc). First built in GitHub Actions (.github/workflows/
-# palace-golden.yml, run 34917157266: 818 s superbuild on a 4-vCPU runner,
-# image ID sha256:cc87ec6b...) after one fix, the explicit gcc below; the
-# resulting image executed the golden candidate in run 34918498363. See
-# docs/palace-execution.md for the record.
+# palace-golden.yml) run 34917157266, whose log shows an 818 s superbuild on
+# a 4-vCPU runner, after one fix: the explicit gcc below. Runs 34918498363
+# and 34919265099 rebuilt it from that layer cache and recorded the image
+# they executed as ID sha256:cc87ec6b... in results/PALACE-GOLDEN-*/. See
+# docs/palace-execution.md for the records.
 #
 # Reproducibility levers, each pinned by default and overridable by build-arg:
 #   BASE_IMAGE      ubuntu:24.04 pinned by content digest, not by tag
@@ -55,8 +56,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 # apt (>= 2.7.3, so the noble base) selects the snapshot with APT::Snapshot;
 # it has to be passed to *both* update and install, or install resolves
 # against the live archive again. The snapshot host is HTTPS-only and the
-# base image carries no CA bundle, so ca-certificates is installed from the
-# live archive first: it is the one package that is not snapshot-pinned.
+# base image carries no CA bundle, so ca-certificates (and its dependency
+# openssl) are installed from the live archive first: those two packages are
+# not snapshot-pinned, and neither is linked by the Palace binary (the
+# runtime-stage ldd check enforces that).
 # After update the list directory must show snapshot entries, or the build
 # stops: a silently un-pinned toolchain is exactly what this file exists to
 # prevent.
