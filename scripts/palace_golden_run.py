@@ -154,6 +154,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--np", type=int, default=1, help="MPI processes")
     parser.add_argument("--timeout", type=int, default=3600, help="seconds")
     parser.add_argument("--results-root", default=str(REPO_ROOT / "results"))
+    parser.add_argument(
+        "--record-pointer",
+        default=None,
+        metavar="FILE",
+        help=(
+            "write the path of the record directory this execution creates to FILE, "
+            "as soon as it is created, so a caller need not guess it from a glob"
+        ),
+    )
     args = parser.parse_args(argv)
 
     started = datetime.now(timezone.utc)
@@ -178,6 +187,10 @@ def main(argv: list[str] | None = None) -> int:
     candidate_dir = root / candidate.candidate_id
     solver_dir = candidate_dir / "solver"
     solver_dir.mkdir(parents=True, exist_ok=False)
+    if args.record_pointer:
+        # Written before Palace runs, so the pointer exists for every outcome
+        # that has a record; a preflight failure (exit 2) creates neither.
+        Path(args.record_pointer).write_text(str(root) + "\n")
     (candidate_dir / "candidate.json").write_text(json.dumps(candidate.to_ordered_dict(), indent=2, sort_keys=True) + "\n")
 
     context = RunContext(run_id=f"RUN-{batch_id}", work_dir=solver_dir)

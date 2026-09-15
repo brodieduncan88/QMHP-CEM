@@ -159,6 +159,25 @@ def cmd_verify_master(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_verify_results(args: argparse.Namespace) -> int:
+    """Re-hash one or more results trees against their manifests (spec §11.4).
+
+    Exit 5 on any discrepancy so a CI step fails; the trees are left exactly
+    as they are, so the failed artefacts can still be uploaded and inspected.
+    """
+    worst = 0
+    for root in args.roots:
+        findings = manifest.verify(root)
+        if findings:
+            print(f"{root}: MISMATCH")
+            for finding in findings:
+                print(f"  ! {finding}")
+            worst = 5
+        else:
+            print(f"{root}: manifest intact")
+    return worst
+
+
 # --- output helpers ---------------------------------------------------------
 
 
@@ -253,6 +272,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_master = sub.add_parser("verify-master", help="verify frozen master provenance")
     p_master.set_defaults(func=cmd_verify_master)
+
+    p_results = sub.add_parser(
+        "verify-results", help="re-hash results trees against their manifests (exit 5 on mismatch)"
+    )
+    p_results.add_argument("roots", nargs="+", type=Path)
+    p_results.set_defaults(func=cmd_verify_results)
 
     return parser
 

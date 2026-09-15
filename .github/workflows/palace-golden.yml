@@ -9,9 +9,18 @@
 # report, and commits that directory back to the branch so the evidence is
 # in the repository whether the run succeeded or not.
 #
-# Runs on manual dispatch, and on a push to the v0.2 development branch that
-# touches the Palace path. The bot's own results commit does not match the
-# path filter and does not re-trigger it.
+# Triggers: manual dispatch on any branch; and a push to `main` or to a
+# `palace/**` development branch that touches the Palace path. The record is
+# committed back to the branch the run was on, so `main` accumulates the
+# records of merged changes and a `palace/*` branch those of its own
+# development. The bot's own results commit does not match the path filter
+# and does not re-trigger the workflow. Pull requests do not run it: the
+# build is long and the results commit needs write access to the branch.
+#
+# The record directory this run created is identified by the pointer file the
+# harness writes, never by globbing results/PALACE-GOLDEN-*: earlier records
+# are committed alongside it. Its manifest is re-hashed and a mismatch fails
+# the job, after the record has been uploaded and committed for inspection.
 
 name: Palace golden run
 
@@ -30,7 +39,9 @@ on:
         type: boolean
         default: true
   push:
-    branches: ["claude/v2a-audit-deep-research-96omim"]
+    branches:
+      - main
+      - "palace/**"
     paths:
       - ".github/workflows/palace-golden.yml"
       - "docker/palace.Dockerfile"
@@ -106,16 +117,43 @@ jobs:
       - name: Golden candidate run
         id: golden
         continue-on-error: true
-        run: uv run python scripts/palace_golden_run.py --np "$MPI_PROCESSES" --results-root results
+        run: uv run python scripts/palace_golden_run.py --np "$MPI_PROCESSES" --results-root results --record-pointer "$RUNNER_TEMP/palace-golden-record"
 
-      - name: Execution record, gate report and Palace log
+      # The harness wrote the path of the directory it created; that path,
+      # not a glob over results/, is what every later step acts on.
+      - name: Identify this run's record
+        id: record
         if: always()
         run: |
+          record="$(cat "$RUNNER_TEMP/palace-golden-record" 2>/dev/null || true)"
+          if [ -z "$record" ] || [ ! -d "$record" ]; then
+            echo "no record directory was created by this run (golden step: ${{ steps.golden.outcome }})"
+            echo "path=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "record directory: $record"
+          echo "path=$record" >> "$GITHUB_OUTPUT"
+          echo "GOLDEN_RECORD=$record" >> "$GITHUB_ENV"
+
+      - name: Execution record, gate report and Palace log
+        if: always() && steps.record.outputs.path != ''
+        run: |
           shopt -s nullglob
-          for f in results/PALACE-GOLDEN-*/execution_record.json results/PALACE-GOLDEN-*/*/gate_report.json results/PALACE-GOLDEN-*/*/solver/palace_run.json results/PALACE-GOLDEN-*/*/solver/postpro/eig.csv results/PALACE-GOLDEN-*/*/solver/palace_log.txt; do
+          for f in "$GOLDEN_RECORD"/execution_record.json "$GOLDEN_RECORD"/*/gate_report.json "$GOLDEN_RECORD"/*/solver/palace_run.json "$GOLDEN_RECORD"/*/solver/postpro/eig.csv "$GOLDEN_RECORD"/*/solver/palace_log.txt; do
+            # A run that died before writing a file (cancelled, timed out) still
+            # gets the rest of its diagnostics printed.
+            [ -f "$f" ] || { echo "(missing) $f"; continue; }
             echo "::group::$f"; cat "$f"; echo; echo "::endgroup::"
           done
-          for d in results/PALACE-GOLDEN-*/; do uv run python -c "from orchestrator import manifest; import sys; p=manifest.verify(sys.argv[1]); print('manifest', 'intact' if not p else p)" "$d"; done
+
+      # A mismatch fails this step (exit 5) and, through the last step, the
+      # job; the record is still uploaded and committed below so the failed
+      # artefacts can be inspected.
+      - name: Verify the record manifest
+        id: manifest
+        if: always() && steps.record.outputs.path != ''
+        continue-on-error: true
+        run: uv run cem verify-results "$GOLDEN_RECORD"
 
       - name: Real-execution test
         if: always()
@@ -132,26 +170,25 @@ jobs:
         with:
           name: palace-golden-${{ github.run_id }}
           path: |
-            results/PALACE-GOLDEN-*
+            ${{ steps.record.outputs.path }}
             sweep-results
           if-no-files-found: warn
 
       - name: Commit the golden record to the branch
         if: always() && env.COMMIT_RESULTS == 'true'
         run: |
-          shopt -s nullglob
-          dirs=(results/PALACE-GOLDEN-*)
-          if [ "${#dirs[@]}" -eq 0 ]; then echo "no golden record to commit"; exit 0; fi
+          if [ -z "$GOLDEN_RECORD" ]; then echo "no golden record to commit"; exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "${dirs[@]}"
-          outcome="$(uv run python -c "import json,sys; print(json.load(open(sys.argv[1]))['outcome'])" "${dirs[0]}/execution_record.json")"
-          git commit -m "Record Palace golden run ${{ github.run_id }}: ${outcome}, golden step ${{ steps.golden.outcome }}" -m "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          git add "$GOLDEN_RECORD"
+          outcome="$(uv run python -c "import json,sys; print(json.load(open(sys.argv[1]))['outcome'])" "$GOLDEN_RECORD/execution_record.json")"
+          git commit -m "Record Palace golden run ${{ github.run_id }}: ${outcome}, golden step ${{ steps.golden.outcome }}, manifest ${{ steps.manifest.outcome }}" -m "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           git pull --rebase --autostash origin "${{ github.ref_name }}"
           git push origin "HEAD:${{ github.ref_name }}"
 
-      - name: Fail the job if the golden run did not succeed
-        if: steps.golden.outcome != 'success'
+      - name: Fail the job if the golden run or the manifest check did not succeed
+        if: always() && (steps.golden.outcome != 'success' || steps.manifest.outcome == 'failure')
         run: |
-          echo "golden run exit status: ${{ steps.golden.outcome }}"
+          echo "golden run step: ${{ steps.golden.outcome }}"
+          echo "manifest check : ${{ steps.manifest.outcome }}"
           exit 1
