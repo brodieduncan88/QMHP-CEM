@@ -275,6 +275,37 @@ in this document means the frequencies and the verdicts, with the
 residual digits reproducing in three of four records and the odd one out
 explained.
 
+### Reproducibility across all eleven golden records
+
+By 2026-09-15 the golden run had executed eleven times, on several commits and
+two images (before and after the GSLIB rebuild). Tallying every committed
+`eig.csv`:
+
+| quantity | result across all eleven records |
+|---|---|
+| Distinct four-frequency tuples | **one**: 9.635896241, 15.23545129, 15.23570396, 19.27229929 GHz, to every printed digit |
+| Distinct `eig.csv` byte patterns | **two**: `19877b1e…` (eight records) and `da6f7d0d…` (three: `025408Z`, `063105Z`, `233133Z`) |
+| Where the two patterns differ | the imaginary parts (about 1e-9 GHz, i.e. sub-hertz), the derived `Q`, and the backward/absolute error columns, at the eleventh to twelfth significant digit. Nothing else |
+| Maximum backward error, all records | 2.021497504e-11, against the 1e-6 rule |
+| Gate verdicts | identical in all eleven |
+
+Two consequences, and the second corrects an earlier reading of the evidence:
+
+1. **The physical result is reproducible in the sense that matters.** Every
+   record agrees on every printed digit of all four eigenfrequencies, on the
+   mesh and config hashes, and on the gate verdicts.
+2. **The thread pin did not eliminate the residual-digit variation.** The
+   `da6f7d0d` pattern appears at `025408Z` (before the pin) and again at
+   `063105Z` and `233133Z` (both after it), while `19877b1e` appears on either
+   side of the pin too. The pin removed the large wall-clock swing and the
+   variation is now rare, but it is still present, so **the golden `eig.csv`
+   digest must not be treated as a fixed constant.** Nothing in the repository
+   does: no test or workflow pins that digest, the golden byte-identity test
+   pins the *prepared input* (config digest and mesh), and the convergence
+   gate reads the backward error, which is six orders of magnitude inside its
+   rule under either pattern. Any future claim of byte-identical solver output
+   should be stated for the records actually compared, not for the set.
+
 The two PASS verdicts describe the empty box, which has no mode below 9.6 GHz
 and therefore nothing near the 4.30 GHz readout root: they say the pipeline
 runs, not that the package is right. The 3x3 sweep also ran in the same job
