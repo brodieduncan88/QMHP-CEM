@@ -1,0 +1,882 @@
+{
+  "analytic_design": {
+    "aux_height": {
+      "delta_f_exact_GHz": -1.8466170624533156,
+      "delta_f_exact_relative": -0.08217566989206158,
+      "heights": {
+        "7": {
+          "eigenmodes_requested": 8,
+          "f_mode_GHz": 22.47157905592814,
+          "f_previous_analytic_mode_GHz": 21.546068014099255,
+          "modes_below_mode_with_multiplicity": 6,
+          "modes_below_target_with_multiplicity": 6,
+          "neighbourhood": [
+            {
+              "frequency_GHz": 22.47157905592814,
+              "label": "analytic_011",
+              "multiplicity": 2,
+              "p": 1
+            }
+          ],
+          "rule_mesh_length_mm": 1.75,
+          "target_GHz": 22.008823535013697
+        },
+        "7.7": {
+          "eigenmodes_requested": 8,
+          "f_mode_GHz": 20.624961993474823,
+          "f_previous_analytic_mode_GHz": 19.27138909094393,
+          "modes_below_mode_with_multiplicity": 4,
+          "modes_below_target_with_multiplicity": 4,
+          "neighbourhood": [
+            {
+              "frequency_GHz": 20.624961993474823,
+              "label": "analytic_011",
+              "multiplicity": 2,
+              "p": 1
+            }
+          ],
+          "rule_mesh_length_mm": 1.8333333333333333,
+          "target_GHz": 19.948175542209377
+        }
+      },
+      "p0_modes_are_height_independent": true
+    },
+    "object001_height": {
+      "delta_f_exact_GHz": -9.061481190145642,
+      "delta_f_exact_relative": -0.09046750617337565,
+      "heights": {
+        "1.5": {
+          "eigenmodes_requested": 18,
+          "f_mode_GHz": 100.16282722306777,
+          "f_previous_analytic_mode_GHz": 99.20554719170522,
+          "modes_below_mode_with_multiplicity": 154,
+          "modes_below_target_with_multiplicity": 154,
+          "neighbourhood": [
+            {
+              "frequency_GHz": 100.16282722306777,
+              "label": "analytic_011",
+              "multiplicity": 2,
+              "p": 1
+            },
+            {
+              "frequency_GHz": 100.39429895170812,
+              "label": "analytic_111",
+              "multiplicity": 2,
+              "p": 1
+            },
+            {
+              "frequency_GHz": 100.59960448096484,
+              "label": "analytic_7130",
+              "multiplicity": 2,
+              "p": 0
+            },
+            {
+              "frequency_GHz": 100.85564868354464,
+              "label": "analytic_021",
+              "multiplicity": 2,
+              "p": 1
+            },
+            {
+              "frequency_GHz": 101.08553396043077,
+              "label": "analytic_121",
+              "multiplicity": 4,
+              "p": 1
+            },
+            {
+              "frequency_GHz": 101.28943842171809,
+              "label": "analytic_5140",
+              "multiplicity": 4,
+              "p": 0
+            },
+            {
+              "frequency_GHz": 101.77207421550303,
+              "label": "analytic_221",
+              "multiplicity": 2,
+              "p": 1
+            },
+            {
+              "frequency_GHz": 101.99989409216403,
+              "label": "analytic_031",
+              "multiplicity": 2,
+              "p": 1
+            },
+            {
+              "frequency_GHz": 102.20197431818183,
+              "label": "analytic_9120",
+              "multiplicity": 2,
+              "p": 0
+            },
+            {
+              "frequency_GHz": 102.22720625889909,
+              "label": "analytic_131",
+              "multiplicity": 4,
+              "p": 1
+            },
+            {
+              "frequency_GHz": 102.42883802533893,
+              "label": "analytic_1150",
+              "multiplicity": 2,
+              "p": 0
+            },
+            {
+              "frequency_GHz": 102.90613010681119,
+              "label": "analytic_231",
+              "multiplicity": 4,
+              "p": 1
+            },
+            {
+              "frequency_GHz": 103.10643419923693,
+              "label": "analytic_2150",
+              "multiplicity": 2,
+              "p": 0
+            }
+          ],
+          "rule_mesh_length_mm": 0.375,
+          "target_GHz": 99.68418720738649
+        },
+        "1.65": {
+          "eigenmodes_requested": 16,
+          "f_mode_GHz": 91.10134603292212,
+          "f_previous_analytic_mode_GHz": 90.90296053624327,
+          "modes_below_mode_with_multiplicity": 127,
+          "modes_below_target_with_multiplicity": 127,
+          "neighbourhood": [
+            {
+              "frequency_GHz": 91.10134603292212,
+              "label": "analytic_011",
+              "multiplicity": 2,
+              "p": 1
+            },
+            {
+              "frequency_GHz": 91.35578007820324,
+              "label": "analytic_111",
+              "multiplicity": 2,
+              "p": 1
+            },
+            {
+              "frequency_GHz": 91.41222480405692,
+              "label": "analytic_6120",
+              "multiplicity": 2,
+              "p": 0
+            },
+            {
+              "frequency_GHz": 91.66579595636671,
+              "label": "analytic_9100",
+              "multiplicity": 2,
+              "p": 0
+            },
+            {
+              "frequency_GHz": 91.86253405535182,
+              "label": "analytic_021",
+              "multiplicity": 2,
+              "p": 1
+            },
+            {
+              "frequency_GHz": 92.11486561764877,
+              "label": "analytic_121",
+              "multiplicity": 4,
+              "p": 1
+            },
+            {
+              "frequency_GHz": 92.67314264155249,
+              "label": "analytic_4130",
+              "multiplicity": 4,
+              "p": 0
+            },
+            {
+              "frequency_GHz": 92.86774672521108,
+              "label": "analytic_221",
+              "multiplicity": 2,
+              "p": 1
+            },
+            {
+              "frequency_GHz": 93.1173543787879,
+              "label": "analytic_031",
+              "multiplicity": 2,
+              "p": 1
+            },
+            {
+              "frequency_GHz": 93.36629472776345,
+              "label": "analytic_131",
+              "multiplicity": 4,
+              "p": 1
+            }
+          ],
+          "rule_mesh_length_mm": 0.4125,
+          "target_GHz": 91.0021532845827
+        }
+      },
+      "p0_modes_are_height_independent": true
+    }
+  },
+  "height_benchmarks": [
+    {
+      "cavity_a_mm": 22.0,
+      "cavity_b_mm": 22.0,
+      "exploratory_mesh_rule": "d / 3",
+      "heights_mm": [
+        1.5,
+        1.65
+      ],
+      "is_object001": true,
+      "mode": [
+        0,
+        1,
+        1
+      ],
+      "name": "object001_height"
+    },
+    {
+      "cavity_a_mm": 22.0,
+      "cavity_b_mm": 22.0,
+      "exploratory_mesh_rule": null,
+      "heights_mm": [
+        7.0,
+        7.7
+      ],
+      "is_object001": false,
+      "mode": [
+        0,
+        1,
+        1
+      ],
+      "name": "aux_height"
+    }
+  ],
+  "height_runs": [
+    {
+      "benchmark": "aux_height",
+      "cavity": {
+        "a_mm": 22.0,
+        "b_mm": 22.0,
+        "d_mm": 7.0
+      },
+      "eigenmodes": 8,
+      "height_mode": [
+        0,
+        1,
+        1
+      ],
+      "level": 1,
+      "mesh_length_mm": 1.75,
+      "name": "aux_height-d7-L1",
+      "note": "the declared rule level",
+      "overrides": {
+        "domain": {
+          "mesh_length_mm": 1.75,
+          "x_max_mm": 11.0,
+          "x_min_mm": -11.0,
+          "y_max_mm": 11.0,
+          "y_min_mm": -11.0,
+          "z_max_mm": 7.0,
+          "z_min_mm": 0.0
+        },
+        "eigenmodes": 8,
+        "label": "aux_height-d7-L1",
+        "mesh_length_mm": 1.75,
+        "probes_mm": [
+          [
+            -4.18,
+            -5.9399999999999995,
+            3.15
+          ],
+          [
+            3.74,
+            -1.9800000000000004,
+            3.8500000000000005
+          ],
+          [
+            -6.82,
+            4.619999999999999,
+            3.5
+          ]
+        ],
+        "target_GHz": 22.008824
+      },
+      "probes": true,
+      "role": "height",
+      "target_GHz": 22.008824,
+      "timeout_s": 1800
+    },
+    {
+      "benchmark": "aux_height",
+      "cavity": {
+        "a_mm": 22.0,
+        "b_mm": 22.0,
+        "d_mm": 7.7
+      },
+      "eigenmodes": 8,
+      "height_mode": [
+        0,
+        1,
+        1
+      ],
+      "level": 1,
+      "mesh_length_mm": 1.8333333333333333,
+      "name": "aux_height-d7.7-L1",
+      "note": "the declared rule level",
+      "overrides": {
+        "domain": {
+          "mesh_length_mm": 1.8333333333333333,
+          "x_max_mm": 11.0,
+          "x_min_mm": -11.0,
+          "y_max_mm": 11.0,
+          "y_min_mm": -11.0,
+          "z_max_mm": 7.7,
+          "z_min_mm": 0.0
+        },
+        "eigenmodes": 8,
+        "label": "aux_height-d7.7-L1",
+        "mesh_length_mm": 1.8333333333333333,
+        "probes_mm": [
+          [
+            -4.18,
+            -5.9399999999999995,
+            3.4650000000000003
+          ],
+          [
+            3.74,
+            -1.9800000000000004,
+            4.235
+          ],
+          [
+            -6.82,
+            4.619999999999999,
+            3.85
+          ]
+        ],
+        "target_GHz": 19.948176
+      },
+      "probes": true,
+      "role": "height",
+      "target_GHz": 19.948176,
+      "timeout_s": 1800
+    },
+    {
+      "benchmark": "aux_height",
+      "cavity": {
+        "a_mm": 22.0,
+        "b_mm": 22.0,
+        "d_mm": 7.0
+      },
+      "eigenmodes": 8,
+      "height_mode": [
+        0,
+        1,
+        1
+      ],
+      "level": 2,
+      "mesh_length_mm": 1.1666666666666667,
+      "name": "aux_height-d7-L2",
+      "note": "rule level / 1.5",
+      "overrides": {
+        "domain": {
+          "mesh_length_mm": 1.1666666666666667,
+          "x_max_mm": 11.0,
+          "x_min_mm": -11.0,
+          "y_max_mm": 11.0,
+          "y_min_mm": -11.0,
+          "z_max_mm": 7.0,
+          "z_min_mm": 0.0
+        },
+        "eigenmodes": 8,
+        "label": "aux_height-d7-L2",
+        "mesh_length_mm": 1.1666666666666667,
+        "probes_mm": [
+          [
+            -4.18,
+            -5.9399999999999995,
+            3.15
+          ],
+          [
+            3.74,
+            -1.9800000000000004,
+            3.8500000000000005
+          ],
+          [
+            -6.82,
+            4.619999999999999,
+            3.5
+          ]
+        ],
+        "target_GHz": 22.008824
+      },
+      "probes": true,
+      "role": "height",
+      "target_GHz": 22.008824,
+      "timeout_s": 1800
+    },
+    {
+      "benchmark": "aux_height",
+      "cavity": {
+        "a_mm": 22.0,
+        "b_mm": 22.0,
+        "d_mm": 7.7
+      },
+      "eigenmodes": 8,
+      "height_mode": [
+        0,
+        1,
+        1
+      ],
+      "level": 2,
+      "mesh_length_mm": 1.222222222222222,
+      "name": "aux_height-d7.7-L2",
+      "note": "rule level / 1.5",
+      "overrides": {
+        "domain": {
+          "mesh_length_mm": 1.222222222222222,
+          "x_max_mm": 11.0,
+          "x_min_mm": -11.0,
+          "y_max_mm": 11.0,
+          "y_min_mm": -11.0,
+          "z_max_mm": 7.7,
+          "z_min_mm": 0.0
+        },
+        "eigenmodes": 8,
+        "label": "aux_height-d7.7-L2",
+        "mesh_length_mm": 1.222222222222222,
+        "probes_mm": [
+          [
+            -4.18,
+            -5.9399999999999995,
+            3.4650000000000003
+          ],
+          [
+            3.74,
+            -1.9800000000000004,
+            4.235
+          ],
+          [
+            -6.82,
+            4.619999999999999,
+            3.85
+          ]
+        ],
+        "target_GHz": 19.948176
+      },
+      "probes": true,
+      "role": "height",
+      "target_GHz": 19.948176,
+      "timeout_s": 1800
+    },
+    {
+      "benchmark": "object001_height",
+      "cavity": {
+        "a_mm": 22.0,
+        "b_mm": 22.0,
+        "d_mm": 1.5
+      },
+      "eigenmodes": 18,
+      "height_mode": [
+        0,
+        1,
+        1
+      ],
+      "level": 1,
+      "mesh_length_mm": 0.5,
+      "name": "object001_height-d1.5-L1",
+      "note": "exploratory: three elements across the height, below the declared rule",
+      "overrides": {
+        "domain": {
+          "mesh_length_mm": 0.5,
+          "x_max_mm": 11.0,
+          "x_min_mm": -11.0,
+          "y_max_mm": 11.0,
+          "y_min_mm": -11.0,
+          "z_max_mm": 1.5,
+          "z_min_mm": 0.0
+        },
+        "eigenmodes": 18,
+        "label": "object001_height-d1.5-L1",
+        "mesh_length_mm": 0.5,
+        "probes_mm": [
+          [
+            -4.18,
+            -5.9399999999999995,
+            0.675
+          ],
+          [
+            3.74,
+            -1.9800000000000004,
+            0.8250000000000001
+          ],
+          [
+            -6.82,
+            4.619999999999999,
+            0.75
+          ]
+        ],
+        "target_GHz": 99.684187
+      },
+      "probes": true,
+      "role": "height_exploratory",
+      "target_GHz": 99.684187,
+      "timeout_s": 3600
+    },
+    {
+      "benchmark": "object001_height",
+      "cavity": {
+        "a_mm": 22.0,
+        "b_mm": 22.0,
+        "d_mm": 1.65
+      },
+      "eigenmodes": 16,
+      "height_mode": [
+        0,
+        1,
+        1
+      ],
+      "level": 1,
+      "mesh_length_mm": 0.5499999999999999,
+      "name": "object001_height-d1.65-L1",
+      "note": "exploratory: three elements across the height, below the declared rule",
+      "overrides": {
+        "domain": {
+          "mesh_length_mm": 0.5499999999999999,
+          "x_max_mm": 11.0,
+          "x_min_mm": -11.0,
+          "y_max_mm": 11.0,
+          "y_min_mm": -11.0,
+          "z_max_mm": 1.65,
+          "z_min_mm": 0.0
+        },
+        "eigenmodes": 16,
+        "label": "object001_height-d1.65-L1",
+        "mesh_length_mm": 0.5499999999999999,
+        "probes_mm": [
+          [
+            -4.18,
+            -5.9399999999999995,
+            0.7424999999999999
+          ],
+          [
+            3.74,
+            -1.9800000000000004,
+            0.9075
+          ],
+          [
+            -6.82,
+            4.619999999999999,
+            0.825
+          ]
+        ],
+        "target_GHz": 91.002153
+      },
+      "probes": true,
+      "role": "height_exploratory",
+      "target_GHz": 91.002153,
+      "timeout_s": 3600
+    },
+    {
+      "benchmark": "object001_height",
+      "cavity": {
+        "a_mm": 22.0,
+        "b_mm": 22.0,
+        "d_mm": 1.5
+      },
+      "eigenmodes": 18,
+      "height_mode": [
+        0,
+        1,
+        1
+      ],
+      "level": 2,
+      "mesh_length_mm": 0.375,
+      "name": "object001_height-d1.5-L2",
+      "note": "the declared rule level",
+      "overrides": {
+        "domain": {
+          "mesh_length_mm": 0.375,
+          "x_max_mm": 11.0,
+          "x_min_mm": -11.0,
+          "y_max_mm": 11.0,
+          "y_min_mm": -11.0,
+          "z_max_mm": 1.5,
+          "z_min_mm": 0.0
+        },
+        "eigenmodes": 18,
+        "label": "object001_height-d1.5-L2",
+        "mesh_length_mm": 0.375,
+        "probes_mm": [
+          [
+            -4.18,
+            -5.9399999999999995,
+            0.675
+          ],
+          [
+            3.74,
+            -1.9800000000000004,
+            0.8250000000000001
+          ],
+          [
+            -6.82,
+            4.619999999999999,
+            0.75
+          ]
+        ],
+        "target_GHz": 99.684187
+      },
+      "probes": true,
+      "role": "height_rule",
+      "target_GHz": 99.684187,
+      "timeout_s": 3600
+    },
+    {
+      "benchmark": "object001_height",
+      "cavity": {
+        "a_mm": 22.0,
+        "b_mm": 22.0,
+        "d_mm": 1.65
+      },
+      "eigenmodes": 16,
+      "height_mode": [
+        0,
+        1,
+        1
+      ],
+      "level": 2,
+      "mesh_length_mm": 0.4125,
+      "name": "object001_height-d1.65-L2",
+      "note": "the declared rule level",
+      "overrides": {
+        "domain": {
+          "mesh_length_mm": 0.4125,
+          "x_max_mm": 11.0,
+          "x_min_mm": -11.0,
+          "y_max_mm": 11.0,
+          "y_min_mm": -11.0,
+          "z_max_mm": 1.65,
+          "z_min_mm": 0.0
+        },
+        "eigenmodes": 16,
+        "label": "object001_height-d1.65-L2",
+        "mesh_length_mm": 0.4125,
+        "probes_mm": [
+          [
+            -4.18,
+            -5.9399999999999995,
+            0.7424999999999999
+          ],
+          [
+            3.74,
+            -1.9800000000000004,
+            0.9075
+          ],
+          [
+            -6.82,
+            4.619999999999999,
+            0.825
+          ]
+        ],
+        "target_GHz": 91.002153
+      },
+      "probes": true,
+      "role": "height_rule",
+      "target_GHz": 91.002153,
+      "timeout_s": 3600
+    }
+  ],
+  "ladder": [
+    {
+      "benchmark": "object001_mesh_ladder",
+      "cavity": {
+        "a_mm": 22.0,
+        "b_mm": 22.0,
+        "d_mm": 1.5
+      },
+      "eigenmodes": 4,
+      "height_mode": null,
+      "level": 1,
+      "mesh_length_mm": 1.8333333333333333,
+      "name": "ladder-L1",
+      "note": "h0 / 1; identical physics, order, tolerances and target to the golden run",
+      "overrides": {
+        "domain": {
+          "mesh_length_mm": 1.8333333333333333,
+          "x_max_mm": 11.0,
+          "x_min_mm": -11.0,
+          "y_max_mm": 11.0,
+          "y_min_mm": -11.0,
+          "z_max_mm": 1.5,
+          "z_min_mm": 0.0
+        },
+        "eigenmodes": 4,
+        "label": "ladder-L1",
+        "mesh_length_mm": 1.8333333333333333,
+        "probes_mm": [
+          [
+            -4.18,
+            -5.9399999999999995,
+            0.675
+          ],
+          [
+            3.74,
+            -1.9800000000000004,
+            0.8250000000000001
+          ],
+          [
+            -6.82,
+            4.619999999999999,
+            0.75
+          ]
+        ]
+      },
+      "probes": true,
+      "role": "mesh_ladder",
+      "target_GHz": null,
+      "timeout_s": 1800
+    },
+    {
+      "benchmark": "object001_mesh_ladder",
+      "cavity": {
+        "a_mm": 22.0,
+        "b_mm": 22.0,
+        "d_mm": 1.5
+      },
+      "eigenmodes": 4,
+      "height_mode": null,
+      "level": 2,
+      "mesh_length_mm": 1.222222222222222,
+      "name": "ladder-L2",
+      "note": "h0 / 1.5; identical physics, order, tolerances and target to the golden run",
+      "overrides": {
+        "domain": {
+          "mesh_length_mm": 1.222222222222222,
+          "x_max_mm": 11.0,
+          "x_min_mm": -11.0,
+          "y_max_mm": 11.0,
+          "y_min_mm": -11.0,
+          "z_max_mm": 1.5,
+          "z_min_mm": 0.0
+        },
+        "eigenmodes": 4,
+        "label": "ladder-L2",
+        "mesh_length_mm": 1.222222222222222,
+        "probes_mm": [
+          [
+            -4.18,
+            -5.9399999999999995,
+            0.675
+          ],
+          [
+            3.74,
+            -1.9800000000000004,
+            0.8250000000000001
+          ],
+          [
+            -6.82,
+            4.619999999999999,
+            0.75
+          ]
+        ]
+      },
+      "probes": true,
+      "role": "mesh_ladder",
+      "target_GHz": null,
+      "timeout_s": 1800
+    },
+    {
+      "benchmark": "object001_mesh_ladder",
+      "cavity": {
+        "a_mm": 22.0,
+        "b_mm": 22.0,
+        "d_mm": 1.5
+      },
+      "eigenmodes": 4,
+      "height_mode": null,
+      "level": 3,
+      "mesh_length_mm": 0.9166666666666666,
+      "name": "ladder-L3",
+      "note": "h0 / 2; identical physics, order, tolerances and target to the golden run",
+      "overrides": {
+        "domain": {
+          "mesh_length_mm": 0.9166666666666666,
+          "x_max_mm": 11.0,
+          "x_min_mm": -11.0,
+          "y_max_mm": 11.0,
+          "y_min_mm": -11.0,
+          "z_max_mm": 1.5,
+          "z_min_mm": 0.0
+        },
+        "eigenmodes": 4,
+        "label": "ladder-L3",
+        "mesh_length_mm": 0.9166666666666666,
+        "probes_mm": [
+          [
+            -4.18,
+            -5.9399999999999995,
+            0.675
+          ],
+          [
+            3.74,
+            -1.9800000000000004,
+            0.8250000000000001
+          ],
+          [
+            -6.82,
+            4.619999999999999,
+            0.75
+          ]
+        ]
+      },
+      "probes": true,
+      "role": "mesh_ladder",
+      "target_GHz": null,
+      "timeout_s": 1800
+    }
+  ],
+  "name": "mesh-height-verification-v1",
+  "object001": {
+    "a_mm": 22.0,
+    "b_mm": 22.0,
+    "d_mm": 1.5
+  },
+  "rules": {
+    "dof_budget": 400000,
+    "dof_per_tetrahedron_estimate": 8.2,
+    "eigenmode_backward_error_max_tolerance": 1e-06,
+    "eigenvalue_tolerance": 1e-06,
+    "final_two_levels_relative_change_max": 0.0001,
+    "finest_relative_analytic_error_max": 0.0001,
+    "finite_element_order": 2,
+    "height_levels_min_for_pass": 2,
+    "height_mesh_rule": "min(min(a, b) / 12, d / 4, lambda(f_target) / 6)",
+    "height_mode_match_relative_tolerance": 0.002,
+    "height_modes_margin": 6,
+    "height_shift_relative_disagreement_max": 0.01,
+    "height_shift_to_uncertainty_min_ratio": 10.0,
+    "height_target_rule": "midway between the target mode and the highest analytic mode below it",
+    "height_window_above_mode": 0.01,
+    "mesh_levels_min": 3,
+    "probe_fractions": [
+      [
+        0.31,
+        0.23,
+        0.45
+      ],
+      [
+        0.67,
+        0.41,
+        0.55
+      ],
+      [
+        0.19,
+        0.71,
+        0.5
+      ]
+    ],
+    "probe_z_fraction_tm0_min": 0.9,
+    "probe_z_fraction_transverse_max": 0.1,
+    "refinement_factors": [
+      1.0,
+      1.5,
+      2.0
+    ],
+    "timeout_s_exploratory": 3600,
+    "timeout_s_height": 1800,
+    "timeout_s_ladder": 1800
+  },
+  "schema": "qmhp-cem.palace-verify-campaign/0.2.0",
+  "statement": "Numerical verification of the empty PEC box only. Mesh convergence of the 22 x 22 x 1.5 mm box on three meshes, and height sensitivity through p >= 1 modes: the Object 001 box itself where the runner budget allows, and an auxiliary 22 x 22 x 7.0/7.7 mm box that verifies the Z pipeline and is not a verification of Object 001. All rules are ENGINEERING-RULEs of numerical verification, not frozen QMHP physical requirements. No mode splitting here is physical QMHP coupling."
+}

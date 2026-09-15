@@ -1,0 +1,106 @@
+{
+  "artifacts": [
+    {
+      "path": "config.json",
+      "role": "palace_config",
+      "sha256": "0f63c27c5cb57de81e74c37dddd83c377d2ca3c0c1d4717409cc9defec9843ba"
+    },
+    {
+      "path": "mesh.msh",
+      "role": "mesh",
+      "sha256": "7602c8c3815d1d76f670789328729389e2b83c978cce23e5557c9cfc48b2e3db"
+    },
+    {
+      "path": "palace_log.txt",
+      "role": "palace_log",
+      "sha256": "eb988517b371ad898e2113a73da64a5dc5ca4761f2634ce4f38f15c41fd1493a"
+    },
+    {
+      "path": "palace_run.json",
+      "role": "palace_run_record",
+      "sha256": "a4f5b7afed5fefcdd9a1f5f4d4067b2618ba12cc19fcb8bf9aff00109b50b5f0"
+    },
+    {
+      "path": "postpro/domain-E.csv",
+      "role": "domain_energy_csv",
+      "sha256": "d581147e2d523c9fbeeedfbe3268a3159e687df5d0ef368ad16ffec9ee3d460f"
+    },
+    {
+      "path": "postpro/eig.csv",
+      "role": "eigenmodes_csv",
+      "sha256": "da6f7d0d1f8f385db87a41d32d398b3c239fa98f4d1b330c5557dbe3351adc32"
+    },
+    {
+      "path": "postpro/error-indicators.csv",
+      "role": "error_indicators_csv",
+      "sha256": "9931581ccda23d4266e462c8155019b0fea7476237f8ec7f3b2823596f3304e9"
+    },
+    {
+      "path": "postpro/palace.json",
+      "role": "palace_metadata",
+      "sha256": "80eee58fa081b1dc7dfb6732d705bc17876e3fcafeef4bc9b0154459df2fdd18"
+    },
+    {
+      "path": "postpro/probe-B.csv",
+      "role": "palace_output",
+      "sha256": "9c1dbc41604308dc9633419c286dac0e2ec9284296eac7f6286ffee65fcd01ea"
+    },
+    {
+      "path": "postpro/probe-E.csv",
+      "role": "probe_E_csv",
+      "sha256": "6df8141036598ea3140acc277a523380b6b68e1ce331ae71378171d2cce6a720"
+    }
+  ],
+  "candidate_id": "QMHP-CEM-A-RF-000001",
+  "convergence": {
+    "metric": "eigenmode_backward_error_max",
+    "status": "CONVERGED",
+    "tolerance": 1e-06,
+    "value": 2.021494287e-11
+  },
+  "eigenmodes": [
+    {
+      "frequency_GHz": 9.635896241,
+      "label": "palace_mode_1",
+      "quality_factor": 1457883448.0
+    },
+    {
+      "frequency_GHz": 15.23545129,
+      "label": "palace_mode_2",
+      "quality_factor": 6735335335.0
+    },
+    {
+      "frequency_GHz": 15.23570396,
+      "label": "palace_mode_3",
+      "quality_factor": 1098533998.0
+    },
+    {
+      "frequency_GHz": 19.27229929,
+      "label": "palace_mode_4",
+      "quality_factor": 3497058773.0
+    }
+  ],
+  "frequency_GHz": [],
+  "notes": [
+    "Palace eigenmode solve of the EMPTY Object 001 vacuum cavity as a closed PEC box. The chip dielectric, recess step, launch bores and lid are not modelled in this milestone.",
+    "Solver domain (mm, spec \u00a77.3 frame): {'x_min_mm': -11.0, 'x_max_mm': 11.0, 'y_min_mm': -11.0, 'y_max_mm': 11.0, 'z_min_mm': 0.0, 'z_max_mm': 1.5, 'mesh_length_mm': 1.8333333333333333}.",
+    "Mesh: 1200 tetrahedra, 443 nodes, gmsh 4.15.2, sha256 7602c8c3815d1d76\u2026.",
+    "Convergence: Palace's own stopping criterion was Solver.Eigenmode.Tol = 1e-06; the reported metric is the maximum a-posteriori backward error over the 4 requested mode(s) against the adapter rule 1e-06. A mesh-refinement convergence campaign is deferred (spec \u00a715).",
+    "Analytic check: first mode 9.635896 GHz vs closed-form analytic_110 9.635695 GHz, relative deviation +2.093e-05. All requested modes are TM_mn0, so this checks the X/Y extent and unit scaling, not the cavity height.",
+    "Palace banner git changeset: v0.13.0.",
+    "Palace ran with 1 MPI process(es).",
+    "palace.json GitTag: v0.13.0."
+  ],
+  "run_id": "RUN-PALACE-VERIFY-20260915T091242Z-ladder-L1",
+  "s_parameters": {},
+  "schema": "qmhp-cem.solver-results/0.1.0",
+  "solver": {
+    "classification": "SOLVED",
+    "command_line": "docker run --rm --network none --hostname localhost --name qmhp-palace-RUN-PALACE-VERIFY-20260915T091242Z-ladder-L1-QMHP-CEM-A-RF-000001 --user 1001:1001 -e HOME=/tmp -v /home/runner/work/QMHP-CEM/QMHP-CEM/results/PALACE-VERIFY-20260915T091242Z/runs/ladder-L1/solver:/work -w /work qmhp-cem/palace:0.13.0 -np 1 config.json",
+    "image_digest": "sha256:f41ad915d54c2b31d7131bbd570479ccf9cc577eac7ea208ab06f840d8b0aa46",
+    "name": "palace",
+    "version": "0.13.0+a61c8cbe0cac"
+  },
+  "synthetic": false,
+  "z_parameters": {}
+}

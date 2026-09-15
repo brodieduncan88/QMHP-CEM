@@ -1,0 +1,77 @@
+{
+  "Boundaries": {
+    "PEC": {
+      "Attributes": [
+        2
+      ]
+    }
+  },
+  "Domains": {
+    "Materials": [
+      {
+        "Attributes": [
+          1
+        ],
+        "LossTan": 0.0,
+        "Permeability": 1.0,
+        "Permittivity": 1.0
+      }
+    ],
+    "Postprocessing": {
+      "Probe": [
+        {
+          "Center": [
+            -4.18,
+            -5.9399999999999995,
+            3.15
+          ],
+          "Index": 1
+        },
+        {
+          "Center": [
+            3.74,
+            -1.9800000000000004,
+            3.8500000000000005
+          ],
+          "Index": 2
+        },
+        {
+          "Center": [
+            -6.82,
+            4.619999999999999,
+            3.5
+          ],
+          "Index": 3
+        }
+      ]
+    }
+  },
+  "Model": {
+    "L0": 0.001,
+    "Mesh": "mesh.msh",
+    "Refinement": {
+      "UniformLevels": 0
+    }
+  },
+  "Problem": {
+    "Output": "postpro",
+    "Type": "Eigenmode",
+    "Verbose": 2
+  },
+  "Solver": {
+    "Device": "CPU",
+    "Eigenmode": {
+      "N": 8,
+      "Save": 0,
+      "Target": 22.008824,
+      "Tol": 1e-06
+    },
+    "Linear": {
+      "KSPType": "GMRES",
+      "MaxIts": 400,
+      "Tol": 1e-08,
+      "Type": "Default"
+    },
+    "Order": 2
+  }
+}
