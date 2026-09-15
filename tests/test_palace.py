@@ -669,9 +669,11 @@ def test_golden_harness_exits_2_and_writes_nothing_when_palace_is_unavailable(mo
         raise SolverUnavailable("palace", "no daemon in this test", "start one")
 
     monkeypatch.setattr(PalaceSolver, "preflight", unavailable)
-    code = script.main(["--results-root", str(tmp_path / "results")])
+    pointer = tmp_path / "record-pointer"
+    code = script.main(["--results-root", str(tmp_path / "results"), "--record-pointer", str(pointer)])
     assert code == 2
     assert not (tmp_path / "results").exists()
+    assert not pointer.exists()          # no record, so nothing to point at
     assert "no daemon in this test" in capsys.readouterr().err
 
 
@@ -707,9 +709,11 @@ def test_golden_harness_keeps_not_converged_and_skips_the_gates(monkeypatch, tmp
         return raw
 
     monkeypatch.setattr(PalaceSolver, "run", fake_run)
-    code = script.main(["--results-root", str(tmp_path / "results")])
+    pointer = tmp_path / "record-pointer"
+    code = script.main(["--results-root", str(tmp_path / "results"), "--record-pointer", str(pointer)])
     assert code == 3
     root = next((tmp_path / "results").glob("PALACE-GOLDEN-*"))
+    assert Path(pointer.read_text().strip()) == root   # the caller learns the directory, not a glob
     record = json.loads((root / "execution_record.json").read_text())
     assert record["outcome"] == "NOT_CONVERGED"
     assert record["validated"] is False

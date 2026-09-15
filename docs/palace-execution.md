@@ -159,9 +159,14 @@ verdict on the empty box describes the empty box.
 The same thing runs unattended in GitHub Actions
 (`.github/workflows/palace-golden.yml`): it builds the image with a layer
 cache, runs the golden candidate, prints the execution record, gate report
-and Palace log into the job log, uploads everything as an artifact, and
-commits `results/PALACE-GOLDEN-<UTC>/` back to the branch whatever the
-outcome. It is not part of default CI (spec §12.8).
+and Palace log into the job log, re-hashes the record against its manifest
+(a mismatch fails the job), uploads the record as an artifact, and commits
+`results/PALACE-GOLDEN-<UTC>/` back to the branch whatever the outcome. The
+directory it acts on is the one the harness reports through
+`--record-pointer`, never a glob over earlier records. It runs on manual
+dispatch on any branch, and on pushes to `main` or to `palace/**`
+development branches that touch the Palace path, committing each record to
+the branch it ran on. It is not part of default CI (spec §12.8).
 
 The run writes:
 

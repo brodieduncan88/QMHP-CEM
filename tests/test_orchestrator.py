@@ -489,3 +489,30 @@ def test_terminal_state_is_reachable_from_gates_evaluated():
         assert can_transition(
             CandidateState.GATES_EVALUATED, _terminal_state(status)
         ), status
+
+
+# --- cem verify-results (the CI manifest gate) ---------------------------------
+
+
+def test_verify_results_cli_fails_on_mismatch_and_leaves_the_tree_alone(tmp_path, capsys):
+    from orchestrator import cem
+
+    root = tmp_path / "PALACE-GOLDEN-TEST"
+    root.mkdir()
+    (root / "execution_record.json").write_text('{"outcome": "CONVERGED"}\n')
+    (root / "eig.csv").write_text("m, Re{f} (GHz)\n1, 9.6\n")
+    manifest.write(root)
+    assert cem.main(["verify-results", str(root)]) == 0
+    assert "manifest intact" in capsys.readouterr().out
+
+    (root / "eig.csv").write_text("m, Re{f} (GHz)\n1, 9.7\n")   # tampered after the manifest
+    before = sorted(p.name for p in root.iterdir())
+    assert cem.main(["verify-results", str(root)]) == 5
+    out = capsys.readouterr().out
+    assert "MISMATCH" in out and "eig.csv" in out
+    assert sorted(p.name for p in root.iterdir()) == before          # nothing removed or rewritten
+    assert (root / "eig.csv").read_text().endswith("9.7\n")
+
+    missing = tmp_path / "no-such-record"
+    missing.mkdir()
+    assert cem.main(["verify-results", str(root), str(missing)]) == 5
