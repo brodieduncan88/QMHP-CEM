@@ -1,0 +1,253 @@
+{
+  "analytic_check": {
+    "closed_form_fundamental_GHz": 9.635694545471965,
+    "expected_relative_deviation": 0.0001,
+    "modes": [
+      {
+        "closed_form_GHz": 9.635694545471965,
+        "index": 1,
+        "palace_GHz": 9.635896241,
+        "relative_deviation": 2.093212140361309e-05,
+        "within_tolerance": true
+      },
+      {
+        "closed_form_GHz": 15.235370800676153,
+        "index": 2,
+        "palace_GHz": 15.23545129,
+        "relative_deviation": 5.283056441538736e-06,
+        "within_tolerance": true
+      },
+      {
+        "closed_form_GHz": 15.235370800676153,
+        "index": 3,
+        "palace_GHz": 15.23570396,
+        "relative_deviation": 2.1867490342474858e-05,
+        "within_tolerance": true
+      },
+      {
+        "closed_form_GHz": 19.27138909094393,
+        "index": 4,
+        "palace_GHz": 19.27229929,
+        "relative_deviation": 4.7230588919842275e-05,
+        "within_tolerance": true
+      }
+    ],
+    "note": "All requested modes are TM_mn0 of the empty box: this comparison verifies the X/Y extent and unit scaling, not the cavity height.",
+    "palace_fundamental_GHz": 9.635896241,
+    "relative_deviation": 2.093212140361309e-05,
+    "tolerance": 0.02,
+    "within_expected": true,
+    "within_tolerance": true,
+    "worst_relative_deviation": 4.7230588919842275e-05
+  },
+  "batch_id": "PALACE-GOLDEN-20260915T115911Z",
+  "candidate_id": "QMHP-CEM-A-RF-000001",
+  "convergence": {
+    "metric": "eigenmode_backward_error_max",
+    "status": "CONVERGED",
+    "tolerance": 1e-06,
+    "value": 2.021497504e-11
+  },
+  "eigenmodes_GHz": [
+    9.635896241,
+    15.23545129,
+    15.23570396,
+    19.27229929
+  ],
+  "ended_utc": "2026-09-15T11:59:54.526773+00:00",
+  "environment": {
+    "architecture": "x86_64",
+    "dependency_lock_sha256": "107a13f00febe62d1e3dbee42ff0e65205746f04aa92fbb350d7aa03b003d498",
+    "dotnet_version": null,
+    "ended_utc": "2026-09-15T11:59:54.526773Z",
+    "git_commit": "ac8bc4a02d7843ec23b5334a086e0d6133370b2d",
+    "os": "Linux 6.17.0-1022-azure",
+    "picogk_version": "2.3.0",
+    "python_version": "3.11.16",
+    "shapekernel_revision": null,
+    "solver_identity": "qmhp-cem/palace:0.13.0@sha256:30c91c71d34ba29e49aa6ebcb67220800622251a0dd4cc8ea5dc7e8b229b945c",
+    "solver_version": "0.13.0+a61c8cbe0cac",
+    "started_utc": "2026-09-15T11:59:11.168462Z",
+    "uv_version": "(x86_64-unknown-linux-gnu)"
+  },
+  "expected_modes_GHz": [
+    9.635694545471965,
+    15.235370800676153,
+    15.235370800676153,
+    19.27138909094393
+  ],
+  "failure": null,
+  "gate_failure": null,
+  "gates": {
+    "gates": [
+      {
+        "evidence_class": "SOLVED",
+        "gate_id": "COLLISION",
+        "hardware_required": false,
+        "margin": 85.41316039466896,
+        "measured": 98.41316039466896,
+        "reason": "|omega24 - f_readout| = 98.4132 MHz >= 13.0 MHz.",
+        "severity": "HARD",
+        "status": "PASS",
+        "threshold": 13.0,
+        "units": "MHz"
+      },
+      {
+        "evidence_class": null,
+        "gate_id": "P6E2_FILTER",
+        "hardware_required": false,
+        "margin": null,
+        "measured": null,
+        "reason": "solver results carry no S21 sample at the dressed emission frequency 3.395056 GHz; cannot evaluate the stopband.",
+        "severity": "HARD",
+        "status": "INCOMPLETE",
+        "threshold": null,
+        "units": null
+      },
+      {
+        "evidence_class": "SOLVED",
+        "gate_id": "P4PRE_SPECTRAL",
+        "hardware_required": false,
+        "margin": null,
+        "measured": null,
+        "reason": "no simulated mode within 13.0 MHz of the readout root 4.301974 GHz. Readout-side pre-check only \u2014 full P4 has NOT passed (spec \u00a76.4).",
+        "severity": "SOFT",
+        "status": "PASS",
+        "threshold": 13.0,
+        "units": "MHz"
+      },
+      {
+        "evidence_class": null,
+        "gate_id": "TOLERANCE",
+        "hardware_required": false,
+        "margin": null,
+        "measured": null,
+        "reason": "no tolerance ensemble was evaluated; per-device evaluation requires the static and dressed models (spec \u00a75.1/\u00a75.2), which are not implemented in v0.1.",
+        "severity": "SOFT",
+        "status": "NOT-EVALUATED",
+        "threshold": null,
+        "units": null
+      },
+      {
+        "evidence_class": null,
+        "gate_id": "COUPLING_EXTRACTION",
+        "hardware_required": false,
+        "margin": null,
+        "measured": null,
+        "reason": "no coupling extraction was performed; both the eigenmode and black-box extractions (spec \u00a75.5) are unimplemented in v0.1.",
+        "severity": "HARD",
+        "status": "NOT-EVALUATED",
+        "threshold": null,
+        "units": null
+      },
+      {
+        "evidence_class": null,
+        "gate_id": "P6E6_JOINT",
+        "hardware_required": true,
+        "margin": null,
+        "measured": null,
+        "reason": "P6-E6 joint acceptance (measured) requires measured f >= f*, p_induced <= 1e-3, complete Pu <= 1e-2 and >= 95% logical-advantage confidence at equal wall-clock \u2014 all four conditions. QMHP-CEM v0.1 does not manufacture MEASURED values, so this gate cannot be closed computationally (spec \u00a72.3, \u00a76.7).",
+        "severity": "HARD",
+        "status": "HARDWARE-GATED",
+        "threshold": null,
+        "units": null
+      },
+      {
+        "evidence_class": null,
+        "gate_id": "P0D",
+        "hardware_required": true,
+        "margin": null,
+        "measured": null,
+        "reason": "Sink reset / process validation requires measured sink reset / process validation. QMHP-CEM v0.1 does not manufacture MEASURED values, so this gate cannot be closed computationally (spec \u00a72.3, \u00a76.7).",
+        "severity": "HARD",
+        "status": "HARDWARE-GATED",
+        "threshold": null,
+        "units": null
+      },
+      {
+        "evidence_class": null,
+        "gate_id": "P1",
+        "hardware_required": true,
+        "margin": null,
+        "measured": null,
+        "reason": "Direct unlocated bypass acceptance requires measured direct unlocated bypass acceptance. QMHP-CEM v0.1 does not manufacture MEASURED values, so this gate cannot be closed computationally (spec \u00a72.3, \u00a76.7).",
+        "severity": "HARD",
+        "status": "HARDWARE-GATED",
+        "threshold": null,
+        "units": null
+      },
+      {
+        "evidence_class": null,
+        "gate_id": "P3",
+        "hardware_required": true,
+        "margin": null,
+        "measured": null,
+        "reason": "Trajectory coherence / bias requires measured trajectory coherence / bias data. QMHP-CEM v0.1 does not manufacture MEASURED values, so this gate cannot be closed computationally (spec \u00a72.3, \u00a76.7).",
+        "severity": "HARD",
+        "status": "HARDWARE-GATED",
+        "threshold": null,
+        "units": null
+      },
+      {
+        "evidence_class": null,
+        "gate_id": "P5",
+        "hardware_required": true,
+        "margin": null,
+        "measured": null,
+        "reason": "Destination-resolved erasure conversion requires measured destination-resolved erasure conversion. QMHP-CEM v0.1 does not manufacture MEASURED values, so this gate cannot be closed computationally (spec \u00a72.3, \u00a76.7).",
+        "severity": "HARD",
+        "status": "HARDWARE-GATED",
+        "threshold": null,
+        "units": null
+      },
+      {
+        "evidence_class": null,
+        "gate_id": "P7",
+        "hardware_required": true,
+        "margin": null,
+        "measured": null,
+        "reason": "Unconditional logical advantage requires measured unconditional logical advantage. QMHP-CEM v0.1 does not manufacture MEASURED values, so this gate cannot be closed computationally (spec \u00a72.3, \u00a76.7).",
+        "severity": "HARD",
+        "status": "HARDWARE-GATED",
+        "threshold": null,
+        "units": null
+      }
+    ],
+    "master_revision": "v1.5.8f",
+    "overall_status": "INCOMPLETE",
+    "quantum_unavailable": [
+      "dressed_system.coupling_extraction: requires eigenmode and black-box extractions from an EM solver (spec \u00a75.5); not available from solver 'palace'.",
+      "tolerance: ensemble not requested for this run (--tolerance-samples 0)."
+    ]
+  },
+  "golden_sha256": "ff9025e3a90aeee06e0d0d7b9b4130b044c8392cc53b0a742c8315b1489d3be3",
+  "outcome": "CONVERGED",
+  "schema": "qmhp-cem.palace-golden-run/0.2.0",
+  "solver_provenance": {
+    "adapter_version": "0.2.0-adapter",
+    "image": "qmhp-cem/palace:0.13.0",
+    "image_id": "sha256:30c91c71d34ba29e49aa6ebcb67220800622251a0dd4cc8ea5dc7e8b229b945c",
+    "labels": {
+      "org.opencontainers.image.description": "Palace EM solver for QMHP-CEM, built from the pinned release tag",
+      "org.opencontainers.image.title": "qmhp-cem/palace",
+      "org.opencontainers.image.version": "24.04",
+      "org.qmhp.cem.apt-snapshot": "20260914T000000Z",
+      "org.qmhp.cem.palace-commit": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+      "org.qmhp.cem.palace-gslib": "ON",
+      "org.qmhp.cem.palace-version": "0.13.0",
+      "org.qmhp.cem.solver": "palace",
+      "org.qmhp.cem.spec": "QMHP-CEM v0.2 \u00a710.3"
+    },
+    "mpi_processes": 1,
+    "palace_commit": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+    "palace_version": "0.13.0",
+    "reference": "qmhp-cem/palace:0.13.0",
+    "repo_digest": null,
+    "rootless_runtime": false,
+    "runtime": "docker",
+    "solver": "palace"
+  },
+  "started_utc": "2026-09-15T11:59:11.168462+00:00",
+  "statement": "Empty Object 001 vacuum cavity as a closed PEC box. ENGINEERING-SEED dimensions. A computational result; not hardware validation, and not yet a mesh-converged result (spec \u00a715).",
+  "validated": true
+}
