@@ -1,0 +1,62 @@
+>> /usr/bin/mpirun -n 1 /opt/palace/bin/palace-x86_64.bin config.json
+
+_____________     _______
+_____   __   \____ __   /____ ____________
+____   /_/  /  __ ` /  /  __ ` /  ___/  _ \
+___   _____/  /_/  /  /  /_/  /  /__/  ___/
+  /__/     \___,__/__/\___,__/\_____\_____/
+
+Git changeset ID: v0.13.0
+Running with 1 MPI process
+Device configuration: cpu
+Memory configuration: host-std
+libCEED backend: /cpu/self/xsmm/blocked
+
+Finished partitioning mesh into 1 subdomain
+
+Characteristic length and time scales:
+ L₀ = 2.200e-02 m, t₀ = 7.338e-02 ns
+
+Mesh curvature order: 1
+Mesh bounding box:
+ (Xmin, Ymin, Zmin) = (-1.100e-02, -1.100e-02, +0.000e+00) m
+ (Xmax, Ymax, Zmax) = (+1.100e-02, +1.100e-02, +1.500e-03) m
+
+Parallel Mesh Stats:
+
+                minimum     average     maximum       total
+ vertices           443         443         443         443
+ edges             2083        2083        2083        2083
+ faces             2841        2841        2841        2841
+ elements          1200        1200        1200        1200
+ neighbors            0           0           0
+
+            minimum     maximum
+ h       0.00242493   0.0943724
+ kappa      1.23107       93919
+
+Configuring Dirichlet PEC BC at attributes:
+ 2
+
+Assembling system matrices, number of global unknowns:
+ H1 (p = 2): 2526, ND (p = 2): 9848, RT (p = 2): 12123
+ Operator assembly level: Partial
+ Mesh geometries:
+  Tetrahedron: P = 20, Q = 11 (quadrature order = 4)
+
+--- stderr ---
+
+
+Verification failed: (iodata.domains.postpro.probe.empty()) is false:
+ --> InterpolationOperator class requires MFEM_USE_GSLIB!
+ ... in function: palace::InterpolationOperator::InterpolationOperator(const palace::IoData&, mfem::ParMesh&)
+ ... in file: /opt/palace-src/palace/fem/interpolator.cpp:64
+
+--------------------------------------------------------------------------
+MPI_ABORT was invoked on rank 0 in communicator MPI_COMM_WORLD
+with errorcode 1.
+
+NOTE: invoking MPI_ABORT causes Open MPI to kill all MPI processes.
+You may or may not see output from other processes, depending on
+exactly when Open MPI kills them.
+--------------------------------------------------------------------------

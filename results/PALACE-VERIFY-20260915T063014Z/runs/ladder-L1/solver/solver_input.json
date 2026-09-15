@@ -1,0 +1,253 @@
+{
+  "adapter_version": "0.2.0-adapter",
+  "analytic_reference": [
+    {
+      "frequency_GHz": 9.635694545471965,
+      "label": "analytic_110",
+      "m": 1,
+      "multiplicity": 1,
+      "n": 1,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 15.235370800676153,
+      "label": "analytic_120",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 2,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 19.27138909094393,
+      "label": "analytic_220",
+      "m": 2,
+      "multiplicity": 1,
+      "n": 2,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 21.546068014099255,
+      "label": "analytic_130",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 3,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 24.56629725719056,
+      "label": "analytic_230",
+      "m": 2,
+      "multiplicity": 2,
+      "n": 3,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 28.092635684035145,
+      "label": "analytic_140",
+      "m": 1,
+      "multiplicity": 2,
+      "n": 4,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 28.907083636415898,
+      "label": "analytic_330",
+      "m": 3,
+      "multiplicity": 1,
+      "n": 3,
+      "p": 0
+    },
+    {
+      "frequency_GHz": 30.470741601352305,
+      "label": "analytic_240",
+      "m": 2,
+      "multiplicity": 2,
+      "n": 4,
+      "p": 0
+    }
+  ],
+  "candidate_sha256": "472c2e612261e97736d961b778ceaaa2a077f7255a0c2154f7e77a2829fb1f16",
+  "config": {
+    "Boundaries": {
+      "PEC": {
+        "Attributes": [
+          2
+        ]
+      }
+    },
+    "Domains": {
+      "Materials": [
+        {
+          "Attributes": [
+            1
+          ],
+          "LossTan": 0.0,
+          "Permeability": 1.0,
+          "Permittivity": 1.0
+        }
+      ],
+      "Postprocessing": {
+        "Probe": [
+          {
+            "Center": [
+              -4.18,
+              -5.9399999999999995,
+              0.675
+            ],
+            "Index": 1
+          },
+          {
+            "Center": [
+              3.74,
+              -1.9800000000000004,
+              0.8250000000000001
+            ],
+            "Index": 2
+          },
+          {
+            "Center": [
+              -6.82,
+              4.619999999999999,
+              0.75
+            ],
+            "Index": 3
+          }
+        ]
+      }
+    },
+    "Model": {
+      "L0": 0.001,
+      "Mesh": "mesh.msh",
+      "Refinement": {
+        "UniformLevels": 0
+      }
+    },
+    "Problem": {
+      "Output": "postpro",
+      "Type": "Eigenmode",
+      "Verbose": 2
+    },
+    "Solver": {
+      "Device": "CPU",
+      "Eigenmode": {
+        "N": 4,
+        "Save": 0,
+        "Target": 8.19034,
+        "Tol": 1e-06
+      },
+      "Linear": {
+        "KSPType": "GMRES",
+        "MaxIts": 400,
+        "Tol": 1e-08,
+        "Type": "Default"
+      },
+      "Order": 2
+    }
+  },
+  "config_file": "config.json",
+  "config_sha256": "0f63c27c5cb57de81e74c37dddd83c377d2ca3c0c1d4717409cc9defec9843ba",
+  "effective": {
+    "characteristic_length_mm": 1.8333333333333333,
+    "eigenmodes_requested": 4,
+    "probes_mm": [
+      [
+        -4.18,
+        -5.9399999999999995,
+        0.675
+      ],
+      [
+        3.74,
+        -1.9800000000000004,
+        0.8250000000000001
+      ],
+      [
+        -6.82,
+        4.619999999999999,
+        0.75
+      ]
+    ],
+    "target_GHz": 8.19034
+  },
+  "expected_solver_modes_GHz": [
+    9.635694545471965,
+    15.235370800676153,
+    15.235370800676153,
+    19.27138909094393
+  ],
+  "geometry_note": "No PicoGK geometry was generated; the solver domain is the empty vacuum cavity derived from the candidate parameters.",
+  "image": "qmhp-cem/palace:0.13.0",
+  "mesh": {
+    "boundary_triangle_count": 882,
+    "characteristic_length_mm": 1.8333333333333333,
+    "file": "mesh.msh",
+    "format": "msh2.2-ascii",
+    "gmsh_version": "4.15.2",
+    "node_count": 443,
+    "physical_groups": {
+      "pec_surfaces": 2,
+      "vacuum_volume": 1
+    },
+    "sha256": "7602c8c3815d1d76f670789328729389e2b83c978cce23e5557c9cfc48b2e3db",
+    "tetrahedron_count": 1200
+  },
+  "mpi_processes": 1,
+  "output_dir": "postpro",
+  "overrides": {
+    "domain": {
+      "mesh_length_mm": 1.8333333333333333,
+      "x_max_mm": 11.0,
+      "x_min_mm": -11.0,
+      "y_max_mm": 11.0,
+      "y_min_mm": -11.0,
+      "z_max_mm": 1.5,
+      "z_min_mm": 0.0
+    },
+    "eigenmodes": 4,
+    "label": "ladder-L1",
+    "mesh_length_mm": 1.8333333333333333,
+    "probes_mm": [
+      [
+        -4.18,
+        -5.9399999999999995,
+        0.675
+      ],
+      [
+        3.74,
+        -1.9800000000000004,
+        0.8250000000000001
+      ],
+      [
+        -6.82,
+        4.619999999999999,
+        0.75
+      ]
+    ]
+  },
+  "runtime": "docker",
+  "solver_domain_mm": {
+    "mesh_length_mm": 1.8333333333333333,
+    "x_max_mm": 11.0,
+    "x_min_mm": -11.0,
+    "y_max_mm": 11.0,
+    "y_min_mm": -11.0,
+    "z_max_mm": 1.5,
+    "z_min_mm": 0.0
+  },
+  "solver_domain_size_mm": [
+    22.0,
+    22.0,
+    1.5
+  ],
+  "solver_rules": {
+    "characteristic_mesh_length_rule": "min(cavity_width, cavity_height) / 12",
+    "domain": "empty vacuum cavity of Object 001 as a closed PEC box; chip, recess step, launches and lid are NOT modelled in this milestone. All requested modes are TM_mn0: independent of height_above_chip_mm, so the closed-form check verifies the X/Y extent and unit scaling, not the height.",
+    "eigenmode_backward_error_max_tolerance": 1e-06,
+    "eigenmode_target_fraction_of_analytic_fundamental": 0.85,
+    "eigenmodes_requested": 4,
+    "eigenvalue_tolerance": 1e-06,
+    "expected_relative_deviation": 0.0001,
+    "finite_element_order": 2,
+    "linear_solver_max_iterations": 400,
+    "linear_solver_tolerance": 1e-08
+  }
+}
