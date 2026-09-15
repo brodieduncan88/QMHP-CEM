@@ -1,0 +1,31 @@
+_____________     _______
+_____   __   \____ __   /____ ____________
+____   /_/  /  __ ` /  /  __ ` /  ___/ _ \
+___   _____/  /_/  /  /  /_/  /  /__/  __/
+  /__/     \___,__/__/\___,__/\____/\____/
+
+Git changeset ID: v0.13.0
+Running with 1 MPI process
+Device configuration: cpu
+Memory configuration: host-std
+libCEED backend: /cpu/self/xsmm/blocked
+
+Added 1 unassigned boundary attribute(s) to the mesh
+Reading mesh from file "mesh.msh"...
+Assembling system matrices, number of global unknowns: 12345
+
+Configuring SLEPc eigenvalue solver:
+ Scaling γ = 1.000e+00, δ = 1.000e+00
+ Found 4 converged eigenvalues (of 4 requested)
+
+         m       Re{ω}/2π (GHz)       Im{ω}/2π (GHz)                    Q          Bkwd. Error           Abs. Error
+         1        +9.641234567e+00      +0.000000000e+00                  inf     +3.214159265e-09     +1.234567890e-07
+         2        +1.523540000e+01      +0.000000000e+00                  inf     +4.100000000e-09     +2.100000000e-07
+         3        +1.523540000e+01      +0.000000000e+00                  inf     +6.500000000e-09     +3.300000000e-07
+         4        +1.927140000e+01      +0.000000000e+00                  inf     +8.000000000e-08     +9.100000000e-07
+
+Writing postprocessing results to "postpro"...
+
+Elapsed Time Report (s)   Local   Max
+  Initialization           0.12  0.12
+  Total                    4.20  4.20

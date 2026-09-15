@@ -46,7 +46,8 @@ physics and geometry generation are **not**.
 | `models/` physics (§5) | **Implemented** and regression-tested against the frozen pins |
 | `geometry/chip_planar/` gdsfactory cells (§7.1) | **Not implemented** |
 | `geometry/package_picogk/` Object 001 (§7.2) | **Not implemented** — C# project skeleton only |
-| `solvers/palace`, `solvers/openems` | Wired; container invocation not implemented |
+| `solvers/palace` | **v0.2 execution path implemented and executed**: mesh, config, container run, parse, provenance. Genuine Palace v0.13.0 runs recorded under `results/PALACE-GOLDEN-*/` (empty Object 001 box, four modes within 5e-5 of closed form, frequencies identical to every printed digit across four runs). See [`docs/palace-execution.md`](docs/palace-execution.md) |
+| `solvers/openems` | Wired; container invocation not implemented |
 | `reference/` vendored v1.5.8f release bundle | Vendored, 27/29 hash-verified |
 
 The physics reproduces the frozen dressed root **exactly** (4.301974466 GHz at
@@ -59,6 +60,22 @@ A mock sweep still tops out at `INCOMPLETE`, but now for a precise reason:
 black-box extraction from a real EM solver, which the mock `TEST_FIXTURE`
 cannot supply. Every other computationally evaluable gate adjudicates.
 Reaching `FEASIBLE_CANDIDATE_FOUND` requires Palace or openEMS.
+
+**v0.2 (in progress):** the Palace execution path is implemented and has
+been executed, for real. `PalaceSolver` meshes the empty Object 001
+vacuum cavity, runs the pinned container, parses the eigenmode output and
+records solver version, image identity, command line, input/output hashes
+and the solver's own convergence figure. The first run is the golden
+candidate in `solvers/palace/golden/`, executed by
+`scripts/palace_golden_run.py` inside GitHub Actions
+(`.github/workflows/palace-golden.yml`) and committed as
+`results/PALACE-GOLDEN-20260915T014639Z/`, then repeated as further
+`results/PALACE-GOLDEN-*/` records with the same frequencies to every
+printed digit: Palace 0.13.0, four converged modes, fundamental
+9.635896 GHz against the closed-form 9.635695 GHz. The
+gates on that result are `INCOMPLETE`, as they must be for an eigenmode-only
+solve of an empty box. See
+[`docs/palace-execution.md`](docs/palace-execution.md).
 
 ---
 

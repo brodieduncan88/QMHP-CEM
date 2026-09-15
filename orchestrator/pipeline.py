@@ -43,7 +43,7 @@ from models.dressed_system import RootNotBracketed
 from orchestrator import environment, manifest
 from orchestrator.lifecycle import CandidateLifecycle
 from orchestrator.results_store import DEFAULT_RESULTS_ROOT, BatchStore
-from solvers import RunContext, SolverAdapter, SolverUnavailable, get_adapter
+from solvers import RunContext, SolverAdapter, get_adapter
 
 
 @dataclass
@@ -246,8 +246,13 @@ def run_candidate(
         solver_results = adapter.validate_convergence(adapter.parse(raw))
         lifecycle.to(CandidateState.SOLVED)
         store.write_model(solver_dir / "solver_results.json", solver_results)
-    except (SolverUnavailable, RuntimeError) as exc:
-        notes.append(f"solver failed: {exc}")
+    except Exception as exc:  # noqa: BLE001 - any solver failure is recorded, never hidden
+        # SolverUnavailable (spec §10.5), a run that did not complete, an
+        # output that could not be parsed, a convergence failure: every one
+        # of them ends this candidate as INCOMPLETE. The cause is carried on
+        # the outcome and written into the batch report's notes by
+        # _batch_notes. Nothing here retries with another solver.
+        notes.append(f"solver failed ({type(exc).__name__}): {exc}")
         lifecycle.to(CandidateState.INCOMPLETE)
         return CandidateOutcome(
             candidate=candidate,
@@ -361,8 +366,8 @@ def run_sweep(
             "environment": environment.record(
                 started_utc=started,
                 solver_name=name,
-                solver_version=adapter.version,
-                solver_identity=f"{adapter.name}@{adapter.version}",
+                solver_version=solver_version(adapter),
+                solver_identity=solver_identity(adapter),
                 ended_utc=datetime.now(timezone.utc),
             ).model_dump(mode="json"),
             "rng_seed": sweep.rng_seed,
@@ -404,6 +409,25 @@ def _terminal_state(status: GateStatus) -> CandidateState:
         GateStatus.HARDWARE_GATED: CandidateState.HARDWARE_GATED,
     }
     return direct.get(status, CandidateState.INCOMPLETE)
+
+
+def solver_version(adapter: SolverAdapter) -> str:
+    """The version of the solver that produced the numbers (spec §13.3).
+
+    For a container-backed adapter that is the solver's own version as read
+    from the image, not the adapter's; the adapter version is recorded in
+    every SolverResults regardless.
+    """
+    provenance = adapter.provenance() if hasattr(adapter, "provenance") else {}
+    return str(provenance.get("palace_version") or provenance.get("solver_version") or adapter.version)
+
+
+def solver_identity(adapter: SolverAdapter) -> str:
+    """Solver/container identity for the batch manifest (spec §13.3)."""
+    provenance = adapter.provenance() if hasattr(adapter, "provenance") else {}
+    if provenance.get("image_id"):
+        return f"{provenance.get('image', adapter.name)}@{provenance['image_id']}"
+    return f"{adapter.name}@{adapter.version}"
 
 
 def _count(outcomes: list[CandidateOutcome]) -> dict[GateStatus, int]:
@@ -462,4 +486,10 @@ def _batch_notes(outcomes: list[CandidateOutcome], adapter: SolverAdapter) -> li
         "A computational PASS is not hardware validation. Hardware-dependent "
         "gates remain HARDWARE-GATED until measured evidence is supplied."
     )
+    # A candidate that ended INCOMPLETE because its solver run failed has no
+    # solver_results.json to explain itself; the cause goes on the record here.
+    for o in outcomes:
+        for note in o.notes:
+            if note.startswith("solver failed"):
+                notes.append(f"{o.candidate.candidate_id}: {note}")
     return notes

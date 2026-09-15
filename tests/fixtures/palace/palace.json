@@ -1,0 +1,5 @@
+{
+  "GitTag": "v0.13.0",
+  "Problem": {"MPISize": 1, "OpenMPThreads": 1, "MeshElements": 1881, "DegreesOfFreedom": 12345},
+  "ElapsedTime": {"Durations": {"Total": 4.2}, "Counts": {}}
+}

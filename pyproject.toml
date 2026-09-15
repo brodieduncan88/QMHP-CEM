@@ -20,6 +20,10 @@ dependencies = [
 # kept optional so that default CI (spec §12.8) stays light. Geometry tests
 # skip cleanly when it is absent.
 planar = ["gdsfactory>=8.0"]
+# gmsh meshes the Palace solver domain (spec §10.3). Optional so default CI
+# stays light; the Palace tests skip cleanly without it. On Linux the gmsh
+# wheel also needs libGLU (apt-get install libglu1-mesa), even headless.
+palace = ["gmsh>=4.12"]
 
 [project.scripts]
 cem = "orchestrator.cem:main"

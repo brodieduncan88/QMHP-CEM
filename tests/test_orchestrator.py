@@ -246,12 +246,45 @@ def test_lifecycle_allows_early_termination_as_incomplete():
 # --- solver substitution (spec §10.5, §12.8) --------------------------------
 
 
-def test_unavailable_solver_fails_and_never_falls_back(object001_sweep, results_root):
-    with pytest.raises(SolverUnavailable):
+def test_unavailable_solver_fails_and_never_falls_back(monkeypatch, object001_sweep, results_root):
+    """Deterministic regardless of whether this machine has the Palace image."""
+    from solvers.palace.adapter import PalaceSolver
+
+    def unavailable(self):
+        raise SolverUnavailable("palace", "no container runtime in this test", "install one")
+
+    monkeypatch.setattr(PalaceSolver, "preflight", unavailable)
+    with pytest.raises(SolverUnavailable, match="will not silently substitute"):
         pipeline.run_sweep(
             object001_sweep, solver_name="palace", results_root=results_root
         )
     assert not results_root.exists() or not list(results_root.glob("BATCH-*"))
+
+
+def test_solver_failure_mid_sweep_ends_the_candidate_incomplete(monkeypatch, object001_sweep, results_root):
+    """A Palace run that dies after preflight is recorded, never replaced."""
+    from solvers.adapter import PreparedInput
+    from solvers.palace.adapter import PalaceRunFailed, PalaceSolver
+
+    def prepare(self, candidate, geometry, run_context):
+        return PreparedInput(candidate.candidate_id, run_context.run_id, run_context.work_dir, {}, [])
+
+    def run(self, prepared):
+        raise PalaceRunFailed("container exited with code 137")
+
+    monkeypatch.setattr(PalaceSolver, "preflight", lambda self: None)
+    monkeypatch.setattr(PalaceSolver, "prepare", prepare)
+    monkeypatch.setattr(PalaceSolver, "run", run)
+    report, outcomes = pipeline.run_sweep(
+        object001_sweep, solver_name="palace", results_root=results_root
+    )
+    assert report.solver == "palace"
+    assert {o.state for o in outcomes} == {CandidateState.INCOMPLETE}
+    assert all(any("PalaceRunFailed" in n and "code 137" in n for n in o.notes) for o in outcomes)
+    assert all(o.solver_results is None for o in outcomes)
+    # The cause is on the batch record too, not only on the in-memory outcome.
+    for o in outcomes:
+        assert any(n.startswith(f"{o.candidate.candidate_id}: solver failed (PalaceRunFailed)") for n in report.notes)
 
 
 def test_unknown_solver_is_rejected():
@@ -259,10 +292,24 @@ def test_unknown_solver_is_rejected():
         get_adapter("hfss")
 
 
-@pytest.mark.parametrize("name", ["palace", "openems"])
-def test_container_solvers_declare_themselves_unavailable(name):
+def test_openems_declares_itself_unavailable():
     with pytest.raises(SolverUnavailable):
-        get_adapter(name).preflight()
+        get_adapter("openems").preflight()
+
+
+def test_palace_preflight_raises_or_finds_a_real_image():
+    """v0.2: Palace runs where its container exists and fails clearly elsewhere.
+
+    Either outcome is correct; what is never correct is a silent substitute.
+    """
+    adapter = get_adapter("palace")
+    try:
+        adapter.preflight()
+    except SolverUnavailable as exc:
+        assert "will not silently substitute" in str(exc)
+    else:
+        identity = adapter.provenance()
+        assert identity.get("image_id", "").startswith("sha256:")
 
 
 def test_batch_report_records_synthetic_provenance(object001_sweep, results_root):
