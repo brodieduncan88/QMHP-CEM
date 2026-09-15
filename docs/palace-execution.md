@@ -5,19 +5,23 @@ what the path does, what it records, how to run the proof, and what it does
 **not** yet claim.
 
 **Status first: genuine Palace runs have been executed and are committed.**
-Three records so far: `results/PALACE-GOLDEN-20260915T014639Z/` (GitHub
+Four records so far: `results/PALACE-GOLDEN-20260915T014639Z/` (GitHub
 Actions run 34918498363 on commit b79a170), `…T015804Z/` (run 34919265099 on
-25089ae) and `…T025408Z/` (run 34922854864 on f6754b0), all Palace v0.13.0
-at commit a61c8cbe, image ID `sha256:cc87ec6b…`, one MPI process, about
-40 s inside Palace. All four requested modes of the empty Object 001 box
+25089ae), `…T025408Z/` (run 34922854864 on f6754b0) and `…T030418Z/` (run
+34923432635 on e256d05), all Palace v0.13.0 at commit a61c8cbe, one MPI
+process. The first three ran image `sha256:cc87ec6b…`; the fourth ran
+`sha256:484073ba…`, the same Palace binary with the BLAS and OpenMP thread
+counts pinned to one. All four requested modes of the empty Object 001 box
 converged (max backward error 2.0e-11 against 1e-6) and agree with the
-closed form to within 4.7e-5 relative. Across the three records the four
-frequencies are identical to every printed digit; the residual quantities
-(Im{f}, Q, backward and absolute errors, error indicators) agree to about
-1e-6 relative, the first two records being byte-identical in every solver
-output and the third differing from them in those last digits. Any later
-change to the Palace path re-runs the workflow and appends another record.
-The last section has the numbers; the records have everything else.
+closed form to within 4.7e-5 relative. Across the four records the
+frequencies are identical to every printed digit and the gate verdicts are
+identical. Records one, two and four are byte-identical in every solver
+output (`eig.csv`, `domain-E.csv`); record three, which took 25.8 s inside
+Palace against about 40 s for the others and so ran with more thread
+parallelism, differs from them in the last digits of the residual
+quantities only. Any later change to the Palace path re-runs the workflow
+and appends another record. The last section has the numbers; the records
+have everything else.
 
 ## What is solved
 
@@ -250,13 +254,21 @@ its `eig.csv` is not byte-identical to the first two. The GMRES residual
 norms in its log differ in the last printed digit from the first run's,
 and so do the residual quantities derived from them: maximum backward error
 2.021494e-11 against 2.021497e-11, Q and Im{f} at the 1e-5 to 1e-6 relative
-level, error indicators likewise. That is run-to-run floating-point
-variation in the a-posteriori quantities, not in the eigenvalues, and the
-pthread OpenBLAS in the runtime image is the obvious source; the image now
-pins `OPENBLAS_NUM_THREADS=1` and `OMP_NUM_THREADS=1`, and the records that
-follow show whether the residual digits then reproduce. "Repeatable" in
-this document means the frequencies and verdicts; it does not claim
-bit-identical residuals.
+level, error indicators likewise. It also took 25.8 s inside Palace against
+40.4 s and 40.2 s for the first two: the pthread OpenBLAS in the runtime
+image, never pinned, evidently ran with more threads that time, and a
+threaded reduction order is exactly what moves last digits.
+
+`results/PALACE-GOLDEN-20260915T030418Z/` (run 34923432635 on e256d05,
+commit fdd3a35) ran the image rebuilt with `OPENBLAS_NUM_THREADS=1` and
+`OMP_NUM_THREADS=1` (image ID `sha256:484073ba…`; the Palace binary comes
+from the same cached builder layers). Its `eig.csv` and `domain-E.csv` are
+byte-identical to records one and two, maximum backward error
+2.021497504e-11, 40.9 s inside Palace. One pinned run is one data point,
+not a proof that the pin removes every source of variation; "repeatable"
+in this document means the frequencies and the verdicts, with the
+residual digits reproducing in three of four records and the odd one out
+explained.
 
 The two PASS verdicts describe the empty box, which has no mode below 9.6 GHz
 and therefore nothing near the 4.30 GHz readout root: they say the pipeline

@@ -46,7 +46,7 @@ physics and geometry generation are **not**.
 | `models/` physics (§5) | **Implemented** and regression-tested against the frozen pins |
 | `geometry/chip_planar/` gdsfactory cells (§7.1) | **Not implemented** |
 | `geometry/package_picogk/` Object 001 (§7.2) | **Not implemented** — C# project skeleton only |
-| `solvers/palace` | **v0.2 execution path implemented and executed**: mesh, config, container run, parse, provenance. Genuine Palace v0.13.0 runs recorded under `results/PALACE-GOLDEN-*/` (empty Object 001 box, four modes within 5e-5 of closed form, frequencies identical to every printed digit across runs). See [`docs/palace-execution.md`](docs/palace-execution.md) |
+| `solvers/palace` | **v0.2 execution path implemented and executed**: mesh, config, container run, parse, provenance. Genuine Palace v0.13.0 runs recorded under `results/PALACE-GOLDEN-*/` (empty Object 001 box, four modes within 5e-5 of closed form, frequencies identical to every printed digit across four runs). See [`docs/palace-execution.md`](docs/palace-execution.md) |
 | `solvers/openems` | Wired; container invocation not implemented |
 | `reference/` vendored v1.5.8f release bundle | Vendored, 27/29 hash-verified |
 
