@@ -1,0 +1,416 @@
+{
+  "admission_disposition": "READY-FOR-REVIEW: declaration valid, sources verified, geometry consistent",
+  "batch_id": "COUPLED-CHECKPOINT-A-20260915T225104Z",
+  "clearance_report": [],
+  "declaration": {
+    "declaration_id": "QMHP-CEM-A-CC-000001",
+    "path": "/home/user/QMHP-CEM/config/coupled/v2a_five_node_candidate.json",
+    "schema": "qmhp-cem.coupled-candidate/0.2.0",
+    "sha256": "c0f68ca183a9034e1095d796f5f5d138a500852202559a1f91803a6f73e46472",
+    "status": "CHECKPOINT-A-PROPOSED; not approved for execution; every ENGINEERING-SEED below is unapproved"
+  },
+  "disposition": "READY-FOR-REVIEW (admission); EXECUTION BLOCKED: ladder exceeds the DOF budget",
+  "disposition_input": {
+    "all_levels_within_budget_order1": false,
+    "all_levels_within_budget_order2": false,
+    "dof_budget": 250000,
+    "levels": {
+      "L1": {
+        "dof_estimate_order1": 102280,
+        "dof_estimate_order2": 698911,
+        "status": "OK",
+        "within_budget_order1": true,
+        "within_budget_order2": false
+      },
+      "L2": {
+        "dof_estimate_order1": 231116,
+        "dof_estimate_order2": 1579295,
+        "status": "OK",
+        "within_budget_order1": true,
+        "within_budget_order2": false
+      },
+      "L3": {
+        "dof_estimate_order1": 447709,
+        "dof_estimate_order2": 3059346,
+        "status": "OK",
+        "within_budget_order1": false,
+        "within_budget_order2": false
+      }
+    },
+    "rule": "order 2 preferred; order 1 only if the finest level exceeds the budget with order 2 (numerical-plan.md \u00a73)"
+  },
+  "dof_budget": 250000,
+  "dry_run": {
+    "L1": {
+      "report": {
+        "aborted_reason": null,
+        "dof_budget": 250000,
+        "dof_estimate_order1": 102280,
+        "dof_estimate_order2": 698911,
+        "dof_order1_note": "order-1 Nedelec DOF = number of edges; 1.2 edges per tetrahedron is an estimate for a large unstructured tetrahedral mesh, not a measured value",
+        "dof_per_tetrahedron_order1": 1.2,
+        "dof_per_tetrahedron_order2": 8.2,
+        "format": "msh2.2-ascii",
+        "gmsh_version": "4.15.2",
+        "h0_gap_mm": 0.01,
+        "h_far_mm": 0.3333333333333333,
+        "h_gap_mm": 0.01,
+        "level": 1,
+        "max_surface_elements": 400000,
+        "mesh_file": "coupled_chip_cell_L1.msh",
+        "mesh_path": "/home/user/QMHP-CEM/results/COUPLED-CHECKPOINT-A-20260915T225104Z/dry_run/L1/coupled_chip_cell_L1.msh",
+        "min_gap_elements": 2.0,
+        "model": "coupled_chip_cell",
+        "nodes": 15703,
+        "physical_groups": {
+          "outer_pec": 2,
+          "port_F1": 10,
+          "port_R1_a": 11,
+          "port_R1_b": 12,
+          "sheet_pec": 4,
+          "substrate": 3,
+          "vacuum": 1
+        },
+        "scale": 1.0,
+        "sha256": "48b0de26765de5411da940e2d5e7340fba6a7ac13a6e3d82b51a9be70965679b",
+        "surface_elements_total": 20996,
+        "tetrahedra": 85233,
+        "tetrahedra_by_tag": {
+          "substrate": 41531,
+          "vacuum": 43702
+        },
+        "triangles_by_tag": {
+          "outer_pec": 1466,
+          "port_F1": 22,
+          "port_R1_a": 18,
+          "port_R1_b": 18,
+          "sheet_pec": 11399
+        },
+        "wall_clock_s": 5.999656406999975,
+        "within_budget_order1": true,
+        "within_budget_order2": false
+      },
+      "status": "OK"
+    },
+    "L2": {
+      "report": {
+        "aborted_reason": null,
+        "dof_budget": 250000,
+        "dof_estimate_order1": 231116,
+        "dof_estimate_order2": 1579295,
+        "dof_order1_note": "order-1 Nedelec DOF = number of edges; 1.2 edges per tetrahedron is an estimate for a large unstructured tetrahedral mesh, not a measured value",
+        "dof_per_tetrahedron_order1": 1.2,
+        "dof_per_tetrahedron_order2": 8.2,
+        "format": "msh2.2-ascii",
+        "gmsh_version": "4.15.2",
+        "h0_gap_mm": 0.01,
+        "h_far_mm": 0.2222222222222222,
+        "h_gap_mm": 0.006666666666666666,
+        "level": 2,
+        "max_surface_elements": 400000,
+        "mesh_file": "coupled_chip_cell_L2.msh",
+        "mesh_path": "/home/user/QMHP-CEM/results/COUPLED-CHECKPOINT-A-20260915T225104Z/dry_run/L2/coupled_chip_cell_L2.msh",
+        "min_gap_elements": 3.0000000000000004,
+        "model": "coupled_chip_cell",
+        "nodes": 34456,
+        "physical_groups": {
+          "outer_pec": 2,
+          "port_F1": 10,
+          "port_R1_a": 11,
+          "port_R1_b": 12,
+          "sheet_pec": 4,
+          "substrate": 3,
+          "vacuum": 1
+        },
+        "scale": 0.6666666666666666,
+        "sha256": "5b20a06390f4fbbc3a6d21f8c74a40fe3d27faf189b5e301c65e9da7e12d5750",
+        "surface_elements_total": 40456,
+        "tetrahedra": 192597,
+        "tetrahedra_by_tag": {
+          "substrate": 92840,
+          "vacuum": 99757
+        },
+        "triangles_by_tag": {
+          "outer_pec": 3040,
+          "port_F1": 40,
+          "port_R1_a": 34,
+          "port_R1_b": 34,
+          "sheet_pec": 21509
+        },
+        "wall_clock_s": 11.05843289500001,
+        "within_budget_order1": true,
+        "within_budget_order2": false
+      },
+      "status": "OK"
+    },
+    "L3": {
+      "report": {
+        "aborted_reason": null,
+        "dof_budget": 250000,
+        "dof_estimate_order1": 447709,
+        "dof_estimate_order2": 3059346,
+        "dof_order1_note": "order-1 Nedelec DOF = number of edges; 1.2 edges per tetrahedron is an estimate for a large unstructured tetrahedral mesh, not a measured value",
+        "dof_per_tetrahedron_order1": 1.2,
+        "dof_per_tetrahedron_order2": 8.2,
+        "format": "msh2.2-ascii",
+        "gmsh_version": "4.15.2",
+        "h0_gap_mm": 0.01,
+        "h_far_mm": 0.16666666666666666,
+        "h_gap_mm": 0.005,
+        "level": 3,
+        "max_surface_elements": 400000,
+        "mesh_file": "coupled_chip_cell_L3.msh",
+        "mesh_path": "/home/user/QMHP-CEM/results/COUPLED-CHECKPOINT-A-20260915T225104Z/dry_run/L3/coupled_chip_cell_L3.msh",
+        "min_gap_elements": 4.0,
+        "model": "coupled_chip_cell",
+        "nodes": 64886,
+        "physical_groups": {
+          "outer_pec": 2,
+          "port_F1": 10,
+          "port_R1_a": 11,
+          "port_R1_b": 12,
+          "sheet_pec": 4,
+          "substrate": 3,
+          "vacuum": 1
+        },
+        "scale": 0.5,
+        "sha256": "0d741c469805321ad07ea99ac97fac8984d7c91098f56867da097590c86846b3",
+        "surface_elements_total": 65470,
+        "tetrahedra": 373091,
+        "tetrahedra_by_tag": {
+          "substrate": 178217,
+          "vacuum": 194874
+        },
+        "triangles_by_tag": {
+          "outer_pec": 5332,
+          "port_F1": 68,
+          "port_R1_a": 54,
+          "port_R1_b": 54,
+          "sheet_pec": 34688
+        },
+        "wall_clock_s": 19.804499127999975,
+        "within_budget_order1": false,
+        "within_budget_order2": false
+      },
+      "status": "OK"
+    }
+  },
+  "dry_run_mode": "gmsh",
+  "ended_utc": "2026-09-15T22:51:54.315620+00:00",
+  "execution_disposition": "BLOCKED: ladder exceeds the DOF budget",
+  "levels": [
+    1,
+    2,
+    3
+  ],
+  "preview": {
+    "json": "preview.json",
+    "json_sha256": "9656e97e7288273878213c662b29a1e72435ab01d25f9e471948e2c4adbfbc43",
+    "svg": "preview.svg",
+    "svg_sha256": "ce5f5ce2b9b79014ba3e9e4ac98c9aa02fce6fa398d89161aa7169e341de2b8e"
+  },
+  "register": {
+    "mismatch_text": [],
+    "mismatches": [],
+    "ok": true,
+    "path": "/home/user/QMHP-CEM/config/coupled/source_register.json",
+    "sha256": "d1e45b5da7d736d848d8d1fe60dbe8c2d52e0e78b9274d66781a81714706fcd6"
+  },
+  "schema": "qmhp-cem.coupled-checkpoint-a/0.2.0",
+  "sensitivity": {
+    "dof_budget": 250000,
+    "statement": "Unadopted measurements. Each row is the declared candidate with one seed changed, meshed at level 1 only, to show what drives the mesh cost. No variant is part of the declaration; adopting one is a human decision that would change config/coupled/v2a_five_node_candidate.json and its record.",
+    "variants": {
+      "cell_2mm": {
+        "changes": "cell 2 x 2 mm instead of 4 x 4 mm; everything else as declared",
+        "clearance_report": [
+          "conductor R1.cpw[10] extends outside the cell",
+          "conductor R1.cpw[11] extends outside the cell",
+          "conductor R1.cpw[12] extends outside the cell",
+          "etch[12] extends outside the cell",
+          "etch[13] extends outside the cell",
+          "clearance island_to_cell_wall_min: realised 0.325000 mm < declared 1.325000 mm",
+          "clearance meander_to_cell_wall_min: realised -0.200000 mm < declared 0.500000 mm"
+        ],
+        "report": {
+          "aborted_reason": null,
+          "dof_budget": 250000,
+          "dof_estimate_order1": 147608,
+          "dof_estimate_order2": 1008657,
+          "dof_order1_note": "order-1 Nedelec DOF = number of edges; 1.2 edges per tetrahedron is an estimate for a large unstructured tetrahedral mesh, not a measured value",
+          "dof_per_tetrahedron_order1": 1.2,
+          "dof_per_tetrahedron_order2": 8.2,
+          "format": "msh2.2-ascii",
+          "gmsh_version": "4.15.2",
+          "h0_gap_mm": 0.01,
+          "h_far_mm": 0.16666666666666666,
+          "h_gap_mm": 0.01,
+          "level": 1,
+          "max_surface_elements": 400000,
+          "mesh_file": "coupled_chip_cell_L1.msh",
+          "mesh_path": "/home/user/QMHP-CEM/results/COUPLED-CHECKPOINT-A-20260915T225104Z/sensitivity/cell_2mm/coupled_chip_cell_L1.msh",
+          "min_gap_elements": 2.0,
+          "model": "coupled_chip_cell",
+          "nodes": 22862,
+          "physical_groups": {
+            "outer_pec": 2,
+            "port_F1": 10,
+            "port_R1_a": 11,
+            "port_R1_b": 12,
+            "sheet_pec": 4,
+            "substrate": 3,
+            "vacuum": 1
+          },
+          "scale": 1.0,
+          "sha256": "e918b949c908e49960b469b450ccd063599d8e848e1e94b5d3ec25f606a18e12",
+          "surface_elements_total": 25340,
+          "tetrahedra": 123007,
+          "tetrahedra_by_tag": {
+            "substrate": 59437,
+            "vacuum": 63570
+          },
+          "triangles_by_tag": {
+            "outer_pec": 2632,
+            "port_F1": 22,
+            "port_R1_a": 18,
+            "port_R1_b": 18,
+            "sheet_pec": 13309
+          },
+          "wall_clock_s": 5.597977547999903,
+          "within_budget_order1": true,
+          "within_budget_order2": false
+        },
+        "status": "OK"
+      },
+      "coupling_gap_40um": {
+        "changes": "coupling gap 40 um instead of 20 um (the narrowest gap sets the mesh)",
+        "clearance_report": [
+          "island-to-pad separation 0.020000 mm != declared gap_to_island 0.040000 mm"
+        ],
+        "report": {
+          "aborted_reason": null,
+          "dof_budget": 250000,
+          "dof_estimate_order1": 61594,
+          "dof_estimate_order2": 420890,
+          "dof_order1_note": "order-1 Nedelec DOF = number of edges; 1.2 edges per tetrahedron is an estimate for a large unstructured tetrahedral mesh, not a measured value",
+          "dof_per_tetrahedron_order1": 1.2,
+          "dof_per_tetrahedron_order2": 8.2,
+          "format": "msh2.2-ascii",
+          "gmsh_version": "4.15.2",
+          "h0_gap_mm": 0.015,
+          "h_far_mm": 0.3333333333333333,
+          "h_gap_mm": 0.015,
+          "level": 1,
+          "max_surface_elements": 400000,
+          "mesh_file": "coupled_chip_cell_L1.msh",
+          "mesh_path": "/home/user/QMHP-CEM/results/COUPLED-CHECKPOINT-A-20260915T225104Z/sensitivity/coupling_gap_40um/coupled_chip_cell_L1.msh",
+          "min_gap_elements": 2.0,
+          "model": "coupled_chip_cell",
+          "nodes": 9565,
+          "physical_groups": {
+            "outer_pec": 2,
+            "port_F1": 10,
+            "port_R1_a": 11,
+            "port_R1_b": 12,
+            "sheet_pec": 4,
+            "substrate": 3,
+            "vacuum": 1
+          },
+          "scale": 1.0,
+          "sha256": "634f4acfa242ded1d47d9e7e81a04ceb5be30a5f420ebe40db01e49d0ee5e39d",
+          "surface_elements_total": 12842,
+          "tetrahedra": 51328,
+          "tetrahedra_by_tag": {
+            "substrate": 24546,
+            "vacuum": 26782
+          },
+          "triangles_by_tag": {
+            "outer_pec": 1464,
+            "port_F1": 18,
+            "port_R1_a": 12,
+            "port_R1_b": 12,
+            "sheet_pec": 7036
+          },
+          "wall_clock_s": 3.518962856999906,
+          "within_budget_order1": true,
+          "within_budget_order2": false
+        },
+        "status": "OK"
+      },
+      "coupling_gap_40um_cell_2mm": {
+        "changes": "both of the above together",
+        "clearance_report": [
+          "conductor R1.cpw[10] extends outside the cell",
+          "conductor R1.cpw[11] extends outside the cell",
+          "conductor R1.cpw[12] extends outside the cell",
+          "etch[12] extends outside the cell",
+          "etch[13] extends outside the cell",
+          "clearance island_to_cell_wall_min: realised 0.325000 mm < declared 1.325000 mm",
+          "clearance meander_to_cell_wall_min: realised -0.200000 mm < declared 0.500000 mm",
+          "island-to-pad separation 0.020000 mm != declared gap_to_island 0.040000 mm"
+        ],
+        "report": {
+          "aborted_reason": null,
+          "dof_budget": 250000,
+          "dof_estimate_order1": 88604,
+          "dof_estimate_order2": 605463,
+          "dof_order1_note": "order-1 Nedelec DOF = number of edges; 1.2 edges per tetrahedron is an estimate for a large unstructured tetrahedral mesh, not a measured value",
+          "dof_per_tetrahedron_order1": 1.2,
+          "dof_per_tetrahedron_order2": 8.2,
+          "format": "msh2.2-ascii",
+          "gmsh_version": "4.15.2",
+          "h0_gap_mm": 0.015,
+          "h_far_mm": 0.16666666666666666,
+          "h_gap_mm": 0.015,
+          "level": 1,
+          "max_surface_elements": 400000,
+          "mesh_file": "coupled_chip_cell_L1.msh",
+          "mesh_path": "/home/user/QMHP-CEM/results/COUPLED-CHECKPOINT-A-20260915T225104Z/sensitivity/coupling_gap_40um_cell_2mm/coupled_chip_cell_L1.msh",
+          "min_gap_elements": 2.0,
+          "model": "coupled_chip_cell",
+          "nodes": 13791,
+          "physical_groups": {
+            "outer_pec": 2,
+            "port_F1": 10,
+            "port_R1_a": 11,
+            "port_R1_b": 12,
+            "sheet_pec": 4,
+            "substrate": 3,
+            "vacuum": 1
+          },
+          "scale": 1.0,
+          "sha256": "e7f5d19cc0b42013cbfa3e1cec22d3dcaf71715fa48b2122d37c4bd491930744",
+          "surface_elements_total": 15320,
+          "tetrahedra": 73837,
+          "tetrahedra_by_tag": {
+            "substrate": 34680,
+            "vacuum": 39157
+          },
+          "triangles_by_tag": {
+            "outer_pec": 2510,
+            "port_F1": 18,
+            "port_R1_a": 12,
+            "port_R1_b": 12,
+            "sheet_pec": 8250
+          },
+          "wall_clock_s": 3.448368100000039,
+          "within_budget_order1": true,
+          "within_budget_order2": false
+        },
+        "status": "OK"
+      }
+    }
+  },
+  "started_utc": "2026-09-15T22:51:04.794437+00:00",
+  "statement": "Nothing in this record is coupled EM evidence: it validates a declaration, recomputes source digests, draws the declared seed geometry and estimates a mesh. No Palace solve was run. Every ENGINEERING-SEED remains unapproved.",
+  "validation": {
+    "ok": true,
+    "source_ids": [
+      "master_requirements",
+      "object001_seed",
+      "palace_golden_candidate"
+    ],
+    "unapproved_seeds": 22,
+    "unbound": 12
+  }
+}

@@ -53,6 +53,15 @@ couplings.**
 Branch A and Branch B stay independent; nothing from Branch C (the
 conventional-fluxonium control, "C-02C" appears in no source) is used.
 
+**Seed plausibility, recorded not adopted.** The source-bound `g = 0.150 GHz`
+implies a coupling capacitance of about 7.2 fF at the declared node
+(`E_C,F1R1 = 5.85 MHz`). A crude edge estimate of the declared 20 µm gap over
+the 100 µm facing width gives about 28 fF, roughly 4× larger, so the seed is
+expected to over-couple. That is information for the review, not a design
+change: what the geometry realises is what the extraction measures and the
+suitability block reports. A wider gap would reduce both the coupling and the
+mesh cost, and the unadopted sensitivity probe measures the second effect.
+
 ## What the routes will compare
 
 Per required pair (S1: `F1–R1`), `|g_F1R1|` in MHz from Route A and from
@@ -75,9 +84,19 @@ quantum calculation stays under its own keys and is never relabelled.
 
 ## Disposition
 
-See the checkpoint report in the pull request and `results/COUPLED-CHECKPOINT-A-*/report.md`
-for the offline-check outcome (declaration valid, register verified, preview,
-mesh dry run against the DOF budget) and the READY-FOR-REVIEW / BLOCKED
-statement. Execution of the coupled campaign, pulse work, decoder studies,
-openEMS and any AMD-E or mediator optimisation are out of scope and not
-started.
+Two dispositions are reported separately, so that a compute limit is never
+read as an invalid candidate nor the reverse
+(`results/COUPLED-CHECKPOINT-A-20260915T224700Z/report.md`):
+
+- **Admission: READY-FOR-REVIEW.** The declaration validates against the new
+  schema, all fifteen source digests verify, the geometry is consistent
+  (empty clearance report), the preview renders and the mesh dry run runs.
+- **Execution: BLOCKED on the declared compute budget.** The declared mesh
+  ladder needs 699 k / 1.58 M / 3.06 M degrees of freedom at order 2 against
+  the 250 k budget of `numerical-plan.md` §6; at order 1 only L1 and L2 fit.
+  The 20 µm coupling gap sets the cost. `numerical-plan.md` §8 carries the
+  measured table and the unadopted sensitivity probe. What to change is a
+  human decision and is not made here.
+
+Execution of the coupled campaign, pulse work, decoder studies, openEMS and
+any AMD-E or mediator optimisation are out of scope and not started.

@@ -922,7 +922,27 @@
   "fluxonium_harmonic_mode_GHz": 2.7539,
   "quarter_wave_mm_at_w_r": 6.9827,
   "eps_eff": 6.225,
-  "note": "derived from source-bound energies and the seed eps_r by the formulas in coupling-definition.md; not evidence"
+  "note": "derived from source-bound energies and the seed eps_r by the formulas in coupling-definition.md; not evidence",
+  "readout_lumped_equivalent_at_50_ohm": {
+   "C_R_fF": 739.9,
+   "E_C_RR_MHz": 26.2,
+   "E_L_R_GHz": 88.4,
+   "n_zpf_R": 3.2048,
+   "note": "lumped LC equivalent of a 50 ohm line at the source-bound bare root; used only to size the seed, never as an input"
+  },
+  "coupling_capacitance_implied_by_the_source_bound_g": {
+   "E_C_F1R1_MHz": 5.85,
+   "C_c_fF": 7.21,
+   "formula": "g = 8 E_C,F1R1 n_zpf,R with n_zpf,R = (E_L,R/32 E_C,RR)^(1/4); C_c from (C^-1)_FR = 2 h E_C,FR / e^2 in the small-coupling limit",
+   "note": "what the seed geometry would have to realise to reproduce g = 0.150 GHz; it is a suitability reference, not a design target"
+  },
+  "seed_gap_plausibility_check": {
+   "crude_edge_estimate_fF": 27.6,
+   "method": "parallel-plate over the 100 um facing width with an effective 100 um fringe extent, half-space permittivity (1 + 11.45)/2, 20 um gap",
+   "ratio_to_requirement": 3.8,
+   "statement": "The crude estimate exceeds the 7.2 fF implied by the source-bound g by about 4x, so the declared 20 um coupling gap is expected to over-couple. It is a seed, not a design: the extraction measures what the geometry realises and the suitability report compares it. A wider gap would reduce both the coupling and the mesh cost, but changing the seed is a human decision and is NOT made here.",
+   "classification": "ENGINEERING-SEED plausibility estimate, unapproved; order of magnitude only"
+  }
  },
  "extraction": {
   "definition": "docs/coupled-candidate/coupling-definition.md",

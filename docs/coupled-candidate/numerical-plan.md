@@ -94,6 +94,29 @@ with a coarser mesh: a coarser ladder is a new declared plan.
    (this checkpoint, offline): tets, DOF estimate for order 2 and 1, gap
    resolution report. Decides the element order and whether the ladder fits
    the budget. If not, the disposition is BLOCKED with the numbers.
+
+## 8. Measured outcome of step 1 (executed at checkpoint A)
+
+`scripts/coupled_candidate_check.py --sensitivity`, record
+`results/COUPLED-CHECKPOINT-A-20260915T224700Z`, gmsh 4.15.2, no Palace:
+
+| level | h near the gaps (mm) | h far (mm) | tets | DOF order 2 | DOF order 1 | mesh s |
+|---|---|---|---|---|---|---|
+| L1 | 0.0100 | 0.3333 | 85 233 | 698 911 | 102 280 | 6.1 |
+| L2 | 0.0067 | 0.2222 | 192 597 | 1 579 295 | 231 116 | 11.4 |
+| L3 | 0.0050 | 0.1667 | 373 091 | 3 059 346 | 447 709 | 19.7 |
+
+The declared ladder therefore **exceeds the 250 000 DOF budget at order 2 at
+every level**, and at order 1 it fits only at L1 and L2. The 20 µm coupling
+gap is what sets the cost: an unadopted probe at 40 µm gives 51 328 tets
+(420 890 DOF at order 2), and shrinking the cell to 2 × 2 mm *raises* the
+count (123 007 tets) because the far-field size `min(a,b)/12` shrinks with
+the cell while the fine region does not. Execution of the coupled campaign is
+therefore BLOCKED on compute until the human review decides one of: a
+different seed geometry, order 1 with a two-level ladder, a different mesh
+rule, or a larger runner allowance (which needs approval and is not assumed
+here). The admission package itself is unaffected: the declaration is valid,
+its sources verify and its geometry is consistent.
 2. Route A ladder, then Route A inversion; Route B ladder, then Route B fit;
    the two run in separate workflow jobs writing separate records.
 3. Comparison, suitability report, per-interaction record, gate evaluation.

@@ -18,7 +18,8 @@ from pathlib import Path
 
 #: Suffixes treated as decision-relevant scientific artifacts.
 DECISION_RELEVANT_SUFFIXES = frozenset(
-    {".json", ".yaml", ".yml", ".gds", ".stl", ".step", ".s2p", ".csv", ".txt", ".msh", ".md"}
+    {".json", ".yaml", ".yml", ".gds", ".stl", ".step", ".s2p", ".csv", ".txt", ".msh", ".md",
+     ".svg", ".geo_unrolled"}
 )
 
 #: Names/directories excluded as transient caches (spec §11.4).
