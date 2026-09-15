@@ -1,0 +1,123 @@
+{
+  "decisions": [
+    {
+      "analytic": "analytic_011",
+      "analytic_GHz": 20.624961993474823,
+      "computed_index": 1,
+      "consistent": true,
+      "decision": "matched",
+      "family": "transverse (TE, p>=1)",
+      "frequency_GHz": 20.62757006,
+      "m": 0,
+      "n": 1,
+      "p": 1,
+      "relative_error": 0.00012645194332973743,
+      "z_fraction": 0.0003092833287239747
+    },
+    {
+      "analytic": "analytic_011",
+      "analytic_GHz": 20.624961993474823,
+      "computed_index": 2,
+      "consistent": true,
+      "decision": "matched",
+      "family": "transverse (TE, p>=1)",
+      "frequency_GHz": 20.62788621,
+      "m": 0,
+      "n": 1,
+      "p": 1,
+      "relative_error": 0.0001417804564246832,
+      "z_fraction": 0.00010802007366160237
+    },
+    {
+      "analytic": "analytic_130",
+      "analytic_GHz": 21.546068014099255,
+      "computed_index": 3,
+      "consistent": true,
+      "decision": "matched",
+      "family": "z-polarised (TM_mn0-like)",
+      "frequency_GHz": 21.54775922,
+      "m": 1,
+      "n": 3,
+      "p": 0,
+      "relative_error": 7.849255370575629e-05,
+      "z_fraction": 0.9998756318574038
+    },
+    {
+      "analytic": "analytic_130",
+      "analytic_GHz": 21.546068014099255,
+      "computed_index": 4,
+      "consistent": true,
+      "decision": "matched",
+      "family": "z-polarised (TM_mn0-like)",
+      "frequency_GHz": 21.54808155,
+      "m": 1,
+      "n": 3,
+      "p": 0,
+      "relative_error": 9.3452591880172e-05,
+      "z_fraction": 0.9998680665054256
+    },
+    {
+      "analytic": "analytic_111",
+      "analytic_GHz": 21.721242181769906,
+      "computed_index": 5,
+      "consistent": true,
+      "decision": "matched",
+      "family": "transverse (TE, p>=1)",
+      "frequency_GHz": 21.7234769,
+      "m": 1,
+      "n": 1,
+      "p": 1,
+      "relative_error": 0.00010288169577939747,
+      "z_fraction": 0.0012619818809366198
+    },
+    {
+      "analytic": "analytic_111",
+      "analytic_GHz": 21.721242181769906,
+      "computed_index": 6,
+      "consistent": true,
+      "decision": "matched",
+      "family": "transverse (TE, p>=1)",
+      "frequency_GHz": 21.72373911,
+      "m": 1,
+      "n": 1,
+      "p": 1,
+      "relative_error": 0.000114953289006188,
+      "z_fraction": 0.009666588942784049
+    },
+    {
+      "analytic": "analytic_021",
+      "analytic_GHz": 23.762553972431885,
+      "computed_index": 7,
+      "consistent": true,
+      "decision": "matched",
+      "family": "transverse (TE, p>=1)",
+      "frequency_GHz": 23.76697182,
+      "m": 0,
+      "n": 2,
+      "p": 1,
+      "relative_error": 0.00018591636123116016,
+      "z_fraction": 0.00012265759091496895
+    },
+    {
+      "analytic": "analytic_021",
+      "analytic_GHz": 23.762553972431885,
+      "computed_index": 8,
+      "consistent": true,
+      "decision": "matched",
+      "family": "transverse (TE, p>=1)",
+      "frequency_GHz": 23.76737435,
+      "m": 0,
+      "n": 2,
+      "p": 1,
+      "relative_error": 0.00020285603869467435,
+      "z_fraction": 0.00023189360119273356
+    }
+  ],
+  "run": "aux_height-d7.7-L1",
+  "target_mode": [
+    0,
+    1,
+    1
+  ],
+  "tolerance": 0.002
+}

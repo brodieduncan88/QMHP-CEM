@@ -1,0 +1,79 @@
+{
+  "adapter_version": "0.2.0-adapter",
+  "candidate_id": "QMHP-CEM-A-RF-000001",
+  "candidate_sha256": "472c2e612261e97736d961b778ceaaa2a077f7255a0c2154f7e77a2829fb1f16",
+  "command_line": [
+    "docker",
+    "run",
+    "--rm",
+    "--network",
+    "none",
+    "--hostname",
+    "localhost",
+    "--name",
+    "qmhp-palace-RUN-PALACE-VERIFY-20260915T065055Z-object001_height-d1.5-L1-QMHP-CEM-A-RF-000001",
+    "--user",
+    "1001:1001",
+    "-e",
+    "HOME=/tmp",
+    "-v",
+    "/home/runner/work/QMHP-CEM/QMHP-CEM/results/PALACE-VERIFY-20260915T065055Z/runs/object001_height-d1.5-L1/solver:/work",
+    "-w",
+    "/work",
+    "qmhp-cem/palace:0.13.0",
+    "-np",
+    "1",
+    "config.json"
+  ],
+  "command_string": "docker run --rm --network none --hostname localhost --name qmhp-palace-RUN-PALACE-VERIFY-20260915T065055Z-object001_height-d1.5-L1-QMHP-CEM-A-RF-000001 --user 1001:1001 -e HOME=/tmp -v /home/runner/work/QMHP-CEM/QMHP-CEM/results/PALACE-VERIFY-20260915T065055Z/runs/object001_height-d1.5-L1/solver:/work -w /work qmhp-cem/palace:0.13.0 -np 1 config.json",
+  "config_sha256": "5be6f576606190cad12d90fb2b546c6881770680f75f57ff18afdf83c4dd409d",
+  "ended_utc": "2026-09-15T08:03:02.979123+00:00",
+  "image": {
+    "image_id": "sha256:f41ad915d54c2b31d7131bbd570479ccf9cc577eac7ea208ab06f840d8b0aa46",
+    "labels": {
+      "org.opencontainers.image.description": "Palace EM solver for QMHP-CEM, built from the pinned release tag",
+      "org.opencontainers.image.title": "qmhp-cem/palace",
+      "org.opencontainers.image.version": "24.04",
+      "org.qmhp.cem.apt-snapshot": "20260914T000000Z",
+      "org.qmhp.cem.palace-commit": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+      "org.qmhp.cem.palace-gslib": "ON",
+      "org.qmhp.cem.palace-version": "0.13.0",
+      "org.qmhp.cem.solver": "palace",
+      "org.qmhp.cem.spec": "QMHP-CEM v0.2 \u00a710.3"
+    },
+    "palace_commit": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+    "palace_version": "0.13.0",
+    "reference": "qmhp-cem/palace:0.13.0",
+    "repo_digest": null,
+    "rootless_runtime": false
+  },
+  "input_sha256": {
+    "config.json": "5be6f576606190cad12d90fb2b546c6881770680f75f57ff18afdf83c4dd409d",
+    "mesh.msh": "7a87cd75d9453f14abf7bb72eb96cd6ec9ca23fc0d5b369e2ebc10e9ae11003a"
+  },
+  "mesh_sha256": "7a87cd75d9453f14abf7bb72eb96cd6ec9ca23fc0d5b369e2ebc10e9ae11003a",
+  "mpi_processes": 1,
+  "outcome": "timeout after 3600s",
+  "output_sha256": {
+    "palace_log.txt": "6c66f42a396824c9e17477f9e918f83b26b2c6b434465525a599c36da155a222",
+    "postpro/palace.json": "b46699e78fa1c0b514a356bbb70e54ea507b8e5ffda5226bbc9f0336fc3455c9"
+  },
+  "returncode": null,
+  "run_id": "RUN-PALACE-VERIFY-20260915T065055Z-object001_height-d1.5-L1",
+  "schema": "qmhp-cem.palace-run/0.2.0",
+  "solver_rules": {
+    "characteristic_mesh_length_rule": "min(cavity_width, cavity_height) / 12",
+    "domain": "empty vacuum cavity of Object 001 as a closed PEC box; chip, recess step, launches and lid are NOT modelled in this milestone. All requested modes are TM_mn0: independent of height_above_chip_mm, so the closed-form check verifies the X/Y extent and unit scaling, not the height.",
+    "eigenmode_backward_error_max_tolerance": 1e-06,
+    "eigenmode_target_fraction_of_analytic_fundamental": 0.85,
+    "eigenmodes_requested": 4,
+    "eigenvalue_tolerance": 1e-06,
+    "expected_relative_deviation": 0.0001,
+    "finite_element_order": 2,
+    "linear_solver_max_iterations": 400,
+    "linear_solver_tolerance": 1e-08
+  },
+  "started_utc": "2026-09-15T07:03:02.975158+00:00",
+  "wall_time_s": 3600.003965,
+  "work_dir": "/home/runner/work/QMHP-CEM/QMHP-CEM/results/PALACE-VERIFY-20260915T065055Z/runs/object001_height-d1.5-L1/solver"
+}
