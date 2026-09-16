@@ -14,6 +14,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -413,3 +414,53 @@ def test_the_record_is_made_durable_before_the_report_is_rendered():
     assert write_summary < write_pointer < render < write_manifest
     assert "except Exception as exc:  # noqa: BLE001 - the record still has to survive" in source
     assert "This is a presentation failure, not a loss of evidence." in source
+
+
+def test_the_level_three_record_reports_no_order_of_convergence():
+    """The negative result is the result, and it must survive in the record."""
+    records = sorted((REPO_ROOT / "results").glob("COUPLED-LADDER-O1-L3-*"))
+    if not records:
+        pytest.skip("the level-3 record is not present")
+    summary = json.loads((records[-1] / "summary.json").read_text())
+    convergence = summary["convergence"]
+    assert convergence["available"]
+    per_mode = convergence["per_mode"]
+    assert len(per_mode) == 2
+    for entry in per_mode.values():
+        assert entry["frequency"]["solvable"] is False
+        assert "no positive order of convergence" in entry["frequency"]["reason"]
+    assert summary["asymptotic"]["still_clearly_pre_asymptotic"] is True
+    assert summary["order_two_projection"]["available"] is True
+    assert all(
+        not p.get("available") for p in summary["order_two_projection"]["per_mode"].values()
+    ), "no extrapolated limit means no order-2 projection"
+    # And the report rendered rather than crashing on it.
+    report = (records[-1] / "report.md").read_text()
+    assert "no order of convergence" in report
+    assert "Not projectable" in report
+    assert "could not be rendered" not in report
+
+
+def test_the_surrogate_faithfulness_check_is_not_circular():
+    """p_true comes from the balance identity, never from the surrogate.
+
+    This is the calibration fix the level-3 record motivates, predeclared in
+    the outcome document for the next run rather than applied to this one.
+    """
+    doc = re.sub(r"\s+", " ", (REPO_ROOT / "docs" / "coupled-candidate" / "order1-ladder-outcome.md").read_text())
+    assert "p_true = 1 − (E_mag + E_cap)/(E_elec + E_cap)" in doc
+    assert "is not circular" in doc
+    assert "not applied to this one" in doc
+    # The level-3 numbers the fix rests on.
+    records = sorted((REPO_ROOT / "results").glob("COUPLED-LADDER-O1-L3-*"))
+    if not records:
+        pytest.skip("the level-3 record is not present")
+    summary = json.loads((records[-1] / "summary.json").read_text())
+    rows = {r["mode"]: r for r in summary["rung"]["port_field_test"]["rows"]}
+    for mode in (1, 2):
+        p_true = 1.0 - rows[mode]["E_mag_over_E_elec"]
+        assert rows[mode]["reported_participation"] == pytest.approx(p_true, rel=1e-3)
+    # m6 passes admission yet its surrogate is unfaithful by ~20x.
+    p_true_6 = 1.0 - rows[6]["E_mag_over_E_elec"]
+    assert rows[6]["reported_participation"] / p_true_6 < 0.1
+    assert rows[6]["admitted"] is True

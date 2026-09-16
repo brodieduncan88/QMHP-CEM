@@ -14,6 +14,7 @@ coupled EM evidence.
 | [`execution-proposal.md`](execution-proposal.md) | the bounded geometry, meshing and resource proposal put to the review; nothing in it is adopted |
 | [`pilot-outcome.md`](pilot-outcome.md) | the approved three-solve numerical-method pilot as executed: completion, modes, the measured order and halo sensitivities, and the `NOT-A-HALO-VERDICT` under the frozen criteria. **Sections 2, 3 and 5 are superseded in part** by the corrective analysis below |
 | [`corrective-analysis.md`](corrective-analysis.md) | bounded corrective analysis of the executed pilot record: mode admission, row correspondence, energy definitions against pinned Palace v0.13.0, the EPR sign convention, and what stays unproven. Keeps execution completion, algebraic convergence, mode validity, mode matching and mesh convergence apart |
+| [`order1-ladder-outcome.md`](order1-ladder-outcome.md) | the three-rung order-1 mesh-refinement check: no observed order of convergence on either tracked mode, the port-stiffness mechanism reproducing at level 3, the calibration flaw that hid it, and why the limit looks like the geometry idealisation rather than the element count |
 | [`implementation-plan.md`](implementation-plan.md) | file-by-file plan; what this checkpoint implements ([A]) and what execution implements ([B]) |
 | `config/coupled/v2a_five_node_candidate.json` | the machine-readable declaration (schema `qmhp-cem.coupled-candidate/0.2.0`) |
 | `config/coupled/source_register.json` | every cited source with path, revision and sha256 |
