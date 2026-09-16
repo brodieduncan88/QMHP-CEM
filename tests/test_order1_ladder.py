@@ -258,3 +258,29 @@ def test_the_tangential_probe_is_the_difference_of_the_two_configured_probes():
             source.participation[1] - source.participation[2]
         )
         assert math.isfinite(row["normal_fraction"])
+
+
+def test_the_field_output_path_is_derived_from_the_configured_output_dir():
+    """Palace writes paraview/ UNDER Problem.Output, not beside it.
+
+    The level-2 rung looked beside it, reported the output as absent although
+    Palace had written it, and so committed 123 MB it had said it would not.
+    """
+    source = (REPO_ROOT / "scripts" / "palace_order1_ladder.py").read_text()
+    assert 'solver_dir / "paraview"' not in source, "the path must not be hard-coded beside postpro"
+    assert 'config["Problem"]["Output"]' in source
+    # The record must be able to say where it put the output, not just whether.
+    assert '"path": str(paraview.relative_to(solver_dir)) if written else None' in source
+
+
+def test_the_level_two_record_is_free_of_uncommittable_field_output():
+    """surface-Q.csv is the evidence; the 120 MB paraview tree is not committed."""
+    records = sorted((REPO_ROOT / "results").glob("COUPLED-LADDER-O1-L2-*"))
+    if not records:
+        pytest.skip("the level-2 record is not present")
+    record = records[-1]
+    assert not list(record.rglob("*.vtu")), "ParaView volume output must not be committed"
+    assert not list(record.rglob("*.pvtu"))
+    assert (record / "L2" / "solver" / "postpro" / "surface-Q.csv").exists()
+    total = sum(f.stat().st_size for f in record.rglob("*") if f.is_file())
+    assert total < 20 * 1024 * 1024, f"the record is {total / 1e6:.0f} MB"

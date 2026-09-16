@@ -442,13 +442,21 @@ def execute_level(
         except pout.PalaceOutputError as exc:
             entry["port_field_test"] = {"available": False, "reason": str(exc)}
 
-        paraview = solver_dir / "paraview"
+        # Palace writes paraview/ UNDER Problem.Output, not beside it. The
+        # level-2 rung looked beside it, reported "written: false" for output
+        # that had in fact been written, and so committed 123 MB it had said
+        # it would not. Derived from the config rather than hard-coded, so the
+        # two cannot drift apart again.
+        paraview = solver_dir / str(config["Problem"]["Output"]) / "paraview"
+        written = paraview.is_dir()
         entry["field_output"] = {
-            "written": paraview.is_dir(),
-            "bytes": sum(f.stat().st_size for f in paraview.rglob("*") if f.is_file()) if paraview.is_dir() else 0,
+            "written": written,
+            "path": str(paraview.relative_to(solver_dir)) if written else None,
+            "bytes": sum(f.stat().st_size for f in paraview.rglob("*") if f.is_file()) if written else 0,
             "note": (
                 "ParaView field output is uploaded as a workflow artifact and is NOT committed: "
-                "the quantitative test uses surface-Q.csv, which is."
+                "it runs to ~120 MB per rung and the quantitative test uses surface-Q.csv, which "
+                "is committed and manifested."
             ),
         }
         entry["status"] = "COMPLETED"
@@ -813,8 +821,9 @@ def main(argv: list[str] | None = None) -> int:
     # commit, so it is moved aside for artifact upload rather than deleted.
     if scratch.is_dir():
         shutil.rmtree(scratch)
-    paraview = solver_dir / "paraview"
-    if paraview.is_dir() and args.field_output_dir:
+    paraview_relative = (summary["rung"].get("field_output") or {}).get("path")
+    paraview = (solver_dir / paraview_relative) if paraview_relative else None
+    if paraview and paraview.is_dir() and args.field_output_dir:
         destination = Path(args.field_output_dir)
         destination.parent.mkdir(parents=True, exist_ok=True)
         if destination.exists():
