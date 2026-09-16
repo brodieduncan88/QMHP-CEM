@@ -192,7 +192,7 @@ jobs:
         if: always() && steps.record.outputs.path != ''
         uses: actions/upload-artifact@v4
         with:
-          name: order1-ladder-${{ github.run_id }}
+          name: order1-ladder-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ steps.record.outputs.path }}
           if-no-files-found: warn
 
@@ -200,7 +200,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: order1-ladder-fields-${{ github.run_id }}
+          name: order1-ladder-fields-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/paraview
           if-no-files-found: warn
 
@@ -208,11 +208,17 @@ jobs:
       # and the approval record said would be uploaded and not committed.
       # Nothing checked. This is the check.
       - name: Refuse unexpected file kinds in the evidence commit
+        id: filekinds
         if: always() && steps.record.outputs.path != '' && env.COMMIT_RESULTS == 'true'
         run: uv run python scripts/check_record_files.py "$LADDER_RECORD"
 
+      # The gate above only gates if the commit depends on it. With both steps
+      # on `always()` a failed gate printed its offenders and the commit ran
+      # anyway, which is the failure the gate was added to prevent. `!= failure`
+      # rather than `== success` so that a SKIPPED gate (no record) still lets
+      # the commit step run and no-op on its own empty check.
       - name: Commit the record to the branch
-        if: always() && env.COMMIT_RESULTS == 'true'
+        if: always() && env.COMMIT_RESULTS == 'true' && steps.filekinds.outcome != 'failure'
         run: |
           if [ -z "$LADDER_RECORD" ]; then echo "no record to commit"; exit 0; fi
           git config user.name "github-actions[bot]"
@@ -226,9 +232,10 @@ jobs:
           git pull --rebase --autostash origin "${{ github.ref_name }}"
           git push origin "HEAD:${{ github.ref_name }}"
 
-      - name: Fail the job if the level or the manifest check did not succeed
-        if: always() && (steps.ladder.outcome != 'success' || steps.manifest.outcome == 'failure')
+      - name: Fail the job if the level, the manifest or the file-kind gate did not succeed
+        if: always() && (steps.ladder.outcome != 'success' || steps.manifest.outcome == 'failure' || steps.filekinds.outcome == 'failure')
         run: |
           echo "ladder step    : ${{ steps.ladder.outcome }}"
           echo "manifest check : ${{ steps.manifest.outcome }}"
+          echo "file-kind gate : ${{ steps.filekinds.outcome }}"
           exit 1

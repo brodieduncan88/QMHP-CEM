@@ -278,6 +278,12 @@ class PortRefinement:
     """Distance over which the box field blends back to ``h_far``."""
     ports: tuple[str, ...] = ("port_F1",)
     """Which declared ports the boxes are built around."""
+    label: str = ""
+    """The approval's identifier for this refinement, e.g. "R1".
+
+    Carried so the record and the commit headline can tell a refined run from a
+    plain rerun of the same level; without it both read "L2 COMPLETED".
+    """
 
     def __post_init__(self) -> None:
         if self.h_port_mm <= 0.0:
@@ -310,6 +316,7 @@ class PortRefinement:
 
     def as_dict(self) -> dict[str, Any]:
         return {
+            "id": self.label or None,
             "h_port_mm": self.h_port_mm,
             "pad_mm": self.pad_mm,
             "transition_mm": self.transition_mm,

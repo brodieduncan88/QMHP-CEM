@@ -768,3 +768,189 @@ def test_the_workflow_describes_the_approval_and_builds_its_headline_from_a_scri
 
     parsed = yaml.safe_load(workflow)
     assert parsed["jobs"]["ladder"]["steps"]
+
+
+# --- the guards the pre-flight audit added ------------------------------------
+
+
+def test_the_post_solve_analysis_cannot_cost_a_paid_for_solve(tmp_path: Path, monkeypatch):
+    """The window between the solve returning and the durable write is guarded.
+
+    The evidence-before-presentation fix guarded the RENDERER. Everything from
+    execute_level() returning to summary.json being written - manifest
+    verification, mode matching, the convergence fit, the baseline comparison -
+    was still fatal, and every function added there widened the exposure.
+    """
+    ladder = _ladder_module()
+    monkeypatch.setattr(
+        ladder, "earlier_rungs",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("analysis exploded")),
+    )
+    approval = tmp_path / "approval.json"
+    approval.write_text(json.dumps({"level": 2}))
+    pointer = tmp_path / "pointer"
+    code = ladder.main([
+        "--level", "2", "--prepare-only",
+        "--approval", str(approval),
+        "--results-root", str(tmp_path / "results"),
+        "--record-pointer", str(pointer),
+    ])
+    assert code == 1, "an analysis failure is reported, not swallowed"
+
+    record = Path(pointer.read_text().strip())
+    assert record.is_dir(), "the record the workflow uploads must still exist"
+    assert manifest.verify(record) == [], "and it must still be manifested"
+    summary = json.loads((record / "summary.json").read_text())
+    assert "analysis exploded" in summary["post_solve_analysis_failed"]
+    # The solve's OWN outputs survive untouched; only the analysis is missing.
+    assert summary["rung"]["status"] == "PREPARED"
+    assert summary["rung"]["dof_measured"] == 79_944
+    assert summary["comparison"]["available"] is False
+    report = (record / "report.md").read_text()
+    assert "post-solve analysis failed" in report
+    assert "not a loss of evidence" in report
+
+
+def test_the_superseded_port_field_test_cannot_downgrade_a_completed_solve():
+    """It is guarded as widely as its successor.
+
+    Guarded only against PalaceOutputError, any other exception from the fitted
+    procedure fell through to execute_level's outer handler, turned a COMPLETED
+    solve into ERROR, and skipped the derived diagnostic entirely.
+    """
+    source = (REPO_ROOT / "scripts" / "palace_order1_ladder.py").read_text()
+    call = source.index("entry[\"port_field_test\"] = port_field_analysis(")
+    guard = source.index("except Exception", call)
+    successor = source.index("entry[\"port_diagnostic\"] = derived_port_diagnostic(", call)
+    assert guard < successor, "the fitted test must be guarded before the derived one runs"
+
+
+def test_the_refinement_label_reaches_the_record_and_the_commit_headline():
+    """Without it both a refined run and a plain rerun read "L2 COMPLETED"."""
+    refinement = PortRefinement(
+        h_port_mm=0.003333333333333333, pad_mm=0.010, transition_mm=0.020, label="R1",
+    )
+    assert refinement.as_dict()["id"] == "R1"
+    label, built, _ = _ladder_module().approved_port_refinement(
+        REPO_ROOT / ".github" / "ladder-approval.json"
+    )
+    assert built.label == label == "R1"
+    assert built.as_dict()["id"] == "R1"
+
+
+def test_a_missing_or_refined_baseline_refuses_before_anything_is_launched(tmp_path: Path):
+    """A solve may not be spent only to find the comparison impossible."""
+    ladder = _ladder_module()
+    approval = tmp_path / "approval.json"
+    block = {
+        "id": "R1", "h_port_mm": 0.003333333333333333,
+        "pad_mm": 0.010, "transition_mm": 0.020,
+    }
+    approval.write_text(json.dumps({
+        "level": 2, "baseline_record": "NO-SUCH-RECORD", "port_refinement": block,
+    }))
+    with pytest.raises(ladder.LadderError, match="not a record on disk"):
+        ladder.approved_port_refinement(approval)
+
+
+def test_the_baseline_port_participation_is_recomputed_when_the_record_predates_it():
+    """Otherwise the headline delta is a column of n/a.
+
+    The committed level-2 baseline was solved before the derived diagnostic
+    existed, so it carries none. It is recomputed read-only from that record's
+    own committed outputs and must reproduce the published numbers.
+    """
+    ladder = _ladder_module()
+    l3 = json.loads(
+        (REPO_ROOT / "results/COUPLED-LADDER-O1-L3-20260916T091212Z/summary.json").read_text()
+    )
+    entry = dict(l3["rung"])
+    entry["port_refinement"] = {"h_port_mm": 0.003333333333333333}
+    comparison = ladder.compare_against_baseline(
+        entry, "COUPLED-LADDER-O1-L2-20260916T080802Z"
+    )
+    assert comparison["baseline_diagnostic_recomputed"] is True
+    ports = [p["port_participation_from_probes"]["baseline"] for p in comparison["pairs"]]
+    assert ports[0] == pytest.approx(9.985982e-01, rel=1e-6)
+    assert ports[1] == pytest.approx(7.803572e-04, rel=1e-5)
+    # And the baseline record itself is untouched.
+    assert manifest.verify(REPO_ROOT / "results/COUPLED-LADDER-O1-L2-20260916T080802Z") == []
+
+
+def test_the_confounded_trend_is_refused_on_a_refined_run():
+    """Against level 1 a refined run changes the level AND the port box."""
+    ladder = _ladder_module()
+    trend = ladder.refinement_trend({}, {"port_refinement": {"h_port_mm": 0.003}}, {})
+    assert trend["available"] is False
+    assert "confounds" in trend["reason"]
+    assert "baseline_comparison" in trend["reason"]
+
+
+def test_the_file_kind_gate_actually_gates_the_commit():
+    """Both steps on always() meant a failed gate printed and the commit ran."""
+    import yaml
+
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github" / "workflows" / "palace-order1-ladder.yml").read_text()
+    )
+    steps = {s.get("name", ""): s for s in workflow["jobs"]["ladder"]["steps"]}
+    gate = next(k for k in steps if "Refuse unexpected file kinds" in k)
+    commit = next(k for k in steps if "Commit the record" in k)
+    assert steps[gate].get("id") == "filekinds"
+    assert "steps.filekinds.outcome != 'failure'" in steps[commit]["if"]
+    fail = next(k for k in steps if k.startswith("Fail the job"))
+    assert "steps.filekinds.outcome == 'failure'" in steps[fail]["if"]
+    # A re-run attempt must be able to upload its artifacts.
+    for name, step in steps.items():
+        if name.startswith("Upload"):
+            assert "github.run_attempt" in step["with"]["name"], name
+
+
+def test_the_report_states_which_refinement_it_reports_on():
+    ladder = _ladder_module()
+    l3 = json.loads(
+        (REPO_ROOT / "results/COUPLED-LADDER-O1-L3-20260916T091212Z/summary.json").read_text()
+    )
+    l3["rung"]["port_refinement"] = {
+        "id": "R1", "h_port_mm": 0.003333333333333333, "pad_mm": 0.01,
+        "transition_mm": 0.02, "ports": ["port_F1"],
+        "holds_fixed": "h_far and the rest", "combination": "Min",
+    }
+    l3["next_level"] = ladder.next_level_disposition(l3["rung"], l3.get("dry_runs") or {})
+    l3["baseline_comparison"] = {"available": False, "reason": "not a port-refined run"}
+    l3["port_resolution_sensitivity"] = {"available": False, "reason": "not a port-refined run"}
+    text = ladder.render_report(l3)
+    assert "Approved as **R1**" in text
+    assert "This is not a ladder rung" in text
+    assert "UNREFINED level prescription" in text
+    assert "SUPERSEDED" in text
+
+
+@pytest.mark.parametrize(
+    "partial",
+    [
+        {"h_port_mm": 0.003},
+        {"id": "R1"},
+        {},
+        None,
+    ],
+)
+def test_the_renderer_is_total_over_a_partial_refinement_payload(partial):
+    """A renderer that can raise is the bug class that lost a completed solve.
+
+    Bracket access on the refinement dict was reintroduced while fixing the
+    report and raised KeyError on anything but a complete payload.
+    """
+    ladder = _ladder_module()
+    summary = json.loads(
+        (REPO_ROOT / "results/COUPLED-LADDER-O1-L3-20260916T091212Z/summary.json").read_text()
+    )
+    summary["rung"]["port_refinement"] = partial
+    summary["next_level"] = ladder.next_level_disposition(
+        summary["rung"], summary.get("dry_runs") or {}
+    )
+    summary["baseline_comparison"] = {"available": False, "reason": "x"}
+    summary["port_resolution_sensitivity"] = {"available": False, "reason": "x"}
+    text = ladder.render_report(summary)
+    assert text
+    assert "could not be rendered" not in text
