@@ -1,0 +1,53 @@
+{
+ "schema": "qmhp-cem.pilot-approval/0.1.0",
+ "what": "the bounded three-solve coupled chip-cell numerical-method pilot",
+ "approved_by": "the repository owner, in the checkpoint-A review thread",
+ "approved_utc": "2026-09-16",
+ "runs": [
+  {
+   "name": "P1",
+   "finite_element_order": 2,
+   "halo_mm": 0.08,
+   "dof_measured": 208670,
+   "purpose": "the reference solve"
+  },
+  {
+   "name": "P2",
+   "finite_element_order": 1,
+   "halo_mm": 0.08,
+   "dof_measured": 39832,
+   "purpose": "element-order sensitivity, against P1"
+  },
+  {
+   "name": "P3",
+   "finite_element_order": 2,
+   "halo_mm": 0.12,
+   "dof_measured": 235806,
+   "purpose": "halo sensitivity, against P1"
+  }
+ ],
+ "constraints": {
+  "per_solve_wall_clock_cap_s": 2700,
+  "dof_budget": 250000,
+  "all_runs_inside_dof_budget": true,
+  "external_or_additional_compute": "none; one job on the standard GitHub-hosted runner",
+  "p3_halo_choice": "0.12 mm, chosen so that every run stays inside the existing 250 000 DOF rule; the 0.15 mm variant, which would have needed a one-run exception, was declined"
+ },
+ "frozen_criteria": {
+  "max_relative_participation_change": 0.01,
+  "max_relative_frequency_change": 0.0001,
+  "frozen_in": "docs/coupled-candidate/execution-proposal.md section 4.2, before the pilot ran",
+  "unchanged": true
+ },
+ "explicitly_out_of_scope": [
+  "the coupling extraction itself",
+  "the Route A inversion",
+  "Route B",
+  "pulse optimisation",
+  "AMD-E",
+  "decoder work",
+  "mediator work",
+  "any broader redesign"
+ ],
+ "note": "Committing this file on a palace/** branch starts the pilot. It is the approval record and the trigger at once, so a pilot cannot be started by an unrelated code change."
+}

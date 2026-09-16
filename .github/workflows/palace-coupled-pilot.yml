@@ -17,12 +17,22 @@
 # and no mediator work. It records completion, the mode list in the declared
 # window, the site participation, wall time and memory, with a manifest.
 #
-# Trigger: manual dispatch only. It does not run on push, because a pilot is
-# something a human approves, not something a commit starts.
+# Triggers. A pilot is something a human approves, not something a commit
+# starts, so this workflow does NOT run on ordinary pushes. It runs when
+# `.github/pilot-approval.json` is committed on a `palace/**` branch: that
+# file records who approved what, so the trigger is the approval record
+# itself and an unrelated code change cannot start a pilot. Manual dispatch
+# also works once this file reaches the default branch, since GitHub
+# registers dispatchable workflows only from there.
 
 name: Palace coupled pilot
 
 on:
+  push:
+    branches:
+      - "palace/**"
+    paths:
+      - ".github/pilot-approval.json"
   workflow_dispatch:
     inputs:
       commit_results:
@@ -43,8 +53,8 @@ concurrency:
 
 env:
   IMAGE: qmhp-cem/palace:0.13.0
-  COMMIT_RESULTS: ${{ inputs.commit_results }}
-  PREPARE_ONLY: ${{ inputs.prepare_only }}
+  COMMIT_RESULTS: ${{ github.event_name != 'workflow_dispatch' || inputs.commit_results }}
+  PREPARE_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.prepare_only }}
 
 jobs:
   pilot:
@@ -55,6 +65,12 @@ jobs:
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
+
+      - name: Show the approval this run executes under
+        run: |
+          echo "::group::.github/pilot-approval.json"
+          cat .github/pilot-approval.json
+          echo "::endgroup::"
 
       - name: Free runner disk
         run: |
