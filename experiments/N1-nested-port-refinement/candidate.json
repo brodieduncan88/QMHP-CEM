@@ -19,7 +19,7 @@
   ],
   "Levels": 1,
   "units": "mesh length units (mm; Model.L0 = 0.001)",
-  "justification": "the lumped-port face (attribute 10) bounding box padded by 0.010 mm, the same pad R1 declared, so the refined neighbourhood is comparable in extent while the mechanism is nested instead of a regenerated mesh"
+  "justification": "the lumped-port face (attribute 10) bounding box padded by 0.010 mm, the same pad R1 declared. NOTE: the same pad does NOT make the perturbation comparable in size -- R1 added 818 DOF, while this candidate's LOWER bound alone is +1920, at least 2.3x, before any green closure. The pad is shared for continuity of the declared region, not to match the perturbation magnitude."
  },
  "baseline_topology": {
   "V": 13991,
@@ -39,7 +39,8 @@
   "material_attributes_touched": [
    1,
    3
-  ]
+  ],
+  "accounting_gap": "boundary elements are bisected too, and Palace adds 9449 interface boundary elements at load; neither appears in the 221/64434 element count. Edge count is unaffected."
  },
  "dof": {
   "measured": null,
@@ -47,22 +48,24 @@
   "rigorous_lower_bound": 81864,
   "lower_bound_derivation": "marked submesh refines uniformly (octasection): E' = 2E+3F+T. Green closure only ADDS elements (mesh.cpp:10123), so E_total >= E_baseline + E(M) + 3F(M) + T(M).",
   "budget": 250000,
-  "headroom_against_lower_bound": 168136,
-  "uniform_refinement_for_scale": 615486
+  "rigorous_upper_bound": 615486,
+  "upper_bound_note": "uniform refinement of the whole mesh; 2.46x the budget. There is no tighter upper bound available offline, so the honest offline statement is the interval [81864, 615486].",
+  "breach_argument": "breaching 250000 from 79944 needs 170056 added edges; the marked octasection supplies 1920 and a full uniform refinement supplies 535542, so a breach requires the green closure to deliver 31.8% of a uniform refinement -- an 89x expansion of the 221 marked elements. Computable offline; still not a measurement.",
+  "enforcement": "Palace prints 'ND (p = 1)' at palace_log.txt line 49, before the eigensolver is configured at line 54. The gate is enforceable by a probe that reads that line and kills the job, with seconds of exposure -- NOT by degrading the rule to a post-hoc check."
  },
  "invariants_by_construction": {
   "mesh_file": "byte-identical; refinement is a config block",
   "existing_vertex_coordinates": "never moved; new vertices are edge midpoints only (mesh.cpp:10834-10841)",
   "element_attributes": "inherited by children (mesh.cpp:10890,10896)",
   "boundary_attributes": "inherited by children (BdrBisection, mesh.cpp:10959)",
-  "port_connectivity_and_L_s": "w and l come from the bounding box of the port attribute (lumpedelement.cpp:22-69); midpoints are convex combinations of existing vertices, so the hull and hence w, l, L_s and kappa are unchanged",
-  "Lc": "largest mesh bounding-box extent; unchanged for the same reason",
+  "port_connectivity_and_L_s": "w and l come from mesh::GetBoundingBox on the port attribute (lumpedelement.cpp:22-69). That box is ORIENTED, not axis-aligned (geodata.hpp:124-128). Midpoints are convex combinations so no inserted vertex can become a new extremum; the extremal-point selection is tie-broken by list order and refinement reorders the cloud, but axes are re-sorted by descending length (geodata.cpp:1013-1014), so Lengths() is permutation-invariant. Safe for THIS rectangular planar port; not a general guarantee.",
+  "Lc": "computed from the PRE-refinement bounding box: main.cpp:311-313 orders ReadMesh -> NondimensionalizeInputs -> RefineMesh, and iodata.cpp:448-463 runs under MFEM_VERIFY(!init). Lc cannot see the refinement at all.",
   "parent_child": "tracked by MFEM as CoarseFineTr.embeddings[i].parent (mesh.cpp:10908)"
  },
  "propagation": {
   "conforming": true,
   "why": "GeneralRefinement forces nonconforming=0 for 3D simplex meshes (mesh.cpp:10565-10567)",
-  "beyond_the_region": "YES. Conformity is restored by a green-closure bisection loop (mesh.cpp:10123+) that refines adjoining elements outside the box. This is NOT a face-only or box-only change. Its extent is not computable offline and is the reason DOF cannot be pre-measured.",
+  "beyond_the_region": "YES. ParMesh::LocalRefinement (pmesh.cpp:3385) restores conformity by bisecting ANY element needing it, marked or not (pmesh.cpp:3467-3477), with an MPI face exchange (3489-3560) and boundary elements (3568-3580). This is NOT a face-only or box-only change, and its extent is not computable offline.",
   "MaxNCLevels_and_Nonconformal": "inert for tets; the conforming branch is taken first"
  },
  "quality": {

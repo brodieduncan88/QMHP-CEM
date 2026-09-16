@@ -1,8 +1,11 @@
 # Can the existing L2 mesh be refined locally, without Gmsh?
 
-**Yes — the pinned stack supports it, and it is better controlled than R1.**
-**But the 250 000-DOF pre-flight gate cannot be discharged offline.** That single
-blocker is the reason this stops for approval rather than proposing a launch.
+**Yes — the pinned stack supports it.** The refinement is conforming, nested and
+applied to the existing mesh with no Gmsh, and it leaves the lumped-port geometry
+untouched. **It is better controlled than R1 on nestedness and geometric
+invariance, and strictly worse on pre-launch verifiability**: the DOF cannot be
+measured offline, so the 250 000-DOF gate must be enforced by a probe at launch
+(§3) rather than before it. That trade is the decision this stops for.
 
 Offline study. No Palace was executed, no mesh regenerated, no record modified.
 Everything below is read from the pinned sources: Palace `v0.13.0`
@@ -25,24 +28,40 @@ What the source says, step by step:
 
 | step | behaviour | source |
 |---|---|---|
-| marking | an element is marked if **any one of its vertices** lies inside the closed box | `geodata.cpp:282-306` |
+| marking | an element is marked if **any one of its vertices** lies inside the closed box | `geodata.cpp:281-307` |
 | dispatch | `GeneralRefinement(refs, -1)` | `geodata.cpp:350` |
 | conformity | for a 3-D mesh containing simplices, `nonconforming = 0` is forced **before** the argument is consulted | `mesh.cpp:10565-10567` |
-| refinement | `Refinement(i)` defaults to `XYZ` (7) → `type = 3` → **octasection**, 7 bisections, 8 children per marked tet | `ncmesh.hpp:44`, `mesh.cpp:10105-10119` |
-| conformity restored | a **green-closure loop** bisects neighbours until there are no hanging nodes | `mesh.cpp:10123+` |
+| refinement | `Refinement(i)` defaults to `XYZ` (7) → `type = 3` → **octasection**, 7 bisections, 8 children per marked tet | `ncmesh.hpp:44`, `pmesh.cpp:3427-3441` |
+| conformity restored | a **green-closure loop** bisects *any* element needing it, marked or not, plus an MPI face exchange and the boundary elements | `pmesh.cpp:3467-3477, 3489-3560, 3568-3580` |
 | new vertices | **edge midpoints only** — `vertices.Append(V)`; existing coordinates are never moved | `mesh.cpp:10834-10841` |
-| element tags | children inherit the parent attribute | `mesh.cpp:10890, 10896` |
+| element tags | children inherit the parent attribute | `mesh.cpp:10890`, then `10896` or `10898` depending on `MFEM_USE_MEMALLOC` |
 | boundary tags | children inherit the parent attribute | `BdrBisection`, `mesh.cpp:10959` |
 | parent/child | tracked as `CoarseFineTr.embeddings[i].parent` | `mesh.cpp:10908-10910` |
 
-Two preconditions were checked rather than assumed:
+**Which code actually runs.** `ParMesh` does not override `GeneralRefinement`
+(`mesh.hpp:2185`), so the dispatch above is the serial one — but it calls
+`LocalRefinement`, which **is** virtual (`mesh.hpp:429`) and **is** overridden
+(`pmesh.hpp:195`). The executed octasection and closure are therefore
+`ParMesh::LocalRefinement` (`pmesh.cpp:3385`), not the serial twins in
+`mesh.cpp`. Behaviour matches; the citations above point at the executed code.
+`Mesh::Bisection` and `Mesh::BdrBisection` are *not* overridden, so the
+midpoint and attribute citations are the serial ones and are correct.
+
+Three preconditions were checked rather than assumed:
 
 - The tet path asserts `GetRefinementFlag() != 0` and aborts otherwise
-  (`mesh.cpp:10826`). Palace loads its mesh with `refine = true`
-  (`geodata.cpp:1494`), which sets those flags. **The path is live.**
-- `Nonconformal` and `MaxNCLevels` are **inert here**. They only reach
-  `NonconformingRefinement`, and the conforming branch is taken first for tets.
-  A reader of the Palace docs alone would not know this.
+  (`mesh.cpp:10825-10826`). Palace loads with `refine = true`
+  (`geodata.cpp:1494`), reaching `MarkTetMeshForRefinement`
+  (`mesh.cpp:2667-2688`), which sets those flags. **The path is live.**
+- `Nonconformal` and `MaxNCLevels` are **inert for this configuration**. They
+  only reach `NonconformingRefinement`. Note the ordering: `if (ncmesh)
+  { nonconforming = 1; }` at `mesh.cpp:10561-10563` takes precedence over the
+  simplex branch, and is skipped only because `EnsureNCMesh` is called solely
+  under `refinement.nonconformal && use_amr` (`geodata.cpp:137-140`), which is
+  false here. So "conforming regardless of the argument" holds **for this
+  config**, not unconditionally.
+- Region refinement `MFEM_ABORT`s outright for any non-simplex mesh
+  (`geodata.cpp:237-246`), so there is no silent fallback.
 
 ## 2. What this controls that R1 did not
 
@@ -54,15 +73,48 @@ R1's weakness was that its comparison regenerated the mesh. This does not.
 | baseline vertices retained | 81.6 % (2 571 of 13 991 absent, out to 3.32 mm) | **100 %, by construction** |
 | nested | no | **yes** |
 | parent/child | none | **tracked by MFEM** |
-| `w`, `l`, `L_s`, `κ`, `Lc` | unchanged in principle | **unchanged, provably** |
+| `w`, `l`, `L_s`, `κ` | unchanged in principle | **unchanged** (see below) |
+| `Lc` | unchanged in principle | **cannot change** — computed pre-refinement |
+| **pre-launch measured DOF** | **yes — 80 762, dry-run before approval** | **no** (§3) |
+| **pre-launch mesh-identity gate** | **yes — `REFUSED-MESH-MISMATCH` on a sha256** | **no** — there is no candidate mesh to hash |
 
-The last row is the one that matters most and is the easiest to get wrong.
-Palace derives the lumped port's `w` and `l` from the **bounding box** of the
-port attribute (`lumpedelement.cpp:22-69`), and `L_s = L·(w/l)·n`. Every vertex
-this refinement adds is a midpoint — a convex combination of existing vertices —
-so the convex hull, the bounding box, `w`, `l`, `L_s`, `κ` and `Lc` are all
-unchanged. `tests/test_nested_refinement.py` asserts this by inserting every
-midpoint (and every midpoint-of-midpoint) and re-measuring, rather than arguing it.
+**The comparison is not one-sided, and the last two rows are R1's.** R1 was
+measured and hash-gated before it was allowed to start; N1 cannot be either,
+because the object being gated does not exist until Palace builds it. **On
+pre-launch verifiability N1 is strictly worse than R1**, and the probe in §3 is
+what narrows that gap rather than closing it. N1 is better on nestedness and
+geometric invariance; that is the trade, and it should be stated as a trade.
+
+`Lc` is the strongest row: `main.cpp:311-313` orders `ReadMesh` →
+`NondimensionalizeInputs` → `RefineMesh`, and `Lc` is taken from the
+pre-refinement bounding box under `MFEM_VERIFY(!init)` (`iodata.cpp:448-463`).
+It cannot see the refinement at all.
+
+**The port-geometry row needs more care than a one-line hull argument**, and an
+earlier draft did not give it. Palace derives `w` and `l` from
+`mesh::GetBoundingBox` on the port attribute (`lumpedelement.cpp:22-69`), and
+that box is **not axis-aligned**: `BoundingBoxFromPointCloud`
+(`geodata.cpp:915-1023`) builds an *oriented* box from extremal points, and
+`geodata.hpp:124-128` says so — "These do not need to be axis-aligned ... for
+other shapes, the result is less predictable". The invariance still holds, for
+two reasons that must both be stated:
+
+1. Every selection functional is hull-extremal, and a midpoint is a convex
+   combination of existing vertices, so **no inserted vertex can become a new
+   extremum**.
+2. The selections are `min_element`/`max_element` iterators, tie-broken by list
+   order, and refinement reorders the point cloud. For this **rectangular**
+   port both off-diagonal corners are equidistant from the main diagonal, so the
+   chosen corner can flip. It is harmless only because `geodata.cpp:1013-1014`
+   re-sorts the axes by descending length, making `Lengths()`
+   permutation-invariant. **On a non-rectangular or non-planar port face that
+   rescue would not exist.**
+
+So the conclusion is safe *for this port*, and for a stated reason rather than a
+general one. `tests/test_nested_refinement.py` checks an **axis-aligned** box,
+which is not the quantity Palace computes; it coincides here only because the
+port is an exactly axis-aligned planar 0.020 × 0.040 mm rectangle, which the
+test also asserts. It is a necessary condition, not the full invariance.
 
 **It is still not a face-only change.** Two reasons, both recorded in the
 candidate:
@@ -72,47 +124,89 @@ candidate:
 2. The **green closure refines elements outside the box**. Conformity requires
    it. Its extent is not computable offline.
 
-## 3. The blocker: DOF cannot be measured offline
+## 3. The DOF gate: not measurable offline, but still enforceable
 
-The 250 000-DOF rule requires a *measured* order-1 DOF before launch. For this
-mechanism there is no offline measurement, for three independent reasons:
+The 250 000-DOF rule requires a *measured* order-1 DOF. **No offline measurement
+exists** for this mechanism:
 
-- The refined mesh **exists only inside Palace**, constructed at load time and
-  never written out.
+- The refined mesh is constructed inside Palace at load time. It is not written
+  before the solve. (It *is* written afterwards — `postoperator.cpp:52` builds
+  the ParaView collection on `space_op.GetNDSpace().GetParMesh()`, the refined
+  mesh, and the candidate keeps `Solver.Eigenmode.Save: 6`. That is post-solve
+  and cannot gate anything, but the mesh is not invisible.)
 - **MFEM has no Python binding in this environment** (checked: `mfem`, `pymfem`
-  absent; only `gmsh` is installed), so the refinement cannot be reproduced.
-- Palace's `--dry-run` **parses the configuration file and exits** without
-  loading a mesh (`main.cpp:246-254`), so it cannot report DOF either.
+  absent; only `gmsh`), so the refinement cannot be reproduced offline.
+- Palace's `--dry-run` **parses the configuration file and exits**
+  (`main.cpp:246-256`) without loading a mesh — the mesh is first touched at
+  `main.cpp:311`.
 
-Computing the green closure offline means reimplementing MFEM's bisection. That
-is out of scope by instruction, and a silent mismatch would be worse than no
-number at all.
+Reproducing the green closure offline means reimplementing MFEM's bisection,
+which is out of scope and would be worse than no number if it silently diverged.
 
-**This weakens an existing guarantee, and that is the decision being asked for.**
-The ladder workflow's header states that *"the driver refuses to launch a level
-whose measured DOF exceeds the budget"* — a **pre-launch refusal**, made possible
-because every mesh so far was built by Gmsh offline and could be counted before
-any solver started. A Palace-side refinement cannot be counted that way, so for
-N1 the 250 000-DOF rule degrades from a refusal to a **post-hoc detection**: the
-run starts, Palace reports its DOF, and the record records a breach after the
-fact. The rule's *value* is unchanged and the cost of a breach is bounded by the
-45-minute cap, but the enforcement is strictly weaker than for every rung to
-date. **No code here changes that rule**, and it should not be changed without
-the owner saying so.
+### The gate does NOT have to be given up
 
-What *can* be established rigorously offline is a **lower bound**. The marked
-submesh refines uniformly, for which `E' = 2E + 3F + T` is exact, and the closure
-only ever adds:
+An earlier draft of this document concluded that the rule must degrade from a
+**pre-launch refusal** to a **post-hoc detection**. That was wrong, and it
+over-read "not measurable offline" as "not enforceable before the solve".
+
+Palace prints the DOF almost immediately, and long before the expensive work.
+From the baseline run's own `palace_log.txt`:
+
+| log line | content |
+|---|---|
+| 30 | `edges  79944` (parallel mesh stats) |
+| **49** | **`H1 (p = 1): 13991, ND (p = 1): 79944, RT (p = 1): 130388`** |
+| 54 | `Configuring SLEPc eigenvalue solver` |
+| 191 | `Found 6 converged eigenvalues` |
+
+So the enforcement a refined run needs is a **bounded probe**: launch Palace,
+read `ND (p = 1)`, and if it exceeds 250 000 kill the job and refuse. Exposure is
+**seconds of mesh loading and assembly**, not the 45-minute cap, and the refusal
+still happens before any eigenvalue work. That is not identical to a pre-launch
+refusal — the process does start — but it is far closer to it than to post-hoc
+detection, and it keeps the rule's force intact.
+
+**This requires running Palace, so it is not done here** and is folded into the
+proposed run in §5 as its first stop condition. The rule itself is unchanged and
+no code in this branch touches it.
+
+### What can be said offline
+
+A *lower* bound is computable exactly. The marked submesh refines uniformly, for
+which `E' = 2E + 3F + T` is an identity, and the closure only ever adds:
 
 ```
-E_refined  >=  E_baseline + E(M) + 3·F(M) + T(M)
-           =   79 944 + 307 + 3·464 + 221   =   81 864
+E_refined  >=  79 944 + 307 + 3·464 + 221  =  81 864
 ```
 
-against a budget of 250 000 — **168 136 of headroom** on the bound. For scale,
-refining the *whole* mesh uniformly would give 615 486, so this region is
-0.34 % of the elements and the budget is not plausibly at risk. **Plausible is
-not measured, and the rule says measured.**
+**A lower bound cannot discharge an upper limit**, and it should not be quoted as
+"headroom" — an earlier draft did exactly that, which was this document's weakest
+moment. Stated honestly, the offline knowledge is an interval:
+
+```
+81 864  <=  E_refined  <=  615 486        (uniform refinement; 2.46x the budget)
+```
+
+The useful offline argument is the *breach* argument, not the bound. Refining the
+whole mesh uniformly adds 535 542 edges. Breaching 250 000 from a baseline of
+79 944 needs 170 056 added edges. The marked octasection supplies 1 920. So a
+breach requires the green closure to deliver
+
+> **31.8 % of a full uniform refinement — an 89× expansion of the 221 marked
+> elements.**
+
+That is a much stronger statement than "0.34 % of the elements", and it is fully
+computable offline. It still is not a measurement, and three things cut against
+complacency:
+
+- There is **no upper bound below 615 486**, which is 2.46× the budget.
+- The marked set is the mesh's **smallest and worst-shaped** elements, sitting
+  directly against much larger neighbours — precisely the configuration in which
+  a longest-edge-marked conforming closure has the most propagating to do.
+- Boundary elements are bisected too (`pmesh.cpp:3568-3580`), and Palace adds
+  9 449 interface boundary elements at load. Neither appears in the 221/64 434
+  element accounting. Edge count is unaffected, but the accounting is not
+  complete.
 
 ## 4. The prepared candidate
 
@@ -139,10 +233,14 @@ not quality-preserving in general.
 
 **N1: the level-2 baseline re-solved with one `Model.Refinement.Boxes` entry.**
 
-**Purpose.** To obtain, for the first time, a frequency difference that *is*
-attributable — a nested pair on one mesh file, where the only change is added
-degrees of freedom in a declared region and `L_s`, `κ` and `Lc` are provably
-unchanged. R1 could not support an attribution; this is the experiment that can.
+**Purpose.** To obtain a frequency difference from a **nested** pair on one mesh
+file, where the only change is added degrees of freedom in a declared region and
+`L_s`, `κ` and `Lc` are unchanged. That is strictly more than R1 could offer —
+but it is **not** an answer to the question R1 was asked. A movement here would
+be attributable to *added resolution in that region*, which is not the same as
+*port-face resolution*: the region is a volume, the closure extends it, and the
+marked elements are the worst-shaped in the mesh. Element quality remains a live
+alternative explanation and this run cannot separate it.
 
 **Remaining confounds**, stated before the run rather than after:
 
@@ -158,10 +256,11 @@ unchanged. R1 could not support an attribution; this is the experiment that can.
 
 **Stop conditions.**
 
-1. Palace reports order-1 DOF **> 250 000** → the record is written, the run is
-   marked over-budget, and no further refinement is proposed. This is the
-   blocker in §3 made visible: it is detected *after* the solve starts, and the
-   45-minute cap bounds the cost of finding out.
+1. **The DOF probe (§3).** Palace prints `ND (p = 1)` at log line 49, before the
+   eigensolver is configured at line 54. The run reads that line and, if it
+   exceeds **250 000**, kills the job and records `REFUSED-DOF-BUDGET`. Exposure
+   is seconds of load and assembly, not the 45-minute cap. This keeps the rule's
+   force; it does not weaken it to a post-hoc check.
 2. Wall clock exceeds the unchanged **45-minute cap** → terminate, record.
 3. Max backward error exceeds the unchanged **1e-6** → record and stop.
 4. The admitted set is not `{m1, m2}`, or matching against the level-1 rung

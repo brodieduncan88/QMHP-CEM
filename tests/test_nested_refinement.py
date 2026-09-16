@@ -105,19 +105,31 @@ def test_the_budget_claim_is_a_bound_and_is_not_presented_as_a_measurement(candi
     assert dof["rigorous_lower_bound"] < BUDGET
     # The bound is only a bound: green closure can only add.
     assert dof["rigorous_lower_bound"] > 79_944
-    assert dof["uniform_refinement_for_scale"] > BUDGET, (
-        "uniform refinement is out of budget, which is why a local region is needed at all"
-    )
+    # The only available upper bound is uniform refinement, and it is OVER budget,
+    # so the offline knowledge is an interval that straddles the limit. A lower
+    # bound cannot discharge an upper limit and must not be quoted as headroom.
+    assert dof["rigorous_upper_bound"] > BUDGET
+    assert dof["rigorous_lower_bound"] < BUDGET < dof["rigorous_upper_bound"]
+    assert "89x" in dof["breach_argument"], "the useful offline argument is the breach argument"
+    # And the gate stays enforceable at launch rather than being weakened.
+    assert "ND (p = 1)" in dof["enforcement"]
 
 
-def test_refining_the_port_face_cannot_move_the_lumped_port_geometry(mesh):
-    """Palace takes the port's w and l from the bounding box of attribute 10
-    (lumpedelement.cpp:22-69), and MFEM's bisection only inserts edge midpoints
-    (mesh.cpp:10834-10841). Midpoints are convex combinations of existing
-    vertices, so the box -- and hence w, l, L_s and kappa -- cannot change.
+def test_inserted_midpoints_never_extend_the_port_point_cloud(mesh):
+    """A NECESSARY condition for the lumped-port geometry to be invariant.
 
-    Asserted by construction rather than argued: insert every midpoint and
-    re-measure.
+    Palace takes the port's w and l from ``mesh::GetBoundingBox`` on attribute 10
+    (lumpedelement.cpp:22-69), and MFEM's bisection inserts only edge midpoints
+    (mesh.cpp:10834-10841). This checks the axis-aligned extent is unmoved by
+    inserting every midpoint.
+
+    It is deliberately NOT the whole claim. Palace's box is ORIENTED, not
+    axis-aligned (geodata.hpp:124-128), so this test checks a necessary
+    condition, not the invariance itself. The two coincide here only because the
+    port is an exactly axis-aligned planar rectangle, which is also asserted
+    below. The remaining step -- that no midpoint can become a new extremum of
+    the oriented box, and that the tie-break is rescued by axes being re-sorted
+    by length -- is argued in the feasibility document, not here.
     """
     nodes, _, tris = mesh
     face = [c for phys, c in tris if phys == PORT_ATTR]
