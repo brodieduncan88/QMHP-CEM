@@ -512,8 +512,17 @@ def earlier_rungs(root: Path | None = None) -> list[dict[str, Any]]:
             # "COUPLED-LADDER-O1-L2-R1-2026..." and loses the dedup race.
             continue
         level = int(summary["level"])
-        if any(r["level"] == level for r in rungs):
-            continue
+        prior = next((r for r in rungs if r["level"] == level), None)
+        if prior is not None:
+            # Two committed records claim one rung. Taking the first silently
+            # means the OLDEST stamp wins, so a superseded re-run would pin the
+            # h-sequence without a word. The ladder takes exactly one record per
+            # level and says so rather than guessing which.
+            raise LadderError(
+                f"two records claim ladder level {level}: {prior['source']} and "
+                f"{record.name}. The h-sequence takes exactly one record per level; "
+                f"retire or relabel one before fitting a convergence order over them."
+            )
         rungs.append({
             "level": level,
             "h_gap_mm": mesh_sizes_mm(cell, level)[1],
@@ -1190,7 +1199,12 @@ def compare_against_baseline(
     reference, a refined level-2 run differs in two things at once - the global
     level AND the port box - and neither effect can be read off. Against the
     plain rung at the same level, the two runs differ in exactly one prescribed
-    number, so any frequency movement is attributable to the port face.
+    number. That number is one PRESCRIPTION, not one physical channel: the box
+    it constrains is 0.040 x 0.060 x 0.020 mm, a volume straddling the chip
+    surface, and gmsh re-meshes globally from it - 18.4% of the baseline's
+    nodes are absent from the refined mesh, out to 3.2 mm from the port. A
+    frequency movement between them is therefore caused by the refined
+    VOLUME plus the re-meshing it forced, not by the port face alone.
 
     The matching rule, the magnitude convention and the frozen tolerances are
     the unchanged ones; nothing here introduces a threshold.
@@ -1199,8 +1213,11 @@ def compare_against_baseline(
         "baseline": baseline_record,
         "why_this_comparison": (
             "the refined run and the baseline differ in exactly one prescribed number, the "
-            "element size held over the port box, so a frequency difference between them is "
-            "attributable to port-face resolution and to nothing else"
+            "element size held over the port box. That is one prescribed number, and "
+            "it is NOT one physical channel: the box is a 0.040 x 0.060 x 0.020 mm VOLUME, "
+            "not a face, and gmsh re-meshes globally from it, so a frequency difference "
+            "between them bounds the effect of refining that volume; it does not isolate "
+            "the port face"
         ),
         "matching_rule": dict(MATCHING_RULE),
         "convention": dict(COMPARISON_CONVENTION),
@@ -1314,8 +1331,13 @@ def port_resolution_sensitivity(
             "is the large L1/L2/L3 frequency movement sensitive to port-face resolution?"
         ),
         "statistic": (
-            "|delta_f(baseline -> refined)| / |delta_f(L2 -> L3)|, per tracked mode, where the "
-            "numerator changes only the port box and the denominator changes the whole mesh"
+            "|delta_f(baseline -> refined)| / |delta_f(L2 -> L3)|, per tracked mode. This is an "
+            "UPPER BOUND, not a share. The numerator is contaminated upward (the refined box is "
+            "a volume and forces a global re-mesh) and the denominator is contaminated in both "
+            "directions (L2 -> L3 is a 1.333x global refinement that ALSO refines the port face, "
+            "1.333x at the face against the numerator's 10.08x at the port centre). Neither is a "
+            "clean single-channel measurement, and an eigenvalue error does not decompose "
+            "additively by region, so the complement of this ratio is not 'the rest of the cause'"
         ),
         "available": False,
     }
@@ -2054,10 +2076,12 @@ def main(argv: list[str] | None = None) -> int:
                 }
 
         # A port-refined run is compared against the PLAIN rung at the same level:
-        # the two differ in exactly one prescribed number, so a frequency movement
-        # between them is attributable to the port face and to nothing else. This is
-        # the comparison the experiment exists for; the level-1 comparison above is
-        # kept because it is what every other rung reports.
+        # the two differ in exactly one prescribed number. One prescribed number is
+        # not one physical channel - the box is a volume, and gmsh re-meshes globally
+        # from it - so the movement between them BOUNDS the port neighbourhood's
+        # contribution rather than isolating it. This is the comparison the
+        # experiment exists for; the level-1 comparison above is kept because it is
+        # what every other rung reports.
         baseline_comparison: dict[str, Any] = {"available": False, "reason": "not a port-refined run"}
         sensitivity: dict[str, Any] = {"available": False, "reason": "not a port-refined run"}
         if port_refinement is not None:

@@ -954,3 +954,247 @@ def test_the_renderer_is_total_over_a_partial_refinement_payload(partial):
     text = ladder.render_report(summary)
     assert text
     assert "could not be rendered" not in text
+
+
+# --- the R1 corrections, pinned to the numbers that justify them --------------
+
+R1_RECORD = REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-R1-20260916T120954Z"
+
+
+def test_the_r1_run_solved_the_approved_mesh_and_nothing_else():
+    summary = json.loads((R1_RECORD / "summary.json").read_text())
+    rung = summary["rung"]
+    approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
+    assert rung["status"] == "COMPLETED"
+    assert rung["mesh"]["sha256"] == approval["dry_run_mesh_sha256"]["R1"]
+    assert rung["dof_measured"] == 80_762 <= DOF_BUDGET
+    assert rung["run"]["wall_clock_s"] < 2700
+    assert summary["post_solve_analysis_failed"] is None
+    assert manifest.verify(R1_RECORD) == []
+
+
+def test_the_claim_that_survives_every_correction():
+    """R1's port face is finer than L3's yet its frequency is below L3's.
+
+    Two measured frequencies and two triangle counts: no ratio, no regional
+    decomposition, no efficiency claim. Everything else in the first write-up
+    was faulted by independent readings and is struck in the document.
+    """
+    from solvers.palace.mesh_inspection import read_msh2
+
+    r1_face = len(read_msh2(R1_RECORD / "L2" / "solver" / "coupled_chip_cell_L2.msh").triangles[10])
+    l3_face = len(
+        read_msh2(
+            REPO_ROOT
+            / "results/COUPLED-LADDER-O1-L3-20260916T091212Z/L3/solver/coupled_chip_cell_L3.msh"
+        ).triangles[10]
+    )
+    assert r1_face == 176 and l3_face == 45
+    assert r1_face / l3_face == pytest.approx(3.91, abs=0.01)
+
+    r1_f = json.loads((R1_RECORD / "summary.json").read_text())["rung"]["admission"]["modes"][0]
+    l3_f = json.loads(
+        (REPO_ROOT / "results/COUPLED-LADDER-O1-L3-20260916T091212Z/summary.json").read_text()
+    )["rung"]["admission"]["modes"][0]
+    assert r1_f["frequency_GHz"] == pytest.approx(1.521003, abs=1e-6)
+    assert l3_f["frequency_GHz"] == pytest.approx(1.709562, abs=1e-6)
+    # Finer port face, LOWER frequency: the port face is not the sole driver.
+    assert r1_f["frequency_GHz"] < l3_f["frequency_GHz"]
+
+
+def test_the_withdrawn_cost_ratios_are_not_restated():
+    """The per-second ratio is 1.28x. The document once said 3.2x, wrongly."""
+    r1 = json.loads((R1_RECORD / "summary.json").read_text())["rung"]["run"]["wall_clock_s"]
+    base = json.loads(
+        (REPO_ROOT / "results/COUPLED-LADDER-O1-L2-20260916T080802Z/summary.json").read_text()
+    )["rung"]["run"]["wall_clock_s"]
+    ratio = (0.059116 / (r1 - base)) / (0.247675 / (159.1 - base))
+    assert ratio == pytest.approx(1.28, abs=0.02), "the corrected per-second ratio"
+    document = (
+        REPO_ROOT / "docs" / "coupled-candidate" / "r1-port-refinement-outcome.md"
+    ).read_text()
+    assert "1.28" in document
+    assert "withdrawn; the measured per-second ratio is 1.28" in document
+
+
+def test_port_refinement_made_the_admitted_closure_worse_and_the_record_says_so():
+    """Reported because it is the reason the separation margin fell."""
+    r1 = json.loads((R1_RECORD / "summary.json").read_text())["rung"]["admission"]
+    base = json.loads(
+        (REPO_ROOT / "results/COUPLED-LADDER-O1-L2-20260916T080802Z/summary.json").read_text()
+    )["rung"]["admission"]
+    r1_m1 = [m for m in r1["modes"] if m["disposition"] == "ADMITTED"][0]
+    base_m1 = [m for m in base["modes"] if m["disposition"] == "ADMITTED"][0]
+    assert r1_m1["energy_balance_defect"] > base_m1["energy_balance_defect"]
+    assert r1["separation_decades"] < base["separation_decades"]
+    document = (
+        REPO_ROOT / "docs" / "coupled-candidate" / "r1-port-refinement-outcome.md"
+    ).read_text()
+    assert "+22.9" in document
+    assert "0.090 decades **worse**" in document
+
+
+def test_the_order_verdict_is_shown_to_depend_on_the_choice_of_h():
+    """Against the DELIVERED face size a positive order fits; against h_gap none does.
+
+    Not a convergence claim. It is why "the ladder shows no positive order of
+    convergence" is withdrawn as a statement about the solution.
+    """
+    import math
+
+    def fits(h, f):
+        H1, H2 = h[0] / h[2], h[1] / h[2]
+        floor = (math.log(H1) - math.log(H2)) / math.log(H2)
+        return (f[0] - f[1]) / (f[1] - f[2]) > floor
+
+    f1 = [1.158332505, 1.461886595, 1.709561611]
+    f2 = [3.693188998, 3.885511214, 4.087683186]
+    requested = [0.010, 0.0066666666, 0.005]
+    delivered = [0.010425, 0.008597, 0.006407]
+    assert not fits(requested, f1) and not fits(requested, f2)
+    assert fits(delivered, f1) and fits(delivered, f2)
+
+    document = (
+        REPO_ROOT / "docs" / "coupled-candidate" / "r1-port-refinement-outcome.md"
+    ).read_text()
+    assert "not robust to the" in document and "choice of `h`" in document
+    assert "is **not** a claim that" in document
+
+
+def test_two_records_claiming_one_ladder_level_are_refused(tmp_path: Path):
+    """Silently taking the first meant the OLDEST stamp won, unannounced."""
+    import shutil
+
+    ladder = _ladder_module()
+    root = tmp_path / "results"
+    root.mkdir()
+    for name in (
+        "COUPLED-PILOT-20260916T035733Z",
+        "COUPLED-LADDER-O1-L2-20260916T080802Z",
+        "COUPLED-LADDER-O1-L3-20260916T091212Z",
+    ):
+        shutil.copytree(REPO_ROOT / "results" / name, root / name)
+    assert [r["level"] for r in ladder.earlier_rungs(root)] == [1, 2, 3]
+
+    shutil.copytree(
+        root / "COUPLED-LADDER-O1-L2-20260916T080802Z",
+        root / "COUPLED-LADDER-O1-L2-20260916T999999Z",
+    )
+    with pytest.raises(ladder.LadderError, match="two records claim ladder level 2"):
+        ladder.earlier_rungs(root)
+
+
+def test_the_refinement_is_a_volume_and_the_code_says_so():
+    """`pad_mm` applies in z too, so this is not a port-FACE refinement.
+
+    Describing it as one asserts a physical channel that the prescription does
+    not establish, and the record and the docstring both had to be corrected.
+    """
+    cell = _cell()
+    rect = cell.ports["P_F1"][0]
+    refinement = PortRefinement(h_port_mm=0.003333333333333333, pad_mm=0.010, transition_mm=0.020)
+    x0, x1, y0, y1, z0, z1 = refinement.box_mm(rect, cell.z_chip_top_mm)
+    assert (x1 - x0, y1 - y0) == pytest.approx((0.040, 0.060), abs=1e-12)
+    assert z1 - z0 == pytest.approx(0.020, abs=1e-12), "it pads in z, into vacuum and substrate"
+    assert "volume, not a face" in PortRefinement.__doc__
+
+    ladder = _ladder_module()
+    source = (REPO_ROOT / "scripts" / "palace_order1_ladder.py").read_text()
+    assert "it is NOT one physical channel" in source
+    assert "UPPER BOUND, not a share" in source
+    assert ladder is not None
+
+
+def test_the_readout_mode_shift_does_not_scale_with_its_port_participation():
+    """A positive-definite port term cannot move two positive-participation modes
+    in opposite directions, so mode 2 moved through some other channel.
+
+    This is what withdrew the causal attribution: the prescription changed one
+    number, but the channel is the refined volume, not the port.
+    """
+    summary = json.loads((R1_RECORD / "summary.json").read_text())
+    pairs = summary["baseline_comparison"]["pairs"]
+    m1, m2 = pairs[0], pairs[1]
+    p1 = m1["port_participation_from_probes"]["baseline"]
+    p2 = m2["port_participation_from_probes"]["baseline"]
+
+    rel1 = abs(m1["delta_f_GHz"]) / m1["baseline_frequency_GHz"]
+    predicted_rel2 = rel1 * (p2 / p1)
+    predicted_GHz = predicted_rel2 * m2["baseline_frequency_GHz"]
+    observed_GHz = abs(m2["delta_f_GHz"])
+
+    assert observed_GHz / predicted_GHz > 100, "two orders too large for a port-mediated shift"
+    # ... and the signs are opposite, which a positive-definite term forbids.
+    assert m1["delta_f_GHz"] > 0 > m2["delta_f_GHz"]
+    # It is not solver noise either.
+    assert abs(m2["delta_f_relative"]) > 40 * 1.0e-4
+
+
+def test_the_denominator_applies_a_far_weaker_port_perturbation():
+    """So the ratio is an upper bound, never a share."""
+    recovery = sorted((REPO_ROOT / "results").glob("COUPLED-S1-RECOVERY-*"))[-1]
+    field = json.loads((recovery / "summary.json").read_text())["mesh_inspection"]["size_field"]
+    centre = {
+        level: block["size_field"]["prescribed_size_at_port_centre_mm"]
+        for level, block in field["per_level"].items()
+    }
+    ladder_step = centre["L2"] / centre["L3"]
+    refined_step = centre["L2"] / 0.003333333333333333
+    assert ladder_step == pytest.approx(1.3333, abs=1e-3)
+    assert refined_step == pytest.approx(10.08, abs=0.02)
+    assert refined_step / ladder_step > 7.0
+
+
+def _eig_mode1_GHz(record: Path) -> float:
+    """Mode 1's Re{f} in GHz, read from the committed eig.csv."""
+    path = next(record.glob("*/solver/postpro/eig.csv"))
+    lines = [r for r in path.read_text().splitlines() if r.strip()]
+    header = [c.strip() for c in lines[0].split(",")]
+    col = next(i for i, c in enumerate(header) if c.startswith("Re{f}"))
+    return float(lines[1].split(",")[col])
+
+
+def _surface_q_mode1(record: Path) -> tuple[float, float]:
+    """(p_Default, p_MA) for mode 1, read from the committed surface-Q.csv."""
+    path = next(record.glob("*/solver/postpro/surface-Q.csv"))
+    rows = [r for r in path.read_text().splitlines() if r.strip()][1:]
+    cols = [c.strip() for c in rows[0].split(",")]
+    return float(cols[1]), float(cols[3])
+
+
+def test_r1_resolved_the_port_face_by_a_field_measure_and_still_missed_L3():
+    """The record's one surviving claim, checked against the raw CSVs.
+
+    The two surface probes share the face, thickness, permittivity and side, so
+    they differ only by the tangential term and `p_MA/p_Default` is the face's
+    normal-field energy fraction. R1 brings that fraction to within 6% of L3's
+    for ~1% more DOF -- and its frequency still sits far below L3's. The claim
+    is about a converged RATIO, never about the absolute integral, which is
+    asserted here to be still moving so the two statements cannot be conflated.
+    """
+    baseline = REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-20260916T080802Z"
+    l3 = REPO_ROOT / "results" / "COUPLED-LADDER-O1-L3-20260916T091212Z"
+
+    pd_b, pma_b = _surface_q_mode1(baseline)
+    pd_r, pma_r = _surface_q_mode1(R1_RECORD)
+    pd_3, pma_3 = _surface_q_mode1(l3)
+
+    frac_b, frac_r, frac_3 = pma_b / pd_b, pma_r / pd_r, pma_3 / pd_3
+    assert frac_b == pytest.approx(0.006402, abs=5e-6)
+    assert frac_r == pytest.approx(0.105803, abs=5e-6)
+    assert frac_3 == pytest.approx(0.100041, abs=5e-6)
+
+    assert frac_3 / frac_b == pytest.approx(15.63, abs=0.02), "baseline face is ~15.6x deficient"
+    assert abs(frac_r - frac_3) / frac_3 < 0.06, "R1 recovers L3's normal fraction to <6%"
+
+    # The absolute integral is NOT converged; only the ratio is. Both are stated
+    # in the record and the caveat exists so they are not conflated.
+    assert pd_b < pd_r < pd_3, "p_Default is still climbing monotonically"
+    assert (pd_3 - pd_r) / pd_r > 0.2, "and by more than 20% from R1 to L3"
+
+    # And having resolved the face, R1's frequency still misses L3's by far more
+    # than anything the frozen tolerance would call agreement.
+    f_r1 = _eig_mode1_GHz(R1_RECORD)
+    f_l3 = _eig_mode1_GHz(l3)
+    assert f_l3 - f_r1 == pytest.approx(0.188559, abs=1e-5)
+    assert (f_l3 - f_r1) / f_r1 > 1e-1, "four orders of magnitude past the frozen 1e-4"

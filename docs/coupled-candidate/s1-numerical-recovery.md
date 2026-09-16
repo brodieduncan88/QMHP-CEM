@@ -231,8 +231,29 @@ holds on the face — the achieved element size is within 5 % of `h_port`.
 
 The contrast is the point. **R1 costs 818 DOF more than the baseline — 1.0 % —
 and gives 2.6× the port-face resolution. L3 cost 67 428 more DOF — 84 % — for
-1.34×.** The two axes are cleanly separated, so a large shift under R1 would
-localise the cause.
+1.34×.**
+
+The sentence that followed here — that *"the two axes are cleanly separated, so
+a large shift under R1 would localise the cause"* — **is withdrawn**, by R1's own
+executed record (`COUPLED-LADDER-O1-L2-R1-20260916T120954Z`, written up in
+[`r1-port-refinement-outcome.md`](r1-port-refinement-outcome.md)). It was written
+before the run and is wrong in two measured ways.
+
+The axes are **not** cleanly separated. `PortRefinement.box_mm` pads in `z` as
+well as `x` and `y`, so the constraint is held over a 0.040 × 0.060 × 0.020 mm
+**volume** straddling the chip surface, not over the port face. And `config.json`
+being byte-identical does not make the meshes nested: gmsh re-meshed globally
+from the new field, and **18.4 % of the baseline's 13 991 nodes (2 571) are
+absent from R1**, at a median 1.37 mm and a maximum 3.32 mm from the port — most
+of the way across a 4 mm cell. No replicate establishes the re-meshing noise
+floor, so part of the observed shift is uncontrolled.
+
+A large shift therefore would **not** have localised the cause, and the shift
+that occurred did not. What R1 does establish is stated without a ratio: it
+brought the port face's normal-field energy fraction to within 5.8 % of L3's for
+818 added DOF against L3's 67 428, and `f(R1 m1)` still sits 0.188559 GHz
+**below** `f(L3 m1)`. The port neighbourhood is not the bulk of what the ladder
+was buying — which is a weaker and differently-shaped claim than localisation.
 
 **Unchanged**: `Δ|p| ≤ 1e-2`, `Δf ≤ 1e-4`, backward error `1e-6`, admission
 `|R−1| ≤ 1e-3`, matching rule `0.1.1`, the magnitude convention, the 0.5–9.0 GHz

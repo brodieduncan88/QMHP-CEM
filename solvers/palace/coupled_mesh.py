@@ -263,7 +263,19 @@ class PortRefinement:
     This is that constraint: a gmsh ``Box`` field holding ``h_port_mm`` over the
     port rectangle padded by ``pad_mm`` in every direction, blending back to
     ``h_far`` over ``transition_mm``, combined with the existing field by
-    ``Min``. Because the box field returns ``h_far`` outside the padded box and
+    ``Min``.
+
+    **It is a volume, not a face.** ``pad_mm`` applies in ``z`` as well as in
+    ``x`` and ``y``, so a 0.010 mm pad around the 0.020 x 0.040 mm S1 port makes
+    a 0.040 x 0.060 x 0.020 mm box reaching into vacuum AND substrate, and the
+    transition carries it 0.020 mm further. Do not describe a run using it as a
+    "port-face refinement": one prescribed number changes, but the perturbed
+    region is a neighbourhood, and gmsh re-meshes globally in response - on the
+    S1 cell 18.4 % of the baseline's nodes do not survive, out to 3.32 mm.
+    Whether a mode's shift is port-mediated is settled by checking that it
+    scales with that mode's port participation, not by the prescription.
+
+    Because the box field returns ``h_far`` outside the padded box and
     the combination is a minimum, this can only refine: the distant size
     prescription is exactly the ladder's, and the geometry, materials, port
     dimensions, inductance, boundary conditions and physical groups are

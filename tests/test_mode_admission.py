@@ -479,6 +479,22 @@ WITHDRAWN_CLAIMS = [
     r"the evidence suggests the limit\s*is not mesh count",
     # kappa is derived; calibrating it on a favourable subset is withdrawn.
     r"[Cc]alibrate\s*.?[Kk]appa.?\s*only on modes where the surrogate is demonstrably\s*faithful",
+    # Withdrawn by the four independent readings of the R1 record.
+    # A sensitivity whose numerator and denominator refine the face differently
+    # is not a share, and an eigenvalue error does not decompose by region.
+    r"accounts for (?:part of )?the ladder.{0,3}s frequency movement",
+    r"remaining\s*~?\s*76\s*%\s*comes from elsewhere",
+    r"19\.7.? more frequency movement per DOF",
+    r"3\.2.? more movement per second",
+    r"held on a mesh it had never seen",
+    r"[Tt]he strongest corroboration is above the window",
+    # The refinement is a VOLUME; one prescribed number is not one channel.
+    r"attributable to port-face resolution and to nothing else",
+    r"a full 1\.5.? global refinement",
+    # Written before R1 ran, and refuted by R1's own mesh: the box pads in z and
+    # the meshes are not nested, so a shift under R1 localises nothing.
+    r"[Tt]he two axes are cleanly separated",
+    r"a large shift under R1 would\s*localise the cause",
 ]
 
 GUARDED_DOCS = [
@@ -486,6 +502,7 @@ GUARDED_DOCS = [
     REPO_ROOT / "docs" / "coupled-candidate" / "corrective-analysis.md",
     REPO_ROOT / "docs" / "coupled-candidate" / "order1-ladder-outcome.md",
     REPO_ROOT / "docs" / "coupled-candidate" / "s1-numerical-recovery.md",
+    REPO_ROOT / "docs" / "coupled-candidate" / "r1-port-refinement-outcome.md",
 ]
 
 #: The ONLY quotations exempt from the guard, named one by one.
@@ -512,6 +529,28 @@ CITATION_EXEMPTIONS: dict[str, tuple[str, ...]] = {
         "null-space / gradient artefacts that the divergence-free projection did not remove",
         "null-space / gradient artefacts that the divergence-free projection did not remove.",
         "the current direction through the port is not stable under discretisation",
+    ),
+    "r1-port-refinement-outcome.md": (
+        "Port-face resolution accounts for part of the ladder's frequency movement and "
+        "not the bulk of it",
+        "23.9 % of what a 1.5\u00d7 global refinement bought",
+        "the remaining ~76 % comes from elsewhere",
+        "19.7\u00d7 more frequency movement per DOF",
+        "3.2\u00d7 more movement per second",
+        "The derived diagnostic held on a mesh it had never seen",
+        "The strongest corroboration is above the window",
+        "direct evidence the port face was under-resolved",
+        "a 1.5\u00d7 global refinement",
+        "The admission margin, which had eroded 6.56 \u2192 4.47 \u2192 3.09 decades over the "
+        "ladder, is 4.39 here",
+        "the ladder shows no positive order of convergence",
+        # Quoted where the document points at the immutable record that still
+        # carries it, because a record is written once and never modified.
+        "attributable to port-face resolution and to nothing else",
+    ),
+    "s1-numerical-recovery.md": (
+        "the two axes are cleanly separated, so a large shift under R1 would "
+        "localise the cause",
     ),
     "order1-ladder-outcome.md": (
         "The sequence does not converge",
