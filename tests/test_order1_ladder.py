@@ -420,9 +420,16 @@ def test_a_ladder_renderer_failure_is_exercised_and_loses_no_evidence(tmp_path, 
         ladder, "render_report",
         lambda summary: (_ for _ in ()).throw(KeyError("target_relative_frequency_error")),
     )
+    # Pin the approval this test runs under. Without --approval the driver reads
+    # the live .github/ladder-approval.json, so whatever is approved at the time
+    # silently changes what this test exercises - it built the R1 mesh once the
+    # owner approved R1, and asserted the plain rung's DOF against it.
+    approval = tmp_path / "approval.json"
+    approval.write_text(json.dumps({"level": 2}))
     pointer = tmp_path / "pointer"
     code = ladder.main([
         "--level", "2", "--prepare-only",
+        "--approval", str(approval),
         "--results-root", str(tmp_path / "results"),
         "--record-pointer", str(pointer),
     ])
@@ -433,12 +440,92 @@ def test_a_ladder_renderer_failure_is_exercised_and_loses_no_evidence(tmp_path, 
     assert manifest.verify(record) == [], "the record must be manifested despite the failure"
     summary = json.loads((record / "summary.json").read_text())
     assert summary["rung"]["status"] == "PREPARED"
+    assert summary["rung"]["port_refinement"] is None, "the pinned approval refines nothing"
     assert summary["rung"]["dof_measured"] == 79_944
     report = (record / "report.md").read_text()
     assert "could not be rendered" in report
     assert "not a loss of evidence" in report
     assert "target_relative_frequency_error" in report
     assert manifest.unexpected_files(record) == [], "and it must still be committable"
+
+
+@needs_gmsh
+@pytest.mark.slow
+def test_a_refined_run_survives_a_renderer_failure_and_stays_off_the_h_sequence(
+    tmp_path, monkeypatch
+):
+    """The same guarantee on the path that had never been exercised.
+
+    A prepare-only run under a port-refined approval, with the renderer made to
+    raise. The record must survive, carry the refinement, measure the approved
+    mesh, and be excluded from the convergence fit it is not a point on.
+    """
+    ladder = _ladder()
+    monkeypatch.setattr(
+        ladder, "render_report", lambda summary: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+    approval = tmp_path / "approval.json"
+    approval.write_text(json.dumps({
+        "level": 2,
+        "baseline_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+        "port_refinement": {
+            "id": "R1", "h_port_mm": 0.003333333333333333,
+            "pad_mm": 0.010, "transition_mm": 0.020, "ports": ["port_F1"],
+        },
+        "dry_run_mesh_sha256": {
+            "R1": "a49ef282c7f07c56f210a450b291a2e027de530ba7c3e78bbdcead3b67315fee",
+        },
+    }))
+    pointer = tmp_path / "pointer"
+    code = ladder.main([
+        "--level", "2", "--prepare-only",
+        "--approval", str(approval),
+        "--results-root", str(tmp_path / "results"),
+        "--record-pointer", str(pointer),
+    ])
+    assert code == 1
+
+    record = Path(pointer.read_text().strip())
+    assert "-R1-" in record.name, "a refined run gets its own record id"
+    assert manifest.verify(record) == []
+    summary = json.loads((record / "summary.json").read_text())
+    rung = summary["rung"]
+    assert rung["status"] == "PREPARED"
+    assert rung["dof_measured"] == 80_762
+    assert rung["mesh"]["sha256"] == (
+        "a49ef282c7f07c56f210a450b291a2e027de530ba7c3e78bbdcead3b67315fee"
+    )
+    assert rung["port_refinement"]["h_port_mm"] == 0.003333333333333333
+    assert summary["next_level"]["decision"].startswith("STOP")
+    # The fit is the three plain rungs; this run is not one of them.
+    assert [r["level"] for r in summary["rungs"]] == [1, 2, 3]
+    assert not any("R1" in r["source"] for r in summary["rungs"])
+
+
+@needs_gmsh
+@pytest.mark.slow
+def test_a_mesh_that_is_not_the_approved_one_is_never_solved(tmp_path):
+    """The hash gate: the run solves the approved mesh or it solves nothing."""
+    ladder = _ladder()
+    approval = tmp_path / "approval.json"
+    approval.write_text(json.dumps({
+        "level": 2,
+        "port_refinement": {
+            "id": "R1", "h_port_mm": 0.003333333333333333,
+            "pad_mm": 0.010, "transition_mm": 0.020, "ports": ["port_F1"],
+        },
+        "dry_run_mesh_sha256": {"R1": "0" * 64},
+    }))
+    pointer = tmp_path / "pointer"
+    ladder.main([
+        "--level", "2", "--prepare-only",
+        "--approval", str(approval),
+        "--results-root", str(tmp_path / "results"),
+        "--record-pointer", str(pointer),
+    ])
+    summary = json.loads((Path(pointer.read_text().strip()) / "summary.json").read_text())
+    assert summary["rung"]["status"] == "REFUSED-MESH-MISMATCH"
+    assert "not the " + "0" * 64 in summary["rung"]["failure"]
 
 
 def test_the_record_is_made_durable_before_the_report_is_rendered():

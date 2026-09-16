@@ -943,7 +943,6 @@ def execute_level(
             port_refinement=port_refinement,
         )
         mesh = report.as_dict()
-        mesh_path = report.mesh_path
         entry["mesh"] = mesh
         if expected_mesh_sha256 and mesh["sha256"] != expected_mesh_sha256:
             # The approval named a mesh. A different one is not the approved
@@ -1029,10 +1028,12 @@ def execute_level(
 
         # The derived diagnostic, in its own guard: it must not be able to cost
         # the solve, and it must not be able to take the calibrated verdict with
-        # it if it fails.
+        # it if it fails. The mesh path is read here rather than next to
+        # report.as_dict(), so that a refusal BEFORE the solve - over the DOF
+        # budget, or the wrong mesh - never depends on it.
         try:
             entry["port_diagnostic"] = derived_port_diagnostic(
-                joined, surface_rows, config=config, mesh_path=mesh_path,
+                joined, surface_rows, config=config, mesh_path=report.mesh_path,
                 requested_h_gap_mm=mesh["h_gap_mm"],
             )
         except Exception as exc:  # noqa: BLE001 - a diagnostic may not cost a solve
