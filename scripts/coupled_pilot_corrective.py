@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import platform
 import sys
 from datetime import datetime, timezone
@@ -416,6 +417,27 @@ def build(source: Path, *, batch_id: str) -> dict[str, Any]:
         if stiffness_proxy["admitted"]
         else float("nan")
     )
+    gradient_amplitude = [
+        100.0 * math.sqrt(m["energy_J"]["E_mag"] / m["energy_J"]["E_elec"])
+        for run in runs
+        for m in per_run[run]["modes"]
+        if m["disposition"] == "REJECTED_ENERGY_BALANCE" and m["energy_J"]["E_elec"] > 0
+    ]
+    p_true = [
+        m["participation_abs"].get(1, m["participation_abs"].get("1", 0.0))
+        + m["energy_balance_defect"]
+        for run in runs
+        for m in per_run[run]["modes"]
+        if m["disposition"] == "REJECTED_ENERGY_BALANCE"
+    ]
+    admitted_bounds = {
+        f"{run} m{m['mode']}": m["surrogate_relative_bound"].get(
+            1, m["surrogate_relative_bound"].get("1")
+        )
+        for run in runs
+        for m in per_run[run]["modes"]
+        if m["disposition"] == "ADMITTED"
+    }
     abs_over_bkwd = {}
     for run in runs:
         ratios = [
@@ -487,12 +509,27 @@ def build(source: Path, *, batch_id: str) -> dict[str, Any]:
             "cause": "SUPPORTED-NOT-PROVEN",
             "the_two_explanations": (
                 "Palace's E_ind is not the port stiffness quadratic form but the rank-one surrogate "
-                "|V|^2/(2 w^2 L) built from the port's AREA-AVERAGED, +Y-PROJECTED voltage, which by "
+                "|V|^2/(2 w^2 L) built from the port's WIDTH-AVERAGED LINE voltage, projected on the declared +Y direction, which by "
                 "Cauchy-Schwarz is a LOWER BOUND on the port energy integral (1/Ls)|E_t|^2 dS. A "
                 "failing row is therefore either (1) an algebraically spurious Ritz vector whose "
                 "reported eigenvalue is meaningless, or (2) a genuine eigenpair of (K, M) whose "
                 "stiffness energy sits almost entirely in the lumped port's Robin term, in a "
                 "tangential field that is non-uniform or transverse to +Y."
+            ),
+            "bound_is_one_sided": (
+                "R_reported <= R_true = 1, so the surrogate can only under-report. On this record "
+                "every failing row has R < 1, none above: corroboration the analysis does not "
+                "otherwise claim."
+            ),
+            "what_explanation_2_would_mean": (
+                "With no port capacitance and an exact E_mag, equipartition gives p_true = p + (1 - R) "
+                "EXACTLY. Under explanation (2) the failing rows would have p_true between "
+                "{p_true_min:.5f} and {p_true_max:.5f} - maximally port-participating, with the "
+                "reported p wrong by five to ten orders of magnitude. The superseded rule selected "
+                "them BECAUSE their |p| was smallest."
+            ).format(
+                p_true_min=min(p_true) if p_true else float("nan"),
+                p_true_max=max(p_true) if p_true else float("nan"),
             ),
             "leading_explanation": (
                 "(2) is the better supported of the two, and is still not proven."
@@ -515,12 +552,15 @@ def build(source: Path, *, batch_id: str) -> dict[str, Any]:
                 "{clustering_factor:.2f} across all of them, over three discretisations, while the "
                 "admitted rows span a factor of {admitted_factor:.0f} and sit orders of magnitude "
                 "higher.".format(clustering_factor=clustering_factor, admitted_factor=admitted_factor),
-                "A residual bound points the same way without closing it: from |x^H r| <= ||x|| ||r|| "
-                "with r = Kx - mu Mx, and R near zero, the failing rows' mass-matrix Rayleigh "
-                "quotient is bounded by Err_abs/mu, so these must be strongly localised vectors - "
-                "which is what explanation (2) predicts and explanation (1) does not naturally "
-                "produce. Whether the bound is outright impossible depends on ||M||, which this "
-                "record does not carry, so this supports (2) without excluding (1).",
+                "The failing rows are almost pure discrete gradients. On a Nedelec space "
+                "curl(grad phi_h) is identically zero, so a pure discrete gradient has E_mag = 0 "
+                "exactly. The observed E_mag/E_elec of 1.52e-5 to 7.44e-5 therefore bounds the "
+                "non-gradient AMPLITUDE content of these vectors at {gradient_amplitude_min:.2f} % "
+                "to {gradient_amplitude_max:.2f} % - a direct on-record measurement, and what the "
+                "gradient reading predicts.".format(
+                    gradient_amplitude_min=min(gradient_amplitude) if gradient_amplitude else float("nan"),
+                    gradient_amplitude_max=max(gradient_amplitude) if gradient_amplitude else float("nan"),
+                ),
             ],
             "mode_budget_dilution": (
                 "At order 1 three admitted modes were found below 10 GHz; at order 2 on the "
@@ -556,12 +596,35 @@ def build(source: Path, *, batch_id: str) -> dict[str, Any]:
                 },
             ],
         },
+        "admission_bounds_an_absolute_defect_not_a_relative_one": {
+            "finding": (
+                "Admission bounds |R - 1| at 1e-3, which is an ABSOLUTE bound on the surrogate "
+                "deficit, while the comparison tolerance max_relative_participation_change = 1e-2 "
+                "is RELATIVE. The relative correction an admitted row's own p could carry is "
+                "(1 - R)/|p|, reported per row as surrogate_relative_bound."
+            ),
+            "per_admitted_row": dict(sorted(admitted_bounds.items())),
+            "worst_admitted": (
+                max(admitted_bounds.items(), key=lambda kv: kv[1] if kv[1] is not None else -1.0)
+                if admitted_bounds
+                else None
+            ),
+            "comparison_tolerance": FROZEN_HALO_CRITERIA["max_relative_participation_change"],
+            "consequence": (
+                "at the rule's own threshold an admitted mode with |p| below about 0.1 can carry a "
+                "relative correction larger than the tolerance it is compared under; the matched "
+                "in-window pairs on this record sit three orders below their measured delta, so the "
+                "conclusions stand, but this is shown rather than assumed"
+            ),
+        },
         "backward_error_normalisation": {
             "finding": (
-                "Palace normalises the reported backward error by the GLOBAL operator norms. The "
-                "record shows it directly: within each run Error(Abs.)/Error(Bkwd.) is constant to "
-                "about five parts in a million, so the printed backward error is the true residual "
-                "divided by a number of order 1e5."
+                "Palace scales the reported backward error by ||K|| + |mu| ||M|| "
+                "(palace/linalg/slepc.cpp, GetBackwardScaling), which is lambda-dependent in "
+                "general. On this record Error(Abs.)/Error(Bkwd.) holds to within about six parts "
+                "in a million across each run, which shows the |mu| ||M|| term is negligible here, "
+                "not that the scaling is lambda-independent by construction. Either way the "
+                "printed backward error is the true residual divided by a number of order 1e5."
             ),
             "abs_over_bkwd_ratio_per_run": abs_over_bkwd,
             "consequence": (
@@ -827,7 +890,22 @@ def render_report(record: dict[str, Any]) -> str:
     for item in imbalance["evidence_for_the_leading_explanation"]:
         add(f"- {item}")
     add("")
+    add(imbalance["bound_is_one_sided"])
+    add("")
+    add(f"**If explanation (2) holds.** {imbalance['what_explanation_2_would_mean']}")
+    add("")
     add(imbalance["why_it_does_not_block_the_rule"])
+    add("")
+    relative = diagnostics["admission_bounds_an_absolute_defect_not_a_relative_one"]
+    add(f"**Absolute versus relative.** {relative['finding']}")
+    add("")
+    add("| admitted row | surrogate relative bound |")
+    add("|---|---|")
+    for row, value in relative["per_admitted_row"].items():
+        flag = " **above the comparison tolerance**" if value and value > relative["comparison_tolerance"] else ""
+        add(f"| {row} | {_fmt(value)}{flag} |")
+    add("")
+    add(relative["consequence"].capitalize() + ".")
     add("")
     add(f"Mode budget: {imbalance['mode_budget_dilution']}")
     add("")

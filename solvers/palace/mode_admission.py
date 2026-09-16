@@ -23,10 +23,12 @@ in a fixed order:
    mesh. A large defect says the reported participation of that row rests on a
    quantity that does not hold together; it does **not**, by itself, say what
    the row is. See ``ADMISSION_RULE["what_it_does_not_establish"]``.
-5. **Matching.** Two runs are put in correspondence by two independent
-   orderings that must agree, with a separation guard. When they do not agree,
-   or the runs admit different numbers of modes, this module **refuses to
-   report a comparison** rather than pairing something arbitrary.
+5. **Matching.** Two runs are put in correspondence by two orderings that must
+   agree, with a separation guard that is what actually carries the pairing.
+   When they do not agree, or the runs admit different numbers of modes, this
+   module **refuses to report a comparison** rather than pairing something
+   arbitrary. See ``MATCHING_RULE`` for what the ordering check can and cannot
+   establish — it is weaker than it looks.
 
 Nothing here extracts a coupling. It produces no ``g``, no charging energy and
 no circuit parameter; it decides which rows of a solver record may be compared
@@ -126,14 +128,32 @@ ROW_CORRESPONDENCE_TOLERANCE: dict[str, float] = {
 
 #: Matching rule between two runs. Also retrospective here, prospective next.
 MATCHING_RULE: dict[str, Any] = {
-    "id": "qmhp-cem.mode-matching/0.1.0",
+    "id": "qmhp-cem.mode-matching/0.1.1",
     "pairing": (
-        "two independent one-to-one pairings over the admitted in-window modes — by "
-        "ascending frequency, and by descending |p| — which must induce the SAME pairing"
+        "two one-to-one pairings over the admitted in-window modes — by ascending frequency, "
+        "and by descending |p| — which must induce the SAME pairing"
+    ),
+    "what_the_ordering_check_can_and_cannot_do": (
+        "Each pairing is formed by sorting the two runs SEPARATELY and zipping, so whenever |p| "
+        "is co-monotone with frequency inside each run the two pairings agree BY CONSTRUCTION, "
+        "whatever the true correspondence is. The check therefore detects a run whose |p| order "
+        "inverts against its frequency order; it is NOT independent evidence that the "
+        "correspondence between the runs is right. On COUPLED-PILOT-20260916T035733Z all three "
+        "runs are co-monotone, so the check could not have contradicted the frequency pairing "
+        "there. The separation guard is what carries the correspondence."
     ),
     "separation_guard": (
         "each pair's frequency shift between runs must be below half the smallest "
         "adjacent-mode spacing in either run, so no swap is possible"
+    ),
+    "separation_guard_is_vacuous_when": (
+        "either run admits a single in-window mode: the adjacent-mode spacing is then infinite, "
+        "so the guard cannot fail and the ordering check cannot fail either. Such a match is "
+        "reported with guard='VACUOUS' rather than silently as if it had been guarded."
+    ),
+    "adjacent_gap_is_over_admitted_modes_only": (
+        "a rejected row lying between two admitted ones does not narrow the guard; on this "
+        "record every rejected row sits above both admitted in-window modes, so it does not bite"
     ),
     "refuses_when": (
         "the two runs admit different numbers of in-window modes, the two pairings "
@@ -222,6 +242,26 @@ class ModeRecord:
     def abs_participation(self, port: int = 1) -> float:
         return abs(self.participation.get(port, 0.0))
 
+    def surrogate_relative_bound(self, port: int = 1) -> float:
+        """How much of this row's own ``|p|`` the energy defect could account for.
+
+        With no port capacitance and an exact ``E_mag``, equipartition gives the
+        port's true participation as ``p_true = p + (1 - R)`` exactly, so
+        ``(1 - R)/|p|`` bounds the *relative* error the rank-one surrogate could
+        be making on this row's participation.
+
+        This matters because admission bounds the **absolute** defect while the
+        comparison tolerance is **relative**: a row can be admitted and still
+        carry a relative correction larger than the tolerance it is about to be
+        compared under. On the pilot record P2's admitted mode 9 does exactly
+        that (``1.47e-2`` against a ``1e-2`` tolerance), while both matched
+        in-window pairs sit near ``1.2e-3``.
+        """
+        magnitude = self.abs_participation(port)
+        if magnitude <= 0:
+            return math.inf
+        return self.energy_balance_defect / magnitude
+
     def signed_participation(self, port: int = 1) -> float:
         return self.participation.get(port, 0.0)
 
@@ -257,6 +297,9 @@ class ModeRecord:
             "lumped_magnetic_fraction": self.lumped_magnetic_fraction,
             "participation_signed": dict(sorted(self.participation.items())),
             "participation_abs": {j: abs(p) for j, p in sorted(self.participation.items())},
+            "surrogate_relative_bound": {
+                j: self.surrogate_relative_bound(j) for j in sorted(self.participation)
+            },
             "current_A": {
                 j: {"re": v.real, "im": v.imag, "abs": abs(v)}
                 for j, v in sorted(self.current_A.items())
@@ -607,11 +650,28 @@ class MatchedPair:
     frequency_shift_GHz: float
     separation_limit_GHz: float
 
+    @property
+    def separation_margin(self) -> float:
+        """How far inside the guard this pair sits. ``inf`` when vacuous."""
+        if self.frequency_shift_GHz <= 0:
+            return math.inf
+        return self.separation_limit_GHz / self.frequency_shift_GHz
+
+    @property
+    def guard(self) -> str:
+        return "VACUOUS" if math.isinf(self.separation_limit_GHz) else "APPLIED"
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "a": {"mode": self.a.mode, "frequency_GHz": self.a.frequency_GHz},
             "b": {"mode": self.b.mode, "frequency_GHz": self.b.frequency_GHz},
             "delta_f_relative": self.delta_f_relative,
+            "guard": self.guard,
+            "separation_margin": self.separation_margin,
+            "surrogate_relative_bound": {
+                "a": {j: self.a.surrogate_relative_bound(j) for j in sorted(self.a.participation)},
+                "b": {j: self.b.surrogate_relative_bound(j) for j in sorted(self.b.participation)},
+            },
             "delta_abs_participation_relative": dict(sorted(self.delta_abs_participation_relative.items())),
             "abs_participation": {
                 "a": {j: abs(p) for j, p in sorted(self.a.participation.items())},

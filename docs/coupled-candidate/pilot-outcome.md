@@ -79,11 +79,13 @@ does not hold for P2. Admission is decided per row, never by index.
 What the defect establishes, and what it does not:
 
 - Palace's `E_ind` is not the port stiffness quadratic form but the rank-one
-  surrogate `|V|²/(2ω²L)` built from the port's line-average voltage, which by
-  Cauchy–Schwarz is a *lower bound* on it. A failing row is therefore either
-  not an eigenvector at its reported frequency, **or** an eigenvector whose
-  stiffness sits in a strongly non-uniform tangential field on the port that
-  the line average grossly understates. The saved record cannot separate those.
+  surrogate `|V|²/(2ω²L)` built from the port's **width-averaged line voltage**,
+  projected on the declared `+Y` direction, which by Cauchy–Schwarz is a *lower
+  bound* on it. A failing row is therefore either not an eigenvector at its
+  reported frequency, **or** an eigenvector whose stiffness sits in a strongly
+  non-uniform tangential field on the port that the average grossly understates.
+  The record cannot separate those, though the second is the better supported;
+  see [`corrective-analysis.md`](corrective-analysis.md) §C.3.
 - It does not matter for admission, because the reported participation
   `p = E_ind/(E_elec + E_cap)` is built from the *same* surrogate: in either
   case the `p` of a failing row is not a quantity two solves may be compared
@@ -107,7 +109,10 @@ Relative differences, `|a − b| / |a|` with P1 as reference:
 | P1 vs P3 | `Δp` | 3.36e-4 | 2.44e-1 |
 
 All four `Δp` figures above are **magnitudes**, `abs(|p_a| − |p_b|) /
-max(|p_a|, |p_b|)`, which is the corrected convention.
+max(|p_a|, |p_b|)`, which is the corrected convention. Note that
+`abs(|a| − |b|) ≤ |a − b|` always, so the change can only make the criterion
+easier to pass: on the readout pair it moves `Δp` from `1.78` to `0.224`. Both
+still fail the frozen `1e-2`, by 178× and by 22×, so no verdict turns on it.
 
 Two further observations, recorded because they bear on the next stage:
 

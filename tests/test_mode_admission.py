@@ -448,14 +448,20 @@ def test_the_phasor_parser_keeps_the_phase(tmp_path):
 # --- the corrected statements stay corrected --------------------------------
 
 #: Statements withdrawn by the corrective analysis. Matched against the
-#: document with blockquotes and REGISTERED citations removed, so a correction
+#: document with REGISTERED citations removed and nothing else, so a correction
 #: that names the wording it withdraws does not trip the guard, while any other
-#: appearance of that wording does.
+#: appearance of that wording does — blockquoted, italicised or bare.
+#:
+#: The patterns are loosened at the joints a paraphrase would most naturally
+#: bend (singular/plural, "did not"/"failed to"), because a literal guard is
+#: escaped by rewording and the point is to catch a regression, not to be
+#: outwitted by one.
 WITHDRAWN_CLAIMS = [
     # A mechanism asserted where only a correlation was observed.
-    r"null-space\s*/\s*gradient artefacts that the divergence-free projection did not\s*remove",
+    r"null-space\s*(?:/|and)\s*gradient artefacts\s*(?:that\s*)?the divergence-free projection"
+    r"\s*(?:did not|failed to)\s*remove",
     # A rule by mode index.
-    r"Only mode 1 and mode 2 of each solve are physical circuit modes",
+    r"[Oo]nly modes?\s+1\s+and\s+(?:mode\s+)?2\s+of each solve are physical circuit modes",
     r"##\s*2\.\s*Only two modes in the window are physical",
     # A solver gauge artefact described as physics.
     r"the current direction through the port\s*is not stable under discretisation",
@@ -469,13 +475,14 @@ GUARDED_DOCS = [
 
 #: The ONLY quotations exempt from the guard, named one by one.
 #:
-#: A correction has to be able to quote the wording it withdraws, but exempting
-#: italic text in general would exempt a great deal more than that: any future
-#: claim could be slipped past the guard by italicising it. So the exemption is
-#: a closed registry — document basename to the exact flattened strings it may
-#: contain — and it applies only where the string appears wrapped as ``*"..."*``
-#: AND the document also states that it is withdrawn or superseded. Everything
-#: else, italic or not, is the document speaking in its own voice.
+#: A correction has to be able to quote the wording it withdraws. Exempting a
+#: whole class of markup — italics, or blockquotes — would exempt far more than
+#: that: any future claim could be slipped past by italicising or indenting it.
+#: So the exemption is a closed registry, document basename to the exact
+#: strings it may quote, and it applies only where the string appears wrapped
+#: as ``*"..."*`` AND a withdrawal marker sits in the same block of the
+#: document. Blockquotes get no licence at all. Everything else, however
+#: marked up, is the document speaking in its own voice.
 CITATION_EXEMPTIONS: dict[str, tuple[str, ...]] = {
     "pilot-outcome.md": (
         "Only mode 1 and mode 2 of each solve are physical circuit modes",
@@ -485,32 +492,64 @@ CITATION_EXEMPTIONS: dict[str, tuple[str, ...]] = {
     ),
     "corrective-analysis.md": (
         "Only mode 1 and mode 2 of each solve are physical circuit modes.",
-        # The document quotes this twice, once mid-sentence and once in the
-        # corrections table where it ends the sentence. Both spellings are
-        # registered explicitly; near-duplicates are the price of exactness.
+        # Quoted twice: once mid-sentence, once ending a corrections-table cell.
+        # Both spellings are registered; near-duplicates are the price of exactness.
         "null-space / gradient artefacts that the divergence-free projection did not remove",
         "null-space / gradient artefacts that the divergence-free projection did not remove.",
         "the current direction through the port is not stable under discretisation",
-        "bit-for-bit",
     ),
 }
 
-#: A document may quote a withdrawn claim only if it says so.
+#: A document may quote a withdrawn claim only where it says it is withdrawn.
 WITHDRAWAL_MARKERS = ("withdrawn", "superseded", "was wrong", "no longer")
 
 
 def _flatten(text: str) -> str:
-    """Drop blockquoted citations, then collapse whitespace."""
-    kept = [line for line in text.splitlines() if not line.lstrip().startswith(">")]
-    return re.sub(r"\s+", " ", "\n".join(kept))
+    """Collapse whitespace, keeping blockquoted text visible to the guard.
+
+    The ``>`` markers are stripped but the words behind them are kept, so
+    indenting a claim into a blockquote does not hide it.
+    """
+    lines = [re.sub(r"^\s*>+\s?", "", line) for line in text.splitlines()]
+    return re.sub(r"\s+", " ", "\n".join(lines))
+
+
+def _blocks(text: str) -> list[str]:
+    """The document split into blank-line-delimited blocks.
+
+    A markdown table is one block, header included, so a corrections table whose
+    header says "withdrawn" carries that marker to each of its rows.
+    """
+    out, current = [], []
+    for line in text.splitlines():
+        if line.strip():
+            current.append(line)
+        elif current:
+            out.append("\n".join(current))
+            current = []
+    if current:
+        out.append("\n".join(current))
+    return out
+
+
+def _citation_is_withdrawn_in_place(text: str, claim: str) -> bool:
+    """Every occurrence of the quoted claim sits in a block that withdraws it."""
+    needle = f'*"{claim}"*'
+    blocks = [b for b in _blocks(text) if needle in re.sub(r"\s+", " ", b)]
+    if not blocks:
+        return False
+    return all(
+        any(marker in re.sub(r"\s+", " ", b).lower() for marker in WITHDRAWAL_MARKERS)
+        for b in blocks
+    )
 
 
 def _assertions_only(text: str, exemptions: tuple[str, ...] = ()) -> str:
     """The document speaking in its own voice.
 
-    Removes blockquotes, and then each REGISTERED citation, but only where it
-    appears wrapped as ``*"..."*``. An unregistered quotation is left in place,
-    so italicising a claim does not hide it from the guard.
+    Removes each REGISTERED citation, and only where it appears wrapped as
+    ``*"..."*``. An unregistered quotation — italic, blockquoted or bare — is
+    left in place, so no markup hides a claim from the guard.
     """
     body = _flatten(text)
     for claim in exemptions:
@@ -532,8 +571,8 @@ def test_no_document_repeats_a_withdrawn_claim(path):
 
 
 def test_the_guard_covers_every_document_that_should_be_guarded():
-    """A guard nobody runs is not a guard. Both documents must exist and be read."""
-    assert len(GUARDED_DOCS) == 2
+    """A guard nobody runs is not a guard. Every listed document must exist."""
+    assert len(GUARDED_DOCS) >= 2
     for path in GUARDED_DOCS:
         assert path.exists(), f"{path} is guarded but missing, so the guard skips it"
 
@@ -551,16 +590,16 @@ def test_every_registered_citation_is_used_and_is_actually_withdrawn(path):
     """No dead registry entries, and no quoting without withdrawing."""
     if not path.exists():
         pytest.skip(f"{path.name} is not present")
-    flat = _flatten(path.read_text(encoding="utf-8"))
-    lowered = flat.lower()
+    raw = path.read_text(encoding="utf-8")
+    flat = _flatten(raw)
     for claim in CITATION_EXEMPTIONS.get(path.name, ()):
         assert f'*"{claim}"*' in flat, (
             f"{path.name}: the registry exempts {claim!r} but the document does not quote it; "
             f"a dead exemption is a hole waiting to open"
         )
-    if CITATION_EXEMPTIONS.get(path.name):
-        assert any(marker in lowered for marker in WITHDRAWAL_MARKERS), (
-            f"{path.name} quotes a withdrawn claim but never says it is withdrawn"
+        assert _citation_is_withdrawn_in_place(raw, claim), (
+            f"{path.name} quotes {claim!r} in a block that does not say it is withdrawn; "
+            f"a registered citation may not be re-asserted as true"
         )
 
 
@@ -580,8 +619,43 @@ def test_the_exemption_is_not_a_general_licence_to_italicise():
     assert unregistered in _assertions_only(f'As noted, *"{unregistered}"*, now withdrawn.\n', exemptions)
     # A registered claim asserted bare is not a citation and is not exempt.
     assert registered in _assertions_only(f"{registered}, as the pilot showed.\n", exemptions)
-    # Blockquoted citations remain exempt, as before.
-    assert registered not in _assertions_only(f"> {registered}\n", ())
+
+
+def test_a_blockquote_is_not_a_way_around_the_guard():
+    """Indenting a withdrawn claim must not hide it. Blockquotes get no licence."""
+    registered = "the current direction through the port is not stable under discretisation"
+    for markup in (f"> {registered}\n", f">> {registered}\n", f"   > {registered}\n"):
+        assert registered in _assertions_only(markup, (registered,)), markup
+    # And the guard proper catches it in a real document.
+    doc = (REPO_ROOT / "docs" / "coupled-candidate" / "pilot-outcome.md").read_text(encoding="utf-8")
+    mutated = doc + f"\n> {registered}\n"
+    cleaned = _assertions_only(mutated, CITATION_EXEMPTIONS["pilot-outcome.md"])
+    assert re.search(WITHDRAWN_CLAIMS[3], cleaned, flags=re.IGNORECASE) is not None
+
+
+def test_a_registered_citation_cannot_be_re_asserted_as_true():
+    """The exemption is for withdrawing a claim, not for repeating it approvingly."""
+    claim = "the current direction through the port is not stable under discretisation"
+    withdrawing = f'The earlier note that *"{claim}"* is withdrawn.\n'
+    reasserting = f'We reaffirm *"{claim}"* as established fact.\n'
+    assert _citation_is_withdrawn_in_place(withdrawing, claim)
+    assert not _citation_is_withdrawn_in_place(reasserting, claim)
+    # A withdrawal marker elsewhere in the document does not license it here.
+    elsewhere = f"Something else is withdrawn.\n\n{reasserting}"
+    assert not _citation_is_withdrawn_in_place(elsewhere, claim)
+
+
+def test_a_paraphrase_at_the_obvious_joints_is_still_caught():
+    """A literal guard is escaped by rewording; these joints are covered."""
+    paraphrases = [
+        "Only modes 1 and 2 of each solve are physical circuit modes.",
+        "null-space and gradient artefacts that the divergence-free projection failed to remove",
+        "null-space / gradient artefacts the divergence-free projection failed to remove",
+    ]
+    for text in paraphrases:
+        assert any(
+            re.search(pattern, text, flags=re.IGNORECASE) for pattern in WITHDRAWN_CLAIMS
+        ), text
 
 
 def test_the_exemption_removes_only_the_quoted_span():
@@ -678,3 +752,66 @@ def test_the_documents_reference_a_corrective_record_that_exists():
         # The source record's digests are carried, not just its name.
         assert payload["source_record"]["file_count"] == 35
         assert payload["halo_disposition"]["verdict"] == "NOT-A-HALO-VERDICT"
+
+
+def test_the_surrogate_relative_bound_is_reported_and_p2_m9_exceeds_the_tolerance(record_reports):
+    """Admission bounds an ABSOLUTE defect; the comparison tolerance is relative.
+
+    P2's admitted mode 9 carries a relative correction above the frozen 1e-2,
+    while both matched in-window pairs sit three orders below their measured
+    delta. The gap is real and is reported rather than assumed away.
+    """
+    tolerance = 1.0e-2
+    bounds = {
+        f"{run} m{entry.record.mode}": entry.record.surrogate_relative_bound()
+        for run, report in record_reports.items()
+        for entry in report.modes
+        if entry.disposition == "ADMITTED"
+    }
+    assert len(bounds) == 7
+    over = {k: v for k, v in bounds.items() if v > tolerance}
+    assert set(over) == {"P2 m9"}
+    assert over["P2 m9"] == pytest.approx(1.4695e-2, rel=1e-3)
+    # p_true = p + (1 - R), so the bound is exactly the defect over |p|.
+    for report in record_reports.values():
+        for entry in report.modes:
+            record = entry.record
+            if record.abs_participation() > 0:
+                assert record.surrogate_relative_bound() == pytest.approx(
+                    record.energy_balance_defect / record.abs_participation()
+                )
+    # The two matched in-window pairs are far below their measured delta.
+    for run in ("P1", "P3"):
+        modes = {m.record.mode: m.record for m in record_reports[run].modes}
+        assert modes[2].surrogate_relative_bound() < 2e-3
+
+
+def test_the_separation_guard_reports_when_it_is_vacuous(record_reports):
+    """A single admitted mode makes both matching tests vacuous; say so."""
+    floor = COUPLED_SOLVER_RULES["band_floor_GHz"]
+    one_each = {
+        run: report.admitted_in_window(floor, 2.0) for run, report in record_reports.items()
+    }
+    assert all(len(v) == 1 for v in one_each.values())
+    report = match_runs("single", one_each["P1"], one_each["P3"])
+    assert report.status == "MATCHED"
+    assert report.pairs[0].guard == "VACUOUS"
+    assert math.isinf(report.pairs[0].separation_limit_GHz)
+    assert "VACUOUS" in MATCHING_RULE["separation_guard_is_vacuous_when"]
+
+    # With two admitted modes the guard applies, and the margins are recorded.
+    full = {run: r.admitted_in_window(floor, 9.0) for run, r in record_reports.items()}
+    halo = match_runs("halo", full["P1"], full["P3"])
+    order = match_runs("order", full["P1"], full["P2"])
+    assert all(p.guard == "APPLIED" for p in halo.pairs + order.pairs)
+    assert min(p.separation_margin for p in halo.pairs) > 15.0
+    # The order comparison clears the guard by only ~2.3x. That is worth knowing.
+    assert 2.0 < min(p.separation_margin for p in order.pairs) < 3.0
+
+
+def test_the_matching_rule_states_what_the_ordering_check_cannot_do():
+    """The ordering check is entailed when |p| is co-monotone with f."""
+    text = MATCHING_RULE["what_the_ordering_check_can_and_cannot_do"]
+    assert "BY CONSTRUCTION" in text
+    assert "NOT independent evidence" in text
+    assert "separation guard is what carries" in text

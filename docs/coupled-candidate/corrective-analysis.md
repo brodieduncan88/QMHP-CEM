@@ -41,22 +41,25 @@ and this section makes none.
 ## B. Algebraic convergence
 
 **ESTABLISHED, and it certifies less than it appears to.** All 23 computed mode
-rows have backward errors between `1.3e-17` and `1.2e-10`, six to sixteen
-orders below the `1e-6` tolerance. Every row converged.
+rows have backward errors between `1.3e-17` and `1.2e-10`, i.e. **four to
+eleven** orders below the `1e-6` tolerance. Every row converged.
 
 A small backward error says the eigenpair solves the discrete problem to that
 residual. It says nothing about whether the eigenpair is a resonance of the
 stated model, and in this record **16 of the 23 converged rows fail the energy
 identity that a resonance satisfies**.
 
-It is also a weaker certificate than its size suggests. Palace normalises the
-residual by the **global** operator norms, `‖K‖ + |μ|‖M‖`. The record shows this
-directly: within each run the ratio `Error(Abs.)/Error(Bkwd.)` is constant to
-five parts in a million — 3.0124e5 for P1, 1.5822e5 for P2, 2.5482e5 for P3 —
-so the printed backward error is the true residual divided by a number of order
-`1e5`. For a vector whose own stiffness quotient is a minute fraction of `‖K‖`,
-that normalisation flatters it. Convergence and validity are different questions
-and are reported separately from here on.
+It is also a weaker certificate than its size suggests. Palace scales the
+residual by `‖K‖ + |μ|‖M‖` (`palace/linalg/slepc.cpp`, `GetBackwardScaling`),
+which is λ-dependent in general. On this record it behaves as a per-run
+constant: `Error(Abs.)/Error(Bkwd.)` holds to within about six parts in a
+million across each run — 3.0124e5 for P1, 1.5822e5 for P2, 2.5482e5 for P3 —
+which shows the `|μ|‖M‖` term is negligible here, not that the scaling is
+λ-independent by construction. Either way the printed backward error is the true
+residual divided by a number of order `1e5`, so for a vector whose own stiffness
+quotient is a minute fraction of `‖K‖` that normalisation flatters it.
+Convergence and validity are different questions and are reported separately
+from here on.
 
 ## C. Mode validity
 
@@ -117,11 +120,14 @@ establishes *that* it occurs and bounds *what it costs us*; it does not
 establish *why*.
 
 Palace's `E_ind` is **not** the port stiffness quadratic form. It is the
-rank-one surrogate `|V|²/(2ω²L)` built from the port's **area-averaged, +Y
-projected** voltage functional, whereas the stiffness carries
-`∫_Γ (1/L_s)|E_t|² dS`. By Cauchy–Schwarz the surrogate is a *lower bound* on
-the true port energy, with equality only when the tangential field on the port
-is uniform and aligned with the port direction. So a failing row is one of:
+rank-one surrogate `|V|²/(2ω²L)` built from the port's **width-averaged line
+voltage**, projected on the declared `+Y` direction, whereas the stiffness
+carries `∫_Γ (1/L_s)|E_t|² dS`. By Cauchy–Schwarz the surrogate is a *lower
+bound* on the true port energy — `E_ind/E_port = |⟨E·d̂⟩|² / ⟨|E_t|²⟩ ≤ 1` —
+with equality only when `E·d̂` is constant on the port face and the tangential
+field is aligned with `d̂`. The bound is one-sided, and consistently so on this
+record: **all 16 failing rows have `R < 1`**, none above, spanning
+`1.52e-5` to `7.44e-5`. So a failing row is one of:
 
 1. **an algebraically spurious Ritz vector** whose reported eigenvalue is
    meaningless; or
@@ -148,17 +154,16 @@ proven.** Four pieces of evidence point at it:
   with a nonzero tangential trace on the port face has strictly positive
   stiffness energy and a finite `ω²`.
 - **The failing rows form one family.** `(E_mag + E_ind)·f²`, proportional to
-  the measured stiffness energy of the unit-normalised field, spans a factor of
+  the *reported* stiffness energy of the unit-normalised field, spans a factor of
   only **4.84** across all 16 failing rows — three different discretisations,
   frequencies from 6.70 to 9.67 GHz — while the 7 admitted rows span a factor of
   74 and sit two to five orders of magnitude higher.
-- **A residual bound points the same way, without closing it.** From
-  `|xᴴr| ≤ ‖x‖‖r‖` with `r = Kx − μMx`, and `R` near zero, the failing rows'
-  mass-matrix Rayleigh quotient is bounded by `Err_abs/μ`: they must be strongly
-  *localised* vectors, which is what explanation 2 predicts and explanation 1
-  does not naturally produce. Whether that bound is outright impossible depends
-  on `‖M‖`, which this record does not carry — so this supports explanation 2
-  without excluding explanation 1.
+- **The failing rows are almost pure discrete gradients.** On a Nédélec space
+  `curl(grad φ_h) ≡ 0` *exactly*, so a pure discrete gradient has `E_mag = 0`
+  identically. The observed `E_mag/E_elec` of `1.52e-5` to `7.44e-5` therefore
+  bounds the non-gradient **amplitude** content of these vectors at
+  **0.39 % to 0.86 %**. That is a direct, on-record measurement, and it is what
+  the gradient reading predicts.
 
 None of that is proof. What would be proof is field output, and there is none.
 An earlier note called these rows *"null-space / gradient artefacts that the
@@ -173,6 +178,37 @@ participation `p = E_ind/(E_elec + E_cap)` is computed from the **same**
 surrogate. Under either explanation the `p` of a failing row is not a quantity
 on which two independent solves may be compared. That is precisely what the
 rule screens, and it is the strongest claim the evidence supports.
+
+**What explanation 2 would mean, quantitatively.** With no port capacitance and
+an exact `E_mag`, equipartition gives the true port participation as
+`p_true = p + (1 − R)` *exactly*. Under explanation 2 the 16 failing rows do not
+have `p ≈ 1e-7`: they have **`p_true = 0.99993` to `0.99998`**, i.e. they would
+be *maximally* port-participating, and the reported `p` is wrong by five to ten
+orders of magnitude. The rule that selected them as "the readout-like mode"
+because their `|p|` was smallest would, under this reading, have selected the
+most strongly participating rows in the window. That is a sharp, checkable
+prediction, and §H turns it into the next test's falsifier.
+
+**The same identity exposes a gap in the admission rule.** Admission bounds the
+**absolute** defect at `1e-3`; the comparison tolerance `Δ|p| ≤ 1e-2` is
+**relative**. The relative correction an admitted row's own `p` could carry is
+`(1 − R)/|p|`, and on this record:
+
+| admitted row | \|p\| | 1 − R | relative bound |
+|---|---|---|---|
+| P1 m1 | 9.980e-1 | 5.35e-6 | 5.4e-6 |
+| P1 m2 | 1.203e-3 | 1.37e-6 | 1.13e-3 |
+| P3 m1 | 9.983e-1 | 1.75e-5 | 1.75e-5 |
+| P3 m2 | 9.094e-4 | 1.19e-6 | 1.31e-3 |
+| P2 m9 | 1.894e-5 | 2.78e-7 | **1.47e-2** |
+
+P2 m9 is admitted and carries a relative bound **above** the `1e-2` comparison
+tolerance. It is out of window, so it never enters a comparison here — but at
+the rule's own threshold any admitted mode with `|p| ≲ 0.1` could. The two
+matched in-window pairs sit at `1.13e-3` and `1.31e-3`, three orders below the
+measured `Δ|p|` of `0.224` and `0.244`, so the conclusions below stand; that had
+to be shown rather than assumed. `surrogate_relative_bound` is now computed per
+row and carried in every record.
 
 It does, however, cost mode budget. At order 1 (P2) three admitted modes were
 found below 10 GHz; at order 2 on the **byte-identical mesh** (P1) six converged
@@ -191,17 +227,33 @@ rather than from the number of rows wanted.
 
 ## D. Mode matching
 
-**ESTABLISHED for both comparisons, under a rule that can refuse.**
+**ESTABLISHED for both comparisons — by the separation guard, not by the
+ordering check.**
 
-Two runs are put in correspondence only when two *independent* one-to-one
-pairings over the admitted in-window modes agree: by ascending frequency, and
-by descending `|p|`. Frequency and participation are independent quantities, so
-their agreement is evidence; the participation *ordering* is used only to
-confirm or contradict, never to select. A separation guard then requires each
-pair's frequency shift to be below half the smallest adjacent-mode spacing in
-either run, so no swap is possible. The rule **refuses to report a comparison**
-when the runs admit different numbers of in-window modes, when the two pairings
-disagree, or when the guard fails.
+Two runs are put in correspondence only when two one-to-one pairings over the
+admitted in-window modes agree: by ascending frequency, and by descending `|p|`.
+A separation guard then requires each pair's frequency shift to be below half
+the smallest adjacent-mode spacing in either run, so no swap is possible. The
+rule **refuses to report a comparison** when the runs admit different numbers of
+in-window modes, when the two pairings disagree, or when the guard fails.
+
+**The ordering check is weaker than it looks, and this section originally
+overstated it.** Each pairing is formed by sorting the two runs *separately* and
+zipping them, so whenever `|p|` is co-monotone with frequency *inside each run*
+the two pairings agree **by construction**, whatever the true correspondence is.
+All three runs here are co-monotone, so the check could not have contradicted
+the frequency pairing on this data. What it does detect is a run whose `|p|`
+order inverts against its frequency order; it is not independent evidence about
+the correspondence *between* runs.
+
+**The separation guard is what carries it, and the margin is worth stating.**
+The halo comparison passes with margins of **16.0×** and **23.7×**; the order
+comparison, where the frequency moves 32 %, passes with only **2.26×** and
+**2.52×**. A 32 % shift clearing a half-gap guard by a factor of 2.3 is close
+enough to say out loud. The guard is also **vacuous when a run admits a single
+in-window mode** — the adjacent spacing is then infinite and neither test can
+fail — so such a match is now reported with `guard: "VACUOUS"` rather than
+silently.
 
 Row correspondence is checked before any of this, rather than assumed. The five
 per-mode tables are joined on the `m` column, never by position, and two
@@ -223,6 +275,18 @@ never relies on row order, only on the `m` key.
 
 `Δ|p| = abs(|p_a| − |p_b|) / max(|p_a|, |p_b|)` — **magnitudes**. This is the
 corrective change. The denominator and the `1e-2` tolerance are unchanged.
+
+Two qualifications a reader is owed. First, `abs(|a| − |b|) ≤ |a − b|` always,
+so the new numerator can only ever make the criterion **easier** to pass: on the
+readout pair it moves `Δp` from `1.78` to `0.224`, a 7.9× relaxation, applied
+after the numbers were seen. Both still fail the `1e-2` tolerance — by 178× and
+by 22× — so no verdict turns on it, but the direction is monotone and is stated
+rather than left to be noticed. Second, the participation ordering is never used
+to select **the pairing**; the *subject* of the frozen criterion — "the
+readout-like mode" — is still chosen by a participation-like quantity, the
+lumped magnetic fraction, which on an admitted row equals `|p|` up to the energy
+defect. What changed is that the choice is made *after* admission and by a fixed
+`0.5` split rather than by "smallest in the window".
 
 Palace's participation sign is `sign(Re I)`. Its port current is computed as
 `I = V/(iωL)` exactly, so `arg(I) = arg(V) − 90°` identically and the ratio
@@ -266,9 +330,12 @@ fluxonium-like frequency from p-refinement on a byte-identical mesh**. At mesh
 level 1 the discretisation error dwarfs both knobs under test.
 
 Two measured costs bound what can be done about it. P3 used **95 % of its
-45-minute cap**, and the time is the AMS preconditioner setup (1769 s of P3's
-2567 s; 1340 s of P1's 2008 s) rather than the eigensolve (3.3 s and 2.3 s).
-A level-2 mesh at order 2 fits neither the cap nor the DOF rule.
+45-minute cap**, and the time is preconditioner *application* inside the linear
+solves — Palace's `Preconditioner` timer reads 1339.6 s of P1's 2007.6 s over 40
+systems and 1229 iterations, and 1769.4 s of P3's 2567.2 s — not the eigensolve
+(2.3 s and 3.3 s). Setup is a separate line and reads 9.7 s; the log names no
+preconditioner type, so none is asserted here. A level-2 mesh at order 2 fits
+neither the cap nor the DOF rule.
 
 ---
 
@@ -324,6 +391,14 @@ measure how the failing family behaves under refinement, which is what sets
 admitted modes converge under refinement, at what observed rate, hence what mesh
 a target tolerance needs and therefore what an order-2 run would cost — and,
 separately, what the 16 failing rows actually are.
+
+*The falsifier, stated in advance.* If explanation 2 holds, the saved fields of a
+failing row must give `∫_Γ (1/L_s)|E_t|² dS / (2ω²) = E_elec` to within
+`|R − 1| < 1e-4`; the ratio `|⟨E·d̂⟩|²/⟨|E_t|²⟩` must be of order `1e-5` or
+smaller; and the row's true participation must be `p_true ≈ 0.99998`, not the
+reported `1e-7`. If instead the fields show a vector with negligible port-face
+energy, explanation 2 is refuted and explanation 1 stands. The test can come
+back either way, which is the point of running it.
 
 *Proposed cost.* Level 1 is already in hand (P2). **Two further order-1 solves**
 (levels 2 and 3), each capped at 45 minutes, one job on the existing runner,

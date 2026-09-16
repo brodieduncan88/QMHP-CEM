@@ -130,22 +130,40 @@ Against the unchanged frozen criteria (Δ\|p\| ≤ 1e-02, Δf ≤ 1e-04):
 
 16 of 23 computed rows fail the reported energy identity. The distribution is bimodal: the worst admitted defect is 1.747e-05 and the best rejected one is 9.999e-01, so the admitted set is unchanged for any cutoff between them.
 
-**Cause: SUPPORTED-NOT-PROVEN.** Palace's E_ind is not the port stiffness quadratic form but the rank-one surrogate |V|^2/(2 w^2 L) built from the port's AREA-AVERAGED, +Y-PROJECTED voltage, which by Cauchy-Schwarz is a LOWER BOUND on the port energy integral (1/Ls)|E_t|^2 dS. A failing row is therefore either (1) an algebraically spurious Ritz vector whose reported eigenvalue is meaningless, or (2) a genuine eigenpair of (K, M) whose stiffness energy sits almost entirely in the lumped port's Robin term, in a tangential field that is non-uniform or transverse to +Y.
+**Cause: SUPPORTED-NOT-PROVEN.** Palace's E_ind is not the port stiffness quadratic form but the rank-one surrogate |V|^2/(2 w^2 L) built from the port's WIDTH-AVERAGED LINE voltage, projected on the declared +Y direction, which by Cauchy-Schwarz is a LOWER BOUND on the port energy integral (1/Ls)|E_t|^2 dS. A failing row is therefore either (1) an algebraically spurious Ritz vector whose reported eigenvalue is meaningless, or (2) a genuine eigenpair of (K, M) whose stiffness energy sits almost entirely in the lumped port's Robin term, in a tangential field that is non-uniform or transverse to +Y.
 
 (2) is the better supported of the two, and is still not proven. The evidence:
 
 - Palace builds the auxiliary-boundary marker for its divergence-free projector as the union of the Dirichlet, farfield, conductivity, impedance and LUMPED-PORT markers (palace/models/spaceoperator.cpp), and those become the essential true dofs of the H1 spaces the projector uses. Its potential is pinned to zero on the inductive port face, so a discrete gradient whose potential varies ON that face lies outside the projector's range. Palace's own source records the residue in a commented-out line beside it: 'Mark all boundaries ... As tested, this does not eliminate all DC modes!'
 - The lumped inductance enters the STIFFNESS as a Robin surface term (1/Ls) integral |E_t|^2 dS, so such a gradient has strictly positive stiffness energy and a finite w^2. The objection that a gradient mode must sit at w = 0 therefore does not apply.
 - The failing rows form one family: (E_mag + E_ind) * f^2, proportional to the measured stiffness energy of the unit-normalised field, spans a factor of only 4.84 across all of them, over three discretisations, while the admitted rows span a factor of 74 and sit orders of magnitude higher.
-- A residual bound points the same way without closing it: from |x^H r| <= ||x|| ||r|| with r = Kx - mu Mx, and R near zero, the failing rows' mass-matrix Rayleigh quotient is bounded by Err_abs/mu, so these must be strongly localised vectors - which is what explanation (2) predicts and explanation (1) does not naturally produce. Whether the bound is outright impossible depends on ||M||, which this record does not carry, so this supports (2) without excluding (1).
+- The failing rows are almost pure discrete gradients. On a Nedelec space curl(grad phi_h) is identically zero, so a pure discrete gradient has E_mag = 0 exactly. The observed E_mag/E_elec of 1.52e-5 to 7.44e-5 therefore bounds the non-gradient AMPLITUDE content of these vectors at 0.39 % to 0.86 % - a direct on-record measurement, and what the gradient reading predicts.
+
+R_reported <= R_true = 1, so the surrogate can only under-report. On this record every failing row has R < 1, none above: corroboration the analysis does not otherwise claim.
+
+**If explanation (2) holds.** With no port capacitance and an exact E_mag, equipartition gives p_true = p + (1 - R) EXACTLY. Under explanation (2) the failing rows would have p_true between 0.99993 and 0.99998 - maximally port-participating, with the reported p wrong by five to ten orders of magnitude. The superseded rule selected them BECAUSE their |p| was smallest.
 
 The reported participation p = E_ind/(E_elec + E_cap) is computed from the SAME surrogate, so under either explanation the p of a failing row is not a quantity two independent solves may be compared on. That is what the admission rule screens.
+
+**Absolute versus relative.** Admission bounds |R - 1| at 1e-3, which is an ABSOLUTE bound on the surrogate deficit, while the comparison tolerance max_relative_participation_change = 1e-2 is RELATIVE. The relative correction an admitted row's own p could carry is (1 - R)/|p|, reported per row as surrogate_relative_bound.
+
+| admitted row | surrogate relative bound |
+|---|---|
+| P1 m1 | 5.3576e-06 |
+| P1 m2 | 1.1346e-03 |
+| P2 m1 | 4.9666e-09 |
+| P2 m2 | 1.8946e-05 |
+| P2 m9 | 1.4695e-02 **above the comparison tolerance** |
+| P3 m1 | 1.7502e-05 |
+| P3 m2 | 1.3128e-03 |
+
+At the rule's own threshold an admitted mode with |p| below about 0.1 can carry a relative correction larger than the tolerance it is compared under; the matched in-window pairs on this record sit three orders below their measured delta, so the conclusions stand, but this is shown rather than assumed.
 
 Mode budget: At order 1 three admitted modes were found below 10 GHz; at order 2 on the byte-identical mesh six converged rows yielded only two, because four failing rows occupied slots 3-6. The family dilutes the requested mode count, so eigenmodes_requested should be chosen from the admitted yield.
 
 Withdrawn: An earlier note called these rows 'null-space / gradient artefacts that the divergence-free projection did not remove'. That asserted a mechanism the evidence does not carry and is withdrawn.
 
-**Backward error.** Palace normalises the reported backward error by the GLOBAL operator norms. The record shows it directly: within each run Error(Abs.)/Error(Bkwd.) is constant to about five parts in a million, so the printed backward error is the true residual divided by a number of order 1e5. Measured per run: P1 3.0124e+05–3.0124e+05, P2 1.5822e+05–1.5822e+05, P3 2.5482e+05–2.5483e+05. Consequence: a small printed backward error is a weaker certificate than its size suggests, and certifies the eigenpair rather than its physics.
+**Backward error.** Palace scales the reported backward error by ||K|| + |mu| ||M|| (palace/linalg/slepc.cpp, GetBackwardScaling), which is lambda-dependent in general. On this record Error(Abs.)/Error(Bkwd.) holds to within about six parts in a million across each run, which shows the |mu| ||M|| term is negligible here, not that the scaling is lambda-independent by construction. Either way the printed backward error is the true residual divided by a number of order 1e5. Measured per run: P1 3.0124e+05–3.0124e+05, P2 1.5822e+05–1.5822e+05, P3 2.5482e+05–2.5483e+05. Consequence: a small printed backward error is a weaker certificate than its size suggests, and certifies the eigenpair rather than its physics.
 
 | missing diagnostic | what it would show | why it is absent |
 |---|---|---|
