@@ -1,21 +1,22 @@
 {
  "schema": "qmhp-cem.ladder-approval/0.1.0",
- "what": "one level of the order-1 mesh-refinement check, at fixed element order 1 and fixed 0.08 mm halo",
- "approved_by": "the repository owner, in the corrective-analysis review thread",
+ "what": "one controlled local-refinement run of the S1 coupled chip cell: the approved level at fixed element order 1 and fixed 0.08 mm halo, with one extra local size constraint over a declared box around the lumped-port face",
+ "approved_by": "the repository owner, approving R1 only after reviewing COUPLED-S1-RECOVERY",
  "approved_utc": "2026-09-16",
- "level": 3,
- "sequential": "one level per run, by the owner's instruction. Level 2 ran first and was reported; this approval runs level 3 and stops. Level 3 was dry-run at 147 372 DOF before approval.",
+ "level": 2,
+ "sequential": "one run per invocation. This approval runs R1 ONLY and stops. R2 is prepared and dry-run but is NOT approved and must not be started until R1 is reviewed.",
  "dry_runs_first": {
   "requirement": "dry-run levels 2 and 3 and record measured DOF for both before running anything",
   "measured_order1_dof": {
    "level_2": 79944,
-   "level_3": 147372
+   "level_3": 147372,
+   "level_2_R1": 80762
   },
   "measured_order2_dof_for_context": {
    "level_2": 420664,
    "level_3": 781554
   },
-  "note": "both levels are inside the 250 000-DOF rule at order 1 and outside it at order 2, which is why this check is at order 1. Level 3 at 147 372 DOF is 58.9 % of the rule."
+  "note": "both plain levels are inside the 250 000-DOF rule at order 1 and outside it at order 2, which is why this check is at order 1. R1 measures 80 762 DOF at order 1, 32.3 % of the rule and 818 DOF (1.0 %) above the plain level-2 baseline it is compared against."
  },
  "constraints": {
   "finite_element_order": 1,
@@ -25,7 +26,9 @@
   "dof_rule_unchanged": true,
   "cap_unchanged": true,
   "external_or_additional_compute": "none; one job on the standard GitHub-hosted runner",
-  "driver_refuses_above_budget": "scripts/palace_order1_ladder.py measures DOF from the offline dry run and does not launch a level above the rule"
+  "driver_refuses_above_budget": "scripts/palace_order1_ladder.py measures DOF from the offline dry run and does not launch a level above the rule",
+  "port_refinement_is_read_from_this_record": "every number comes from this file; no code change can introduce a refinement",
+  "distant_size_prescription": "unchanged: h_far, the halo and the conductor/etch Distance field are the baseline's. The Box field returns h_far outside the padded box and is combined by Min, so it can only refine."
  },
  "field_output": {
   "enabled": true,
@@ -40,16 +43,19 @@
   "the matching rule qmhp-cem.mode-matching/0.1.1 (two orderings plus the separation guard)",
   "the magnitude comparison convention for participation",
   "the eigenmode backward-error tolerance",
-  "the declared 0.5-9.0 GHz window"
+  "the declared 0.5-9.0 GHz window",
+  "the frozen Delta|p| <= 1e-2 and Delta f <= 1e-4 criteria, reported and not gating"
  ],
  "explicitly_out_of_scope": [
+  "the R2 mesh, which is prepared and dry-run but NOT approved",
   "the coupling extraction itself",
-  "the Route A inversion",
+  "the Route A inversion on EM data",
   "Route B",
   "pulse optimisation",
   "AMD-E",
   "decoder work",
   "mediator work",
+  "physical redesign",
   "any change to the 250 000-DOF rule or the 45-minute cap",
   "merging pull request 7"
  ],
@@ -70,6 +76,39 @@
    "why_rerun": "a defect in the reporting, not in the science: the driver rendered its report BEFORE writing the manifest and the record pointer, and the renderer raised KeyError on a result the convergence estimator is designed to return - the first tracked mode admitted no positive order of convergence. The record was therefore never manifested, uploaded or committed, and that solve's outputs were lost with the runner. The approved level is unchanged and is re-run.",
    "fixed_by": "summary.json and the record pointer are now written before any rendering; a render failure is captured into report.md and reported as a non-zero exit while the record is still manifested. The renderer handles every refusal the estimator can return, covered by a parametrised test over all six combinations including the one that failed.",
    "note_for_the_rerun": "attempt 1 told us something before it fell over: the fluxonium-like mode's frequency sequence over L1, L2, L3 admits NO positive order of convergence. That is a result, not a failure, and the rerun should reproduce it."
+  },
+  {
+   "attempt": "R1 pre-flight",
+   "workflow_run": null,
+   "solve": "NOT RUN - this is a record of what was fixed before spending the solve",
+   "why": "the post-solve path had never executed with a port refinement. A prepare-only dry run of the full driver found render_report() raising KeyError('dof_measured'), because next_level_disposition returns the refinement branch for a refined run and the renderer assumed the level-3 shape. On the real run that would have cost the solve's report; the record would have survived, but only because the evidence-before-presentation fix was already in place.",
+   "also_fixed": [
+    "earlier_rungs() excluded a refined record only by lexicographic accident; any label sorting before the plain record (e.g. one starting with a digit) would have put a different mesh into the convergence fit. Now excluded explicitly by payload.",
+    "the driver computed only the superseded fitted-kappa port_field_analysis; the derived diagnostic is now computed into the record alongside it.",
+    "the driver compared only against the level-1 reference; it now also compares against the plain rung at the same level, which is the comparison this run exists for.",
+    "TAGS was used in the new diagnostic without being imported, which would have raised NameError inside the post-solve path."
+   ]
   }
- ]
+ ],
+ "baseline_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+ "port_refinement": {
+  "id": "R1",
+  "h_port_mm": 0.003333333333333333,
+  "pad_mm": 0.01,
+  "transition_mm": 0.02,
+  "ports": [
+   "port_F1"
+  ]
+ },
+ "dry_run_mesh_sha256": {
+  "R1": "a49ef282c7f07c56f210a450b291a2e027de530ba7c3e78bbdcead3b67315fee",
+  "note": "measured by an offline dry run on this branch. execute_level refuses with REFUSED-MESH-MISMATCH and launches nothing if the mesh it builds does not hash to this, so the run either solves the approved mesh or solves nothing."
+ },
+ "h_port_note": "the owner wrote h_port = 0.003333 mm, which is the rounded form of h_gap(level 2)/2 = 0.006666666666666666/2. The exact double is used here because the mesh hash above is for that exact value; a truncated literal could build a different mesh and the hash gate would then correctly refuse to solve it.",
+ "what_this_run_answers": {
+  "question": "is the large L1/L2/L3 frequency movement sensitive to port-face resolution?",
+  "statistic": "|delta_f(baseline -> R1)| / |delta_f(L2 -> L3)| per tracked mode: the numerator changes only the port box at +1.0 % DOF, the denominator changed the whole mesh at +84 % DOF",
+  "predeclared_outcomes": "qmhp-cem.s1-port-refinement-experiment/0.1.0, outcomes A to E",
+  "stop_conditions": "the six predeclared in that record; completing R1 means STOP for review"
+ }
 }
