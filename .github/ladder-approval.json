@@ -61,5 +61,15 @@
   "measured_within_order_timing_exponent": 1.32,
   "projected_level_3_wall_clock_s": 182,
   "port_field_test": "EXPLANATION-2-SUPPORTED"
- }
+ },
+ "reruns": [
+  {
+   "attempt": 1,
+   "workflow_run": 35076604481,
+   "solve": "COMPLETED; Palace ran and wrote its outputs, and the 173 MB field artifact uploaded",
+   "why_rerun": "a defect in the reporting, not in the science: the driver rendered its report BEFORE writing the manifest and the record pointer, and the renderer raised KeyError on a result the convergence estimator is designed to return - the first tracked mode admitted no positive order of convergence. The record was therefore never manifested, uploaded or committed, and that solve's outputs were lost with the runner. The approved level is unchanged and is re-run.",
+   "fixed_by": "summary.json and the record pointer are now written before any rendering; a render failure is captured into report.md and reported as a non-zero exit while the record is still manifested. The renderer handles every refusal the estimator can return, covered by a parametrised test over all six combinations including the one that failed.",
+   "note_for_the_rerun": "attempt 1 told us something before it fell over: the fluxonium-like mode's frequency sequence over L1, L2, L3 admits NO positive order of convergence. That is a result, not a failure, and the rerun should reproduce it."
+  }
+ ]
 }

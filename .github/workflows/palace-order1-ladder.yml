@@ -179,7 +179,7 @@ jobs:
             || { echo "the preserved pilot record changed"; git status --porcelain results/COUPLED-PILOT-20260916T035733Z; exit 1; }
 
       - name: Upload the record
-        if: always()
+        if: always() && steps.record.outputs.path != ''
         uses: actions/upload-artifact@v4
         with:
           name: order1-ladder-${{ github.run_id }}

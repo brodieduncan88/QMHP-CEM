@@ -42,6 +42,7 @@ import shutil
 import subprocess
 import sys
 import time
+import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -1114,93 +1115,132 @@ def render_report(summary: dict[str, Any]) -> str:
         add(f"Not available: {test.get('reason')}")
     add("")
 
+    def num(value: Any, spec: str = ".4e") -> str:
+        """Format a number, or say plainly that there is not one.
+
+        Every section below can be handed a refusal instead of a value — that
+        is the point of an estimator that can refuse — so the renderer must
+        never assume a key is present. A report that crashes on a negative
+        result loses the negative result.
+        """
+        if value is None or (isinstance(value, float) and math.isnan(value)):
+            return "—"
+        try:
+            return format(value, spec)
+        except (TypeError, ValueError):
+            return str(value)
+
     convergence = summary.get("convergence") or {}
+    tracking = summary.get("tracking") or {}
+    series_all = tracking.get("series") or {}
     if convergence.get("available"):
         add("## 6. Convergence over the rungs")
         add("")
-        rungs = summary["rungs"]
         add("| level | h_gap (mm) | DOF | wall clock (s) | source |")
         add("|---|---|---|---|---|")
-        for r in rungs:
-            add(f"| {r['level']} | {r['h_gap_mm']:.6f} | {r['dof']} "
-                f"| {r['wall_clock_s']:.1f} | `{r['source']}` |")
+        for r in summary.get("rungs", []):
+            add(f"| {r.get('level')} | {num(r.get('h_gap_mm'), '.6f')} | {r.get('dof')} "
+                f"| {num(r.get('wall_clock_s'), '.1f')} | `{r.get('source')}` |")
         add("")
-        tracking = summary.get("tracking") or {}
-        add(f"Mode tracking: {tracking.get('transitivity_note')}")
+        add(f"Mode tracking: {tracking.get('transitivity_note', 'not reported')}")
         add("")
-        for key, entry_m in convergence["per_mode"].items():
-            freq = entry_m["frequency"]
-            add(f"### {key} ({entry_m['role']})")
+        for key, entry_m in (convergence.get("per_mode") or {}).items():
+            freq = entry_m.get("frequency") or {}
+            add(f"### {key} ({entry_m.get('role')})")
             add("")
-            series = (summary["tracking"]["series"][key]["points"])
-            add("| level | mode | f (GHz) | \|p\| |")
-            add("|---|---|---|---|")
-            for point in series:
-                add(f"| {point['level']} | {point['mode']} | {point['frequency_GHz']:.6f} "
-                    f"| {point['abs_participation']:.6e} |")
-            add("")
+            points = (series_all.get(key) or {}).get("points") or []
+            if points:
+                add("| level | mode | f (GHz) | \\|p\\| |")
+                add("|---|---|---|---|")
+                for point in points:
+                    add(f"| {point['level']} | {point['mode']} | {num(point['frequency_GHz'], '.6f')} "
+                        f"| {num(point['abs_participation'])} |")
+                add("")
             if freq.get("solvable"):
-                add(f"- observed order **{freq['observed_order']:.3f}**, extrapolated limit "
-                    f"**{freq['extrapolated_limit']:.6f} GHz**")
-                add("- estimated remaining relative error: "
-                    + ", ".join(f"L{point['level']} {err:.3e}"
-                                for point, err in zip(series, freq["remaining_relative_error"])))
+                add(f"- observed order **{num(freq.get('observed_order'), '.3f')}**, extrapolated limit "
+                    f"**{num(freq.get('extrapolated_limit'), '.6f')} GHz**")
+                remaining = freq.get("remaining_relative_error") or []
+                if points and len(remaining) == len(points):
+                    add("- estimated remaining relative error: "
+                        + ", ".join(f"L{point['level']} {num(err, '.3e')}"
+                                    for point, err in zip(points, remaining)))
             else:
-                add(f"- no order of convergence: {freq['reason']}")
-            part = entry_m["abs_participation"]
+                add(f"- **no order of convergence**: {freq.get('reason', 'not reported')}")
+                add(f"- differences: L1→L2 {num(freq.get('difference_12'))}, "
+                    f"L2→L3 {num(freq.get('difference_23'))}; shrinking: "
+                    f"{freq.get('differences_shrinking')}; monotone: {freq.get('monotone')}")
+                if freq.get("ratio_of_differences") is not None:
+                    add(f"- ratio of successive differences {num(freq.get('ratio_of_differences'), '.4g')} "
+                        f"against the {num(freq.get('ratio_floor_for_any_positive_order'), '.4g')} floor "
+                        f"these refinement ratios impose for any positive order")
+            part = entry_m.get("abs_participation") or {}
             if part.get("solvable"):
-                add(f"- \|p\| observed order {part['observed_order']:.3f}, limit "
-                    f"{part['extrapolated_limit']:.6e}")
+                add(f"- \\|p\\| observed order {num(part.get('observed_order'), '.3f')}, limit "
+                    f"{num(part.get('extrapolated_limit'))}")
             else:
-                add(f"- \|p\|: no order — {part['reason']}")
+                add(f"- \\|p\\|: no order — {part.get('reason', 'not reported')}")
             add("")
-        add(convergence["note"])
+        add(convergence.get("note", ""))
         add("")
 
     asymptotic = summary.get("asymptotic") or {}
     if asymptotic:
         add("## 7. Is the sequence still clearly pre-asymptotic?")
         add("")
-        add(f"**{'YES' if asymptotic['still_clearly_pre_asymptotic'] else 'NO'}** — worst estimated "
-            f"remaining relative error at the finest rung {asymptotic['worst_remaining_relative_error']:.3e}.")
+        add(f"**{'YES' if asymptotic.get('still_clearly_pre_asymptotic') else 'NO'}** — worst estimated "
+            f"remaining relative error at the finest rung "
+            f"{num(asymptotic.get('worst_remaining_relative_error'), '.3e')}.")
         add("")
-        for verdict in asymptotic["per_mode"]:
-            add(f"- `{verdict['mode']}`: **{verdict['verdict']}** — {verdict['reason']}")
+        for verdict in asymptotic.get("per_mode", []):
+            add(f"- `{verdict.get('mode')}`: **{verdict.get('verdict')}** — {verdict.get('reason')}")
         add("")
-        add(asymptotic["criterion"])
+        add(asymptotic.get("criterion", ""))
         add("")
 
     order_two = summary.get("order_two_projection") or {}
     if order_two.get("available"):
         add("## 8. What order-2 mesh the frozen tolerance would need")
         add("")
-        add(f"Target: relative frequency error ≤ {list(order_two['per_mode'].values())[0]['target_relative_frequency_error']:.0e} "
-            f"— {list(order_two['per_mode'].values())[0]['target_source']}.")
-        add("")
-        add("| mode | order-2 error at L1 | assumption | required h (mm) | required DOF | ≤ 250 000 |")
-        add("|---|---|---|---|---|---|")
-        for key, projection in order_two["per_mode"].items():
-            if not projection.get("available"):
-                add(f"| {key} | — | {projection['reason']} | — | — | — |")
-                continue
-            datum = projection["order2_datum"]
-            for name, values in projection["projections"].items():
-                if values.get("already_met"):
-                    add(f"| {key} | {datum['relative_error_against_the_limit']:.3e} | {name} "
-                        f"| already met | {values['required_dof']:.0f} | yes |")
-                    continue
-                add(f"| {key} | {datum['relative_error_against_the_limit']:.3e} | {name} "
-                    f"| {values['required_h_mm']:.3e} | {values['required_dof']:.3e} "
-                    f"| {'yes' if values['within_dof_budget'] else 'NO'} |")
-        add("")
-        first = next(iter(order_two["per_mode"].values()))
-        if first.get("available"):
-            add(f"Measured DOF scaling exponent q = {first['measured_dof_scaling_exponent_q']:.3f} "
-                f"({first['dof_scaling_note']}).")
+        usable = [v for v in (order_two.get("per_mode") or {}).values() if v.get("available")]
+        if not usable:
+            add("**Not projectable.** No tracked mode yielded an extrapolated limit, so there is "
+                "no continuum value to measure an order-2 mesh against:")
             add("")
-            for caveat in first["caveats"]:
+            for key, projection in (order_two.get("per_mode") or {}).items():
+                add(f"- `{key}`: {projection.get('reason', 'not reported')}")
+            add("")
+        else:
+            first = usable[0]
+            add(f"Target: relative frequency error ≤ {num(first.get('target_relative_frequency_error'), '.0e')} "
+                f"— {first.get('target_source')}.")
+            add("")
+            add("| mode | order-2 error at L1 | assumption | required h (mm) | required DOF | ≤ 250 000 |")
+            add("|---|---|---|---|---|---|")
+            for key, projection in (order_two.get("per_mode") or {}).items():
+                if not projection.get("available"):
+                    add(f"| {key} | — | not projectable: {projection.get('reason')} | — | — | — |")
+                    continue
+                datum = projection.get("order2_datum") or {}
+                for name, values in (projection.get("projections") or {}).items():
+                    if values.get("already_met"):
+                        add(f"| {key} | {num(datum.get('relative_error_against_the_limit'), '.3e')} | {name} "
+                            f"| already met | {num(values.get('required_dof'), '.0f')} | yes |")
+                        continue
+                    add(f"| {key} | {num(datum.get('relative_error_against_the_limit'), '.3e')} | {name} "
+                        f"| {num(values.get('required_h_mm'), '.3e')} | {num(values.get('required_dof'), '.3e')} "
+                        f"| {'yes' if values.get('within_dof_budget') else 'NO'} |")
+            add("")
+            add(f"Measured DOF scaling exponent q = {num(first.get('measured_dof_scaling_exponent_q'), '.3f')} "
+                f"({first.get('dof_scaling_note')}).")
+            add("")
+            for caveat in first.get("caveats", []):
                 add(f"- {caveat}")
             add("")
+    elif order_two:
+        add("## 8. What order-2 mesh the frozen tolerance would need")
+        add("")
+        add(f"Not available: {order_two.get('reason', 'not reported')}")
+        add("")
 
     reproduction = summary.get("port_field_reproduction") or {}
     if reproduction:
@@ -1393,13 +1433,34 @@ def main(argv: list[str] | None = None) -> int:
         shutil.move(str(paraview), str(destination))
         summary["rung"].setdefault("field_output", {})["moved_to"] = str(destination)
 
+    # The record is made durable BEFORE anything presentational runs. The
+    # level-3 run rendered its report before writing the manifest and the
+    # pointer, the renderer raised on a negative result the estimator was
+    # designed to return, and the solve's outputs were never manifested,
+    # uploaded or committed. Presentation must not be able to destroy evidence.
     (record_dir / "summary.json").write_text(json.dumps(summary, indent=1, sort_keys=True, default=str) + "\n")
-    (record_dir / "report.md").write_text(render_report(summary))
-    manifest.write(record_dir)
     if args.record_pointer:
         Path(args.record_pointer).write_text(str(record_dir))
-    print(render_report(summary))
+
+    render_failed: str | None = None
+    try:
+        report = render_report(summary)
+    except Exception as exc:  # noqa: BLE001 - the record still has to survive
+        render_failed = f"{type(exc).__name__}: {exc}"
+        report = (
+            f"# Order-1 mesh-refinement check — level {args.level}\n\n"
+            f"**The report could not be rendered: {render_failed}**\n\n"
+            f"Every measured quantity is in `summary.json`, which is written and manifested. "
+            f"This is a presentation failure, not a loss of evidence.\n\n"
+            f"```\n{traceback.format_exc()}\n```\n"
+        )
+    (record_dir / "report.md").write_text(report)
+    manifest.write(record_dir)
+    print(report)
     print(f"{record_dir}: written")
+    if render_failed:
+        print(f"WARNING: the report failed to render ({render_failed}); the record is intact")
+        return 1
     return 0 if entry["status"] in {"COMPLETED", "PREPARED"} else 1
 
 

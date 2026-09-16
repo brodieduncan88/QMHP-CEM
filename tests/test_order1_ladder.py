@@ -288,3 +288,128 @@ def test_the_level_two_record_is_free_of_uncommittable_field_output():
     assert (record / "L2" / "solver" / "postpro" / "surface-Q.csv").exists()
     total = sum(f.stat().st_size for f in record.rglob("*") if f.is_file())
     assert total < 20 * 1024 * 1024, f"the record is {total / 1e6:.0f} MB"
+
+
+# --- the report must survive every refusal the estimator can return ----------
+
+
+def _three_rung_summary(frequencies: dict[str, list[float]]) -> dict:
+    """A level-3 summary built from explicit frequency sequences."""
+    ladder = _ladder()
+    h = [0.01, 0.01 * 2.0 / 3.0, 0.005]
+    series = {}
+    for i, (key, values) in enumerate(frequencies.items(), start=1):
+        series[key] = {
+            "points": [
+                {
+                    "level": level, "h_gap_mm": hh, "mode": i,
+                    "frequency_GHz": f, "abs_participation": 0.5 / i, "dof": dof,
+                }
+                for level, hh, f, dof in zip((1, 2, 3), h, values, (39832, 79944, 147372))
+            ],
+            "role": "LUMPED_DOMINATED" if i == 1 else "FIELD_DOMINATED",
+        }
+    convergence = ladder.convergence_over_rungs(series)
+    convergence["available"] = True
+    projections = {
+        key: ladder.order_two_projection(
+            convergence, {1: 39832, 2: 79944, 3: 147372}, {1: 208670, 2: 420664, 3: 781554},
+            {1: h[0], 2: h[1], 3: h[2]},
+            {"mode": key, "level": 1, "frequency_GHz": 1.707441654},
+            ladder.FROZEN_FREQUENCY_TOLERANCE,
+        )
+        for key in series
+    }
+    return {
+        "batch_id": "COUPLED-LADDER-O1-L3-TEST", "statement": "test", "level": 3,
+        "dry_runs": {}, "rung": {"status": "COMPLETED", "dof_measured": 147372, "admission": {"modes": []}},
+        "comparison": {"available": False, "reason": "test"},
+        "rungs": [
+            {"level": 1, "h_gap_mm": h[0], "dof": 39832, "wall_clock_s": 32.4, "source": "P2"},
+            {"level": 2, "h_gap_mm": h[1], "dof": 79944, "wall_clock_s": 81.2, "source": "L2"},
+            {"level": 3, "h_gap_mm": h[2], "dof": 147372, "wall_clock_s": None, "source": "L3"},
+        ],
+        "tracking": {"available": True, "transitivity_note": "ok", "series": series},
+        "convergence": convergence,
+        "asymptotic": ladder.asymptotic_assessment(convergence),
+        "order_two_projection": {"available": True, "per_mode": projections, "match": {}},
+        "port_field_reproduction": {"L2": "EXPLANATION-2-SUPPORTED", "L3": None},
+        "trend": {"available": False},
+        "next_level": {"level": 4, "dof_measured": None, "dof_budget": 250_000,
+                       "within_dof_budget": False, "cap_s": 2700, "projected_wall_clock": None,
+                       "decision": "FOR REVIEW"},
+    }
+
+
+CONVERGING = [1.158333, 1.461887, 1.55]        # solvable
+NOT_SHRINKING = [1.0, 1.1, 1.2]                # no positive order
+NON_MONOTONE = [1.0, 1.2, 1.1]                 # no power law
+
+
+@pytest.mark.parametrize(
+    "first,second",
+    [
+        (CONVERGING, CONVERGING),
+        (CONVERGING, NOT_SHRINKING),
+        (NOT_SHRINKING, CONVERGING),   # the case that crashed the level-3 run
+        (NOT_SHRINKING, NOT_SHRINKING),
+        (NON_MONOTONE, CONVERGING),
+        (NON_MONOTONE, NON_MONOTONE),
+    ],
+    ids=["both-ok", "second-refuses", "first-refuses", "both-refuse", "first-non-monotone", "both-non-monotone"],
+)
+def test_the_report_renders_whatever_the_estimator_returns(first, second):
+    """A report that crashes on a negative result loses the negative result.
+
+    The level-3 run refused an order on its FIRST tracked mode and the renderer
+    raised, so the record was never manifested, never uploaded and never
+    committed, and the solve's outputs were lost. Every combination is covered
+    here, not just the one that failed.
+    """
+    ladder = _ladder()
+    summary = _three_rung_summary({"L1m1": first, "L1m2": second})
+    text = ladder.render_report(summary)
+    assert "Order-1 mesh-refinement check" in text
+    assert "## 6. Convergence over the rungs" in text
+    for key, values in (("L1m1", first), ("L1m2", second)):
+        if values is CONVERGING:
+            assert "observed order" in text
+        else:
+            assert "no order of convergence" in text
+    # A refusal must be explained, never silently blank.
+    if NOT_SHRINKING in (first, second):
+        assert "floor" in text
+    if NON_MONOTONE in (first, second):
+        assert "not monotone" in text
+
+
+def test_the_report_says_so_when_nothing_can_be_projected():
+    ladder = _ladder()
+    summary = _three_rung_summary({"L1m1": NOT_SHRINKING, "L1m2": NON_MONOTONE})
+    text = ladder.render_report(summary)
+    assert "Not projectable" in text
+    assert "no continuum value" in text
+
+
+def test_the_report_tolerates_a_missing_wall_clock():
+    ladder = _ladder()
+    summary = _three_rung_summary({"L1m1": CONVERGING, "L1m2": CONVERGING})
+    assert summary["rungs"][2]["wall_clock_s"] is None
+    assert "| — |" in ladder.render_report(summary)
+
+
+def test_the_record_is_made_durable_before_the_report_is_rendered():
+    """Presentation must not be able to destroy evidence.
+
+    summary.json and the record pointer are written first; a rendering failure
+    is captured into report.md and reported as a non-zero exit, but the record
+    is still manifested.
+    """
+    source = (REPO_ROOT / "scripts" / "palace_order1_ladder.py").read_text()
+    write_summary = source.index('"summary.json").write_text')
+    write_pointer = source.index("Path(args.record_pointer).write_text")
+    render = source.index("report = render_report(summary)")
+    write_manifest = source.index("manifest.write(record_dir)")
+    assert write_summary < write_pointer < render < write_manifest
+    assert "except Exception as exc:  # noqa: BLE001 - the record still has to survive" in source
+    assert "This is a presentation failure, not a loss of evidence." in source
