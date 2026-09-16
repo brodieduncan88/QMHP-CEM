@@ -68,7 +68,7 @@ if the block becomes a typed field.
 `route_b_MHz`, `route_b_floor_MHz`, `status` ∈ {RESOLVED, UNRESOLVED,
 MISSING}, `relative_disagreement`, `consistent`), `RouteRecord`
 (route id, record path, solver identity, convergence evidence, values of
-`E_C` entries), `CouplingExtractionRecord` (declaration id + sha256,
+the invariant triple), `CouplingExtractionRecord` (declaration id + sha256,
 register sha256, both `RouteRecord`s, list of `InteractionExtraction`,
 `suitability` dict, `hidden_modes`, `verdict`). Validation: `status` is
 RESOLVED only if `|value| ≥ 10·floor` on both routes; `consistent` is only
@@ -134,7 +134,9 @@ Keep `CouplingExtraction`, `ExtractionInconsistent`,
 `max_relative_disagreement()` exactly. Replace the two stubs by real
 functions that take typed inputs, never `SolverResults` of the other route:
 `extract_eigenmode(eig_modes, epr, domain_E, declared_L) -> RouteResult`
-(the participation inversion of `extraction-routes.md` §2.3) and
+(the participation inversion of `extraction-routes.md` §2.3, implemented and
+demonstrated in `models/route_a_inversion.py`, returning the invariant triple
+and never the readout-node entries) and
 `extract_blackbox(S_complex, references_ohm, band, model_order) ->
 RouteResult` (S→Z→Y, rational fit of §3.3). Plus `resolve(pair,
 route_a, route_b) -> InteractionExtraction` applying the 10·floor rule

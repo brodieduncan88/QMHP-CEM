@@ -48,9 +48,11 @@ geometric on the chip (island size and gap, coupling gap, CPW dimensions,
 meander, ports, substrate permittivity, PEC metal, 50 Ω port references,
 `C_J = 0`) is a **newly proposed, unapproved ENGINEERING-SEED** with its
 rationale in the declaration. S1 claims a numerical extraction of
-`E_C,F1F1`, `E_C,F1R1`, `(E_C,R1R1, E_L,R1)` and hence `g_F1R1` by two
-independent routes, their agreement to the existing 10 % rule, and a
-suitability report against the source values. **It does not claim V2A
+the gauge-invariant triple `{E_C,F1F1, f_R1, g_F1R1}` by two independent
+routes, their agreement on the coupling to the existing 10 % rule, and a
+suitability report against the source values. The individual readout-node
+entries `E_C,F1R1`, `E_C,R1R1` and `E_L,R1` are **not** outputs: each depends
+on an arbitrary readout-node normalisation (see the correction below). **It does not claim V2A
 validation, and says nothing about the mediator, `F2`, `R2` or their
 couplings.**
 

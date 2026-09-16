@@ -19,8 +19,8 @@ Shared inputs (identical files, hashed into both records):
 - the declared node set, port locations, port orientations, reference planes
   and the lumped-element site geometry;
 - the declared lumped values `E_J`, `E_L`, `f_C`, non-geometric capacitances;
-- the algebra of `coupling-definition.md` §3 that turns `(E_C, E_L,R)` into
-  `g`, `J`;
+- the algebra of `coupling-definition.md` §3 that turns the circuit
+  quantities into the invariant coefficients `g`, `J`;
 - the single-mode representation of each readout resonator;
 - Palace itself (one binary, one image) and MFEM's Nédélec discretisation.
 
@@ -229,8 +229,18 @@ The fit is a deterministic vector-fitting / rational least squares over the
 recorded complex `Y(f)` with the model order fixed by the declared mode
 count (one readout pole for S1), never chosen from the data. Its residual, the
 change between two consecutive fit orders and between two mesh levels give
-this route's resolution floor. The output is again `C⁻¹`, `E_C` and
-`(E_C,RR, E_L,R)` in the node basis.
+this route's resolution floor.
+
+**Route B's output is the same invariant triple as Route A's**, and for the
+same reason. The pole and zero of `Y_FF` fix the *product* `L_R(C_R + C_c)`
+and `L_R C_R`, never `L_R` and the capacitances separately: rescaling the
+readout node moves `L_R`, `C_R` and `C_c` together and leaves every fitted
+pole, zero and residue unchanged. What the fit determines without a
+convention is the site capacitance `E_C,F1F1`, the pole frequency `f_R1`, and
+the residue at the pole, which is the invariant coupling `g_F1R1`. Any
+readout-node capacitance or inductance the fit reports is stated in, and only
+meaningful in, a declared gauge, and is never compared between the routes
+(`route-a-identifiability.md`).
 
 ### 3.4 Independent convergence evidence
 
@@ -249,6 +259,7 @@ levels of each ladder. Route B never reads `eig.csv`; Route A never reads
 | Lumped elements in the EM model | inductive ports, removed analytically | resistive ports, removed by the S→Z conversion |
 | Primary data | real eigenfrequencies + energy participations | complex generalised S columns on a frequency grid |
 | Extraction step | algebraic inversion of the normal-mode problem | rational fit of the admittance (poles, zeros, low-frequency slope) |
+| Output | the invariant triple `{E_C,F1F1, f_R1, g_F1R1}` | the same invariant triple |
 | Numerical error sources | eigen-solver tolerance, mode identification, energy postprocessing | frequency sampling, adaptive error, dB/degree quantisation, fit conditioning |
 | Reads the other route's output | no | no |
 

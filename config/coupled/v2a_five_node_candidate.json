@@ -232,7 +232,7 @@
    "R1"
   ],
   "represents": "a bounded subsystem of the proposed structure: one grounded Branch-A encoded fluxonium capacitively coupled to one passive readout mode, in a bounded chip cell of the Object 001 package",
-  "claims": "numerical extraction of E_C,F1F1, E_C,F1R1, (E_C,R1R1, E_L,R1) and hence g_F1R1 by two independent routes for the declared seed geometry; agreement of the routes to the 10 % ENGINEERING-RULE; suitability report against the source-bound E_C, w_r, g",
+  "claims": "numerical extraction of the gauge-invariant triple {E_C,F1F1, f_R1, g_F1R1} of the declared seed geometry by two independent routes; agreement of the routes on g_F1R1 to the 10 % ENGINEERING-RULE; suitability report against the source-bound E_C, w_r and g",
   "does_not_claim": [
    "any V2A validation",
    "any statement about the mediator, F2, R2 or their couplings",
@@ -249,6 +249,7 @@
    {
     "id": "E_C_F1F1_GHz",
     "source_value": 0.6,
+    "invariant": true,
     "binding": {
      "class": "SOURCE-BOUND",
      "source_id": "master_requirements",
@@ -258,6 +259,7 @@
    {
     "id": "bare_readout_GHz",
     "source_value": 4.301974466,
+    "invariant": true,
     "binding": {
      "class": "SOURCE-BOUND",
      "source_id": "master_requirements",
@@ -267,13 +269,26 @@
    {
     "id": "g_F1R1_GHz",
     "source_value": 0.15,
+    "invariant": true,
     "binding": {
      "class": "SOURCE-BOUND",
      "source_id": "master_requirements",
      "locator": "L73-74"
     }
    }
-  ]
+  ],
+  "not_identifiable": {
+   "quantities": [
+    "E_C,F1R1",
+    "E_C,R1R1",
+    "E_L,R1",
+    "L_R1",
+    "any individual readout-node matrix entry"
+   ],
+   "reason": "the readout node carries no lumped element, so nothing in the EM model fixes the scale of its node flux; the rescaling Phi_R -> s Phi_R, Q_R -> Q_R/s leaves every observable invariant while moving these entries by powers of s. They are conventions, not measurements",
+   "treatment": "never an output and never compared between the routes; shown, if at all, only alongside the gauge they are stated in",
+   "reference": "docs/coupled-candidate/route-a-identifiability.md"
+  }
  },
  "geometry": {
   "kind": "bounded_chip_cell",
@@ -954,6 +969,15 @@
    "unchanged": true
   },
   "resolution_ratio": 10,
-  "resolution_ratio_source": "solvers/palace/verification.py RULES height_shift_to_uncertainty_min_ratio"
+  "resolution_ratio_source": "solvers/palace/verification.py RULES height_shift_to_uncertainty_min_ratio",
+  "target": {
+   "invariant_triple": [
+    "E_C_F1F1_GHz",
+    "f_R1_GHz",
+    "g_F1R1_GHz"
+   ],
+   "statement": "both routes estimate the same gauge-invariant quantities; the individual readout-node matrix entries are not identifiable and are not outputs",
+   "reference": "docs/coupled-candidate/route-a-identifiability.md"
+  }
  }
 }

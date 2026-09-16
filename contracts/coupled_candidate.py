@@ -161,9 +161,44 @@ class ProposedStructure(StrictModel):
 
 
 class SuitabilityQuantity(StrictModel):
+    """A source value the extraction is compared against, for information.
+
+    ``invariant`` records whether the quantity is independent of the readout
+    node's flux normalisation. A suitability quantity that is not invariant
+    would be comparing a convention against a frozen number, so the validator
+    rejects one (``route-a-identifiability.md``).
+    """
+
     id: str
     source_value: float
     binding: Binding
+    invariant: bool = True
+
+    @model_validator(mode="after")
+    def _must_be_invariant(self) -> "SuitabilityQuantity":
+        if not self.invariant:
+            raise ValueError(
+                f"suitability quantity {self.id!r} is marked not gauge-invariant; a quantity "
+                f"fixed by a readout-node normalisation cannot be compared against a source value"
+            )
+        return self
+
+
+class NotIdentifiable(StrictModel):
+    """Quantities the routes must never report as convention-independent outputs."""
+
+    quantities: list[str]
+    reason: str
+    treatment: str
+    reference: str
+
+
+class ExtractionTarget(StrictModel):
+    """The gauge-invariant quantities both routes estimate."""
+
+    invariant_triple: list[str]
+    statement: str
+    reference: str
 
 
 class ExecutableScope(StrictModel):
@@ -176,6 +211,7 @@ class ExecutableScope(StrictModel):
     does_not_claim: list[str]
     required_interactions: list[tuple[str, str]]
     suitability_quantities: list[SuitabilityQuantity]
+    not_identifiable: NotIdentifiable | None = None
 
 
 class Cell(StrictModel):
@@ -448,6 +484,7 @@ class ExtractionRef(StrictModel):
     consistency_rule: ConsistencyRule
     resolution_ratio: float
     resolution_ratio_source: str
+    target: ExtractionTarget | None = None
 
 
 # --- root --------------------------------------------------------------------------

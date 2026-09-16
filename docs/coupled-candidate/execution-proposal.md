@@ -83,50 +83,123 @@ here. The honest way to decide the element order is to measure it.
 
 ## 4. What is proposed
 
-### 4.1 A bounded pilot, before any ladder
+### 4.1 The bounded pilot: three solves
 
-Two Palace eigenmode solves of the same declared geometry at level 1, both
-inside the existing budget and the existing runner allowance:
+Three Palace eigenmode solves of the **same declared geometry**, all at mesh
+level 1, differing only in element order and in the size-field halo. Each is
+capped at **45 minutes** of solver wall clock and killed at the cap. **No
+external or additional compute is used**: one job on the existing
+GitHub-hosted runner, 2.25 h of solver time plus the 30 min evidence reserve,
+inside the 6 h ceiling.
 
-| run | order | DOF | what it measures |
-|---|---|---|---|
-| P1 | 2 | 208 670 (option A) | wall clock, memory, the participation, and whether the solve completes at all |
-| P2 | 1 | 39 832 | the same quantities at order 1 |
+| run | element order | halo `DistMax` | DOF (measured) | purpose |
+|---|---|---|---|---|
+| **P1** | 2 | 0.08 mm | 208 670 | the reference solve |
+| **P2** | 1 | 0.08 mm | 39 832 | element-order sensitivity, against P1 |
+| **P3** | 2 | 0.15 mm | **281 332** | halo sensitivity, against P1 |
 
-Comparing the participation of P1 and P2 at the same mesh gives the
-order-dependence directly. The pilot decides the element order with data, and
-its cost is bounded: **two solves, each capped at 45 minutes**, one job, well
-under the 6 h ceiling. It launches only on approval.
+P1 against P2 tests element-order sensitivity at a fixed halo. P1 against P3
+tests whether tightening the halo materially changes the participation, so the
+halo change is **validated rather than assumed**.
 
-The pilot is not an extraction. It produces no coupling and feeds no gate: its
-outputs are timing, memory, the mode list in the window, and the participation
-with its convergence behaviour. It would be recorded like any other run, with
-a manifest, and labelled a pilot.
+> **One thing the review must decide with this.** P3 at the 0.15 mm halo
+> measures **281 332 DOF**, which is **12.5 % above the declared 250 000 DOF
+> budget** of §6 of the numerical plan. That budget is a predeclared
+> ENGINEERING-RULE and this proposal does not relax it. Approving the pilot as
+> specified therefore means approving P3 as a **single, explicit,
+> one-run exception** to the DOF rule, for a validation solve that produces no
+> extraction. If the exception is not wanted, the measured in-budget
+> alternatives for the second halo are:
+>
+> | halo | DOF order 2 | within the 250 000 budget |
+> |---|---|---|
+> | 0.10 mm | 215 586 | yes |
+> | 0.12 mm | 235 806 | yes |
+> | 0.15 mm | 281 332 | **no** |
+>
+> A 0.12 mm P3 gives a 1.5× halo contrast instead of 1.9× and keeps the whole
+> pilot inside every declared rule. Either choice is acceptable to this
+> proposal; what is not acceptable is running P3 at 0.15 mm while leaving the
+> budget rule unmarked.
 
-### 4.2 The ladder the pilot selects
+The pilot is **not an extraction**. It produces no coupling, feeds no gate and
+touches no threshold. Its outputs are wall clock, memory, the mode list in the
+declared window, and the site energy participation with its sensitivity to the
+two knobs. It is recorded like any other run, with a manifest, labelled a
+pilot, and it launches only on approval.
 
-- If P1 completes comfortably, propose **order 2** with a two-level ladder
-  (L1 and a level between L1 and L2 sized to the measured budget), and state
-  plainly that two levels is the minimum defensible convergence evidence and
-  weaker than the three levels the empty-box campaign carried.
-- If P1 is too slow or too large, propose **order 1** with the full three
-  levels of option A, with the participation convergence reported per level
-  and the Route A floor on `g` derived from it rather than assumed.
-- If neither delivers a participation whose level-to-level change is small
-  enough to give a useful floor on `g`, the honest outcome is that the
-  extraction is **not executable within the current allowance**, and the
-  decision returns to the review.
+### 4.2 The predeclared numerical criterion for the halo
+
+Written down before the pilot runs, so it cannot be chosen after seeing the
+numbers. **This is a numerical execution rule about a discretisation choice.
+It is not a physical QMHP threshold, it introduces no acceptance criterion for
+any coupling, and it leaves the 10 % agreement rule untouched.**
+
+Let `p₁` and `p₃` be the site energy participation of the readout-like mode
+from P1 and P3, and `f₁`, `f₃` the corresponding mode frequencies. Define
+
+```
+Δp = |p₁ − p₃| / max(|p₁|, |p₃|)        the halo-induced relative change in participation
+Δf = |f₁ − f₃| / f₁                     the halo-induced relative change in frequency
+```
+
+The 0.08 mm halo is **ADMISSIBLE** when both hold:
+
+| check | rule | where the number comes from |
+|---|---|---|
+| frequency | `Δf ≤ 1e-4` | the existing frequency convergence rule of the numerical plan, applied unchanged to a different perturbation. Nothing new is invented |
+| participation | `Δp ≤ 1e-2` | the participation accuracy Route A must reach anyway: the measured propagation is roughly one-for-one from participation to `g`, so a halo-induced shift above 1 % would by itself consume the whole Route A floor on `g` before any mesh refinement is considered |
+
+**The result is propagated, not just passed.** When the halo is admissible,
+`Δp` does not vanish from the record: it is carried forward as a *systematic*
+contribution to Route A's resolution floor for `g`, combined with the
+mesh-ladder term by taking the maximum, which is the same combination rule the
+repository already uses for resolution floors. A halo that scrapes past the
+criterion therefore raises the floor it must later be judged against, and it
+cannot be made free by passing.
+
+Outcomes, all three predeclared:
+
+- **Both checks pass** → the 0.08 mm halo is admissible for the Route A
+  ladder; `Δp` enters `δ_A` as above; the element order is then chosen from
+  P1 against P2 by the rule in §4.3 below.
+- **The participation check fails** (`Δp > 1e-2`) → the 0.08 mm halo is
+  **rejected**: the coarse/fine transition is close enough to the fields to
+  matter. The ladder would then need a halo at least as wide as 0.15 mm, which
+  at order 2 does not fit the DOF budget at any level, so execution returns to
+  the review as BLOCKED with that measurement. It is not rescued by loosening
+  the criterion.
+- **The frequency check fails** (`Δf > 1e-4`) → this is not a halo verdict at
+  all: a frequency moving that much between two size fields at the same
+  refinement level indicates the level-1 mesh is too coarse for the geometry,
+  or the model is wrong. Report and stop; the halo question is not answerable
+  from that pilot.
+
+### 4.3 How the element order is chosen, from P1 against P2
+
+Also predeclared, and also purely numerical. Let `Δp₁₂` be the relative
+difference in the same participation between P1 and P2 at the common 0.08 mm
+halo.
+
+- If P1 completes inside its 45 minute cap, **order 2 is selected**, and
+  `Δp₁₂` is reported as the measured cost of the cheaper discretisation.
+- If P1 does not complete, **order 1 is the only option**, and it is usable
+  only if its own participation converges on the ladder well enough to give a
+  useful floor on `g`; `Δp₁₂` is then unavailable and that is reported.
+- If neither completes, the extraction is not executable within the current
+  allowance and the decision returns to the review.
 
 ### 4.3 The one approval being requested
 
-**Change the Route A mesh-rule halo `DistMax` from 0.30 mm to 0.08 mm, or
-approve the pilot that tests it.** This is the only change with a large effect
-that costs no geometry: it does not touch a single declared dimension, and the
+**Approve the three-solve pilot of §4.1, which tests the halo change rather
+than assuming it.** The halo is the only knob with a large effect that costs
+no geometry: it does not touch a single declared dimension, and the
 declaration's `ENGINEERING-SEED` values stay exactly as they are. Its risk is
-specific and testable: a halo that is too tight puts the coarse/fine
-transition where the fields are still strong, which would show up as a
-participation that moves between halo settings. That is a measurement the
-pilot can make at the same time, by repeating P1 at a 0.15 mm halo.
+specific and testable, and §4.2 states the criterion in advance.
+
+The approval carries one sub-decision: whether P3 runs at 0.15 mm as a
+single explicit exception to the 250 000 DOF rule, or at 0.12 mm to stay
+inside every declared rule with a slightly smaller halo contrast.
 
 Nothing else is requested. **No additional runner allowance and no purchased
 compute is being asked for**, and none is assumed anywhere in this proposal.
@@ -148,10 +221,17 @@ compute is being asked for**, and none is assumed anywhere in this proposal.
 
 ## 6. Decision requested
 
-1. Approve, or decline, the bounded pilot of §4.1 (two eigenmode solves, one
-   job, ≤ 45 min each, no new allowance).
-2. If approved, confirm that the halo change of §4.3 may be tested as part of
-   it while the declaration itself stays unchanged.
+1. Approve, or decline, the **three-solve** pilot of §4.1: P1 order 2 at a
+   0.08 mm halo, P2 order 1 at 0.08 mm, P3 order 2 at the wider halo, one
+   job, each solve capped at 45 minutes, no new allowance and no external
+   compute.
+2. Choose P3's halo: **0.15 mm**, accepting one explicit exception to the
+   250 000 DOF rule for a validation solve that produces no extraction, or
+   **0.12 mm**, which stays inside every declared rule.
+
+The criterion that decides the halo (§4.2) and the rule that selects the
+element order (§4.3) are predeclared here and are not revisited after the
+pilot runs.
 
 Until one of these is answered, execution stays BLOCKED and the checkpoint-A
 package stands as it is.

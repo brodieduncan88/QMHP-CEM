@@ -165,8 +165,11 @@ upper triangle of `E_C`:
 | R1–R2, F1–R2, F2–R1 | parasitic, must be reported | cross-readout paths |
 
 For the **first executable candidate S1** (`𝒩 = {F1, R1}`) the required set is
-the single essential pair **F1–R1**, plus the diagonal `E_C,F1F1` and the bare
-`(ω_R1, E_L,R1)` as suitability quantities. Reporting fewer pairs than the
+the single essential pair **F1–R1**, plus the two other members of the
+invariant triple, `E_C,F1F1` and the bare readout frequency `f_R1`, as
+suitability quantities. `E_L,R1` is *not* among them: it is a readout-node
+quantity fixed only by a normalisation convention, so it is not an output
+(section 3 and [`route-a-identifiability.md`](route-a-identifiability.md)). Reporting fewer pairs than the
 declared required set, or choosing which pairs to report after seeing values,
 makes the extraction INCOMPLETE.
 
@@ -235,9 +238,13 @@ Rules that prevent double counting:
    `C` after extraction, or declared absent; it is never both in the EM model
    and in the lumped model.
 5. The distributed readout resonators are part of the EM model in both
-   routes. Their single-mode representation `(E_C,RR, E_L,R)` is an output of
-   each route, not an input; higher resonator modes are screened (numerical
-   plan) and omitted from the circuit model.
+   routes. What each route outputs for them is the **invariant** bare
+   frequency `f_R`, not the pair `(E_C,RR, E_L,R)`: that split is fixed by an
+   arbitrary readout-node normalisation and is a convention, not a
+   measurement. Neither is an input. Higher resonator modes are screened
+   (numerical plan) and omitted from the circuit model. When the circuit model
+   needs a single-mode representation, it is constructed *in a stated gauge*
+   from `f_R` and the invariant coupling, and the gauge is recorded with it.
 6. `E_C` is used once: the same matrix drives both the self-charging terms
    and the couplings, as the V2A assessment requires (Maxwell matrix, not
    isolated `E_C` values with appended `g`s).
@@ -270,10 +277,10 @@ values are zero, is therefore only ever fed RESOLVED pairs
 
 | item | binding |
 |---|---|
-| `E_C` sign | `E_C = (e²/2) C⁻¹` with `C` the Maxwell matrix (positive diagonal, negative off-diagonal mutuals); off-diagonal `E_C,kl` is then **positive** for capacitive coupling |
+| `E_C` sign | `E_C = (e²/2) C⁻¹` with `C` the Maxwell matrix (positive diagonal, negative off-diagonal mutuals); off-diagonal `E_C,kl` is then **positive** for capacitive coupling. This fixes the sign of a matrix entry; it does not make a readout-node entry identifiable |
 | `g_kR` | `8 E_C,kR n_zpf,R`, `n_zpf,R = (E_L,R/32 E_C,RR)^{1/4}`, magnitude reported. Gauge-invariant: in closed form `g = 2 e^{3/2}√(L_k φ_r) k /(h b^{1/4})` with no `L_R` (`route-a-identifiability.md` §2) |
 | readout-node gauge | the readout node flux has no scale until one is declared. Any matrix entry shown for a readout node states its gauge; the reported coefficients do not depend on it |
-| `J_kl` | `8 E_C,kl`, magnitude reported |
+| `J_kl` | `8 E_C,kl`, magnitude reported. Invariant when both `k` and `l` carry a declared lumped branch; for a pair involving a readout node the invariant coefficient is the `g_kR` form above |
 | readout operator phase | `n_R = n_zpf,R (a + a†)`, matching the Master's `g n (a + a†)` |
 | fluxonium charge operator | `n = −i d/dφ` on the Master grid; the Master's `n12 = 0.659915` is the regression anchor |
 | flux allocation, SQUID phase sign | declared per registration R1c; the static spectrum is invariant under the sign, which is why it is declared, not tested |

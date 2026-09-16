@@ -61,9 +61,9 @@ about the physical layout.
 | ladder | levels | what converges | rule |
 |---|---|---|---|
 | Route A mesh | `h0`, `h0/1.5`, `h0/2` of the declared rule (gap-resolving size field: 2 elements across the narrowest declared gap at `h0`, box rule `min(a,b)/12` far from conductors) | eigenfrequencies, the site energy participation `p_mF`, and the derived invariants `{E_C,FF, f_R, g}` | frequencies: final-two-level relative change ≤ 1e-4 (existing rule); **participation: final-two-level relative change reported, and it is the dominant term in the resolution floor of `g`** — the measured propagation (`route-a-identifiability.md` §6) is that the relative error on `g` tracks the relative error on the participation roughly one-for-one and is nearly insensitive to the frequency error, so about 1 % on the participation is needed for a 1 % Route A floor on `g`; no threshold on the invariants is invented |
-| Route B mesh | its own `h0`, `h0/1.5` (minimum two levels; `h0/2` if the budget allows) | pole frequency, low-frequency capacitance slope, derived `E_C` | pole: ≤ 1e-4 relative change; `E_C`: change reported, floor `δ_B,mesh` |
-| Route B response fit | fit order `n`, `n+1`; adaptive sweep tolerance `1e-2`, `1e-3` | fitted `E_C`, `L_R` | change between the two tolerances and the two orders reported; floor `δ_B,fit`; `δ_B = max(δ_B,mesh, δ_B,fit)` |
-| Chip-cell size (suitability, not extraction) | box 4 × 4 mm and 6 × 6 mm at `h0` | `E_C,FF`, `E_C,FR`, readout frequency | change reported as the wall-proximity uncertainty of the bounded model; it is **not** part of the route disagreement and is listed under omitted effects |
+| Route B mesh | its own `h0`, `h0/1.5` (minimum two levels; `h0/2` if the budget allows) | pole frequency, low-frequency capacitance slope, and the derived invariants `{E_C,F1F1, f_R1, g_F1R1}` | pole: ≤ 1e-4 relative change; invariants: change reported, floor `δ_B,mesh` |
+| Route B response fit | fit order `n`, `n+1`; adaptive sweep tolerance `1e-2`, `1e-3` | the fitted invariants | change between the two tolerances and the two orders reported; floor `δ_B,fit`; `δ_B = max(δ_B,mesh, δ_B,fit)` |
+| Chip-cell size (suitability, not extraction) | box 4 × 4 mm and 6 × 6 mm at `h0` | `E_C,F1F1`, `g_F1R1`, readout frequency | change reported as the wall-proximity uncertainty of the bounded model; it is **not** part of the route disagreement and is listed under omitted effects |
 | Element order | 2 preferred; 1 only if the dry-run DOF estimate at `h0/2` exceeds the budget with order 2 | | the order is fixed by the mesh dry run **before** any solve and is the same for both routes |
 
 ## 4. Uncertainty and resolution checks
@@ -76,7 +76,8 @@ indicator and per-frequency residuals (Route B), and the fit residual.
 
 ## 5. Candidate suitability checks (separate from agreement)
 
-Reported as information after both routes exist: `E_C,F1F1` against 0.60 GHz,
+Reported as information after both routes exist, all of them invariants:
+`E_C,F1F1` against 0.60 GHz,
 bare readout root against 4.301974466 GHz, `|g|` against 0.150 GHz, the
 chip-cell wall sensitivity from the box-size ladder, the list of omitted
 effects, and whether the seed geometry's `C_Σ` includes a declared `C_J`.
