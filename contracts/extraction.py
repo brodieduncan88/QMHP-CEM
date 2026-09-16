@@ -49,6 +49,19 @@ def pair_id(pair: tuple[str, str]) -> str:
     return f"{pair[0]}-{pair[1]}"
 
 
+#: Quantity names that name a readout-node matrix entry rather than an
+#: invariant. Matching is on the normalised name, so ``E_C_R1R1``,
+#: ``E_C,R1R1`` and ``e_c_r1r1`` are all caught.
+_READOUT_ENTRY_PATTERNS = ("e_c_f1r1", "e_c_r1r1", "e_c_rr", "e_c_kr", "e_l_r", "e_l_r1", "l_r", "l_r1")
+
+
+def _looks_like_a_readout_node_entry(name: str) -> bool:
+    flat = name.lower().replace(",", "_").replace(" ", "").replace("-", "_")
+    for suffix in ("_ghz", "_mhz", "_nh", "_ff"):
+        flat = flat.removesuffix(suffix)
+    return flat in _READOUT_ENTRY_PATTERNS
+
+
 def _derive(
     route_a_MHz: float | None,
     route_a_floor_MHz: float,
@@ -156,8 +169,26 @@ class RouteRecord(StrictModel):
     solver_version: str
     classification: Classification
     convergence: dict[str, Any] = Field(default_factory=dict)
-    E_C_GHz: dict[str, float] = Field(default_factory=dict)
+    #: The gauge-invariant quantities this route determined, keyed by the ids
+    #: of the declaration's ``extraction.target.invariant_triple``. The
+    #: readout-node entries (``E_C,F1R1``, ``E_C,R1R1``, ``E_L,R1``, ``L_R``)
+    #: are NOT identifiable and are never recorded here; a gauge-dependent
+    #: intermediate, if it is kept at all, goes in ``notes`` with its gauge
+    #: stated (``docs/coupled-candidate/route-a-identifiability.md``).
+    invariants_GHz: dict[str, float] = Field(default_factory=dict)
     notes: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _no_readout_node_entries(self) -> "RouteRecord":
+        forbidden = {k for k in self.invariants_GHz if _looks_like_a_readout_node_entry(k)}
+        if forbidden:
+            raise ValueError(
+                f"route {self.route} records {sorted(forbidden)} as an extracted quantity; the "
+                f"readout node carries no lumped element, so these depend on an arbitrary "
+                f"normalisation and are not identifiable. Record the invariants instead "
+                f"(docs/coupled-candidate/route-a-identifiability.md)"
+            )
+        return self
 
 
 class CouplingExtractionRecord(StrictModel):

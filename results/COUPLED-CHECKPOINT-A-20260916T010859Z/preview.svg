@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 920" width="920" height="920" font-family="monospace">
+<title>PROPOSED ENGINEERING SEED — not approved</title>
+<rect x="0" y="0" width="920" height="920" fill="#ffffff"/>
+<text x="60" y="33" font-size="18" fill="#b00000">PROPOSED ENGINEERING SEED — not approved</text>
+<text x="60" y="51" font-size="11" fill="#333333">chip cell 4 x 4 mm, z = 0 (chip top), spec 7.3 frame, +X right, +Y up; ground plane grey, etch white, conductors black, ports red</text>
+<g transform="translate(60,60)">
+<rect x="0" y="0" width="800" height="800" fill="#9a9a9a" stroke="#000000" stroke-width="1"/>
+<polygon points="257,423 303,423 303,377 257,377" fill="#ffffff" stroke="none"/>
+<polygon points="293,416 325,416 325,384 293,384" fill="#ffffff" stroke="none"/>
+<polygon points="319,411 390,411 390,389 319,389" fill="#ffffff" stroke="none"/>
+<polygon points="368,411 390,411 390,289 368,289" fill="#ffffff" stroke="none"/>
+<polygon points="368,311 440,311 440,289 368,289" fill="#ffffff" stroke="none"/>
+<polygon points="418,511 440,511 440,289 418,289" fill="#ffffff" stroke="none"/>
+<polygon points="418,511 490,511 490,489 418,489" fill="#ffffff" stroke="none"/>
+<polygon points="468,511 490,511 490,289 468,289" fill="#ffffff" stroke="none"/>
+<polygon points="468,311 540,311 540,289 468,289" fill="#ffffff" stroke="none"/>
+<polygon points="518,511 540,511 540,289 518,289" fill="#ffffff" stroke="none"/>
+<polygon points="518,511 590,511 590,489 518,489" fill="#ffffff" stroke="none"/>
+<polygon points="568,511 590,511 590,289 568,289" fill="#ffffff" stroke="none"/>
+<polygon points="568,311 640,311 640,289 568,289" fill="#ffffff" stroke="none"/>
+<polygon points="618,486.6 640,486.6 640,289 618,289" fill="#ffffff" stroke="none"/>
+<polygon points="265,415 295,415 295,385 265,385" fill="#000000" stroke="none"/>
+<polygon points="299,410 319,410 319,390 299,390" fill="#000000" stroke="none"/>
+<polygon points="319,405 384,405 384,395 319,395" fill="#000000" stroke="none"/>
+<polygon points="374,405 384,405 384,295 374,295" fill="#000000" stroke="none"/>
+<polygon points="374,305 434,305 434,295 374,295" fill="#000000" stroke="none"/>
+<polygon points="424,505 434,505 434,295 424,295" fill="#000000" stroke="none"/>
+<polygon points="424,505 484,505 484,495 424,495" fill="#000000" stroke="none"/>
+<polygon points="474,505 484,505 484,295 474,295" fill="#000000" stroke="none"/>
+<polygon points="474,305 534,305 534,295 474,295" fill="#000000" stroke="none"/>
+<polygon points="524,505 534,505 534,295 524,295" fill="#000000" stroke="none"/>
+<polygon points="524,505 584,505 584,495 524,495" fill="#000000" stroke="none"/>
+<polygon points="574,505 584,505 584,295 574,295" fill="#000000" stroke="none"/>
+<polygon points="574,305 634,305 634,295 574,295" fill="#000000" stroke="none"/>
+<polygon points="624,486.6 634,486.6 634,295 624,295" fill="#000000" stroke="none"/>
+<polygon points="618,492.6 640,492.6 640,486.6 618,486.6" fill="#000000" stroke="none"/>
+<polygon points="278,423 282,423 282,415 278,415" fill="#e00000" stroke="none"/>
+<polygon points="618,458.6 624,458.6 624,454.6 618,454.6" fill="#e00000" stroke="none"/>
+<polygon points="634,458.6 640,458.6 640,454.6 634,454.6" fill="#e00000" stroke="none"/>
+<line x1="280" y1="400" x2="280" y2="391" stroke="#0044cc" stroke-width="0.8"/>
+<text x="283" y="388" font-size="11" fill="#0044cc">F1.island</text>
+<line x1="309" y1="400" x2="309" y2="377" stroke="#0044cc" stroke-width="0.8"/>
+<text x="312" y="374" font-size="11" fill="#0044cc">R1.coupling_pad</text>
+<line x1="280" y1="419" x2="280" y2="410" stroke="#0044cc" stroke-width="0.8"/>
+<text x="283" y="407" font-size="11" fill="#0044cc">P_F1</text>
+<line x1="629" y1="456.6" x2="629" y2="433.6" stroke="#0044cc" stroke-width="0.8"/>
+<text x="632" y="430.6" font-size="11" fill="#0044cc">P_R1</text>
+<line x1="10" y1="786" x2="210" y2="786" stroke="#000000" stroke-width="3"/>
+<text x="10" y="781" font-size="11" fill="#000000">1 mm</text>
+</g>
+</svg>

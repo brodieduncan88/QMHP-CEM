@@ -7,7 +7,7 @@ coupled EM evidence.
 
 | document | content |
 |---|---|
-| [`coupling-definition.md`](coupling-definition.md) | what the two routes estimate: node-basis charging-energy matrix, derived `g`, `J`; units, signs, normalisation; what is *not* the target; required interactions; the unchanged 10 % rule; unresolved-coupling reporting; the linear/nonlinear boundary |
+| [`coupling-definition.md`](coupling-definition.md) | what the two routes estimate: the gauge-invariant triple `{E_C,F1F1, f_R1, g_F1R1}` and the per-pair coefficients `g`, `J`; units, signs, normalisation; what is *not* the target, including the non-identifiable readout-node entries; required interactions; the unchanged 10 % rule; unresolved-coupling reporting; the linear/nonlinear boundary |
 | [`extraction-routes.md`](extraction-routes.md) | Route A (eigenmode + participation inversion) and Route B (driven response, S→Z, admittance fit), their shared assumptions, and the Palace v0.13.0 features each relies on, checked against the pinned tree |
 | [`numerical-plan.md`](numerical-plan.md) | bands, mode identification and hidden-mode screening, refinement ladders, resolution checks, suitability checks, compute budget, order of execution |
 | [`route-a-identifiability.md`](route-a-identifiability.md) | the readout-normalisation problem, the corrected invariant target, the closed-form inversion, and its demonstration on synthetic circuits |

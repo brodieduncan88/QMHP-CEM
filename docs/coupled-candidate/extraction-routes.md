@@ -2,8 +2,12 @@
 
 **Status:** checkpoint-A definition, frozen for review; nothing executed.
 Both routes estimate the target of `coupling-definition.md` §3: the
-charging-energy matrix `E_C` of the declared nodes and the bare readout-mode
-parameters, from which the per-pair coefficients `g_kR`, `J_kl` follow.
+gauge-invariant triple `{E_C,F1F1, f_R1, g_F1R1}` for S1, and in general the
+charging energies of the nodes that carry a declared lumped branch, each
+readout mode's bare frequency `f_R`, and the invariant coefficient `g_kR` or
+`J_kl` of every required pair. The individual readout-node entries
+`E_C,kR`, `E_C,RR` and `L_R` are not identifiable and are not estimated
+([`route-a-identifiability.md`](route-a-identifiability.md)).
 Neither route may read the other's coupling, intermediate or final. The
 Palace facts cited below are checked against the pinned v0.13.0 documentation
 and source (commit a61c8cbe, image `qmhp-cem/palace:0.13.0`); see §5 for the
@@ -90,7 +94,7 @@ probes (`probe-E.csv`) at declared points classify each mode (fluxonium-like,
 readout-like, other) independently of its frequency, as in the verification
 campaign.
 
-### 2.3 Inversion to the node basis (the "participation-based" step)
+### 2.3 Inversion of the normal-mode problem (the "participation-based" step)
 
 The linear circuit of `coupling-definition.md` §2 with the lumped inductances
 attached is `H_lin = ½ Qᵀ C⁻¹ Q + ½ Φᵀ L⁻¹ Φ` on the node set `𝒩`, with
@@ -108,12 +112,20 @@ p_mj = (u_mj² / L_j) / (u_mᵀ L⁻¹ u_m)
 ```
 
 which is exactly what the EM solver reports as the EPR of that element. The
-unknowns are the symmetric `C⁻¹` (`N(N+1)/2` entries) and the readout
-inductances `L_R` (one per readout node); the data are the `M` band
-frequencies and the `M × N_lumped` participations, with the sum rule
-`Σ_j p_mj + p_m,dist = 1` per mode. For S1 (`N = 2`, one lumped inductor,
-`M = 2` modes) the four data `(f_+, f_−, p_+F, p_−F)` determine the four
-unknowns `((C⁻¹)_FF, (C⁻¹)_FR, (C⁻¹)_RR, L_R)` in closed form:
+raw unknowns, *before the gauge is fixed*, are the symmetric `C⁻¹`
+(`N(N+1)/2` entries) and the readout inductances `L_R` (one per readout
+node); the data are the `M` band frequencies and the `M × N_lumped`
+participations, with the sum rule `Σ_j p_mj + p_m,dist = 1` per mode.
+
+For S1 (`N = 2`, one lumped inductor, `M = 2` modes) the data are **three**
+independent numbers, `f_+`, `f_−` and one participation, since
+`p_−F = 1 − p_+F`; and with `L_F` declared the circuit has **three**
+gauge-invariant degrees of freedom, one readout-node gauge direction having
+removed the fourth. They determine the invariant triple
+`{E_C,F1F1, f_R1, g_F1R1}` in closed form. A representative
+`((C⁻¹)_FF, (C⁻¹)_FR, (C⁻¹)_RR, L_R)` can be written down only after a
+readout-node gauge is fixed, and the implementation fixes `L_R = 1 H` purely
+to have one to write:
 
 ```
 ω_±² = eigenvalues of  C⁻¹ diag(1/L_F, 1/L_R)
@@ -246,9 +258,11 @@ meaningful in, a declared gauge, and is never compared between the routes
 
 Route B has its own mesh ladder (same generator, its own levels) and a
 response-fit ladder (fit order, frequency-grid density of the adaptive sweep,
-band edges); the frequency of the readout pole and the extracted `E_C`
-entries must change by less than the declared rule between the final two
-levels of each ladder. Route B never reads `eig.csv`; Route A never reads
+band edges); the frequency of the readout pole and the extracted invariants
+`{E_C,F1F1, f_R1, g_F1R1}` must change by less than the declared rule between
+the final two levels of each ladder. No convergence rule is stated on a
+gauge-dependent entry, because such a rule would be untestable: the entry
+follows whatever normalisation the fit happens to use. Route B never reads `eig.csv`; Route A never reads
 `port-*.csv`.
 
 ## 4. Why the two routes are genuinely separate
@@ -299,7 +313,7 @@ Neither route linearises the small junction. Route A's only linear inductance
 at a fluxonium site is the superinductor, which is the harmonic basis in which
 the Master's fluxonium is routinely diagonalised (`√(8 E_L E_C) = 2.75 GHz`
 for the nominal device); that mode is a computational device of Route A and
-is removed by the inversion. The extracted `E_C` then enters the frozen
+is removed by the inversion. The extracted `E_C,F1F1` then enters the frozen
 fluxonium Hamiltonian on the 3201-point grid, so the fluxonium is treated
 exactly (to grid convergence) and the weakly-anharmonic approximation is used
 for **no** Branch-A element. The mediator, if and when its parameters are

@@ -72,7 +72,7 @@ submission's proposed-design status.
 | finding | detail |
 |---|---|
 | **"five-mode" is not the submission's term** | The V2A documents say **five-node** throughout, a statement about a lumped capacitance matrix; "five-mode" appears nowhere in `docs/v2a` (zero hits). A node is not a mode: the count of electromagnetic modes in a band is exactly what the hidden-mode screen must establish, and is not fixed by the node count. The declaration and this milestone's documents use *node*, and the earlier milestone text that said "five-mode hypothesis" is superseded by that usage. |
-| **The submission's matrix is a comparison target, not an input** | Were it recovered, the five-node capacitance matrix would be the same object the two extraction routes estimate (`E_C = (e²/2)C⁻¹`). It would therefore be a quantity to compare an extraction against — and its provenance would have to be settled before any such comparison — never an input to the extraction. |
+| **The submission's matrix is a comparison target only in its invariant content** | Were it recovered, the five-node capacitance matrix would overlap the routes' target only where that target is gauge-invariant: the charging energies of nodes carrying a declared lumped branch, each readout mode's bare frequency, and the invariant couplings. Its readout-node rows and columns depend on whatever readout-node normalisation the submission chose, and are not comparable until that convention is stated (`docs/coupled-candidate/route-a-identifiability.md`). Its provenance would also have to be settled first. It is never an input to the extraction. |
 | **`f_22` does not bind the mediator** | The reported conditional transition `f_22 = 7.016031785 GHz` is one number; the mediator's `E_J,Σ`, `E_C`, junction asymmetry and flux bias `f_C` are four. Infinitely many parameter sets reproduce a single conditional line, and the line is itself a property of the *coupled* spectrum rather than of the bare mediator. Deriving mediator parameters from it would be reconstructing canonical parameters from a summary, which this milestone forbids. The declaration therefore leaves them UNBOUND with **no seed proposed**. |
 | **Reported values are not seeds** | `f_22`, `Δ_min ≈ 5.90 MHz`, `n_C = 1.300454`, `ζ/2π = 62.1 kHz` and the label overlaps stay in `reported-not-reproduced.md`. None appears as a value in the declaration; the declaration cites the V2A documents only as the description of the proposed structure. |
 | **Registration BIND fields remain open** | R1.1–R1.7, R1b, R1c.1–R1c.3, R2.1–R2.3, R2.5, R3.1–R3.3, R7 and all R8 sign-off fields are unbound. The declaration records the irrotational 0.5/0.5 flux split as *presumptive, not bound*, and states no drive convention at all, because this milestone runs no driven propagation. |
@@ -82,9 +82,10 @@ submission's proposed-design status.
 
 Nothing automatically. Recovering it would allow three things, each a separate
 decision: binding the mediator parameters from a primary source instead of
-leaving them UNBOUND; comparing an extracted capacitance matrix against the
-submission's, with both provenances stated; and closing registration item R8
-by hashing the coupled Hamiltonian file. None of these is in scope for
+leaving them UNBOUND; comparing the extraction's gauge-invariant quantities
+against the submission's, with both provenances and the submission's
+readout-node convention stated; and closing registration item R8 by hashing
+the coupled Hamiltonian file. None of these is in scope for
 checkpoint A, and none is assumed by it.
 
 ## 4. Status retained

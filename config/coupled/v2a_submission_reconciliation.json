@@ -42,7 +42,7 @@
    "contains": "5x5 Maxwell capacitance matrix generating self-charging and coupling terms",
    "referenced_at": "assessment L25, L45, L55",
    "status": "ABSENT",
-   "if_recovered": "a comparison target for the extracted E_C, never an input to the extraction"
+   "if_recovered": "comparable only in its gauge-invariant content (the charging energies of nodes carrying a declared lumped branch, each readout mode's bare frequency, and the invariant couplings); its readout-node entries depend on a normalisation convention and are not comparable until that convention is stated; never an input to the extraction"
   },
   {
    "id": "diagonalisation",
@@ -119,8 +119,8 @@
     "detail": "the V2A documents say five-NODE throughout; 'five-mode' appears nowhere in docs/v2a. A node is not a mode; the mode count in a band is what the hidden-mode screen must establish."
    },
    {
-    "finding": "the submission's matrix is a comparison target, not an input",
-    "detail": "if recovered it is the same object the routes estimate, so it would be compared against an extraction with both provenances stated."
+    "finding": "the submission's matrix is a comparison target only in its invariant content",
+    "detail": "if recovered, only its gauge-invariant content is the same object the routes estimate; its readout-node entries are convention-dependent and are never compared between the routes or against an extraction. Never an input."
    },
    {
     "finding": "f_22 does not bind the mediator",
@@ -141,7 +141,7 @@
   ],
   "would_change_if_recovered": [
    "binding the mediator parameters from a primary source instead of leaving them UNBOUND",
-   "comparing an extracted capacitance matrix against the submission's, with both provenances stated",
+   "comparing the extraction's gauge-invariant quantities against the submission's, with both provenances and the readout-node convention stated",
    "closing registration item R8 by hashing the coupled Hamiltonian file"
   ],
   "changes_now": "none; recovery failed, so nothing in the declaration changes"

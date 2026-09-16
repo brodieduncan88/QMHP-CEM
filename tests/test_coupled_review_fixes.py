@@ -31,7 +31,11 @@ DECLARATION = REPO_ROOT / "config" / "coupled" / "v2a_five_node_candidate.json"
 REGISTER = REPO_ROOT / "config" / "coupled" / "source_register.json"
 PROPOSAL = DOCS / "execution-proposal.md"
 
-#: Every prose file that states or restates the extraction target.
+#: Every prose file that states or restates the extraction target, plus the
+#: machine-readable files and the contracts, because an audit found stale
+#: claims in all three kinds. A guard that reads only the coupled-candidate
+#: docs would have stayed green while the recovery documents, the
+#: reconciliation JSON and the result contract still asserted the old target.
 TARGET_DOCS = [
     DOCS / "README.md",
     DOCS / "coupling-definition.md",
@@ -39,6 +43,12 @@ TARGET_DOCS = [
     DOCS / "numerical-plan.md",
     DOCS / "implementation-plan.md",
     DOCS / "route-a-identifiability.md",
+    DOCS / "execution-proposal.md",
+    REPO_ROOT / "docs" / "v2a" / "submission-recovery.md",
+    REPO_ROOT / "config" / "coupled" / "v2a_five_node_candidate.json",
+    REPO_ROOT / "config" / "coupled" / "v2a_submission_reconciliation.json",
+    REPO_ROOT / "contracts" / "extraction.py",
+    REPO_ROOT / "contracts" / "coupled_candidate.py",
 ]
 
 #: Phrasings that would assert a readout-node entry is an output. Each is
@@ -46,11 +56,25 @@ TARGET_DOCS = [
 #: sentence, so a correction that *names* the entry in order to deny it does
 #: not trip the guard; the guard is on the claim, not the symbol.
 STALE_CLAIM_PATTERNS = [
+    # The original pre-correction phrasings.
     r"\(E_C,RR,\s*E_L,R\)\s*(?:of each readout node\s*)?is an output",
     r"output is again[^.]*E_C,RR",
     r"E_C,F1R1[^.]*\(E_C,R1R1,\s*E_L,R1\)\s*and hence",
     r"routes estimate the same object:\s*the off-diagonal charging-energy",
     r"bare linear-mode parameters\s*`?\(E_C,RR,\s*E_L,R\)`?\s*of\s*each readout node[^.]*convention-free",
+    # Found by audit after the first pass: the routes estimating the matrix.
+    r"routes estimate the target[^.]*charging-energy matrix",
+    r"node-basis charging-energy matrix",
+    r"the same object the two extraction routes estimate",
+    r"comparison target for the extracted E_C\b",
+    r"comparing an extracted capacitance matrix",
+    # Readout entries presented as determined, converged or recovered.
+    r"determine the four\s*unknowns",
+    r"extracted `?E_C`?\s*entries must change",
+    r"must recover\s*`?E_C`?\s*to 1e-6",
+    # The old RouteRecord field: an unconstrained dict of charging energies as
+    # a route's only result field. Targets the declaration, not any mention.
+    r"E_C_GHz:\s*dict\[",
 ]
 
 
@@ -68,18 +92,41 @@ def _flat(text: str) -> str:
     return re.sub(r"\s+", " ", without_quotes)
 
 
+def _assertions_only(text: str) -> str:
+    """The document with markdown blockquotes removed, then flattened.
+
+    A pre-correction phrasing *quoted inside a blockquote* is a citation — the
+    correction notes quote the old wording in order to refute it — so it is not
+    an assertion by the document and must not trip the guard. Text outside a
+    blockquote is the document speaking in its own voice, and that is what the
+    stale-claim patterns are checked against.
+    """
+    kept = [line for line in text.splitlines() if not line.lstrip().startswith(">")]
+    return re.sub(r"\s+", " ", "\n".join(kept))
+
+
 # --- fix 1: the corrected invariant target -----------------------------------
 
 
 @pytest.mark.parametrize("path", TARGET_DOCS, ids=lambda p: p.name)
 def test_no_document_claims_a_readout_node_entry_is_an_output(path):
-    text = _text(path)
+    assert path.exists(), f"{path} is listed in the guard but does not exist"
+    text = _assertions_only(_text(path))
     for pattern in STALE_CLAIM_PATTERNS:
         match = re.search(pattern, text, flags=re.IGNORECASE | re.DOTALL)
         assert match is None, (
             f"{path.name} still claims a readout-node entry is an output: "
             f"{match.group(0)[:160]!r}"
         )
+
+
+def test_the_citation_exemption_does_not_swallow_an_assertion():
+    """The blockquote exemption is for citations, not a hole in the guard."""
+    quoted = "> the bare linear-mode parameters `(E_C,RR, E_L,R)` of each readout node\n"
+    asserted = "the bare linear-mode parameters `(E_C,RR, E_L,R)` of each readout node\n"
+    tail = "are convention-free quantities\n"
+    assert "convention-free" not in _assertions_only(quoted + "> " + tail)
+    assert "convention-free" in _assertions_only(asserted + tail)
 
 
 def test_the_definition_states_the_invariant_triple_as_the_target():
@@ -147,6 +194,38 @@ def load_declaration_from_dict(raw: dict):
     from contracts.coupled_candidate import CoupledCandidateDeclaration
 
     return CoupledCandidateDeclaration.model_validate(raw)
+
+
+def test_the_route_record_refuses_to_carry_a_readout_node_entry():
+    """The typed per-route result record is the authoritative output statement."""
+    from contracts.common import Classification
+    from contracts.extraction import RouteRecord
+
+    def record(invariants):
+        return RouteRecord(
+            route="A", method="eigenmode/participation", record_path="results/x",
+            solver_name="palace", solver_version="0.13.0",
+            classification=Classification.SOLVED, invariants_GHz=invariants,
+        )
+
+    ok = record({"E_C_F1F1_GHz": 0.6, "f_R1_GHz": 4.301974466, "g_F1R1_GHz": 0.15})
+    assert sorted(ok.invariants_GHz) == ["E_C_F1F1_GHz", "f_R1_GHz", "g_F1R1_GHz"]
+
+    for entry in ("E_C_F1R1_GHz", "E_C,R1R1", "E_L,R1", "L_R_nH", "E_C_RR"):
+        with pytest.raises(ValueError, match="not identifiable"):
+            record({entry: 1.0})
+
+
+def test_the_submission_reconciliation_compares_only_invariant_content():
+    raw = json.loads(
+        (REPO_ROOT / "config" / "coupled" / "v2a_submission_reconciliation.json").read_text()
+    )
+    matrix = next(a for a in raw["referenced_artefacts"]
+                  if a["id"] == "five_node_capacitance_matrix")
+    assert "gauge-invariant content" in matrix["if_recovered"]
+    assert "normalisation convention" in matrix["if_recovered"]
+    assert not any("comparing an extracted capacitance matrix" in x
+                   for x in raw["reconciliation"]["would_change_if_recovered"])
 
 
 # --- fix 2: the pilot is unambiguous -----------------------------------------

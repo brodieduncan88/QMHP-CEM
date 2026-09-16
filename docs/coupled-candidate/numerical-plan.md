@@ -4,7 +4,7 @@
 Every limit is an ENGINEERING-RULE of numerical verification and is written
 down before any coupled solve so that it cannot be tuned to a result. The
 plan is for the first executable candidate S1 (`{F1, R1}` in the bounded chip
-cell, see `README.md`); the full five-mode structure inherits the same rules
+cell, see `README.md`); the full five-node structure inherits the same rules
 with the larger node set and is not executable until its parameters are
 bound.
 
@@ -14,7 +14,7 @@ bound.
 |---|---|---|
 | Route A eigenmode band | 0.5 GHz – 9.0 GHz | contains the fluxonium harmonic mode (2.75 GHz for the nominal `E_C`, `E_L`; ±30 % for the seed geometry gives 1.9–3.6 GHz), the readout mode (4.30 GHz nominal, ±15 % for the seed: 3.7–5.0 GHz), the readout's second harmonic region (λ/4 line: 3 × f₀ ≈ 12.9 GHz lies **above** the band and is the first hidden resonator mode, screened by 2×f₀ margin), and stays below the first measured Object 001 package mode (9.636 GHz, `results/PALACE-GOLDEN-*`). The ceiling 9.0 GHz is chosen so that the band ends below the first package mode; a chip-cell mode found between 5.0 and 9.0 GHz is a reportable hidden mode |
 | Route B driven band | 0.1 GHz – 9.0 GHz, adaptive sweep | the low edge gives the static (`jωC`) limit of the admittance with `ωL_R`-independent slope; the same ceiling as Route A so both routes screen the same window; at least 12 points per readout linewidth-equivalent (the pole is lossless, so the fit uses the analytic pole/zero structure, not a linewidth) and a dense grid (≤ 10 MHz spacing) within ±200 MHz of every pole identified by the fit's first pass, the pass being the adaptive sweep's own error indicator, never Route A's frequencies |
-| Full five-mode band (not executable now) | 0.1 – 9.0 GHz plus the mediator region 6–8 GHz | the reported `f_22 ≈ 7.016 GHz` (reported, not reproduced) lies inside; still below the package mode |
+| Full five-node band (not executable now) | 0.1 – 9.0 GHz plus the mediator region 6–8 GHz | the reported `f_22 ≈ 7.016 GHz` (reported, not reproduced) lies inside; still below the package mode |
 
 ## 2. Mode identification and hidden-mode screening
 

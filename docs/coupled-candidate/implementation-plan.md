@@ -209,8 +209,9 @@ fails closed (absent `port-EPR.csv`, truncated `port-S.csv`, NaN); candidate
 -derived parameters reach the downstream block under `candidate_derived`
 and never overwrite the nominal block; independently known extraction
 fixtures (a two-node lumped circuit with known `C`, `L` → synthetic
-`(f_±, p_±)` and synthetic `S(f)`; the inversion and the fit must recover
-`E_C` to 1e-6); unit/normalisation errors (a factor 2π or 2 injected in one
+`(f_±, p_±)` and synthetic `S(f)`; the inversion and the fit must recover the
+invariant triple `{E_C,F1F1, f_R1, g_F1R1}` to 1e-6 in every readout-node
+gauge, and must not report the readout-node entries as route outputs); unit/normalisation errors (a factor 2π or 2 injected in one
 route → EXTRACTION-INCONSISTENT, never averaged); insufficient convergence or
 mode identification → INCOMPLETE; disagreement beyond 10 % →
 EXTRACTION-INCONSISTENT; partial failures (Route B run killed) still write

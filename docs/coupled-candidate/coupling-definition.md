@@ -8,7 +8,7 @@ requirements in `master/`.
 
 This document fixes, before any solver runs, *what quantity* the two
 extraction routes of spec §5.5 estimate for the coupled candidate declared in
-`config/coupled/v2a_five_mode_candidate.json`, in which basis, in which
+`config/coupled/v2a_five_node_candidate.json`, in which basis, in which
 units, with which sign and normalisation, and how a coupling that cannot be
 resolved is reported. The routes themselves are in
 [`extraction-routes.md`](extraction-routes.md).
@@ -31,7 +31,7 @@ Constants: `e = 1.602176634e-19 C`, `h = 6.62607015e-34 J s`,
 ## 2. Node basis and the governing circuit Hamiltonian
 
 The declaration names a set of **electrical nodes** `k ∈ 𝒩`. For the full
-V2A five-mode proposal `𝒩 = {F1, F2, C, R1, R2}`: two grounded Branch-A
+V2A five-node proposal `𝒩 = {F1, F2, C, R1, R2}`: two grounded Branch-A
 encoded fluxoniums `F1`, `F2`, the SQUID-transmon mediator `C`, and two
 passive readout modes `R1`, `R2`. For the first executable candidate (the
 bounded subsystem S1, see `README.md`) `𝒩 = {F1, R1}`. The **ground** is the
@@ -145,7 +145,7 @@ the routes.
 | Quantity | Relation to the target | Where it lives |
 |---|---|---|
 | Circuit-level coupling `g_kR`, `J_kl` | **the target** (section 3) | EM extraction, both routes |
-| Transition-specific matrix elements, e.g. `⟨22,1_C\|n_C\|22,0_C⟩ = 1.300454` (reported) | derived from the diagonalised *nonlinear* circuit built with the extracted `E_C`; never extracted from EM | `models/` (static + dressed system), V2A registration |
+| Transition-specific matrix elements, e.g. `⟨22,1_C\|n_C\|22,0_C⟩ = 1.300454` (reported) | derived from the diagonalised *nonlinear* circuit built with the extracted invariants (and, where a readout node enters, a stated gauge); never extracted from EM | `models/` (static + dressed system), V2A registration |
 | Normal-mode splitting / hybridisation of the *linear* EM eigenmodes | Route A intermediate (section 3 of `extraction-routes.md`); it is not the coupling and is not compared as such | Route A only |
 | Readout-node matrix entries `E_C,kR`, `E_C,RR`, `L_R` | **not identifiable**: each depends on an arbitrary readout-node normalisation. Reported only in a stated gauge, never compared | `route-a-identifiability.md` |
 | Dispersive pulls `χ`, logical/sink pulls, sink line | outputs of the frozen dressed-system model; unchanged and still computed for the nominal device | `models/dressed_system.py` |
@@ -153,8 +153,10 @@ the routes.
 
 ## 5. Interactions required for the milestone (declared before any result)
 
-For the **full five-mode proposal** the required interaction set is the whole
-upper triangle of `E_C`:
+For the **full five-node proposal** the required interaction set is every pair
+of the upper triangle, each reported by its invariant coefficient: `J_kl` when
+both nodes carry a declared lumped branch, and `g_kR` when one of them is a
+readout node:
 
 | pair | class | why it is required |
 |---|---|---|
@@ -209,8 +211,11 @@ never overwrite the nominal ones.
 The EM solver models the **linear environment only**: conductors, substrate,
 vacuum, package walls, and (Route A only) the declared *linear* lumped
 inductances. The nonlinear circuit is assembled afterwards from the extracted
-`E_C`, the declared `E_J`, `E_L`, `f_C` and any declared non-geometric
-capacitance, and diagonalised with the existing `models/` machinery
+invariants (`E_C,F1F1`, each readout mode's `f_R` and the invariant
+couplings, with the readout single-mode representation built in a stated
+gauge as in item 5 below), the declared `E_J`, `E_L`, `f_C` and any declared
+non-geometric capacitance, and diagonalised with the existing `models/`
+machinery
 (3201-point phase grid, `Nq = 10`, `Nph = 12`).
 
 Rules that prevent double counting:
@@ -245,9 +250,12 @@ Rules that prevent double counting:
    (numerical plan) and omitted from the circuit model. When the circuit model
    needs a single-mode representation, it is constructed *in a stated gauge*
    from `f_R` and the invariant coupling, and the gauge is recorded with it.
-6. `E_C` is used once: the same matrix drives both the self-charging terms
-   and the couplings, as the V2A assessment requires (Maxwell matrix, not
-   isolated `E_C` values with appended `g`s).
+6. One capacitance model is used once: the self-charging terms and the
+   couplings come from the same extracted linear environment, never from
+   isolated `E_C` values with appended `g`s, which is the discipline the V2A
+   assessment requires. Where a readout node is involved that single matrix is
+   written in the stated gauge of item 5, and only its invariant content
+   (`E_C` on lumped-branch nodes, `f_R`, `g`) is reported.
 
 ## 9. Vanishing or numerically unresolved couplings
 
