@@ -1202,9 +1202,9 @@ def compare_against_baseline(
     number. That number is one PRESCRIPTION, not one physical channel: the box
     it constrains is 0.040 x 0.060 x 0.020 mm, a volume straddling the chip
     surface, and gmsh re-meshes globally from it - 18.4% of the baseline's
-    nodes are absent from the refined mesh, out to 3.2 mm from the port. A
-    frequency movement between them is therefore caused by the refined
-    VOLUME plus the re-meshing it forced, not by the port face alone.
+    nodes are absent from the refined mesh, out to 3.2 mm from the port. So a
+    frequency movement between them is an observed difference between two runs
+    on non-nested meshes. It is not attributable to the port face.
 
     The matching rule, the magnitude convention and the frozen tolerances are
     the unchanged ones; nothing here introduces a threshold.
@@ -1213,11 +1213,11 @@ def compare_against_baseline(
         "baseline": baseline_record,
         "why_this_comparison": (
             "the refined run and the baseline differ in exactly one prescribed number, the "
-            "element size held over the port box. That is one prescribed number, and "
-            "it is NOT one physical channel: the box is a 0.040 x 0.060 x 0.020 mm VOLUME, "
-            "not a face, and gmsh re-meshes globally from it, so a frequency difference "
-            "between them bounds the effect of refining that volume; it does not isolate "
-            "the port face"
+            "element size held over the port box. That is one prescribed number, not one "
+            "physical channel: the box is a 0.040 x 0.060 x 0.020 mm VOLUME, not a face, and "
+            "gmsh re-meshes globally from it, so the two meshes are not nested. A frequency "
+            "difference between them is an observed difference between two runs; it is not "
+            "attributable to the port face, and it does not bound a port contribution"
         ),
         "matching_rule": dict(MATCHING_RULE),
         "convention": dict(COMPARISON_CONVENTION),
@@ -1331,13 +1331,13 @@ def port_resolution_sensitivity(
             "is the large L1/L2/L3 frequency movement sensitive to port-face resolution?"
         ),
         "statistic": (
-            "|delta_f(baseline -> refined)| / |delta_f(L2 -> L3)|, per tracked mode. This is an "
-            "UPPER BOUND, not a share. The numerator is contaminated upward (the refined box is "
-            "a volume and forces a global re-mesh) and the denominator is contaminated in both "
-            "directions (L2 -> L3 is a 1.333x global refinement that ALSO refines the port face, "
-            "1.333x at the face against the numerator's 10.08x at the port centre). Neither is a "
-            "clean single-channel measurement, and an eigenvalue error does not decompose "
-            "additively by region, so the complement of this ratio is not 'the rest of the cause'"
+            "|delta_f(baseline -> refined)| / |delta_f(L2 -> L3)|, per tracked mode. This is a "
+            "RATIO OF OBSERVED FREQUENCY CHANGES between whole runs. It is NOT a causal share "
+            "and NOT an upper bound on a port contribution: reading it as either would require "
+            "the numerator to isolate the port (it does not - the box is a volume and the "
+            "re-mesh is global and non-nested) and an eigenvalue error to decompose additively "
+            "by mesh region (no such decomposition is available here). Reported as measured; it "
+            "carries no attribution, and its complement is not 'the rest of the cause'"
         ),
         "available": False,
     }
@@ -2078,8 +2078,8 @@ def main(argv: list[str] | None = None) -> int:
         # A port-refined run is compared against the PLAIN rung at the same level:
         # the two differ in exactly one prescribed number. One prescribed number is
         # not one physical channel - the box is a volume, and gmsh re-meshes globally
-        # from it - so the movement between them BOUNDS the port neighbourhood's
-        # contribution rather than isolating it. This is the comparison the
+        # from it - so the movement between them is an observed difference, not an
+        # attribution and not a bound on any one region. This is the comparison the
         # experiment exists for; the level-1 comparison above is kept because it is
         # what every other rung reports.
         baseline_comparison: dict[str, Any] = {"available": False, "reason": "not a port-refined run"}

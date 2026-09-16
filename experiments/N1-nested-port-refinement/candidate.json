@@ -1,0 +1,81 @@
+{
+ "schema": "qmhp-cem.nested-refinement-candidate/0.1.0",
+ "id": "N1",
+ "mechanism": "Palace Model.Refinement.Boxes on the EXISTING mesh; no gmsh, no new mesh file",
+ "baseline_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+ "baseline_mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+ "candidate_mesh_sha256": "identical to baseline; the mesh file is an input, not regenerated",
+ "baseline_config_sha256": "0ae6e3ac793e4348983719a36de8a940bd72c92049d446f5262c4608c8e4ea6f",
+ "refinement_region": {
+  "BoundingBoxMin": [
+   -0.62,
+   -0.125,
+   -0.01
+  ],
+  "BoundingBoxMax": [
+   -0.58,
+   -0.065,
+   0.01
+  ],
+  "Levels": 1,
+  "units": "mesh length units (mm; Model.L0 = 0.001)",
+  "justification": "the lumped-port face (attribute 10) bounding box padded by 0.010 mm, the same pad R1 declared, so the refined neighbourhood is comparable in extent while the mechanism is nested instead of a regenerated mesh"
+ },
+ "baseline_topology": {
+  "V": 13991,
+  "E_is_order1_dof": 79944,
+  "F": 130388,
+  "T": 64434
+ },
+ "marking": {
+  "criterion": "any vertex of the element inside the closed box (geodata.cpp:282-306)",
+  "marked_tets": 221,
+  "marked_fraction": 0.00343,
+  "marked_submesh": {
+   "E": 307,
+   "F": 464,
+   "T": 221
+  },
+  "material_attributes_touched": [
+   1,
+   3
+  ]
+ },
+ "dof": {
+  "measured": null,
+  "why_not_measured": "the refined mesh exists only inside Palace at load time. MFEM has no Python binding in this environment and Palace's --dry-run parses the config only (main.cpp:246-254), so no offline measurement is possible without reimplementing MFEM's bisection.",
+  "rigorous_lower_bound": 81864,
+  "lower_bound_derivation": "marked submesh refines uniformly (octasection): E' = 2E+3F+T. Green closure only ADDS elements (mesh.cpp:10123), so E_total >= E_baseline + E(M) + 3F(M) + T(M).",
+  "budget": 250000,
+  "headroom_against_lower_bound": 168136,
+  "uniform_refinement_for_scale": 615486
+ },
+ "invariants_by_construction": {
+  "mesh_file": "byte-identical; refinement is a config block",
+  "existing_vertex_coordinates": "never moved; new vertices are edge midpoints only (mesh.cpp:10834-10841)",
+  "element_attributes": "inherited by children (mesh.cpp:10890,10896)",
+  "boundary_attributes": "inherited by children (BdrBisection, mesh.cpp:10959)",
+  "port_connectivity_and_L_s": "w and l come from the bounding box of the port attribute (lumpedelement.cpp:22-69); midpoints are convex combinations of existing vertices, so the hull and hence w, l, L_s and kappa are unchanged",
+  "Lc": "largest mesh bounding-box extent; unchanged for the same reason",
+  "parent_child": "tracked by MFEM as CoarseFineTr.embeddings[i].parent (mesh.cpp:10908)"
+ },
+ "propagation": {
+  "conforming": true,
+  "why": "GeneralRefinement forces nonconforming=0 for 3D simplex meshes (mesh.cpp:10565-10567)",
+  "beyond_the_region": "YES. Conformity is restored by a green-closure bisection loop (mesh.cpp:10123+) that refines adjoining elements outside the box. This is NOT a face-only or box-only change. Its extent is not computable offline and is the reason DOF cannot be pre-measured.",
+  "MaxNCLevels_and_Nonconformal": "inert for tets; the conforming branch is taken first"
+ },
+ "quality": {
+  "port_face_mean_edge_mm": 0.008453,
+  "port_face_mean_edge_after_one_level_mm": 0.004227,
+  "radius_ratio_all_tets": {
+   "min": 0.05,
+   "mean": 0.37
+  },
+  "radius_ratio_marked_tets": {
+   "min": 0.0913,
+   "mean": 0.2197
+  },
+  "note": "octasection of a tet is not quality-preserving in general; bisection quality is bounded by MFEM's marked-edge scheme but is not measured here"
+ }
+}

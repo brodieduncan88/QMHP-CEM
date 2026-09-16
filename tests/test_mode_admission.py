@@ -540,7 +540,6 @@ CITATION_EXEMPTIONS: dict[str, tuple[str, ...]] = {
         "The derived diagnostic held on a mesh it had never seen",
         "The strongest corroboration is above the window",
         "direct evidence the port face was under-resolved",
-        "a 1.5\u00d7 global refinement",
         "The admission margin, which had eroded 6.56 \u2192 4.47 \u2192 3.09 decades over the "
         "ladder, is 4.39 here",
         "the ladder shows no positive order of convergence",
