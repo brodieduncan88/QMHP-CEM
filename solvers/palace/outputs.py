@@ -373,6 +373,66 @@ def parse_domain_energy_csv(path: Path) -> list[DomainEnergyRow]:
     ]
 
 
+@dataclass(frozen=True)
+class PhasorRow:
+    """One mode's complex port phasor from ``port-I.csv`` or ``port-V.csv``.
+
+    The phasor is kept complex. An eigenvector is defined only up to an overall
+    complex scale, so the *phase* of a single port phasor is a property of the
+    solver's arbitrary normalisation and not of the mode; only phase-invariant
+    combinations (magnitudes, and ratios between phasors of the same mode) are
+    comparable between two independent solves. The raw complex value is
+    preserved here so that a later analysis can say which it used.
+    """
+
+    mode: int
+    phasor: dict[int, complex]
+
+
+def parse_port_phasor_csv(path: Path, symbol: str) -> list[PhasorRow]:
+    """Parse ``port-I.csv`` (``symbol='I'``) or ``port-V.csv`` (``symbol='V'``).
+
+    Header at v0.13.0 is ``m`` followed by ``Re{X[j]} (unit)``/``Im{X[j]} (unit)``
+    pairs, one pair per lumped port.
+    """
+    path = Path(path)
+    if not path.exists():
+        raise PalaceOutputError(f"{path} was not written")
+    with path.open(newline="") as fh:
+        rows = [[c.strip() for c in row] for row in csv.reader(fh) if any(c.strip() for c in row)]
+    if len(rows) < 2:
+        raise PalaceOutputError(f"{path} holds a header but no rows")
+    header = rows[0]
+
+    real: dict[int, int] = {}
+    imag: dict[int, int] = {}
+    pattern = re.compile(rf"^(Re|Im)\{{{re.escape(symbol)}\[(\d+)\]\}}", re.IGNORECASE)
+    for i, column in enumerate(header):
+        match = pattern.match(column.replace(" ", ""))
+        if not match:
+            continue
+        (real if match.group(1).lower() == "re" else imag)[int(match.group(2))] = i
+    if not real or set(real) != set(imag):
+        raise PalaceOutputError(
+            f"{path} has no complete Re/Im column pair for {symbol}[j]; header was {header}"
+        )
+
+    exact_m = [i for i, c in enumerate(header) if c.strip().lower() == "m"]
+    if not exact_m:
+        raise PalaceOutputError(f"{path} has no mode column; header was {header}")
+    i_m = exact_m[0]
+
+    parsed: list[PhasorRow] = []
+    for row in rows[1:]:
+        parsed.append(
+            PhasorRow(
+                mode=int(round(_to_float(row[i_m]))),
+                phasor={j: complex(_to_float(row[real[j]]), _to_float(row[imag[j]])) for j in real},
+            )
+        )
+    return parsed
+
+
 def read_metadata_json(path: Path) -> dict[str, Any]:
     """Palace's ``palace.json`` where present; empty dict where not."""
     path = Path(path)

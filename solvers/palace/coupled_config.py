@@ -43,10 +43,15 @@ COUPLED_SOLVER_RULES: dict[str, Any] = {
     "band_floor_GHz": 0.5,
     "band_ceiling_GHz": 9.0,
     "eigenmode_target_GHz": 0.5,
-    # Enough modes to cover the window: the cell's own electromagnetic cavity
-    # modes lie far above it (c/2a = 37.5 GHz in vacuum for a 4 mm cell), so
-    # the in-band modes are the circuit modes created by the lumped inductor
-    # and the distributed resonator. Six leaves margin for a hidden mode.
+    # Requested, not obtained. The premise originally written here — that the
+    # in-band modes are the circuit modes, so six leaves margin for a hidden
+    # one — is refuted by COUPLED-PILOT-20260916T035733Z: of the 23 rows the
+    # three solves returned, only 7 satisfy the energy identity a resonance
+    # satisfies, and the solver returns as many rows as it converges rather
+    # than the number requested (P2 returned nine). Six requested modes bought
+    # two admitted in-window modes per run. The next run should choose this
+    # number from the admitted yield, not from the requested count; raising it
+    # is not free, since each extra converged row costs solver time.
     "eigenmodes_requested": 6,
     "eigenvalue_tolerance": 1.0e-6,
     "eigenmode_backward_error_max_tolerance": 1.0e-6,

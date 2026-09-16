@@ -27,8 +27,15 @@ The frozen acceptance criteria for the halo, predeclared in
 ``docs/coupled-candidate/execution-proposal.md`` §4.2 **before** this ran and
 unchanged here:
 
-* ``Δp = |p₁ − p₃| / max(|p₁|, |p₃|) ≤ 1e-2``
+* ``Δp = abs(|p₁| − |p₃|) / max(|p₁|, |p₃|) ≤ 1e-2``
 * ``Δf = |f₁ − f₃| / f₁ ≤ 1e-4``
+
+The **tolerances** are exactly as frozen. The Δp *numerator* is the one
+corrective change: §4.2 wrote it as ``|p₁ − p₃|`` on the signed participation,
+and Palace's sign is ``sign(Re I)``, which tracks the eigenvector's arbitrary
+global phase rather than anything physical. Comparing signed values across two
+independent solves therefore mixes a solver convention into the measurement.
+See ``docs/coupled-candidate/corrective-analysis.md`` §D.1.
 
 Evidence is append-only: one record directory per invocation, every solver
 input and output kept, manifest written last.
@@ -62,6 +69,17 @@ from solvers.palace.coupled_config import (  # noqa: E402
     superinductor_henry,
 )
 from solvers.palace.coupled_geometry import chip_cell_from_declaration  # noqa: E402
+from solvers.palace.mode_admission import (  # noqa: E402
+    ADMISSION_RULE,
+    COMPARISON_CONVENTION,
+    MATCHING_RULE,
+    admit_modes,
+    check_row_correspondence,
+    join_modes_by_id,
+    label_roles,
+    match_runs,
+    unique_field_dominated,
+)
 from solvers.palace.coupled_mesh import dry_run  # noqa: E402
 
 SUMMARY_SCHEMA = "qmhp-cem.coupled-pilot/0.1.0"
@@ -281,15 +299,46 @@ def execute_run(
             }
             for r in table.rows
         ]
-        epr = pout.parse_port_epr_csv(post / "port-EPR.csv")
-        participation = {row.mode: row.participation.get(1) for row in epr}
+        # Join the five per-mode tables ON THE MODE ID, check the identities
+        # that span them, then decide validity. Algebraic convergence and mode
+        # validity are separate dispositions; neither uses participation rank.
+        joined = join_modes_by_id(post)
+        correspondence = check_row_correspondence(joined, {1: inductance})
+        admission = admit_modes(
+            spec.name,
+            joined,
+            backward_error_tolerance=COUPLED_SOLVER_RULES["eigenmode_backward_error_max_tolerance"],
+            row_correspondence=correspondence,
+        )
+        by_mode = {m.record.mode: m for m in admission.modes}
         for mode in modes:
-            mode["site_participation"] = participation.get(mode["index"])
-        energies = pout.parse_domain_energy_csv(post / "domain-E.csv")
-        entry["equipartition_residuals"] = [e.equipartition_residual for e in energies]
+            classified = by_mode.get(int(round(mode["index"])))
+            if classified is None:
+                raise pout.PalaceOutputError(
+                    f"eig.csv mode {mode['index']} has no joined row; the per-mode tables disagree"
+                )
+            mode["site_participation"] = classified.record.signed_participation(1)
+            mode["abs_site_participation"] = classified.record.abs_participation(1)
+            mode["energy_balance_ratio"] = classified.record.energy_balance_ratio
+            mode["energy_balance_defect"] = classified.record.energy_balance_defect
+            mode["disposition"] = classified.disposition
+        entry["row_correspondence"] = correspondence.as_dict()
+        entry["admission"] = admission.as_dict()
+        entry["roles"] = [r.as_dict() for r in label_roles(admission.admitted)]
+        # Keyed by mode id: an array whose only link back to a mode is its
+        # position is a positional join waiting to slip.
+        entry["energy_balance_by_mode"] = {
+            str(m.record.mode): m.record.energy_balance_defect for m in admission.modes
+        }
         entry["palace_metadata"] = pout.read_metadata_json(post / "palace.json")
         entry["modes"] = modes
         entry["modes_in_window"] = [m for m in modes if m["in_declared_window"]]
+        entry["admitted_in_window"] = [
+            m.mode
+            for m in admission.admitted_in_window(
+                COUPLED_SOLVER_RULES["band_floor_GHz"], COUPLED_SOLVER_RULES["band_ceiling_GHz"]
+            )
+        ]
         entry["max_backward_error"] = table.max_backward_error
         entry["status"] = "COMPLETED"
     except Exception as exc:  # noqa: BLE001 - a failure is evidence
@@ -309,60 +358,123 @@ def _port_direction(declaration: dict[str, Any]) -> str:
 # --- comparisons --------------------------------------------------------------
 
 
-def _readout_like_mode(entry: dict[str, Any]) -> dict[str, Any] | None:
-    """The in-window mode with the SMALLEST site participation.
+def _admitted_in_window(entry: dict[str, Any]) -> list[Any]:
+    """The admitted modes of one run inside the declared window.
 
-    Route A's readout-like mode is the one the fluxonium site participates in
-    least; the fluxonium-like mode is its partner. Selecting by participation
-    rather than by frequency keeps the choice independent of where the modes
-    happen to land.
+    Rebuilt from the admission report the run already recorded, so the
+    comparison cannot see a mode the admission step rejected.
     """
-    candidates = [m for m in entry.get("modes_in_window", []) if m.get("site_participation") is not None]
-    return min(candidates, key=lambda m: abs(m["site_participation"])) if candidates else None
+    admission = entry.get("admission") or {}
+    floor = COUPLED_SOLVER_RULES["band_floor_GHz"]
+    ceiling = COUPLED_SOLVER_RULES["band_ceiling_GHz"]
+    from solvers.palace.mode_admission import ModeRecord
 
-
-def _fluxonium_like_mode(entry: dict[str, Any]) -> dict[str, Any] | None:
-    candidates = [m for m in entry.get("modes_in_window", []) if m.get("site_participation") is not None]
-    return max(candidates, key=lambda m: abs(m["site_participation"])) if candidates else None
+    admitted = []
+    for mode in admission.get("modes", []):
+        if mode.get("disposition") != "ADMITTED":
+            continue
+        frequency = mode["frequency_GHz"]
+        if not (floor <= frequency <= ceiling):
+            continue
+        signed = {int(k): v for k, v in mode["participation_signed"].items()}
+        admitted.append(
+            ModeRecord(
+                mode=mode["mode"],
+                frequency_GHz=frequency,
+                frequency_im_GHz=mode["frequency_im_GHz"],
+                backward_error=mode["backward_error"],
+                absolute_error=mode.get("absolute_error"),
+                electric_J=mode["energy_J"]["E_elec"],
+                magnetic_J=mode["energy_J"]["E_mag"],
+                capacitive_J=mode["energy_J"]["E_cap"],
+                inductive_J=mode["energy_J"]["E_ind"],
+                participation=signed,
+                current_A={
+                    int(k): complex(v["re"], v["im"]) for k, v in mode["current_A"].items()
+                },
+                voltage_V={
+                    int(k): complex(v["re"], v["im"]) for k, v in mode["voltage_V"].items()
+                },
+            )
+        )
+    return admitted
 
 
 def compare(a: dict[str, Any], b: dict[str, Any], label: str) -> dict[str, Any]:
-    """Relative change in the readout-like mode's frequency and participation."""
-    out: dict[str, Any] = {"comparison": label, "available": False}
+    """Relative change between two runs, over MATCHED admitted modes.
+
+    The mode the frozen criterion is written about — "the readout-like mode" —
+    is identified as the single field-dominated admitted mode of run A, after
+    admission, not as whatever row carries the smallest ``|p|``. Every matched
+    pair is reported, so no pair is selected once the numbers are known; the
+    headline delta is the criterion's own subject where that subject is
+    unique, and the worst pair where it is not.
+
+    The participation change uses MAGNITUDES. Palace's participation sign is
+    ``sign(Re I)`` and the phase of a single port phasor is not invariant under
+    the eigenvector's arbitrary global scale, so a signed difference between
+    two independent solves mixes a solver convention into the comparison. The
+    signed values are carried through unchanged.
+    """
+    out: dict[str, Any] = {
+        "comparison": label,
+        "available": False,
+        "matching_rule": dict(MATCHING_RULE),
+        "admission_rule": dict(ADMISSION_RULE),
+        "convention": dict(COMPARISON_CONVENTION),
+    }
     if a.get("status") != "COMPLETED" or b.get("status") != "COMPLETED":
         out["reason"] = (
             f"not both solves completed ({a['spec']['name']}: {a.get('status')}, "
             f"{b['spec']['name']}: {b.get('status')})"
         )
         return out
-    ma, mb = _readout_like_mode(a), _readout_like_mode(b)
-    if ma is None or mb is None:
-        out["reason"] = "no in-window mode with a site participation in one of the solves"
+
+    admitted_a, admitted_b = _admitted_in_window(a), _admitted_in_window(b)
+    match = match_runs(f"{a['spec']['name']} vs {b['spec']['name']}", admitted_a, admitted_b)
+    out["match"] = match.as_dict()
+    out["admitted_in_window"] = {
+        a["spec"]["name"]: [r.mode for r in admitted_a],
+        b["spec"]["name"]: [r.mode for r in admitted_b],
+    }
+    if not match.comparable:
+        out["reason"] = match.reason
         return out
-    fa, fb = ma["frequency_GHz"], mb["frequency_GHz"]
-    pa, pb = ma["site_participation"], mb["site_participation"]
-    scale = max(abs(pa), abs(pb))
-    out.update({
-        "available": True,
-        "readout_like_mode": {
-            a["spec"]["name"]: {"frequency_GHz": fa, "site_participation": pa},
-            b["spec"]["name"]: {"frequency_GHz": fb, "site_participation": pb},
-        },
-        "delta_f_relative": abs(fa - fb) / fa if fa else None,
-        "delta_p_relative": (abs(pa - pb) / scale) if scale > 0 else None,
-        "modes_in_window": {
-            a["spec"]["name"]: len(a.get("modes_in_window", [])),
-            b["spec"]["name"]: len(b.get("modes_in_window", [])),
-        },
-    })
-    fa_flux, fb_flux = _fluxonium_like_mode(a), _fluxonium_like_mode(b)
-    if fa_flux and fb_flux:
-        out["fluxonium_like_mode"] = {
-            a["spec"]["name"]: {"frequency_GHz": fa_flux["frequency_GHz"],
-                                "site_participation": fa_flux["site_participation"]},
-            b["spec"]["name"]: {"frequency_GHz": fb_flux["frequency_GHz"],
-                                "site_participation": fb_flux["site_participation"]},
+
+    subject = unique_field_dominated(admitted_a)
+    pairs = [
+        {
+            "a_mode": pair.a.mode,
+            "b_mode": pair.b.mode,
+            "a_frequency_GHz": pair.a.frequency_GHz,
+            "b_frequency_GHz": pair.b.frequency_GHz,
+            "delta_f_relative": pair.delta_f_relative,
+            "delta_abs_p_relative": pair.delta_abs_participation_relative.get(1),
+            "is_criterion_subject": bool(subject is not None and pair.a.mode == subject.mode),
+            "signed_participation": pair.signed_participation,
         }
+        for pair in match.pairs
+    ]
+    chosen = next((row for row in pairs if row["is_criterion_subject"]), None)
+    if chosen is None:
+        chosen = max(pairs, key=lambda row: (row["delta_f_relative"], row["delta_abs_p_relative"] or 0.0))
+        basis = "no unique field-dominated admitted mode; the worst matched pair is reported"
+    else:
+        basis = "the single field-dominated admitted in-window mode of the reference run"
+
+    out.update(
+        {
+            "available": True,
+            "criterion_subject": {"basis": basis, "a_mode": chosen["a_mode"], "b_mode": chosen["b_mode"]},
+            "pairs": pairs,
+            "delta_f_relative": chosen["delta_f_relative"],
+            "delta_p_relative": chosen["delta_abs_p_relative"],
+            "modes_in_window": {
+                a["spec"]["name"]: len(a.get("modes_in_window", [])),
+                b["spec"]["name"]: len(b.get("modes_in_window", [])),
+            },
+        }
+    )
     return out
 
 
@@ -516,12 +628,25 @@ def render_report(summary: dict[str, Any]) -> str:
             L.append(f"Not available: {c.get('reason')}")
             continue
         L += [
-            f"- readout-like mode: {json.dumps(c['readout_like_mode'])}",
-            f"- relative frequency change: {c['delta_f_relative']:.3e}",
-            f"- relative participation change: {c['delta_p_relative']:.3e}",
+            f"Admitted in the declared window: {json.dumps(c['admitted_in_window'])}. "
+            f"Matching: {c['match']['status']}.",
+            "",
+            "| pair | f_a (GHz) | f_b (GHz) | Δf | Δ\\|p\\| | criterion subject |",
+            "|---|---|---|---|---|---|",
         ]
-        if "fluxonium_like_mode" in c:
-            L.append(f"- fluxonium-like mode: {json.dumps(c['fluxonium_like_mode'])}")
+        for row in c["pairs"]:
+            L.append(
+                f"| m{row['a_mode']}↔m{row['b_mode']} | {row['a_frequency_GHz']:.6f} "
+                f"| {row['b_frequency_GHz']:.6f} | {row['delta_f_relative']:.3e} "
+                f"| {cell(row['delta_abs_p_relative'], '.3e')} "
+                f"| {'yes' if row['is_criterion_subject'] else ''} |"
+            )
+        L += [
+            "",
+            f"Headline pair: {c['criterion_subject']['basis']}.",
+            f"- relative frequency change: {c['delta_f_relative']:.3e}",
+            f"- relative participation change (magnitudes): {c['delta_p_relative']:.3e}",
+        ]
     h = summary["halo_verdict"]
     L += ["", "## 4. Is the 0.08 mm halo admissible under the frozen criteria?", "",
           f"Criteria, frozen in {h['frozen_in']} before this ran: "

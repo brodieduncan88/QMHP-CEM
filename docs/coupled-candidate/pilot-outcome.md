@@ -4,6 +4,18 @@ Record: `results/COUPLED-PILOT-20260916T035733Z` (workflow run 35053649226),
 committed append-only, manifest verified. Approval record:
 `.github/pilot-approval.json`.
 
+> **Superseded in part.** Sections 2, 3 and 5 below were written before the
+> bounded corrective analysis of this record. That analysis corrected three
+> things: which rows are admissible (P2 admits a *third* mode, m9 at
+> 9.961 GHz, above six rejected rows, so "modes 1 and 2" was wrong as a rule);
+> what the energy-balance defect establishes (it flags the rows whose reported
+> participation cannot be trusted, and does **not** prove a mechanism); and the
+> participation sign (a solver gauge artefact, not a physical current
+> direction). The corrected text is below, with the superseded wording named
+> where it was wrong. The record itself is unchanged; the corrected analysis is
+> a separate record, `results/COUPLED-PILOT-CORR-20260916T064943Z`, and the reasoning is in
+> [`corrective-analysis.md`](corrective-analysis.md).
+
 **This was a numerical-method pilot only.** No coupling extraction was
 performed: no Route A inversion, no `g`, no invariant triple, no gate input,
 no Route B, no pulse, AMD-E, decoder or mediator work, no redesign. Every
@@ -44,25 +56,44 @@ Two resource facts for the next stage:
   2007.6 s and 1769.4 s of P3's 2567.2 s, against 2.3 s and 3.3 s of actual
   eigenvalue solve.
 
-## 2. Only two modes in the window are physical
+## 2. Most computed rows fail the reported energy balance
 
-The record's own `equipartition_residual`, computed per mode from the domain
-energies and independent of any participation, separates the modes sharply:
+For an exact eigenpair of the discrete problem `K x = ω² M x` the identity
+`x'Kx = ω² x'Mx` holds by algebra, so `R = (E_mag + E_ind) / (E_elec + E_cap)`
+is 1 for a resonance. Across all 23 mode rows of the three solves, `R` is
+**strictly bimodal**: 7 rows have `|R − 1| ≤ 1.7473e-5` and the other 16 have
+`|R − 1| ≥ 0.999926`, with nothing in between. The admitted set is therefore
+the same for any cutoff between `1.75e-5` and `0.9999`.
 
-| run | modes in window | residual, modes 1–2 | residual, modes 3+ |
+| run | rows | admitted | admitted in the 0.5–9.0 GHz window |
 |---|---|---|---|
-| P1 | 3 | 2.7e-6, 6.8e-7 | 0.99997 (×4) |
-| P2 | 8 | 2.5e-9, 8.8e-9 | 0.9999 (×6) |
-| P3 | 4 | 8.7e-6, 6.0e-7 | 0.99996 (×6) |
+| P1 | 6 | m1, m2 | m1, m2 |
+| P2 | 9 | m1, m2, **m9** | m1, m2 |
+| P3 | 8 | m1, m2 | m1, m2 |
 
-A residual near 1 means the electric-side and magnetic-side energies are not
-equal, so the object is not a resonant mode of the problem; these are
-null-space / gradient artefacts that the divergence-free projection did not
-remove. Their site participation is correspondingly `1e-7` to `1e-11`.
+**P2 admits a third mode, m9 at 9.961 GHz, sitting above six rejected rows.**
+The earlier wording — *"Only mode 1 and mode 2 of each solve are physical
+circuit modes"* — was wrong as a rule: it happened to hold for P1 and P3 and
+does not hold for P2. Admission is decided per row, never by index.
 
-**Only mode 1 and mode 2 of each solve are physical circuit modes.** Mode 1
-is the fluxonium-like mode (`p ≈ 0.998`); mode 2 is the readout-like mode
-(`p ≈ 1e-3`).
+What the defect establishes, and what it does not:
+
+- Palace's `E_ind` is not the port stiffness quadratic form but the rank-one
+  surrogate `|V|²/(2ω²L)` built from the port's line-average voltage, which by
+  Cauchy–Schwarz is a *lower bound* on it. A failing row is therefore either
+  not an eigenvector at its reported frequency, **or** an eigenvector whose
+  stiffness sits in a strongly non-uniform tangential field on the port that
+  the line average grossly understates. The saved record cannot separate those.
+- It does not matter for admission, because the reported participation
+  `p = E_ind/(E_elec + E_cap)` is built from the *same* surrogate: in either
+  case the `p` of a failing row is not a quantity two solves may be compared
+  on.
+- The earlier claim that these are *"null-space / gradient artefacts that the
+  divergence-free projection did not remove"* asserted a mechanism the
+  evidence does not carry. It is withdrawn. Settling the cause needs the
+  per-mode port stiffness integral `∫(1/L_s)|E_t|² dS`, which Palace does not
+  write, or the saved mode fields, which this record does not contain
+  (`Solver.Eigenmode.Save = 0` in all three configs).
 
 ## 3. The measured sensitivities
 
@@ -75,13 +106,24 @@ Relative differences, `|a − b| / |a|` with P1 as reference:
 | P1 vs P3 (halo, same order) | `Δf` | **4.49e-2** | 1.24e-2 |
 | P1 vs P3 | `Δp` | 3.36e-4 | 2.44e-1 |
 
+All four `Δp` figures above are **magnitudes**, `abs(|p_a| − |p_b|) /
+max(|p_a|, |p_b|)`, which is the corrected convention.
+
 Two further observations, recorded because they bear on the next stage:
 
-- The readout-like mode's participation **changes sign** between order 1 and
-  order 2 (`−9.34e-4` against `+1.20e-3`). Palace's EPR sign is
-  `sign(Re I)`, so at the `1e-3` level the current direction through the port
-  is not stable under discretisation. A signed comparison of that quantity
-  gives `Δp = 1.78`.
+- The readout-like mode's *signed* participation differs between order 1 and
+  order 2 (`−9.34e-4` against `+1.20e-3`). This is **not** a physical current
+  instability, and the earlier claim that *"the current direction through the
+  port is not stable under discretisation"* is withdrawn. Palace computes the
+  port current as `I = V/(iωL)` exactly, so `arg(I) = arg(V) − 90°`
+  identically and `V/I` is the constant `iωL` — the ratio carries no
+  information. The EPR sign is `sign(Re I) = sign(Im V)`, which rotates with
+  the eigenvector's overall complex phase, and the pinned Palace tree contains
+  no phase-fixing step: its only post-solve normalisation is multiplication by
+  a real non-negative scalar. With a single inductive port there is no second
+  phase reference in the solve, so the sign is a gauge choice. A signed
+  comparison of that quantity gives `Δp = 1.78`; the magnitude comparison
+  gives `2.24e-1`, and the magnitude is the defensible one.
 - The fluxonium-like participation is stable to `3–5e-4` across both knobs,
   while its **frequency** is not. The participation is pinned near 1 by the
   sum rule; it cannot detect under-resolution on its own.
@@ -110,44 +152,54 @@ error dwarfs both knobs under test.
 
 ## 5. A defect in the automated mode selection, and why it changes nothing
 
-`scripts/palace_coupled_pilot.py::_readout_like_mode` implements
-"the readout-like mode" as the in-window mode with the **smallest** `|p|`.
-That implementation predates the discovery in §2 that the window also
-contains non-physical modes with `|p| ~ 1e-7`. It therefore selected mode 3 of
-P1 (8.846 GHz, `p = −1.22e-7`) against mode 3 of P3 (8.296 GHz,
-`p = +1.88e-7`) — two unmatched artefacts — and the numbers it printed as the
-verdict (`Δp = 1.648`, `Δf = 6.22e-2`) are comparisons between them.
+`scripts/palace_coupled_pilot.py::_readout_like_mode` implemented "the
+readout-like mode" as the in-window row with the **smallest** `|p|`. Because a
+failing row's `p` is small *precisely because* its reported energies do not
+balance, that rule selects the least trustworthy row in the window in
+preference to the mode it was meant to find. Re-deriving the selector against
+the record reproduces exactly the rows the report names: P1 m3 (8.846 GHz,
+`p = −1.22e-7`, `|R−1| = 0.99998`), P2 m4 (7.044 GHz, `p = −1.39e-11`) and
+P3 m3 (8.296 GHz, `p = +1.88e-7`). The published `Δp = 1.648`,
+`Δf = 6.22e-2` are comparisons between unmatched rejected rows, and the `Δp`
+also used a **signed** difference, which compounds the error.
 
-**The verdict is unchanged by the defect.** Under every candidate pairing —
-the artefact pair the script chose, the genuine readout-like mode 2, or the
-fluxonium-like mode 1 — `Δf` exceeds `1e-4` by two to three orders of
-magnitude, so outcome three of §4.2 is reached on all of them. The recorded
-verdict `NOT-A-HALO-VERDICT` stands, and the record's own
-`fluxonium_like_mode` block already carries the alternative pairing.
+**The verdict is unchanged by the defect.** On matched admitted modes the halo
+comparison gives `Δf = 4.49e-2` and `1.24e-2`, both exceeding the frozen
+`1e-4` by two to three orders of magnitude, so outcome three of §4.2 is
+reached either way. The recorded verdict `NOT-A-HALO-VERDICT` stands.
 
-The record is **not** rewritten. Re-running the comparison with a different
-selection rule after seeing the numbers is exactly the move the frozen-criteria
-discipline forbids, so the fix belongs to the next check, predeclared before
-it runs, not to this one.
+The record is **not** rewritten. The corrected comparison is a separate,
+versioned record (`results/COUPLED-PILOT-CORR-20260916T064943Z`) that references the source
+record's hashes, and the rules it introduces are labelled retrospective for
+this record and prospective for the next confirmatory run. Both defects are
+fixed in the driver: it now joins the five per-mode tables by mode id, checks
+two identities that span them, admits rows on the energy balance, matches two
+runs by two independent orderings with a separation guard, and compares
+magnitudes.
 
-## 6. Proposed, not adopted: what the next bounded check would need
+## 6. Where the three proposals ended up
 
-Nothing below is approved or in force. It is the proposal this pilot's result
-implies, for the review to accept, change or refuse.
+This section originally listed three things the next bounded check would need.
+The corrective analysis settled two of them and withdrew the third.
 
-1. **Mode identification by physics, not by rank.** Admit a mode to the
-   comparison only if its `equipartition_residual` is below a predeclared
-   floor; identify the readout-like mode among the survivors. The residual is
-   already computed and recorded for every mode, so this adds no solve. The
-   floor must be written down before the check runs.
-2. **The open question is mesh level, not halo.** The halo is not separable
-   from discretisation error at level 1, so the next check is a mesh-level
-   refinement at fixed order 2 and fixed 0.08 mm halo. On the measured cost
-   this does not fit the current 45 min cap or the 250 000 DOF rule, so it
-   returns to the review as a resource question before anything is launched.
-3. **The readout-like participation needs a sign convention that survives
-   discretisation** before it can enter any comparison at the `1e-3` level.
+1. **Mode identification by physics, not by rank — done.** Admission is now
+   `|R − 1| ≤ 1e-3` on `R = (E_mag + E_ind)/(E_elec + E_cap)`, applied before
+   any participation is looked at, and implemented in
+   `solvers/palace/mode_admission.py`. It adds no solve. The rule is
+   retrospective for this record and prospective for the next run. (The
+   quantity named here originally, `equipartition_residual`, normalised by the
+   sum of all four energies rather than by the electric side; `R` is the ratio
+   the Rayleigh identity is actually about.)
+2. **The open question is mesh level, not halo — unchanged, and still open.**
+   The halo is not separable from discretisation error at level 1. The proposed
+   next test is in [`corrective-analysis.md`](corrective-analysis.md) §H: an
+   order-1 mesh-refinement sequence at fixed 0.08 mm halo, preceded by the free
+   offline DOF dry run, because order 1 measured 32.4 s where order 2 measured
+   2009.7 s on the same mesh. It is a proposal, not an approval.
+3. **Withdrawn.** The third item said the participation *"needs a sign
+   convention that survives discretisation"*. There is nothing to survive: the
+   sign is a solver gauge choice, per §3. The comparison uses magnitudes and
+   the signed values are preserved.
 
-Until those are settled the extraction stage is not executable on this
-evidence. Its disposition is
+The extraction stage is not executable on this evidence. Its disposition is
 **REQUIRES-ANOTHER-BOUNDED-NUMERICAL-CHECK**, as the record states.

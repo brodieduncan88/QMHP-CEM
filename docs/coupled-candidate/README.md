@@ -12,7 +12,8 @@ coupled EM evidence.
 | [`numerical-plan.md`](numerical-plan.md) | bands, mode identification and hidden-mode screening, refinement ladders, resolution checks, suitability checks, compute budget, order of execution |
 | [`route-a-identifiability.md`](route-a-identifiability.md) | the readout-normalisation problem, the corrected invariant target, the closed-form inversion, and its demonstration on synthetic circuits |
 | [`execution-proposal.md`](execution-proposal.md) | the bounded geometry, meshing and resource proposal put to the review; nothing in it is adopted |
-| [`pilot-outcome.md`](pilot-outcome.md) | the approved three-solve numerical-method pilot as executed: completion, modes, the measured order and halo sensitivities, the `NOT-A-HALO-VERDICT` under the frozen criteria, and what the next bounded check would need |
+| [`pilot-outcome.md`](pilot-outcome.md) | the approved three-solve numerical-method pilot as executed: completion, modes, the measured order and halo sensitivities, and the `NOT-A-HALO-VERDICT` under the frozen criteria. **Sections 2, 3 and 5 are superseded in part** by the corrective analysis below |
+| [`corrective-analysis.md`](corrective-analysis.md) | bounded corrective analysis of the executed pilot record: mode admission, row correspondence, energy definitions against pinned Palace v0.13.0, the EPR sign convention, and what stays unproven. Keeps execution completion, algebraic convergence, mode validity, mode matching and mesh convergence apart |
 | [`implementation-plan.md`](implementation-plan.md) | file-by-file plan; what this checkpoint implements ([A]) and what execution implements ([B]) |
 | `config/coupled/v2a_five_node_candidate.json` | the machine-readable declaration (schema `qmhp-cem.coupled-candidate/0.2.0`) |
 | `config/coupled/source_register.json` | every cited source with path, revision and sha256 |

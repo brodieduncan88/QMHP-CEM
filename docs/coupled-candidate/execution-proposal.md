@@ -150,6 +150,14 @@ from P1 and P3, and `f₁`, `f₃` the corresponding mode frequencies. Define
 Δf = |f₁ − f₃| / f₁                     the halo-induced relative change in frequency
 ```
 
+**Read with one correction, made after the pilot ran and recorded separately.**
+The `Δp` numerator above is on the *signed* participation. Palace's
+participation sign is `sign(Re I)`, which tracks the eigenvector's arbitrary
+global phase and not a physical current direction, so the corrective analysis
+evaluates `abs(|p₁| − |p₃|) / max(|p₁|, |p₃|)` instead. **The tolerances
+`1e-2` and `1e-4` are unchanged**, and this frozen text is deliberately left as
+written. See [`corrective-analysis.md`](corrective-analysis.md) §D.1.
+
 The 0.08 mm halo is **ADMISSIBLE** when both hold:
 
 | check | rule | where the number comes from |
