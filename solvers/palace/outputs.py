@@ -433,6 +433,63 @@ def parse_port_phasor_csv(path: Path, symbol: str) -> list[PhasorRow]:
     return parsed
 
 
+@dataclass(frozen=True)
+class SurfaceParticipationRow:
+    """One mode's interface-dielectric participations from ``surface-Q.csv``.
+
+    Palace writes ``p_surf[i] = integral(f_i) dS / (E_elec + E_cap)`` for each
+    configured interface index, i.e. already normalised by the same denominator
+    as the lumped-port participation, so the two are directly comparable.
+    """
+
+    mode: int
+    participation: dict[int, float]
+    quality_factor: dict[int, float]
+
+
+def parse_surface_q_csv(path: Path) -> list[SurfaceParticipationRow]:
+    """Parse Palace's ``surface-Q.csv``.
+
+    Header at v0.13.0 is ``m`` followed by a ``p_surf[i]``/``Q_surf[i]`` pair
+    per configured interface-dielectric index.
+    """
+    path = Path(path)
+    if not path.exists():
+        raise PalaceOutputError(
+            f"{path} was not written; Palace writes it only when "
+            f"Boundaries.Postprocessing.Dielectric is configured"
+        )
+    with path.open(newline="") as fh:
+        rows = [[c.strip() for c in row] for row in csv.reader(fh) if any(c.strip() for c in row)]
+    if len(rows) < 2:
+        raise PalaceOutputError(f"{path} holds a header but no rows")
+    header = rows[0]
+
+    p_columns: dict[int, int] = {}
+    q_columns: dict[int, int] = {}
+    for i, column in enumerate(header):
+        flat = column.replace(" ", "")
+        match = re.match(r"^([pQ])_surf\[(\d+)\]$", flat)
+        if match:
+            (p_columns if match.group(1) == "p" else q_columns)[int(match.group(2))] = i
+    if not p_columns:
+        raise PalaceOutputError(f"{path} has no p_surf[i] column; header was {header}")
+
+    exact_m = [i for i, c in enumerate(header) if c.strip().lower() == "m"]
+    if not exact_m:
+        raise PalaceOutputError(f"{path} has no mode column; header was {header}")
+    i_m = exact_m[0]
+
+    return [
+        SurfaceParticipationRow(
+            mode=int(round(_to_float(row[i_m]))),
+            participation={k: _to_float(row[v]) for k, v in p_columns.items()},
+            quality_factor={k: _to_float(row[v]) for k, v in q_columns.items()},
+        )
+        for row in rows[1:]
+    ]
+
+
 def read_metadata_json(path: Path) -> dict[str, Any]:
     """Palace's ``palace.json`` where present; empty dict where not."""
     path = Path(path)

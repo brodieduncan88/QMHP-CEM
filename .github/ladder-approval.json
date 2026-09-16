@@ -1,0 +1,57 @@
+{
+ "schema": "qmhp-cem.ladder-approval/0.1.0",
+ "what": "one level of the order-1 mesh-refinement check, at fixed element order 1 and fixed 0.08 mm halo",
+ "approved_by": "the repository owner, in the corrective-analysis review thread",
+ "approved_utc": "2026-09-16",
+ "level": 2,
+ "sequential": "one level per run, by the owner's instruction: level 3 is a separate approval and is not launched by this file",
+ "dry_runs_first": {
+  "requirement": "dry-run levels 2 and 3 and record measured DOF for both before running anything",
+  "measured_order1_dof": {
+   "level_2": 79944,
+   "level_3": 147372
+  },
+  "measured_order2_dof_for_context": {
+   "level_2": 420664,
+   "level_3": 781554
+  },
+  "note": "both levels are inside the 250 000-DOF rule at order 1 and outside it at order 2, which is why this check is at order 1"
+ },
+ "constraints": {
+  "finite_element_order": 1,
+  "halo_mm": 0.08,
+  "per_solve_wall_clock_cap_s": 2700,
+  "dof_budget": 250000,
+  "dof_rule_unchanged": true,
+  "cap_unchanged": true,
+  "external_or_additional_compute": "none; one job on the standard GitHub-hosted runner",
+  "driver_refuses_above_budget": "scripts/palace_order1_ladder.py measures DOF from the offline dry run and does not launch a level above the rule"
+ },
+ "field_output": {
+  "enabled": true,
+  "solver_eigenmode_save": 6,
+  "boundary_postprocessing": "two interface-dielectric probes on the port face, Default and MA, unit thickness and unit permittivity",
+  "purpose": "test the supported-but-unproven port-stiffness explanation of the energy-balance failures",
+  "changes_the_operator": false,
+  "committed": "surface-Q.csv is committed with the record; the paraview/ tree is uploaded as an artifact only"
+ },
+ "rules_preserved_unchanged": [
+  "the admission rule qmhp-cem.mode-admission/0.1.0 (|R - 1| <= 1e-3)",
+  "the matching rule qmhp-cem.mode-matching/0.1.1 (two orderings plus the separation guard)",
+  "the magnitude comparison convention for participation",
+  "the eigenmode backward-error tolerance",
+  "the declared 0.5-9.0 GHz window"
+ ],
+ "explicitly_out_of_scope": [
+  "the coupling extraction itself",
+  "the Route A inversion",
+  "Route B",
+  "pulse optimisation",
+  "AMD-E",
+  "decoder work",
+  "mediator work",
+  "any change to the 250 000-DOF rule or the 45-minute cap",
+  "merging pull request 7"
+ ],
+ "note": "Committing this file on a palace/** branch starts the approved level. It is the approval record and the trigger at once, so a level cannot be started by an unrelated code change."
+}

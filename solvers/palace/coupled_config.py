@@ -102,6 +102,39 @@ class CoupledRun:
         }
 
 
+#: Postprocessing probes on the lumped-port face, added for the order-1 ladder.
+#:
+#: Palace's interface-dielectric postprocessing integrates a coefficient over a
+#: boundary and divides by ``E_elec + E_cap`` — the same denominator as the port
+#: participation — so the two entries below come back on the same footing as
+#: ``p``. With ``Thickness = 1`` mesh unit and ``Permittivity = 1`` the
+#: coefficients reduce to (``palace/fem/coefficient.hpp``):
+#:
+#: * ``Default``: ``0.5 |E|^2``
+#: * ``MA``:      ``0.5 |E_n|^2``
+#:
+#: so their difference is ``0.5 |E_t|^2`` integrated over the port face — the
+#: quantity Palace's own ``E_ind`` surrogate replaces with a rank-one average,
+#: and therefore the measurement that tests it.
+#:
+#: This is **postprocessing only**. It adds no boundary condition, changes no
+#: operator and moves no tolerance: K, M and every declared BC are identical
+#: with and without it.
+PORT_FIELD_PROBES: dict[str, Any] = {
+    "purpose": (
+        "measure the port face's true tangential-field integral, against which Palace's "
+        "rank-one E_ind surrogate can be tested"
+    ),
+    "default_index": 1,
+    "normal_index": 2,
+    "thickness_mesh_units": 1.0,
+    "permittivity": 1.0,
+    "side": "SmallerRefractiveIndex",
+    "reduction": "0.5*|E_t|^2 integrated over the port face = (index 1) - (index 2)",
+    "changes_the_operator": False,
+}
+
+
 def build_coupled_config(
     mesh_filename: str,
     *,
@@ -113,6 +146,8 @@ def build_coupled_config(
     eigenmodes: int | None = None,
     target_GHz: float | None = None,
     probes_mm: list[list[float]] | None = None,
+    save_modes: int = 0,
+    port_field_probes: bool = False,
 ) -> dict[str, Any]:
     """The Palace configuration document for the coupled chip cell.
 
@@ -158,6 +193,47 @@ def build_coupled_config(
             ]
         }
 
+    boundaries: dict[str, Any] = {
+        # Outer walls and every zero-thickness metal sheet.
+        "PEC": {"Attributes": [TAGS["outer_pec"], TAGS["sheet_pec"]]},
+        # The fluxonium element site. Inductive, so Palace writes
+        # port-EPR.csv; not excited, because this is an eigenmode solve.
+        "LumpedPort": [
+            {
+                "Index": 1,
+                "Attributes": [TAGS["port_F1"]],
+                "Direction": port_direction,
+                "L": float(port_inductance_H),
+            }
+        ],
+    }
+    if port_field_probes:
+        boundaries["Postprocessing"] = {
+            "Dielectric": [
+                {
+                    "Index": PORT_FIELD_PROBES["default_index"],
+                    "Attributes": [TAGS["port_F1"]],
+                    "Type": "Default",
+                    "Thickness": PORT_FIELD_PROBES["thickness_mesh_units"],
+                    "Permittivity": PORT_FIELD_PROBES["permittivity"],
+                    "Side": PORT_FIELD_PROBES["side"],
+                },
+                {
+                    "Index": PORT_FIELD_PROBES["normal_index"],
+                    "Attributes": [TAGS["port_F1"]],
+                    "Type": "MA",
+                    "Thickness": PORT_FIELD_PROBES["thickness_mesh_units"],
+                    "Permittivity": PORT_FIELD_PROBES["permittivity"],
+                    "Side": PORT_FIELD_PROBES["side"],
+                },
+            ]
+        }
+
+    if save_modes < 0:
+        raise ValueError("save_modes must be >= 0")
+    if save_modes > n_modes:
+        raise ValueError(f"save_modes ({save_modes}) cannot exceed the {n_modes} modes computed")
+
     return {
         "Problem": {"Type": "Eigenmode", "Verbose": 2, "Output": output_dir},
         "Model": {
@@ -166,20 +242,7 @@ def build_coupled_config(
             "Refinement": {"UniformLevels": 0},
         },
         "Domains": domains,
-        "Boundaries": {
-            # Outer walls and every zero-thickness metal sheet.
-            "PEC": {"Attributes": [TAGS["outer_pec"], TAGS["sheet_pec"]]},
-            # The fluxonium element site. Inductive, so Palace writes
-            # port-EPR.csv; not excited, because this is an eigenmode solve.
-            "LumpedPort": [
-                {
-                    "Index": 1,
-                    "Attributes": [TAGS["port_F1"]],
-                    "Direction": port_direction,
-                    "L": float(port_inductance_H),
-                }
-            ],
-        },
+        "Boundaries": boundaries,
         "Solver": {
             "Order": int(order),
             "Device": "CPU",
@@ -187,7 +250,7 @@ def build_coupled_config(
                 "N": n_modes,
                 "Tol": COUPLED_SOLVER_RULES["eigenvalue_tolerance"],
                 "Target": round(target, 6),
-                "Save": 0,
+                "Save": int(save_modes),
             },
             "Linear": {
                 "Type": "Default",
@@ -201,6 +264,7 @@ def build_coupled_config(
 
 __all__ = [
     "COUPLED_SOLVER_RULES",
+    "PORT_FIELD_PROBES",
     "CoupledRun",
     "L0_MM_TO_M",
     "build_coupled_config",
