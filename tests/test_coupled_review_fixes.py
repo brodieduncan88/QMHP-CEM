@@ -303,3 +303,54 @@ def test_nothing_in_the_proposal_relaxes_a_frozen_rule():
     assert "No seed is promoted" in flat
     # The DOF rule is named as predeclared and explicitly not relaxed.
     assert "predeclared ENGINEERING-RULE and this proposal does not relax it" in flat
+
+
+# --- the approved pilot -------------------------------------------------------
+
+
+def test_the_pilot_script_matches_the_approval():
+    """The runner encodes exactly the three approved solves and the frozen criteria."""
+    import importlib.util
+
+    path = REPO_ROOT / "scripts" / "palace_coupled_pilot.py"
+    spec = importlib.util.spec_from_file_location("palace_coupled_pilot", path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+
+    assert [(r.name, r.finite_element_order, r.halo_mm, r.level) for r in module.RUNS] == [
+        ("P1", 2, 0.08, 1), ("P2", 1, 0.08, 1), ("P3", 2, 0.12, 1)
+    ]
+    assert module.SOLVE_TIMEOUT_S == 45 * 60
+    assert module.DOF_BUDGET == 250_000
+    # The criteria are the frozen ones, not recomputed or relaxed.
+    assert module.HALO_CRITERIA == {
+        "max_relative_participation_change": 1.0e-2,
+        "max_relative_frequency_change": 1.0e-4,
+    }
+    # And the record says plainly what the pilot did not do.
+    assert "NO coupling extraction" in module.STATEMENT
+    assert "no Route B" in module.STATEMENT
+
+
+def test_the_halo_verdict_applies_the_frozen_criteria_in_both_directions():
+    import importlib.util
+
+    path = REPO_ROOT / "scripts" / "palace_coupled_pilot.py"
+    spec = importlib.util.spec_from_file_location("palace_coupled_pilot_v", path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+
+    def verdict(dp, df):
+        return module.halo_verdict(
+            {"available": True, "delta_p_relative": dp, "delta_f_relative": df}
+        )
+
+    assert verdict(1e-3, 1e-5)["verdict"] == "ADMISSIBLE"
+    assert verdict(1e-2, 1e-4)["verdict"] == "ADMISSIBLE"          # the boundary passes
+    assert verdict(2e-2, 1e-5)["verdict"] == "REJECTED"            # participation fails
+    assert verdict(1e-3, 1e-3)["verdict"] == "NOT-A-HALO-VERDICT"  # frequency fails
+    assert module.halo_verdict({"available": False, "reason": "x"})["verdict"] == "NOT-DECIDED"
+    # An admissible halo is propagated, not merely passed.
+    assert verdict(4e-3, 1e-5)["systematic_floor_contribution_relative"] == 4e-3

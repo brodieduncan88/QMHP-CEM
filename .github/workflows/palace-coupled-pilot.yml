@@ -1,0 +1,167 @@
+# Coupled chip-cell numerical-method pilot (approved for the checkpoint-A review).
+#
+# NOT part of default CI (spec §12.8). Builds the pinned Palace container
+# (layer cache shared with the golden-run workflow) and executes the three
+# approved eigenmode solves of the same declared S1 chip cell:
+#
+#   P1  order 2, halo 0.08 mm   the reference solve
+#   P2  order 1, halo 0.08 mm   element-order sensitivity, against P1
+#   P3  order 2, halo 0.12 mm   halo sensitivity, against P1
+#
+# All three are inside the declared 250 000 DOF ENGINEERING-RULE; each solve
+# is capped at 45 minutes; one job on the standard GitHub-hosted runner, so no
+# external or additional compute is used.
+#
+# This is a numerical-method pilot ONLY. It performs no coupling extraction,
+# no Route A inversion, no Route B, no pulse work, no AMD-E, no decoder work
+# and no mediator work. It records completion, the mode list in the declared
+# window, the site participation, wall time and memory, with a manifest.
+#
+# Trigger: manual dispatch only. It does not run on push, because a pilot is
+# something a human approves, not something a commit starts.
+
+name: Palace coupled pilot
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_results:
+        description: "Commit results/COUPLED-PILOT-* back to this branch"
+        type: boolean
+        default: true
+      prepare_only:
+        description: "Mesh and write the configs without launching Palace"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: palace-coupled-pilot-${{ github.ref }}
+  cancel-in-progress: false   # a pilot that is running is not superseded
+
+env:
+  IMAGE: qmhp-cem/palace:0.13.0
+  COMMIT_RESULTS: ${{ inputs.commit_results }}
+  PREPARE_ONLY: ${{ inputs.prepare_only }}
+
+jobs:
+  pilot:
+    name: build the image, run the three approved solves
+    runs-on: ubuntu-latest
+    # Three solves capped at 45 min each, plus the image build and the
+    # evidence reserve, well inside the ceiling.
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free runner disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the Palace image (pinned base, apt snapshot, Palace tag)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/palace.Dockerfile
+          tags: ${{ env.IMAGE }}
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image identity
+        run: |
+          docker image inspect "$IMAGE" --format 'id={{.Id}}  repo-digests={{json .RepoDigests}}'
+          docker run --rm --network none --entrypoint /bin/sh "$IMAGE" -c 'cat /opt/palace/PALACE_VERSION /opt/palace/PALACE_COMMIT; echo "OPENBLAS_NUM_THREADS=$OPENBLAS_NUM_THREADS OMP_NUM_THREADS=$OMP_NUM_THREADS"'
+
+      - name: Runner resources
+        run: |
+          nproc; free -g; df -h /
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.11"
+
+      - name: Install gmsh runtime libraries
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends libglu1-mesa libgl1 libxrender1 libxcursor1 libxft2 libxinerama1 libxfixes3 libxext6 libfontconfig1
+
+      - name: Sync locked environment
+        run: uv sync --locked --all-extras --dev
+
+      - name: Assert the mesher imports
+        run: uv run python -c "import gmsh; print('gmsh', gmsh.__version__)"
+
+      - name: The approved pilot
+        id: pilot
+        continue-on-error: true
+        run: |
+          args=()
+          if [ "$PREPARE_ONLY" = "true" ]; then args+=(--prepare-only); fi
+          uv run python scripts/palace_coupled_pilot.py --np 1 --results-root results \
+            --record-pointer "$RUNNER_TEMP/coupled-pilot-record" "${args[@]}"
+
+      - name: Identify this run's record
+        id: record
+        if: always()
+        run: |
+          record="$(cat "$RUNNER_TEMP/coupled-pilot-record" 2>/dev/null || true)"
+          if [ -z "$record" ] || [ ! -d "$record" ]; then
+            echo "no record directory was created by this run (pilot step: ${{ steps.pilot.outcome }})"
+            echo "path=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "record directory: $record"
+          echo "path=$record" >> "$GITHUB_OUTPUT"
+          echo "PILOT_RECORD=$record" >> "$GITHUB_ENV"
+
+      - name: Report
+        if: always() && steps.record.outputs.path != ''
+        run: |
+          for f in "$PILOT_RECORD"/report.md "$PILOT_RECORD"/summary.json; do
+            [ -f "$f" ] || { echo "(missing) $f"; continue; }
+            echo "::group::$f"; cat "$f"; echo; echo "::endgroup::"
+          done
+          for p in P1 P2 P3; do
+            log="$PILOT_RECORD/$p/solver/palace_log.txt"
+            [ -f "$log" ] || continue
+            echo "::group::$p palace log (tail)"; tail -80 "$log"; echo "::endgroup::"
+          done
+
+      - name: Verify the record manifest
+        id: manifest
+        if: always() && steps.record.outputs.path != ''
+        continue-on-error: true
+        run: uv run cem verify-results "$PILOT_RECORD"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coupled-pilot-${{ github.run_id }}
+          path: ${{ steps.record.outputs.path }}
+          if-no-files-found: warn
+
+      - name: Commit the pilot record to the branch
+        if: always() && env.COMMIT_RESULTS == 'true'
+        run: |
+          if [ -z "$PILOT_RECORD" ]; then echo "no pilot record to commit"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$PILOT_RECORD"
+          verdicts="$(uv run python -c "import json,sys; s=json.load(open(sys.argv[1])); r=s['runs']; print(', '.join(k + ' ' + v['status'] for k, v in sorted(r.items())) + '; halo ' + s['halo_verdict']['verdict'] + '; order ' + str(s['order_verdict'].get('selected_order')) + '; next ' + s['next_stage']['disposition'])" "$PILOT_RECORD/summary.json")"
+          git commit -m "Record coupled pilot ${{ github.run_id }}: ${verdicts}" -m "Numerical-method pilot only: no coupling extraction, no Route B." -m "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          git pull --rebase --autostash origin "${{ github.ref_name }}"
+          git push origin "HEAD:${{ github.ref_name }}"
+
+      - name: Fail the job if the pilot or the manifest check did not succeed
+        if: always() && (steps.pilot.outcome != 'success' || steps.manifest.outcome == 'failure')
+        run: |
+          echo "pilot step     : ${{ steps.pilot.outcome }}"
+          echo "manifest check : ${{ steps.manifest.outcome }}"
+          exit 1

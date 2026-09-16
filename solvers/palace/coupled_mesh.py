@@ -145,6 +145,7 @@ class DryRunReport:
     h0_gap_mm: float
     h_gap_mm: float
     h_far_mm: float
+    halo_mm: float
     nodes: int
     tetrahedra: int
     edges: int
@@ -175,6 +176,7 @@ class DryRunReport:
             "h0_gap_mm": self.h0_gap_mm,
             "h_gap_mm": self.h_gap_mm,
             "h_far_mm": self.h_far_mm,
+            "halo_mm": self.halo_mm,
             "measured": {
                 "nodes": self.nodes,
                 "tetrahedra": self.tetrahedra,
@@ -246,6 +248,7 @@ def dry_run(
     out_dir: Path,
     dof_budget: int = 250_000,
     max_surface_elements: int = 400_000,
+    halo_mm: float | None = None,
 ) -> DryRunReport:
     """Mesh the coupled cell at ladder ``level`` and report counts and DOF estimates.
 
@@ -258,6 +261,9 @@ def dry_run(
     gmsh = _require_gmsh()
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    halo = DIST_MAX_MM if halo_mm is None else float(halo_mm)
+    if halo <= 0.0:
+        raise ValueError("halo_mm must be positive")
     mesh_path = out_dir / f"{MODEL_NAME}_L{level}.msh"
     h0_gap, h_gap, h_far = mesh_sizes_mm(cell, level)
     if not (0.0 < h_gap <= h_far):
@@ -374,7 +380,7 @@ def dry_run(
         gmsh.model.mesh.field.setNumber(thr, "SizeMin", h_gap)
         gmsh.model.mesh.field.setNumber(thr, "SizeMax", h_far)
         gmsh.model.mesh.field.setNumber(thr, "DistMin", 0.0)
-        gmsh.model.mesh.field.setNumber(thr, "DistMax", DIST_MAX_MM)
+        gmsh.model.mesh.field.setNumber(thr, "DistMax", halo)
         gmsh.model.mesh.field.setAsBackgroundMesh(thr)
 
         gmsh.model.mesh.generate(2)
@@ -418,6 +424,7 @@ def dry_run(
         h0_gap_mm=h0_gap,
         h_gap_mm=h_gap,
         h_far_mm=h_far,
+        halo_mm=halo,
         nodes=n_nodes,
         tetrahedra=n_tets,
         edges=n_edges,
