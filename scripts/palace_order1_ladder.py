@@ -85,6 +85,14 @@ HALO_MM = 0.08
 SOLVE_TIMEOUT_S = 45 * 60
 DOF_BUDGET = 250_000
 
+#: The frozen frequency tolerance, used as the TARGET of the order-2 projection
+#: so that projection invents no threshold of its own. Read from the approval
+#: record the pilot ran under rather than restated here.
+FROZEN_FREQUENCY_TOLERANCE = float(
+    json.loads((REPO_ROOT / ".github" / "pilot-approval.json").read_text())
+    ["frozen_criteria"]["max_relative_frequency_change"]
+)
+
 #: The reference rung, already executed and preserved. Level 2 and level 3 are
 #: compared against it; it is never re-run.
 REFERENCE_RECORD = "COUPLED-PILOT-20260916T035733Z"
@@ -331,6 +339,412 @@ def _port_field_verdict(spread: float, failing: list[dict[str, Any]]) -> tuple[s
     )
 
 
+def rebuild_admitted(modes: list[dict[str, Any]], floor: float, ceiling: float) -> list[Any]:
+    """Rebuild the admitted in-window ModeRecords a record already decided.
+
+    A record's admission is evidence: it is read back, never re-decided.
+    """
+    from solvers.palace.mode_admission import ModeRecord  # noqa: PLC0415
+
+    built = []
+    for m in modes:
+        if m.get("disposition") != "ADMITTED":
+            continue
+        built.append(
+            ModeRecord(
+                mode=m["mode"],
+                frequency_GHz=m["frequency_GHz"],
+                frequency_im_GHz=m["frequency_im_GHz"],
+                backward_error=m["backward_error"],
+                absolute_error=m.get("absolute_error"),
+                electric_J=m["energy_J"]["E_elec"],
+                magnetic_J=m["energy_J"]["E_mag"],
+                capacitive_J=m["energy_J"]["E_cap"],
+                inductive_J=m["energy_J"]["E_ind"],
+                participation={int(k): v for k, v in m["participation_signed"].items()},
+                current_A={int(k): complex(v["re"], v["im"]) for k, v in m["current_A"].items()},
+                voltage_V={int(k): complex(v["re"], v["im"]) for k, v in m["voltage_V"].items()},
+            )
+        )
+    return [r for r in built if r.in_window(floor, ceiling)]
+
+
+def earlier_rungs(root: Path | None = None) -> list[dict[str, Any]]:
+    """Every earlier order-1 rung already on disk, lowest level first.
+
+    Level 1 is the preserved pilot run P2; higher levels are this ladder's own
+    committed records. Each is read-only.
+    """
+    from solvers.palace.coupled_mesh import mesh_sizes_mm  # noqa: PLC0415
+
+    results = root or (REPO_ROOT / "results")
+    floor = COUPLED_SOLVER_RULES["band_floor_GHz"]
+    ceiling = COUPLED_SOLVER_RULES["band_ceiling_GHz"]
+    declaration = json.loads((REPO_ROOT / "config" / "coupled" / "v2a_five_node_candidate.json").read_text())
+    cell = chip_cell_from_declaration(declaration)
+
+    rungs: list[dict[str, Any]] = []
+    reference, reference_meta = reference_modes(results)
+    admitted = admit_modes(
+        REFERENCE_RUN, reference,
+        backward_error_tolerance=COUPLED_SOLVER_RULES["eigenmode_backward_error_max_tolerance"],
+    )
+    rungs.append({
+        "level": REFERENCE_LEVEL,
+        "h_gap_mm": mesh_sizes_mm(cell, REFERENCE_LEVEL)[1],
+        "source": f"{REFERENCE_RECORD}/{REFERENCE_RUN}",
+        "modes": admitted.admitted_in_window(floor, ceiling),
+        "dof": reference_meta.get("dof_for_this_order"),
+        "wall_clock_s": reference_meta.get("run", {}).get("wall_clock_s"),
+    })
+
+    for record in sorted(results.glob(f"{RECORD_PREFIX}-L*")):
+        summary_path = record / "summary.json"
+        if not summary_path.exists():
+            continue
+        summary = json.loads(summary_path.read_text())
+        rung = summary.get("rung") or {}
+        if rung.get("status") != "COMPLETED":
+            continue
+        level = int(summary["level"])
+        if any(r["level"] == level for r in rungs):
+            continue
+        rungs.append({
+            "level": level,
+            "h_gap_mm": mesh_sizes_mm(cell, level)[1],
+            "source": record.name,
+            "modes": rebuild_admitted(rung["admission"]["modes"], floor, ceiling),
+            "dof": rung.get("dof_measured"),
+            "wall_clock_s": (rung.get("run") or {}).get("wall_clock_s"),
+            "port_field_test": rung.get("port_field_test"),
+        })
+    return sorted(rungs, key=lambda r: r["level"])
+
+
+def track_modes(rungs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Follow each admitted mode across every rung, using the matching rule.
+
+    Adjacent levels are matched pairwise with the unchanged prospective rule,
+    and the chain is then checked for transitivity against the direct
+    first-to-last match. A mode that cannot be followed the whole way is
+    reported as untracked rather than guessed at.
+    """
+    if len(rungs) < 2:
+        return {"available": False, "reason": "fewer than two rungs"}
+    pairwise = {}
+    for a, b in zip(rungs, rungs[1:]):
+        report = match_runs(f"L{a['level']} vs L{b['level']}", a["modes"], b["modes"])
+        pairwise[f"L{a['level']}->L{b['level']}"] = report.as_dict()
+        if not report.comparable:
+            return {
+                "available": False,
+                "reason": f"L{a['level']} and L{b['level']} could not be matched: {report.reason}",
+                "pairwise": pairwise,
+            }
+        a.setdefault("_pairs", {})[b["level"]] = {p.a.mode: p.b.mode for p in report.pairs}
+
+    direct = match_runs(f"L{rungs[0]['level']} vs L{rungs[-1]['level']}", rungs[0]["modes"], rungs[-1]["modes"])
+    pairwise[f"L{rungs[0]['level']}->L{rungs[-1]['level']} (direct)"] = direct.as_dict()
+
+    series: dict[str, Any] = {}
+    for start in rungs[0]["modes"]:
+        chain = [start]
+        current = start.mode
+        ok = True
+        for a, b in zip(rungs, rungs[1:]):
+            nxt = a.get("_pairs", {}).get(b["level"], {}).get(current)
+            if nxt is None:
+                ok = False
+                break
+            record = next((r for r in b["modes"] if r.mode == nxt), None)
+            if record is None:
+                ok = False
+                break
+            chain.append(record)
+            current = nxt
+        if not ok:
+            continue
+        key = f"L{rungs[0]['level']}m{start.mode}"
+        series[key] = {
+            "points": [
+                {
+                    "level": rung["level"],
+                    "h_gap_mm": rung["h_gap_mm"],
+                    "mode": record.mode,
+                    "frequency_GHz": record.frequency_GHz,
+                    "abs_participation": record.abs_participation(),
+                    "dof": rung["dof"],
+                }
+                for rung, record in zip(rungs, chain)
+            ],
+            "role": label_roles([start])[0].label,
+        }
+
+    transitive = True
+    if direct.comparable:
+        composed = {}
+        for key, track in series.items():
+            composed[track["points"][0]["mode"]] = track["points"][-1]["mode"]
+        straight = {p.a.mode: p.b.mode for p in direct.pairs}
+        transitive = composed == straight
+    return {
+        "available": bool(series),
+        "series": series,
+        "pairwise": pairwise,
+        "chain_is_transitive": transitive,
+        "transitivity_note": (
+            "the composed L1->L2->L3 correspondence agrees with the direct L1->L3 match"
+            if transitive else
+            "the composed correspondence DISAGREES with the direct match; the chain is not trusted"
+        ),
+    }
+
+
+# --- convergence, over three rungs --------------------------------------------
+
+
+def observed_order(h: list[float], values: list[float]) -> dict[str, Any]:
+    """The observed order of convergence from three rungs, or a refusal.
+
+    Fits ``f(h) = f* + C h^p`` to three points. The refinement ratios here are
+    not equal (h scales by 1, 2/3, 1/2), so ``p`` is not the textbook two-ratio
+    formula: it solves
+
+        (f1 - f2)/(f2 - f3) = (H1^p - H2^p)/(H2^p - 1),   H_i = h_i/h3
+
+    whose right-hand side increases monotonically from
+    ``(ln H1 - ln H2)/ln H2`` at ``p -> 0`` to infinity. That floor matters: a
+    sequence whose successive differences shrink more slowly than it has **no
+    positive order** and this returns NOT-SOLVABLE rather than a number. So
+    does a non-monotone sequence. An estimator that always returns a value
+    would be worthless here, because the question being asked is precisely
+    whether the sequence is converging at all.
+    """
+    if len(h) != 3 or len(values) != 3:
+        return {"solvable": False, "reason": "three rungs are required"}
+    if not (h[0] > h[1] > h[2] > 0):
+        return {"solvable": False, "reason": "the mesh sizes are not strictly decreasing"}
+
+    d12, d23 = values[0] - values[1], values[1] - values[2]
+    out: dict[str, Any] = {
+        "h": list(h),
+        "values": list(values),
+        "difference_12": d12,
+        "difference_23": d23,
+        "differences_shrinking": abs(d23) < abs(d12),
+        "monotone": (d12 > 0 and d23 > 0) or (d12 < 0 and d23 < 0),
+    }
+    if d23 == 0.0:
+        out.update({"solvable": False, "reason": "the last two rungs are identical"})
+        return out
+    if not out["monotone"]:
+        out.update({
+            "solvable": False,
+            "reason": "the sequence is not monotone in h, so no single power law describes it",
+        })
+        return out
+
+    H = [x / h[2] for x in h]
+    lhs = d12 / d23
+    floor = (math.log(H[0]) - math.log(H[1])) / math.log(H[1])
+    out["ratio_of_differences"] = lhs
+    out["ratio_floor_for_any_positive_order"] = floor
+    if lhs <= floor:
+        out.update({
+            "solvable": False,
+            "reason": (
+                f"the successive differences shrink by only {lhs:.4g}, at or below the {floor:.4g} "
+                f"that the refinement ratios impose even as the order tends to zero: no positive "
+                f"order of convergence fits these three rungs"
+            ),
+        })
+        return out
+
+    def rhs(power: float) -> float:
+        return (H[0] ** power - H[1] ** power) / (H[1] ** power - 1.0)
+
+    lo, hi = 1.0e-6, 1.0
+    while rhs(hi) < lhs and hi < 64.0:
+        hi *= 2.0
+    if rhs(hi) < lhs:
+        out.update({
+            "solvable": False,
+            "reason": f"no order below {hi:.0f} fits; the sequence collapses faster than a power law",
+        })
+        return out
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if rhs(mid) < lhs:
+            lo = mid
+        else:
+            hi = mid
+    power = 0.5 * (lo + hi)
+
+    amplitude = d23 / (H[1] ** power - 1.0)
+    limit = values[2] - amplitude
+    out.update({
+        "solvable": True,
+        "observed_order": power,
+        "extrapolated_limit": limit,
+        "amplitude": amplitude,
+        "remaining_relative_error": [
+            (abs(v - limit) / abs(limit)) if limit else math.nan for v in values
+        ],
+    })
+    return out
+
+
+def convergence_over_rungs(series: dict[str, Any]) -> dict[str, Any]:
+    """Observed order for each tracked mode's frequency and |p|."""
+    out: dict[str, Any] = {"note": (
+        "Three rungs give the FIRST order estimate, not a confirmed one: confirming it needs a "
+        "fourth, because a three-point fit has no degrees of freedom left to test itself."
+    )}
+    per_mode = {}
+    for key, track in series.items():
+        h = [point["h_gap_mm"] for point in track["points"]]
+        per_mode[key] = {
+            "modes_by_level": {str(point["level"]): point["mode"] for point in track["points"]},
+            "frequency": observed_order(h, [point["frequency_GHz"] for point in track["points"]]),
+            "abs_participation": observed_order(h, [point["abs_participation"] for point in track["points"]]),
+            "role": track.get("role"),
+        }
+    out["per_mode"] = per_mode
+    solvable = [m["frequency"] for m in per_mode.values() if m["frequency"].get("solvable")]
+    out["frequency_orders"] = [m["observed_order"] for m in solvable]
+    out["all_frequencies_solvable"] = len(solvable) == len(per_mode) and bool(per_mode)
+    return out
+
+
+def asymptotic_assessment(convergence: dict[str, Any], expected_order: float = 2.0) -> dict[str, Any]:
+    """Is the sequence clearly pre-asymptotic?
+
+    For lowest-order Nedelec elements the textbook eigenvalue convergence is
+    ``O(h^2)``. That is the expectation, not a measurement, and it is used only
+    to say whether the observed orders are anywhere near where the method
+    should land — never to replace them.
+    """
+    per_mode = convergence.get("per_mode", {})
+    verdicts = []
+    for key, entry in per_mode.items():
+        frequency = entry["frequency"]
+        if not frequency.get("solvable"):
+            verdicts.append({"mode": key, "verdict": "NO-ORDER", "reason": frequency.get("reason")})
+            continue
+        power = frequency["observed_order"]
+        remaining = frequency["remaining_relative_error"][-1]
+        plausible = 0.5 <= power <= 2.0 * expected_order
+        verdicts.append({
+            "mode": key,
+            "verdict": "PLAUSIBLE-ORDER" if plausible else "IMPLAUSIBLE-ORDER",
+            "observed_order": power,
+            "expected_order_for_the_method": expected_order,
+            "remaining_relative_error_at_finest": remaining,
+            "reason": (
+                f"observed order {power:.3f} against the {expected_order:.0f} this method should "
+                f"reach; estimated remaining error at the finest rung {remaining:.3e}"
+            ),
+        })
+    any_implausible = any(v["verdict"] != "PLAUSIBLE-ORDER" for v in verdicts)
+    worst_remaining = max(
+        (v.get("remaining_relative_error_at_finest", math.inf) for v in verdicts), default=math.inf
+    )
+    return {
+        "per_mode": verdicts,
+        "still_clearly_pre_asymptotic": bool(any_implausible or worst_remaining > 1.0e-2),
+        "worst_remaining_relative_error": worst_remaining,
+        "criterion": (
+            "clearly pre-asymptotic if any tracked mode yields no positive order, or an order far "
+            "from the method's expected 2, or an estimated remaining error above 1e-2 at the "
+            "finest rung. This is a descriptive numerical criterion introduced with this record; "
+            "it gates nothing and is not a physical threshold."
+        ),
+    }
+
+
+def order_two_projection(
+    convergence: dict[str, Any],
+    dof_by_level_order1: dict[int, int],
+    dof_by_level_order2: dict[int, int],
+    h_by_level: dict[int, float],
+    order2_reference: dict[str, Any],
+    target_relative: float,
+) -> dict[str, Any]:
+    """What order-2 mesh the frozen frequency tolerance would need.
+
+    A projection, and labelled as one. It uses: the continuum limit from the
+    order-1 extrapolation; the single order-2 datum available (level 1 from the
+    pilot); and the measured ``DOF ~ h^-q`` scaling of this mesh family. The
+    convergence rate of the order-2 discretisation is **not** measured — one
+    point cannot give a rate — so the requirement is bracketed between the
+    textbook ``O(h^4)`` for degree-2 elements and the pessimistic assumption
+    that it converges no faster than the order-1 sequence does.
+    """
+    per_mode = convergence.get("per_mode", {})
+    tracked = order2_reference.get("mode")
+    entry = per_mode.get(tracked or "")
+    if not entry or not entry["frequency"].get("solvable"):
+        return {
+            "available": False,
+            "reason": "the order-1 sequence yields no extrapolated limit, so nothing can be projected",
+        }
+    limit = entry["frequency"]["extrapolated_limit"]
+    observed = entry["frequency"]["observed_order"]
+    f_order2 = order2_reference["frequency_GHz"]
+    h_order2 = h_by_level[order2_reference["level"]]
+    error_order2 = abs(f_order2 - limit) / abs(limit)
+
+    levels = sorted(dof_by_level_order2)
+    q = math.log(dof_by_level_order2[levels[-1]] / dof_by_level_order2[levels[0]]) / math.log(
+        h_by_level[levels[0]] / h_by_level[levels[-1]]
+    )
+
+    projections = {}
+    for name, rate in (("textbook_h4", 4.0), ("pessimistic_same_as_order1", observed)):
+        if error_order2 <= target_relative:
+            projections[name] = {
+                "already_met": True,
+                "required_h_mm": h_order2,
+                "required_dof": dof_by_level_order2[order2_reference["level"]],
+            }
+            continue
+        shrink = (target_relative / error_order2) ** (1.0 / rate)
+        required_h = h_order2 * shrink
+        required_dof = dof_by_level_order2[order2_reference["level"]] * (h_order2 / required_h) ** q
+        projections[name] = {
+            "assumed_rate": rate,
+            "required_h_mm": required_h,
+            "h_shrink_factor": 1.0 / shrink,
+            "required_dof": required_dof,
+            "required_dof_over_budget": required_dof / DOF_BUDGET,
+            "within_dof_budget": required_dof <= DOF_BUDGET,
+            "already_met": False,
+        }
+    return {
+        "available": True,
+        "target_relative_frequency_error": target_relative,
+        "target_source": "the frozen halo criterion's frequency tolerance; no new threshold",
+        "tracked_mode": tracked,
+        "extrapolated_limit_GHz": limit,
+        "order1_observed_order": observed,
+        "order2_datum": {
+            "level": order2_reference["level"],
+            "frequency_GHz": f_order2,
+            "h_gap_mm": h_order2,
+            "dof": dof_by_level_order2[order2_reference["level"]],
+            "relative_error_against_the_limit": error_order2,
+        },
+        "measured_dof_scaling_exponent_q": q,
+        "dof_scaling_note": "DOF ~ h^-q measured over the three meshes of this family, not assumed",
+        "projections": projections,
+        "caveats": [
+            "the order-1 sequence must be asymptotic for its extrapolated limit to mean anything",
+            "the order-2 rate is not measured: one datum cannot give a rate, so it is bracketed",
+            "DOF ~ h^-q is measured on three meshes of this family and extended beyond them",
+        ],
+    }
+
+
 # --- the rung -----------------------------------------------------------------
 
 
@@ -486,32 +900,7 @@ def compare_against_reference(entry: dict[str, Any], reference: list[Any], refer
 
     floor = COUPLED_SOLVER_RULES["band_floor_GHz"]
     ceiling = COUPLED_SOLVER_RULES["band_ceiling_GHz"]
-    from solvers.palace.mode_admission import ModeRecord  # noqa: PLC0415
-
-    def rebuild(modes: list[dict[str, Any]]) -> list[ModeRecord]:
-        built = []
-        for m in modes:
-            if m.get("disposition") != "ADMITTED":
-                continue
-            built.append(
-                ModeRecord(
-                    mode=m["mode"],
-                    frequency_GHz=m["frequency_GHz"],
-                    frequency_im_GHz=m["frequency_im_GHz"],
-                    backward_error=m["backward_error"],
-                    absolute_error=m.get("absolute_error"),
-                    electric_J=m["energy_J"]["E_elec"],
-                    magnetic_J=m["energy_J"]["E_mag"],
-                    capacitive_J=m["energy_J"]["E_cap"],
-                    inductive_J=m["energy_J"]["E_ind"],
-                    participation={int(k): v for k, v in m["participation_signed"].items()},
-                    current_A={int(k): complex(v["re"], v["im"]) for k, v in m["current_A"].items()},
-                    voltage_V={int(k): complex(v["re"], v["im"]) for k, v in m["voltage_V"].items()},
-                )
-            )
-        return [r for r in built if r.in_window(floor, ceiling)]
-
-    this_level = rebuild(entry["admission"]["modes"])
+    this_level = rebuild_admitted(entry["admission"]["modes"], floor, ceiling)
     reference_admitted = admit_modes(
         REFERENCE_RUN,
         reference,
@@ -725,7 +1114,103 @@ def render_report(summary: dict[str, Any]) -> str:
         add(f"Not available: {test.get('reason')}")
     add("")
 
-    add("## 6. Is level 3 justified and affordable?")
+    convergence = summary.get("convergence") or {}
+    if convergence.get("available"):
+        add("## 6. Convergence over the rungs")
+        add("")
+        rungs = summary["rungs"]
+        add("| level | h_gap (mm) | DOF | wall clock (s) | source |")
+        add("|---|---|---|---|---|")
+        for r in rungs:
+            add(f"| {r['level']} | {r['h_gap_mm']:.6f} | {r['dof']} "
+                f"| {r['wall_clock_s']:.1f} | `{r['source']}` |")
+        add("")
+        tracking = summary.get("tracking") or {}
+        add(f"Mode tracking: {tracking.get('transitivity_note')}")
+        add("")
+        for key, entry_m in convergence["per_mode"].items():
+            freq = entry_m["frequency"]
+            add(f"### {key} ({entry_m['role']})")
+            add("")
+            series = (summary["tracking"]["series"][key]["points"])
+            add("| level | mode | f (GHz) | \|p\| |")
+            add("|---|---|---|---|")
+            for point in series:
+                add(f"| {point['level']} | {point['mode']} | {point['frequency_GHz']:.6f} "
+                    f"| {point['abs_participation']:.6e} |")
+            add("")
+            if freq.get("solvable"):
+                add(f"- observed order **{freq['observed_order']:.3f}**, extrapolated limit "
+                    f"**{freq['extrapolated_limit']:.6f} GHz**")
+                add("- estimated remaining relative error: "
+                    + ", ".join(f"L{point['level']} {err:.3e}"
+                                for point, err in zip(series, freq["remaining_relative_error"])))
+            else:
+                add(f"- no order of convergence: {freq['reason']}")
+            part = entry_m["abs_participation"]
+            if part.get("solvable"):
+                add(f"- \|p\| observed order {part['observed_order']:.3f}, limit "
+                    f"{part['extrapolated_limit']:.6e}")
+            else:
+                add(f"- \|p\|: no order — {part['reason']}")
+            add("")
+        add(convergence["note"])
+        add("")
+
+    asymptotic = summary.get("asymptotic") or {}
+    if asymptotic:
+        add("## 7. Is the sequence still clearly pre-asymptotic?")
+        add("")
+        add(f"**{'YES' if asymptotic['still_clearly_pre_asymptotic'] else 'NO'}** — worst estimated "
+            f"remaining relative error at the finest rung {asymptotic['worst_remaining_relative_error']:.3e}.")
+        add("")
+        for verdict in asymptotic["per_mode"]:
+            add(f"- `{verdict['mode']}`: **{verdict['verdict']}** — {verdict['reason']}")
+        add("")
+        add(asymptotic["criterion"])
+        add("")
+
+    order_two = summary.get("order_two_projection") or {}
+    if order_two.get("available"):
+        add("## 8. What order-2 mesh the frozen tolerance would need")
+        add("")
+        add(f"Target: relative frequency error ≤ {list(order_two['per_mode'].values())[0]['target_relative_frequency_error']:.0e} "
+            f"— {list(order_two['per_mode'].values())[0]['target_source']}.")
+        add("")
+        add("| mode | order-2 error at L1 | assumption | required h (mm) | required DOF | ≤ 250 000 |")
+        add("|---|---|---|---|---|---|")
+        for key, projection in order_two["per_mode"].items():
+            if not projection.get("available"):
+                add(f"| {key} | — | {projection['reason']} | — | — | — |")
+                continue
+            datum = projection["order2_datum"]
+            for name, values in projection["projections"].items():
+                if values.get("already_met"):
+                    add(f"| {key} | {datum['relative_error_against_the_limit']:.3e} | {name} "
+                        f"| already met | {values['required_dof']:.0f} | yes |")
+                    continue
+                add(f"| {key} | {datum['relative_error_against_the_limit']:.3e} | {name} "
+                    f"| {values['required_h_mm']:.3e} | {values['required_dof']:.3e} "
+                    f"| {'yes' if values['within_dof_budget'] else 'NO'} |")
+        add("")
+        first = next(iter(order_two["per_mode"].values()))
+        if first.get("available"):
+            add(f"Measured DOF scaling exponent q = {first['measured_dof_scaling_exponent_q']:.3f} "
+                f"({first['dof_scaling_note']}).")
+            add("")
+            for caveat in first["caveats"]:
+                add(f"- {caveat}")
+            add("")
+
+    reproduction = summary.get("port_field_reproduction") or {}
+    if reproduction:
+        add("## 9. Does the port-field mechanism reproduce?")
+        add("")
+        for level, verdict in sorted(reproduction.items()):
+            add(f"- {level}: **{verdict}**")
+        add("")
+
+    add("## 10. Is the next level justified and affordable?")
     add("")
     nxt = summary["next_level"]
     add(f"Level 3 measures **{nxt['dof_measured']} DOF** at order 1 against the "
@@ -787,6 +1272,69 @@ def main(argv: list[str] | None = None) -> int:
     reference, reference_meta = reference_modes()
     comparison = compare_against_reference(entry, reference, reference_meta)
 
+    # Every rung on disk, plus this one, tracked mode by mode.
+    floor = COUPLED_SOLVER_RULES["band_floor_GHz"]
+    ceiling = COUPLED_SOLVER_RULES["band_ceiling_GHz"]
+    rungs = earlier_rungs()
+    if entry.get("status") == "COMPLETED":
+        from solvers.palace.coupled_mesh import mesh_sizes_mm  # noqa: PLC0415
+
+        rungs.append({
+            "level": args.level,
+            "h_gap_mm": mesh_sizes_mm(cell, args.level)[1],
+            "source": batch_id,
+            "modes": rebuild_admitted(entry["admission"]["modes"], floor, ceiling),
+            "dof": entry.get("dof_measured"),
+            "wall_clock_s": (entry.get("run") or {}).get("wall_clock_s"),
+            "port_field_test": entry.get("port_field_test"),
+        })
+    rungs = sorted({r["level"]: r for r in rungs}.values(), key=lambda r: r["level"])
+    tracking = track_modes(rungs)
+
+    convergence: dict[str, Any] = {"available": False, "reason": tracking.get("reason", "not tracked")}
+    asymptotic: dict[str, Any] = {}
+    order_two: dict[str, Any] = {"available": False, "reason": "fewer than three rungs"}
+    if tracking.get("available") and len(rungs) >= 3:
+        convergence = convergence_over_rungs(tracking["series"])
+        convergence["available"] = True
+        asymptotic = asymptotic_assessment(convergence)
+
+        from solvers.palace.coupled_mesh import mesh_sizes_mm  # noqa: PLC0415
+
+        h_by_level = {r["level"]: mesh_sizes_mm(cell, r["level"])[1] for r in rungs}
+        dof1 = {r["level"]: r["dof"] for r in rungs}
+        dof2 = {1: 208_670}
+        for name, report in dry_runs.items():
+            dof2[int(report["level"])] = report["measured"]["dof_order2"]
+        # Which tracked mode each order-2 datum belongs to, decided by the
+        # matching rule against the order-1 rung at the same level, not assumed.
+        pilot = json.loads((REPO_ROOT / "results" / REFERENCE_RECORD / "summary.json").read_text())
+        p1_modes = rebuild_admitted(
+            admit_modes(
+                "P1",
+                join_modes_by_id(REPO_ROOT / "results" / REFERENCE_RECORD / "P1" / "solver" / "postpro"),
+                backward_error_tolerance=COUPLED_SOLVER_RULES["eigenmode_backward_error_max_tolerance"],
+            ).as_dict()["modes"],
+            floor, ceiling,
+        )
+        order_match = match_runs("P2 vs P1 (order, level 1)", rungs[0]["modes"], p1_modes)
+        order_two = {"available": False, "reason": order_match.reason, "match": order_match.as_dict()}
+        if order_match.comparable:
+            per_mode = {}
+            for pair in order_match.pairs:
+                key = f"L{rungs[0]['level']}m{pair.a.mode}"
+                per_mode[key] = order_two_projection(
+                    convergence, dof1, dof2, h_by_level,
+                    {"mode": key, "level": 1, "frequency_GHz": pair.b.frequency_GHz},
+                    FROZEN_FREQUENCY_TOLERANCE,
+                )
+            order_two = {
+                "available": True,
+                "match": order_match.as_dict(),
+                "per_mode": per_mode,
+                "order2_source": f"{REFERENCE_RECORD}/P1 (level 1, order 2)",
+            }
+
     summary = {
         "schema": SUMMARY_SCHEMA,
         "batch_id": batch_id,
@@ -805,6 +1353,20 @@ def main(argv: list[str] | None = None) -> int:
         "dry_runs": dry_runs,
         "rung": entry,
         "comparison": comparison,
+        "rungs": [
+            {k: v for k, v in r.items() if k not in {"modes", "_pairs", "port_field_test"}}
+            for r in rungs
+        ],
+        "tracking": {k: v for k, v in tracking.items() if k != "series"} | (
+            {"series": tracking["series"]} if tracking.get("series") else {}
+        ),
+        "convergence": convergence,
+        "asymptotic": asymptotic,
+        "order_two_projection": order_two,
+        "port_field_reproduction": {
+            f"L{r['level']}": (r.get("port_field_test") or {}).get("verdict")
+            for r in rungs if r.get("port_field_test")
+        },
         "trend": refinement_trend(comparison, entry, reference_meta),
         "next_level": next_level_disposition(entry, dry_runs),
         "environment": {

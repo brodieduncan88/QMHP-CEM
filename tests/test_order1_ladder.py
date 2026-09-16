@@ -47,7 +47,11 @@ def test_the_driver_constants_are_the_approved_ones():
     assert ladder.HALO_MM == constraints["halo_mm"] == 0.08
     assert ladder.SOLVE_TIMEOUT_S == constraints["per_solve_wall_clock_cap_s"] == 2700
     assert ladder.DOF_BUDGET == constraints["dof_budget"] == 250_000
-    assert approval["level"] == 2, "this approval is for level 2 only"
+    assert approval["level"] in (2, 3), "the approval must name a dry-run level"
+    measured = approval["dry_runs_first"]["measured_order1_dof"]
+    assert measured[f"level_{approval['level']}"] <= ladder.DOF_BUDGET, (
+        "the approved level must have been dry-run inside the DOF rule before approval"
+    )
     assert constraints["dof_rule_unchanged"] and constraints["cap_unchanged"]
 
 

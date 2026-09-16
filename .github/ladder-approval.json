@@ -3,8 +3,8 @@
  "what": "one level of the order-1 mesh-refinement check, at fixed element order 1 and fixed 0.08 mm halo",
  "approved_by": "the repository owner, in the corrective-analysis review thread",
  "approved_utc": "2026-09-16",
- "level": 2,
- "sequential": "one level per run, by the owner's instruction: level 3 is a separate approval and is not launched by this file",
+ "level": 3,
+ "sequential": "one level per run, by the owner's instruction. Level 2 ran first and was reported; this approval runs level 3 and stops. Level 3 was dry-run at 147 372 DOF before approval.",
  "dry_runs_first": {
   "requirement": "dry-run levels 2 and 3 and record measured DOF for both before running anything",
   "measured_order1_dof": {
@@ -15,7 +15,7 @@
    "level_2": 420664,
    "level_3": 781554
   },
-  "note": "both levels are inside the 250 000-DOF rule at order 1 and outside it at order 2, which is why this check is at order 1"
+  "note": "both levels are inside the 250 000-DOF rule at order 1 and outside it at order 2, which is why this check is at order 1. Level 3 at 147 372 DOF is 58.9 % of the rule."
  },
  "constraints": {
   "finite_element_order": 1,
@@ -53,5 +53,13 @@
   "any change to the 250 000-DOF rule or the 45-minute cap",
   "merging pull request 7"
  ],
- "note": "Committing this file on a palace/** branch starts the approved level. It is the approval record and the trigger at once, so a level cannot be started by an unrelated code change."
+ "note": "Committing this file on a palace/** branch starts the approved level. It is the approval record and the trigger at once, so a level cannot be started by an unrelated code change.",
+ "level_2_outcome_for_context": {
+  "record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+  "wall_clock_s": 81.2,
+  "cap_fraction": 0.03,
+  "measured_within_order_timing_exponent": 1.32,
+  "projected_level_3_wall_clock_s": 182,
+  "port_field_test": "EXPLANATION-2-SUPPORTED"
+ }
 }
