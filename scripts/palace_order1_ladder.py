@@ -765,6 +765,54 @@ def reference_modes(root: Path | None = None) -> tuple[list[Any], dict[str, Any]
     return modes, summary["runs"][REFERENCE_RUN]
 
 
+#: The approval record is also the trigger (see the workflow header). It may
+#: carry an optional ``port_refinement`` block, which turns the approved level
+#: into the controlled local-refinement experiment prepared in
+#: COUPLED-S1-RECOVERY: the same level, the same distant size prescription, one
+#: extra local size constraint over a declared box around the port face.
+LADDER_APPROVAL = REPO_ROOT / ".github" / "ladder-approval.json"
+_PORT_REFINEMENT_KEYS = {"id", "h_port_mm", "pad_mm", "transition_mm", "ports"}
+
+
+def approved_port_refinement(path: Path | None = None) -> tuple[str, Any, str | None] | None:
+    """The local refinement the approval record authorises, or ``None``.
+
+    Absent means a plain ladder rung, exactly as before. Present means the
+    owner approved the prepared experiment, and every one of its numbers comes
+    from the approval record rather than from this file: a refinement cannot be
+    introduced by a code change.
+    """
+    from solvers.palace.coupled_mesh import PortRefinement  # noqa: PLC0415
+
+    approval_path = LADDER_APPROVAL if path is None else Path(path)
+    if not approval_path.is_file():
+        return None
+    approval = json.loads(approval_path.read_text())
+    block = approval.get("port_refinement")
+    if block is None:
+        return None
+    expected = (
+        (approval.get("predeclaration") or {}).get("dry_run_mesh_sha256")
+        or approval.get("dry_run_mesh_sha256")
+        or {}
+    )
+    unknown = set(block) - _PORT_REFINEMENT_KEYS
+    if unknown:
+        raise LadderError(f"unknown port_refinement key(s) in the approval record: {sorted(unknown)}")
+    missing = {"id", "h_port_mm", "pad_mm", "transition_mm"} - set(block)
+    if missing:
+        raise LadderError(f"port_refinement is missing {sorted(missing)}")
+    label = str(block["id"])
+    if not label.isalnum():
+        raise LadderError(f"port_refinement id must be alphanumeric, got {label!r}")
+    return label, PortRefinement(
+        h_port_mm=float(block["h_port_mm"]),
+        pad_mm=float(block["pad_mm"]),
+        transition_mm=float(block["transition_mm"]),
+        ports=tuple(block.get("ports", ("port_F1",))),
+    ), expected.get(label)
+
+
 def execute_level(
     level: int,
     declaration: dict[str, Any],
@@ -774,18 +822,34 @@ def execute_level(
     image: str,
     np_processes: int,
     prepare_only: bool,
+    port_refinement: Any = None,
+    expected_mesh_sha256: str | None = None,
 ) -> dict[str, Any]:
     entry: dict[str, Any] = {
         "level": level,
         "finite_element_order": FINITE_ELEMENT_ORDER,
         "halo_mm": HALO_MM,
+        "port_refinement": None if port_refinement is None else port_refinement.as_dict(),
         "status": "NOT-RUN",
     }
     try:
         cell = chip_cell_from_declaration(declaration)
-        report = dry_run(cell, level, solver_dir, dof_budget=DOF_BUDGET, halo_mm=HALO_MM)
+        report = dry_run(
+            cell, level, solver_dir, dof_budget=DOF_BUDGET, halo_mm=HALO_MM,
+            port_refinement=port_refinement,
+        )
         mesh = report.as_dict()
         entry["mesh"] = mesh
+        if expected_mesh_sha256 and mesh["sha256"] != expected_mesh_sha256:
+            # The approval named a mesh. A different one is not the approved
+            # experiment, whatever else matches, so nothing is solved.
+            entry["status"] = "REFUSED-MESH-MISMATCH"
+            entry["failure"] = (
+                f"the built mesh hashes to {mesh['sha256']}, not the "
+                f"{expected_mesh_sha256} the approval record named. The solve is not "
+                "launched."
+            )
+            return entry
         dof = mesh["measured"][f"dof_order{FINITE_ELEMENT_ORDER}"]
         entry["dof_measured"] = dof
         entry["within_dof_budget"] = dof <= DOF_BUDGET
@@ -1274,6 +1338,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--image", default=DEFAULT_IMAGE)
     parser.add_argument("--np", type=int, default=1)
     parser.add_argument("--prepare-only", action="store_true")
+    parser.add_argument(
+        "--approval",
+        default=None,
+        help="the approval record to read the optional port_refinement from (default .github/ladder-approval.json)",
+    )
     parser.add_argument("--record-pointer", default=None)
     parser.add_argument(
         "--field-output-dir",
@@ -1291,7 +1360,12 @@ def main(argv: list[str] | None = None) -> int:
     runtime = args.runtime or ("docker" if shutil.which("docker") else "podman")
     declaration = json.loads((REPO_ROOT / args.declaration).read_text())
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    batch_id = f"{RECORD_PREFIX}-L{args.level}-{stamp}"
+    approved = approved_port_refinement(args.approval)
+    label, port_refinement, expected_mesh_sha256 = approved if approved else (None, None, None)
+    # A port-refined run is a different experiment from a plain rung, so it
+    # gets a different record id and is kept out of the ladder's h-sequence.
+    suffix = f"-{label}" if label else ""
+    batch_id = f"{RECORD_PREFIX}-L{args.level}{suffix}-{stamp}"
     root = REPO_ROOT / args.results_root
     record_dir = root / batch_id
     solver_dir = record_dir / f"L{args.level}" / "solver"
@@ -1308,6 +1382,8 @@ def main(argv: list[str] | None = None) -> int:
     entry = execute_level(
         args.level, declaration, solver_dir,
         runtime=runtime, image=args.image, np_processes=args.np, prepare_only=args.prepare_only,
+        port_refinement=port_refinement,
+        expected_mesh_sha256=expected_mesh_sha256,
     )
     reference, reference_meta = reference_modes()
     comparison = compare_against_reference(entry, reference, reference_meta)
@@ -1316,7 +1392,10 @@ def main(argv: list[str] | None = None) -> int:
     floor = COUPLED_SOLVER_RULES["band_floor_GHz"]
     ceiling = COUPLED_SOLVER_RULES["band_ceiling_GHz"]
     rungs = earlier_rungs()
-    if entry.get("status") == "COMPLETED":
+    # The ladder's convergence fit is over a sequence in h at a fixed size
+    # prescription. A locally refined run is not a point on that sequence, so
+    # it is compared against the reference rung but never folded into the fit.
+    if entry.get("status") == "COMPLETED" and port_refinement is None:
         from solvers.palace.coupled_mesh import mesh_sizes_mm  # noqa: PLC0415
 
         rungs.append({

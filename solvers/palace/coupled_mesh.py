@@ -146,6 +146,7 @@ class DryRunReport:
     h_gap_mm: float
     h_far_mm: float
     halo_mm: float
+    port_refinement: "PortRefinement | None"
     nodes: int
     tetrahedra: int
     edges: int
@@ -177,6 +178,9 @@ class DryRunReport:
             "h_gap_mm": self.h_gap_mm,
             "h_far_mm": self.h_far_mm,
             "halo_mm": self.halo_mm,
+            "port_refinement": (
+                None if self.port_refinement is None else self.port_refinement.as_dict()
+            ),
             "measured": {
                 "nodes": self.nodes,
                 "tetrahedra": self.tetrahedra,
@@ -242,6 +246,85 @@ def _is_plane_face(bb: tuple[float, ...], z: float) -> bool:
     return abs(bb[2] - z) <= _BBOX_TOL and abs(bb[5] - z) <= _BBOX_TOL
 
 
+@dataclass(frozen=True)
+class PortRefinement:
+    """A local size constraint over a declared box around the lumped-port face.
+
+    The existing Distance/Threshold field is anchored to the *conductor and
+    etch curves*: it prescribes ``h_gap`` on those curves and blends linearly
+    to ``h_far`` over the halo. The port face's interior is up to half its
+    width from the nearest such curve, and because ``h_gap`` and ``h_far`` both
+    carry the ladder's level factor while the halo does not, the size the field
+    asks for at the port centre is a fixed multiple of ``h_gap`` at *every*
+    level (5.04x for the S1 cell, which is 2.5x the whole port width at level 1
+    and still 1.26x at level 3). Refining the ladder therefore never resolves
+    the port face; only a constraint anchored to the face itself does.
+
+    This is that constraint: a gmsh ``Box`` field holding ``h_port_mm`` over the
+    port rectangle padded by ``pad_mm`` in every direction, blending back to
+    ``h_far`` over ``transition_mm``, combined with the existing field by
+    ``Min``. Because the box field returns ``h_far`` outside the padded box and
+    the combination is a minimum, this can only refine: the distant size
+    prescription is exactly the ladder's, and the geometry, materials, port
+    dimensions, inductance, boundary conditions and physical groups are
+    untouched. It changes the mesh and nothing else.
+    """
+
+    h_port_mm: float
+    """Size held over the padded port box."""
+    pad_mm: float
+    """How far the box extends beyond the port rectangle, in every direction."""
+    transition_mm: float
+    """Distance over which the box field blends back to ``h_far``."""
+    ports: tuple[str, ...] = ("port_F1",)
+    """Which declared ports the boxes are built around."""
+
+    def __post_init__(self) -> None:
+        if self.h_port_mm <= 0.0:
+            raise ValueError("h_port_mm must be positive")
+        if self.pad_mm < 0.0:
+            raise ValueError("pad_mm must not be negative")
+        if self.transition_mm <= 0.0:
+            raise ValueError("transition_mm must be positive")
+        if not self.ports:
+            raise ValueError("a port refinement must name at least one port")
+        unknown = [p for p in self.ports if p not in TAGS]
+        if unknown:
+            raise ValueError(f"unknown port name(s) {unknown}; known: {sorted(TAGS)}")
+
+    def box_mm(self, rect: Rect, z0: float) -> tuple[float, float, float, float, float, float]:
+        """``(x_min, x_max, y_min, y_max, z_min, z_max)`` of the padded box."""
+        return (
+            rect.x_min - self.pad_mm, rect.x_max + self.pad_mm,
+            rect.y_min - self.pad_mm, rect.y_max + self.pad_mm,
+            z0 - self.pad_mm, z0 + self.pad_mm,
+        )
+
+    def refined_volume_mm3(self, rect: Rect) -> float:
+        """Volume held at ``h_port_mm``; the first-order cost of the constraint."""
+        return (
+            (rect.w_mm + 2.0 * self.pad_mm)
+            * (rect.h_mm + 2.0 * self.pad_mm)
+            * (2.0 * self.pad_mm)
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "h_port_mm": self.h_port_mm,
+            "pad_mm": self.pad_mm,
+            "transition_mm": self.transition_mm,
+            "ports": list(self.ports),
+            "field": "gmsh Box (VIn = h_port, VOut = h_far, Thickness = transition)",
+            "combination": "Min with the existing conductor/etch Threshold",
+            "can_only_refine": True,
+            "holds_fixed": (
+                "h_far, the conductor/etch Distance field, the halo, the geometry, the "
+                "materials, the port dimensions and inductance, the boundary conditions "
+                "and the physical groups"
+            ),
+        }
+
+
 def dry_run(
     cell: ChipCell,
     level: int,
@@ -249,6 +332,8 @@ def dry_run(
     dof_budget: int = 250_000,
     max_surface_elements: int = 400_000,
     halo_mm: float | None = None,
+    port_refinement: PortRefinement | None = None,
+    mesh_filename: str | None = None,
 ) -> DryRunReport:
     """Mesh the coupled cell at ladder ``level`` and report counts and DOF estimates.
 
@@ -264,7 +349,7 @@ def dry_run(
     halo = DIST_MAX_MM if halo_mm is None else float(halo_mm)
     if halo <= 0.0:
         raise ValueError("halo_mm must be positive")
-    mesh_path = out_dir / f"{MODEL_NAME}_L{level}.msh"
+    mesh_path = out_dir / (mesh_filename or f"{MODEL_NAME}_L{level}.msh")
     h0_gap, h_gap, h_far = mesh_sizes_mm(cell, level)
     if not (0.0 < h_gap <= h_far):
         raise ValueError(f"mesh sizes must satisfy 0 < h_gap <= h_far, got {h_gap} and {h_far}")
@@ -296,7 +381,10 @@ def dry_run(
         gmsh.option.setNumber("Mesh.RandomSeed", 1)     # pinned, as mesh.py
         gmsh.option.setNumber("Mesh.Optimize", 1)
         gmsh.option.setNumber("Mesh.OptimizeNetgen", 0)
-        gmsh.option.setNumber("Mesh.CharacteristicLengthMin", h_gap)
+        gmsh.option.setNumber(
+            "Mesh.CharacteristicLengthMin",
+            h_gap if port_refinement is None else min(h_gap, port_refinement.h_port_mm),
+        )
         gmsh.option.setNumber("Mesh.CharacteristicLengthMax", h_far)
         # The background field alone sets the size: no size from points,
         # curvature or boundary extension, so the rule is exactly §3.
@@ -341,6 +429,15 @@ def dry_run(
             port_name = next((name for name, r in ports_in_order if _bbox_inside(bb, r)), None)
             if port_name is not None:
                 port_faces[port_name].append(tag)
+                # A port face is not a conductor or etch face, so its curves are
+                # not collected here. Measured on this model
+                # (solvers.palace.mesh_inspection.classify_size_field_curves):
+                # three of each port's four curves ARE in the field anyway,
+                # contributed by the neighbouring conductor and etch faces; the
+                # fourth, shared only with the untagged ground plane, is not.
+                # Collecting them here would not resolve the face either - the
+                # blend is what coarsens its interior - so the fix is the Box
+                # field of PortRefinement, not a change to this classification.
                 continue
             in_conductor = any(_bbox_inside(bb, r) for r in conductor_rects)
             in_etch = any(_bbox_inside(bb, r) for r in etch_rects)
@@ -381,7 +478,28 @@ def dry_run(
         gmsh.model.mesh.field.setNumber(thr, "SizeMax", h_far)
         gmsh.model.mesh.field.setNumber(thr, "DistMin", 0.0)
         gmsh.model.mesh.field.setNumber(thr, "DistMax", halo)
-        gmsh.model.mesh.field.setAsBackgroundMesh(thr)
+        background = thr
+        if port_refinement is not None:
+            boxes = [thr]
+            for name in port_refinement.ports:
+                rect = next(r for n, r in ports_in_order if n == name)
+                x0, x1, y0, y1, z_lo, z_hi = port_refinement.box_mm(rect, z0)
+                box = gmsh.model.mesh.field.add("Box")
+                gmsh.model.mesh.field.setNumber(box, "XMin", x0)
+                gmsh.model.mesh.field.setNumber(box, "XMax", x1)
+                gmsh.model.mesh.field.setNumber(box, "YMin", y0)
+                gmsh.model.mesh.field.setNumber(box, "YMax", y1)
+                gmsh.model.mesh.field.setNumber(box, "ZMin", z_lo)
+                gmsh.model.mesh.field.setNumber(box, "ZMax", z_hi)
+                gmsh.model.mesh.field.setNumber(box, "VIn", port_refinement.h_port_mm)
+                # VOut is h_far, so outside the box this field is never the Min
+                # and the distant prescription is exactly the ladder's.
+                gmsh.model.mesh.field.setNumber(box, "VOut", h_far)
+                gmsh.model.mesh.field.setNumber(box, "Thickness", port_refinement.transition_mm)
+                boxes.append(box)
+            background = gmsh.model.mesh.field.add("Min")
+            gmsh.model.mesh.field.setNumbers(background, "FieldsList", boxes)
+        gmsh.model.mesh.field.setAsBackgroundMesh(background)
 
         gmsh.model.mesh.generate(2)
         _, tri_tags, _ = gmsh.model.mesh.getElements(2)
@@ -425,6 +543,7 @@ def dry_run(
         h_gap_mm=h_gap,
         h_far_mm=h_far,
         halo_mm=halo,
+        port_refinement=port_refinement,
         nodes=n_nodes,
         tetrahedra=n_tets,
         edges=n_edges,
@@ -456,6 +575,7 @@ __all__ = [
     "MODEL_NAME",
     "TAGS",
     "DryRunReport",
+    "PortRefinement",
     "dry_run",
     "gmsh_available",
     "mesh_sizes_mm",

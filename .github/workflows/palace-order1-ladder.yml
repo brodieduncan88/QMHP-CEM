@@ -25,6 +25,15 @@
 # tree is uploaded as an artifact and NOT committed: it is large, and the
 # quantitative test uses surface-Q.csv, which is committed.
 #
+# Local refinement. The approval record may carry an optional
+# `port_refinement` block ({id, h_port_mm, pad_mm, transition_mm}), which runs
+# the approved level with one extra local size constraint over a declared box
+# around the port face, holding the distant size prescription, the geometry,
+# the materials, the port and every solver setting fixed. Such a run gets its
+# own record id and is deliberately kept out of the ladder's convergence fit,
+# because it is not a point on a sequence in h. The numbers come from the
+# approval record; no code change can introduce a refinement.
+#
 # Triggers. As with the pilot, a level is something a human approves, not
 # something a commit starts: this runs when `.github/ladder-approval.json` is
 # committed on a `palace/**` branch, so the trigger is the approval record.
@@ -193,6 +202,13 @@ jobs:
           name: order1-ladder-fields-${{ github.run_id }}
           path: ${{ runner.temp }}/paraview
           if-no-files-found: warn
+
+      # The level-2 rung committed a 123 MB ParaView tree that both this file
+      # and the approval record said would be uploaded and not committed.
+      # Nothing checked. This is the check.
+      - name: Refuse unexpected file kinds in the evidence commit
+        if: always() && steps.record.outputs.path != '' && env.COMMIT_RESULTS == 'true'
+        run: uv run python scripts/check_record_files.py "$LADDER_RECORD"
 
       - name: Commit the record to the branch
         if: always() && env.COMMIT_RESULTS == 'true'

@@ -1,5 +1,30 @@
 # The order-1 mesh-refinement check: what three rungs measured
 
+> **Superseded in part by
+> [`s1-numerical-recovery.md`](s1-numerical-recovery.md)**
+> (record `COUPLED-S1-RECOVERY-20260916T105215Z`). The runs, the records and
+> the level-3 **CALIBRATION-UNSOUND** verdict are unchanged and stand. Three
+> things written below do not:
+>
+> 1. **§2's calibrated `κ`.** The constant is *derived* from pinned Palace
+>    v0.13.0 source, the declared port geometry and the unit conventions —
+>    `κ = 1/(t_nd·L_s_nd) = 0.3886882529` — and reproduces the closure defect
+>    on all twelve committed rows at both levels to 2e-8 (L3) and 4.3e-7 (L2).
+>    Fitting it was never necessary, and the post-hoc "use only the in-window
+>    modes" repair below is withdrawn along with the fit it repaired.
+> 2. **§1's heading, and §5's claim that the budget was spent.** Two in-budget
+>    meshes at 80 762 and 111 238 DOF are exhibited in the recovery record.
+>    Three points do not prove mathematical nonconvergence, and nothing here
+>    bears on the physical architecture.
+> 3. **§5's closing recommendation.** A *differently distributed* solve inside
+>    the existing rule is available with the geometry unchanged, and is what is
+>    now proposed.
+>
+> Where a withdrawn sentence appeared as an assertion it is struck and replaced
+> in place, with the original wording kept as a marked quotation, so no reader
+> meets the old claim without its correction and no quotation is lost. The
+> measurements, the tables and the records are untouched.
+
 Records, each committed append-only with its own manifest:
 
 | level | h_gap | DOF (order 1) | wall clock | record |
@@ -16,7 +41,12 @@ no `g`, no charging energy, no capacitance, no circuit parameter.
 
 ---
 
-## 1. The sequence does not converge
+## 1. No order of convergence fits these three rungs
+
+> **Heading struck and replaced.** It read *"The sequence does not converge"*,
+> which is withdrawn: three points cannot establish that. What was measured —
+> that no positive order fits these rungs — stands unaltered below.
+> `s1-numerical-recovery.md` §4 reports what the three points *do* follow.
 
 Both tracked modes fail the weakest possible test of convergence.
 
@@ -52,6 +82,8 @@ neither is converging.
 
 ## 2. The port-stiffness mechanism reproduces — but the procedure said otherwise
 
+> **Superseded.** The mechanism does reproduce, and the verdict below is the record of what the predeclared procedure returned. But the whole calibration — including the fix proposed at the end of this section — is withdrawn: `κ` is computable from source and needs no modes at all. `s1-numerical-recovery.md` §1–§2.
+
 The predeclared procedure returned **CALIBRATION-UNSOUND** at level 3: the
 admitted modes disagreed about the constant `κ` by 20.5×, so it withheld a
 verdict rather than issuing one. That stands as the record.
@@ -79,15 +111,16 @@ mode whose port term is a negligible part of its magnetic side — m6 has
 insensitive to `E_ind` being 20× wrong. Such a mode passes admission and then
 poisons a calibration that assumes faithfulness.
 
-**The fix, to be predeclared before the next run and not applied to this one.**
-The true port participation is available exactly from the balance identity with
-no field probes at all: `p_true = 1 − (E_mag + E_cap)/(E_elec + E_cap)`.
-Calibrate `κ` only on modes where the surrogate is demonstrably faithful,
-`|p_reported − p_true| / p_true` small. That is computable per mode, is not
-circular — `p_true` never uses the surrogate — and would have excluded m6 and
-admitted m1 and m2. The probes' role is then what it should always have been:
-confirming that the port-face tangential field accounts for `p_true`, which
-here it does to about `2e-4`.
+**The proposed fix is withdrawn, and so is the problem it addressed.** It read:
+*"Calibrate `κ` only on modes where the surrogate is demonstrably faithful"*,
+using *"`p_true = 1 − (E_mag + E_cap)/(E_elec + E_cap)`"* as the reference.
+Two things are wrong with it. `κ` needs no calibration — it is
+`1/(t_nd·L_s_nd)`, computable from the configuration and the mesh, and it
+reproduces the closure defect on all twelve committed rows to 2e-8 at level 3.
+And `p_true` so defined is *inferred from the energy closure*, so using it to
+confirm that the port field accounts for the closure would be circular; the
+recovery record evaluates the port term from the probes alone and says so
+explicitly. `s1-numerical-recovery.md` §1–§2.
 
 ## 3. The admission rule's margin is eroding
 
@@ -117,13 +150,35 @@ level 3: Total 158.8 s, of which `Solve` (the error estimator) 46.7 s,
 
 ## 5. Where this leaves the extraction
 
-**Compute-limited under the existing rules — and the evidence suggests the limit
-is not mesh count.**
+> **Superseded.** The conclusion below — that the remedy is a modelling
+> decision rather than a solve — was wrong on the available evidence. The
+> *global* ladder is out of rungs, which is all the DOF arithmetic shows; the
+> budget is not. Two in-budget meshes that resolve the port face are prepared
+> and dry-run in `s1-numerical-recovery.md` §5, with the geometry, materials,
+> port and solver settings all unchanged. The second and third bullets below
+> named the right two candidate causes; §3 of that document measures the second
+> one and shows the size field never reached the port face at any level.
 
-The ladder is exhausted at order 1 inside the 250 000-DOF rule: level 3 is
-147 372 DOF, and a further halving of `h` would be roughly four times that.
-Order 2 is already outside the rule from level 2 on (420 664). So there is no
-further rung available under the current allowance.
+**Compute-limited under the existing *uniform* ladder — and the evidence points
+at where the elements are, not at how many there are.**
+
+> **Struck and replaced.** It read *"Compute-limited under the existing rules —
+> and the evidence suggests the limit is not mesh count"*, which is withdrawn
+> on both halves: the rules are not the binding constraint, and the limit is a
+> mesh property, just not the element total.
+
+The *uniform* ladder is out of rungs at order 1: level 3 is 147 372 DOF, and a
+further halving of `h` would be roughly four times that. Order 2 is already
+outside the rule from level 2 on (420 664). So there is no further **uniform**
+rung available under the current allowance.
+
+> **Struck and replaced.** The sentence read *"The ladder is exhausted at order
+> 1 inside the 250 000-DOF rule"* and concluded *"there is no further rung
+> available under the current allowance"*, which is withdrawn: what the DOF
+> arithmetic shows is that the *uniform* sequence has no next term, not that
+> the budget is spent. Two in-budget meshes at 80 762 and 111 238 DOF, both
+> resolving the port face far better than level 3 does, are dry-run in
+> `s1-numerical-recovery.md` §5.
 
 But more refinement is not obviously the answer either, because the sequence
 shows no convergence over a factor of two in `h`. Two features of the model are
@@ -139,7 +194,16 @@ candidate causes, both testable and neither established here:
   the whole subject of §2. A mode frequency that depends on that face may not
   converge under uniform refinement.
 
-Both point at the geometry idealisation rather than the element count. The next
-step is therefore a **modelling decision, not a larger solve**, and it is the
-owner's to make. Nothing here recommends spending more compute on the same
-geometry.
+Both point at where the elements are rather than how many there are. The next
+step is a **differently distributed solve on the same geometry**, inside the
+existing rule, and it is prepared and awaiting the owner's approval.
+
+> **Struck and replaced.** The paragraph read *"The next step is therefore a
+> modelling decision, not a larger solve"* and *"Nothing here recommends
+> spending more compute on the same geometry"*. Both are withdrawn. The second
+> candidate cause above — the port face spanning few elements — is measured in
+> `s1-numerical-recovery.md` §3: the size field prescribes an element larger
+> than the port width at the face centre, at *every* level, and the ratio is
+> scale-invariant, so the uniform ladder could never have fixed it. That is a
+> mesh fault, not a modelling decision, and it is correctable within budget
+> with the geometry untouched.

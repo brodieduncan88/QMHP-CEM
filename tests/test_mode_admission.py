@@ -466,11 +466,26 @@ WITHDRAWN_CLAIMS = [
     # A solver gauge artefact described as physics.
     r"the current direction through the port\s*is not stable under discretisation",
     r"needs a sign convention that survives\s*discretisation",
+    # Withdrawn by COUPLED-S1-RECOVERY. Three points refusing an order is not
+    # a proof that a sequence diverges.
+    r"##\s*1\.\s*The sequence does not converge",
+    r"[Tt]he sequence does not converge\b(?!\w)",
+    # The budget was never exhausted; the UNIFORM ladder ran out of rungs.
+    r"[Tt]he ladder is exhausted at order 1",
+    r"there is no further rung\s*available under the current allowance",
+    # The remedy is a differently distributed solve, not a modelling decision.
+    r"a?\s*\*?\*?modelling decision, not a larger solve",
+    r"[Nn]othing here recommends spending more compute on the same\s*geometry",
+    r"the evidence suggests the limit\s*is not mesh count",
+    # kappa is derived; calibrating it on a favourable subset is withdrawn.
+    r"[Cc]alibrate\s*.?[Kk]appa.?\s*only on modes where the surrogate is demonstrably\s*faithful",
 ]
 
 GUARDED_DOCS = [
     REPO_ROOT / "docs" / "coupled-candidate" / "pilot-outcome.md",
     REPO_ROOT / "docs" / "coupled-candidate" / "corrective-analysis.md",
+    REPO_ROOT / "docs" / "coupled-candidate" / "order1-ladder-outcome.md",
+    REPO_ROOT / "docs" / "coupled-candidate" / "s1-numerical-recovery.md",
 ]
 
 #: The ONLY quotations exempt from the guard, named one by one.
@@ -498,6 +513,17 @@ CITATION_EXEMPTIONS: dict[str, tuple[str, ...]] = {
         "null-space / gradient artefacts that the divergence-free projection did not remove.",
         "the current direction through the port is not stable under discretisation",
     ),
+    "order1-ladder-outcome.md": (
+        "The sequence does not converge",
+        "The ladder is exhausted at order 1 inside the 250 000-DOF rule",
+        "there is no further rung available under the current allowance",
+        "The next step is therefore a modelling decision, not a larger solve",
+        "Nothing here recommends spending more compute on the same geometry",
+        "Compute-limited under the existing rules — and the evidence suggests the limit "
+        "is not mesh count",
+        "Calibrate `\u03ba` only on modes where the surrogate is demonstrably faithful",
+        "`p_true = 1 \u2212 (E_mag + E_cap)/(E_elec + E_cap)`",
+    ),
 }
 
 #: A document may quote a withdrawn claim only where it says it is withdrawn.
@@ -515,13 +541,21 @@ def _flatten(text: str) -> str:
 
 
 def _blocks(text: str) -> list[str]:
-    """The document split into blank-line-delimited blocks.
+    """The document split into blank-line-delimited blocks, ``>`` markers stripped.
 
     A markdown table is one block, header included, so a corrections table whose
     header says "withdrawn" carries that marker to each of its rows.
+
+    The ``>`` markers go the same way :func:`_flatten` removes them, and for the
+    same reason: ``_assertions_only`` already sees through a blockquote, so if
+    this did not, a registered citation re-asserted inside one would be invisible
+    to the withdrawal check while still being removed from the assertion text.
+    That is a hole, not a licence — an UNregistered claim in a blockquote is
+    still caught, because it is never removed in the first place.
     """
     out, current = [], []
-    for line in text.splitlines():
+    for raw in text.splitlines():
+        line = re.sub(r"^\s*>+\s?", "", raw)
         if line.strip():
             current.append(line)
         elif current:
@@ -555,6 +589,32 @@ def _assertions_only(text: str, exemptions: tuple[str, ...] = ()) -> str:
     for claim in exemptions:
         body = body.replace(f'*"{claim}"*', " ")
     return body
+
+
+def test_a_registered_citation_cannot_be_re_asserted_from_inside_a_blockquote():
+    """The hole the ``>``-stripping in :func:`_blocks` closes.
+
+    ``_assertions_only`` sees through a blockquote and removes the registered
+    citation wherever it sits. If the withdrawal check did not see through one
+    too, a document could withdraw a claim in one place and quietly re-assert it
+    in a blockquote elsewhere, and neither check would notice.
+    """
+    claim = "The sequence does not converge"
+    honest = (
+        f'> **Struck.** It read *"{claim}"*, which is withdrawn.\n'
+        "\nSome other paragraph.\n"
+    )
+    assert _citation_is_withdrawn_in_place(honest, claim)
+
+    sneaky = honest + f'\n> Actually *"{claim}"* after all.\n'
+    assert not _citation_is_withdrawn_in_place(sneaky, claim)
+
+    # And the same claim wrapped across lines inside a blockquote is still seen.
+    wrapped = (
+        '> **Struck.** It read *"The sequence does not\n'
+        '> converge"*, which is withdrawn.\n'
+    )
+    assert _citation_is_withdrawn_in_place(wrapped, claim)
 
 
 @pytest.mark.parametrize("path", GUARDED_DOCS, ids=lambda p: p.name)

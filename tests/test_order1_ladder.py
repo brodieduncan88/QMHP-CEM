@@ -19,6 +19,8 @@ from pathlib import Path
 
 import pytest
 
+from orchestrator import manifest
+from solvers.palace import mesh as pmesh
 from solvers.palace.coupled_config import PORT_FIELD_PROBES, build_coupled_config
 from solvers.palace.coupled_mesh import TAGS
 from solvers.palace.mode_admission import ADMISSION_RULE, MATCHING_RULE, ModeRecord
@@ -26,6 +28,9 @@ from solvers.palace.outputs import PalaceOutputError, SurfaceParticipationRow, p
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APPROVAL = REPO_ROOT / ".github" / "ladder-approval.json"
+
+
+needs_gmsh = pytest.mark.skipif(not pmesh.gmsh_available(), reason="gmsh not importable")
 
 
 def _ladder():
@@ -399,6 +404,43 @@ def test_the_report_tolerates_a_missing_wall_clock():
     assert "| — |" in ladder.render_report(summary)
 
 
+@needs_gmsh
+@pytest.mark.slow
+def test_a_ladder_renderer_failure_is_exercised_and_loses_no_evidence(tmp_path, monkeypatch):
+    """The ordering test below reads the source; this one makes it happen.
+
+    ``--prepare-only`` meshes and writes the record without launching Palace,
+    so the whole record-writing path runs for real. The renderer is then made
+    to raise the way it did on the level-3 run's first attempt, and everything
+    that attempt lost has to survive: the raw summary, the manifest, the record
+    pointer the workflow uploads and commits by, and a non-zero exit.
+    """
+    ladder = _ladder()
+    monkeypatch.setattr(
+        ladder, "render_report",
+        lambda summary: (_ for _ in ()).throw(KeyError("target_relative_frequency_error")),
+    )
+    pointer = tmp_path / "pointer"
+    code = ladder.main([
+        "--level", "2", "--prepare-only",
+        "--results-root", str(tmp_path / "results"),
+        "--record-pointer", str(pointer),
+    ])
+    assert code == 1, "a rendering failure must be reported, not swallowed"
+
+    record = Path(pointer.read_text().strip())
+    assert record.is_dir(), "the record pointer must name the record the workflow uploads"
+    assert manifest.verify(record) == [], "the record must be manifested despite the failure"
+    summary = json.loads((record / "summary.json").read_text())
+    assert summary["rung"]["status"] == "PREPARED"
+    assert summary["rung"]["dof_measured"] == 79_944
+    report = (record / "report.md").read_text()
+    assert "could not be rendered" in report
+    assert "not a loss of evidence" in report
+    assert "target_relative_frequency_error" in report
+    assert manifest.unexpected_files(record) == [], "and it must still be committable"
+
+
 def test_the_record_is_made_durable_before_the_report_is_rendered():
     """Presentation must not be able to destroy evidence.
 
@@ -441,26 +483,39 @@ def test_the_level_three_record_reports_no_order_of_convergence():
     assert "could not be rendered" not in report
 
 
-def test_the_surrogate_faithfulness_check_is_not_circular():
-    """p_true comes from the balance identity, never from the surrogate.
+def test_the_calibration_fix_this_record_proposed_is_withdrawn_not_applied():
+    """The level-3 record proposed a repair for a procedure that no longer exists.
 
-    This is the calibration fix the level-3 record motivates, predeclared in
-    the outcome document for the next run rather than applied to this one.
+    It would have calibrated the probe constant on the modes where the
+    surrogate is faithful, using ``p_true = 1 - (E_mag + E_cap)/(E_elec +
+    E_cap)`` as the reference. Two problems, both now recorded in the outcome
+    document: the constant is computable from pinned source and needs no
+    calibration at all, and ``p_true`` so defined is *inferred from the energy
+    closure*, so confirming the closure with it would be circular. The
+    measurements the proposal rested on are unchanged and still hold, which is
+    what the rest of this test checks.
     """
-    doc = re.sub(r"\s+", " ", (REPO_ROOT / "docs" / "coupled-candidate" / "order1-ladder-outcome.md").read_text())
-    assert "p_true = 1 − (E_mag + E_cap)/(E_elec + E_cap)" in doc
-    assert "is not circular" in doc
-    assert "not applied to this one" in doc
-    # The level-3 numbers the fix rests on.
+    doc = re.sub(
+        r"\s+", " ",
+        (REPO_ROOT / "docs" / "coupled-candidate" / "order1-ladder-outcome.md").read_text(),
+    )
+    assert "The proposed fix is withdrawn" in doc
+    assert "would be circular" in doc
+    assert "is not circular" not in doc
+    assert "s1-numerical-recovery.md" in doc
+
     records = sorted((REPO_ROOT / "results").glob("COUPLED-LADDER-O1-L3-*"))
     if not records:
         pytest.skip("the level-3 record is not present")
     summary = json.loads((records[-1] / "summary.json").read_text())
     rows = {r["mode"]: r for r in summary["rung"]["port_field_test"]["rows"]}
+    # The observation that motivated the proposal stands: the surrogate is
+    # faithful on the two in-window admitted modes and not on the third.
     for mode in (1, 2):
         p_true = 1.0 - rows[mode]["E_mag_over_E_elec"]
         assert rows[mode]["reported_participation"] == pytest.approx(p_true, rel=1e-3)
-    # m6 passes admission yet its surrogate is unfaithful by ~20x.
     p_true_6 = 1.0 - rows[6]["E_mag_over_E_elec"]
     assert rows[6]["reported_participation"] / p_true_6 < 0.1
     assert rows[6]["admitted"] is True
+    # And the CALIBRATION-UNSOUND verdict is preserved, not quietly rewritten.
+    assert summary["rung"]["port_field_test"]["verdict"] == "CALIBRATION-UNSOUND"

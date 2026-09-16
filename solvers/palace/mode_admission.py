@@ -107,6 +107,24 @@ ADMISSION_RULE: dict[str, Any] = {
         "integral(1/Ls * |E_t|^2) over the port surface, which Palace does not write, or the "
         "saved mode fields, which this record does not contain."
     ),
+    "what_the_missing_integral_turned_out_to_be": (
+        "That integral IS recoverable, from the two interface-dielectric probes in "
+        "surface-Q.csv via a conversion derived from pinned Palace v0.13.0 source and the "
+        "declared port geometry (solvers.palace.port_diagnostic, record "
+        "COUPLED-S1-RECOVERY). Evaluated that way it accounts for the whole energy-balance "
+        "defect on every mode of both probed levels, to 2.1e-8 at level 3 and 4.3e-7 at "
+        "level 2."
+    ),
+    "what_that_means_for_this_rule": (
+        "With the port term evaluated correctly the balance closes for EVERY mode, "
+        "including the rejected ones, so this rule's discriminating power comes from the "
+        "surrogate's failure rather than from algebraic convergence: it selects modes whose "
+        "port-face tangential field is close to uniform and aligned with the declared port "
+        "direction, which is the one configuration E_ind represents exactly. That is a "
+        "defensible criterion and it is not the same statement as 'this row is an "
+        "eigenvector'. Reported, not acted on: the quantity, the threshold and the "
+        "behaviour of this rule are unchanged."
+    ),
     "why_this_threshold": (
         "Chosen for separation, not for a physical target: it sits far from both observed "
         "populations rather than between two close ones. It is not a physical QMHP threshold "
