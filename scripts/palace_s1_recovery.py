@@ -56,10 +56,10 @@ from solvers.palace.outputs import (  # noqa: E402
     parse_surface_q_csv,
 )
 from solvers.palace.port_diagnostic import (  # noqa: E402
-    NonDimensionalisation,
     PortConversion,
-    PortGeometry,
+    PortConversionError,
     compare,
+    conversion_from_run,
 )
 
 RECORD_SCHEMA = "qmhp-cem.s1-numerical-recovery/0.1.0"
@@ -161,53 +161,17 @@ def assert_sources_unchanged(before: dict[str, Any]) -> None:
 
 
 def build_conversion(solver_dir: Path, mesh_report: dict[str, Any]) -> PortConversion:
-    """Derive the conversion for one run, from its own config and its own mesh.
+    """Derive the conversion for one committed run.
 
-    ``Lc`` is measured from the mesh bounding box rather than read from
-    Palace's log, which prints it to four significant figures.
+    Thin wrapper over :func:`solvers.palace.port_diagnostic.conversion_from_run`
+    so this analysis and the ladder driver cannot drift apart on how ``kappa``
+    is formed; the refusals it raises are re-raised as :class:`RecoveryError`.
     """
     config = json.loads((solver_dir / "config.json").read_text())
-    port = config["Boundaries"]["LumpedPort"][0]
-    probes = config["Boundaries"]["Postprocessing"]["Dielectric"]
-    thicknesses = {p["Thickness"] for p in probes}
-    permittivities = {p["Permittivity"] for p in probes}
-    sides = {p["Side"] for p in probes}
-    if len(thicknesses) != 1 or len(permittivities) != 1 or len(sides) != 1:
-        raise RecoveryError(
-            "the Default and MA probes must share thickness, permittivity and side for "
-            f"their difference to be 0.5 t |E_t|^2; got {thicknesses}, {permittivities}, {sides}"
-        )
-    face = mesh_report["ports"]["port_F1"]
-    box = face["bounding_box_mm"]
-    direction = str(port["Direction"])
-    if direction not in ("+Y", "-Y"):
-        raise RecoveryError(
-            f"the port length is taken along {direction}; this analysis measured the face "
-            "assuming a +/-Y direction"
-        )
-    # Palace takes l along the declared direction and w as the largest
-    # remaining extent (fem/lumpedelement.cpp:53-69). For a +/-Y port the Y
-    # extent is l; here that is the larger of the two in-plane extents.
-    y_extent = box["max"][1] - box["min"][1]
-    x_extent = box["max"][0] - box["min"][0]
-    length_mm, width_mm = y_extent, x_extent
-    return PortConversion(
-        geometry=PortGeometry(
-            length_mm=length_mm,
-            width_mm=width_mm,
-            n_elements=len(port["Attributes"]),
-            direction=direction,
-        ),
-        scales=NonDimensionalisation(
-            # Model.L0 is metres per mesh length unit; Lc is measured from the
-            # mesh bounding box in those same units and converted here.
-            Lc_m=mesh_report["largest_extent_mm"] * float(config["Model"]["L0"]),
-            L0_m=float(config["Model"]["L0"]),
-        ),
-        inductance_H=float(port["L"]),
-        probe_thickness_mesh_units=float(next(iter(thicknesses))),
-        probe_permittivity=float(next(iter(permittivities))),
-    )
+    try:
+        return conversion_from_run(config, mesh_report)
+    except PortConversionError as exc:
+        raise RecoveryError(str(exc)) from exc
 
 
 def port_diagnostic(name: str, spec: dict[str, Any], mesh_report: dict[str, Any]) -> dict[str, Any]:

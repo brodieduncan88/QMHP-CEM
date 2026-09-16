@@ -92,6 +92,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then level="${{ inputs.level }}"; fi
           echo "level=$level" >> "$GITHUB_OUTPUT"
           echo "running level $level"
+          python3 scripts/describe_ladder_approval.py --approval .github/ladder-approval.json
 
       - name: Free runner disk
         run: |
@@ -217,7 +218,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$LADDER_RECORD"
-          headline="$(uv run python -c "import json,sys; s=json.load(open(sys.argv[1])); r=s['rung']; t=(r.get('port_field_test') or {}); print(f\"L{s['level']} {r['status']}, {r.get('dof_measured')} DOF; port-field {t.get('verdict','n/a')}\")" "$LADDER_RECORD/summary.json")"
+          headline="$(uv run python scripts/describe_ladder_approval.py --headline "$LADDER_RECORD/summary.json")"
           git commit -m "Record order-1 ladder ${{ github.run_id }}: ${headline}" \
             -m "One approved level, order 1, halo 0.08 mm, inside the 250k DOF rule and the 45 min cap." \
             -m "No coupling extraction, no Route A/B. Field output uploaded as an artifact, not committed." \

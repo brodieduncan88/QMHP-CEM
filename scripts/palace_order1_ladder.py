@@ -60,7 +60,7 @@ from solvers.palace.coupled_config import (  # noqa: E402
     superinductor_henry,
 )
 from solvers.palace.coupled_geometry import chip_cell_from_declaration  # noqa: E402
-from solvers.palace.coupled_mesh import dry_run  # noqa: E402
+from solvers.palace.coupled_mesh import TAGS, dry_run  # noqa: E402
 from solvers.palace.mode_admission import (  # noqa: E402
     ADMISSION_RULE,
     COMPARISON_CONVENTION,
@@ -89,10 +89,13 @@ DOF_BUDGET = 250_000
 #: The frozen frequency tolerance, used as the TARGET of the order-2 projection
 #: so that projection invents no threshold of its own. Read from the approval
 #: record the pilot ran under rather than restated here.
-FROZEN_FREQUENCY_TOLERANCE = float(
-    json.loads((REPO_ROOT / ".github" / "pilot-approval.json").read_text())
-    ["frozen_criteria"]["max_relative_frequency_change"]
-)
+_FROZEN_CRITERIA = json.loads(
+    (REPO_ROOT / ".github" / "pilot-approval.json").read_text()
+)["frozen_criteria"]
+FROZEN_FREQUENCY_TOLERANCE = float(_FROZEN_CRITERIA["max_relative_frequency_change"])
+#: The frozen participation tolerance, read from the same record for the same
+#: reason: it is reported alongside a comparison, never restated as a literal.
+FROZEN_PARTICIPATION_TOLERANCE = float(_FROZEN_CRITERIA["max_relative_participation_change"])
 
 #: The reference rung, already executed and preserved. Level 2 and level 3 are
 #: compared against it; it is never re-run.
@@ -191,6 +194,99 @@ def palace_timers(metadata: dict[str, Any]) -> dict[str, Any]:
 
 
 # --- the port-field test ------------------------------------------------------
+
+
+def derived_port_diagnostic(
+    modes: list[Any],
+    surface_rows: list[pout.SurfaceParticipationRow],
+    *,
+    config: dict[str, Any],
+    mesh_path: Path,
+    requested_h_gap_mm: float,
+) -> dict[str, Any]:
+    """The port participation from a conversion DERIVED from pinned Palace source.
+
+    This supersedes the calibrated :func:`port_field_analysis` below, which fits
+    its constant on the admitted modes and returned CALIBRATION-UNSOUND at level
+    3 because the rank-one surrogate is not faithful on all of them. Here the
+    constant is ``kappa = 1/(t_nd * Ls_nd)``, computed from the configuration,
+    the mesh bounding box and Palace's unit conventions, reading no solver
+    output (``solvers.palace.port_diagnostic``).
+
+    Both are recorded. The calibrated verdict is evidence of what the earlier
+    procedure returned and is not deleted; this is the number to read.
+
+    ``p_probe`` uses ``surface-Q.csv``, the frequency and geometry; the closure
+    requirement uses ``domain-E.csv``. They share no input, so their agreement
+    is evidence. The closure number is NOT an independent measurement of the
+    port energy and is labelled as such.
+    """
+    from solvers.palace.mesh_inspection import inspect_mesh  # noqa: PLC0415
+    from solvers.palace.port_diagnostic import (  # noqa: PLC0415
+        PortConversionError,
+        compare,
+        conversion_from_run,
+    )
+
+    try:
+        mesh_report = inspect_mesh(
+            mesh_path,
+            requested_h_gap_mm=requested_h_gap_mm,
+            port_tags={"port_F1": TAGS["port_F1"]},
+            port_dimensions={"port_F1": (0.04, 0.02)},
+        )
+        conversion = conversion_from_run(config, mesh_report)
+    except (PortConversionError, KeyError, OSError) as exc:
+        return {"available": False, "reason": f"{type(exc).__name__}: {exc}"}
+
+    by_mode = {int(r.mode): r for r in surface_rows}
+    default_idx = PORT_FIELD_PROBES["default_index"]
+    normal_idx = PORT_FIELD_PROBES["normal_index"]
+
+    rows: list[dict[str, Any]] = []
+    worst = 0.0
+    for record in modes:
+        probe = by_mode.get(record.mode)
+        if probe is None:
+            continue
+        p_default = probe.participation.get(default_idx)
+        p_ma = probe.participation.get(normal_idx)
+        if p_default is None or p_ma is None:
+            continue
+        result = compare(
+            conversion,
+            mode=record.mode,
+            frequency_GHz=record.frequency_GHz,
+            p_default=p_default,
+            p_ma=p_ma,
+            E_elec=record.electric_J,
+            E_mag=record.magnetic_J,
+            E_cap=record.capacitive_J,
+            E_ind=record.inductive_J,
+        )
+        payload = result.as_dict()
+        payload["backward_error"] = record.backward_error
+        payload["reported_EPR_signed"] = record.participation.get(1)
+        rows.append(payload)
+        worst = max(worst, abs(result.probe_versus_closure - 1.0))
+
+    return {
+        "available": bool(rows),
+        "conversion": conversion.as_dict(),
+        "modes": rows,
+        "worst_relative_disagreement_probe_vs_closure": worst if rows else None,
+        "supersedes": (
+            "port_field_test, which calibrates its constant on the admitted modes. That "
+            "verdict is preserved in the record as evidence of what the earlier procedure "
+            "returned; this block is the number to read."
+        ),
+        "independence": (
+            "p_probe reads surface-Q.csv, eig.csv and geometry; p_closure reads "
+            "domain-E.csv. They share no input. p_closure is NOT an independent "
+            "measurement of the port energy and may not be quoted as verifying the "
+            "closure it comes from."
+        ),
+    }
 
 
 def port_field_analysis(
@@ -406,6 +502,14 @@ def earlier_rungs(root: Path | None = None) -> list[dict[str, Any]]:
         summary = json.loads(summary_path.read_text())
         rung = summary.get("rung") or {}
         if rung.get("status") != "COMPLETED":
+            continue
+        if rung.get("port_refinement") is not None:
+            # A port-refined run is not a point on the h-sequence: it carries a
+            # size constraint the other rungs do not, so folding it in would put
+            # two different size prescriptions into a fit that assumes one,
+            # scaled by the level factor. It is excluded explicitly rather than
+            # by the accident that "COUPLED-LADDER-O1-L2-2026..." sorts before
+            # "COUPLED-LADDER-O1-L2-R1-2026..." and loses the dedup race.
             continue
         level = int(summary["level"])
         if any(r["level"] == level for r in rungs):
@@ -839,6 +943,7 @@ def execute_level(
             port_refinement=port_refinement,
         )
         mesh = report.as_dict()
+        mesh_path = report.mesh_path
         entry["mesh"] = mesh
         if expected_mesh_sha256 and mesh["sha256"] != expected_mesh_sha256:
             # The approval named a mesh. A different one is not the approved
@@ -913,6 +1018,7 @@ def execute_level(
         entry["palace_timers"] = palace_timers(entry["palace_metadata"])
         entry["max_backward_error"] = max(m.record.backward_error for m in admission.modes)
 
+        surface_rows: list[pout.SurfaceParticipationRow] = []
         try:
             surface_rows = pout.parse_surface_q_csv(post / "surface-Q.csv")
             entry["port_field_test"] = port_field_analysis(
@@ -920,6 +1026,17 @@ def execute_level(
             )
         except pout.PalaceOutputError as exc:
             entry["port_field_test"] = {"available": False, "reason": str(exc)}
+
+        # The derived diagnostic, in its own guard: it must not be able to cost
+        # the solve, and it must not be able to take the calibrated verdict with
+        # it if it fails.
+        try:
+            entry["port_diagnostic"] = derived_port_diagnostic(
+                joined, surface_rows, config=config, mesh_path=mesh_path,
+                requested_h_gap_mm=mesh["h_gap_mm"],
+            )
+        except Exception as exc:  # noqa: BLE001 - a diagnostic may not cost a solve
+            entry["port_diagnostic"] = {"available": False, "reason": f"{type(exc).__name__}: {exc}"}
 
         # Palace writes paraview/ UNDER Problem.Output, not beside it. The
         # level-2 rung looked beside it, reported "written: false" for output
@@ -1000,6 +1117,206 @@ def compare_against_reference(entry: dict[str, Any], reference: list[Any], refer
     return out
 
 
+def compare_against_baseline(
+    entry: dict[str, Any],
+    baseline_record: str,
+    root: Path | None = None,
+) -> dict[str, Any]:
+    """Match a port-refined run against the PLAIN rung at the same level.
+
+    This is the comparison the experiment exists for. Against the level-1
+    reference, a refined level-2 run differs in two things at once - the global
+    level AND the port box - and neither effect can be read off. Against the
+    plain rung at the same level, the two runs differ in exactly one prescribed
+    number, so any frequency movement is attributable to the port face.
+
+    The matching rule, the magnitude convention and the frozen tolerances are
+    the unchanged ones; nothing here introduces a threshold.
+    """
+    out: dict[str, Any] = {
+        "baseline": baseline_record,
+        "why_this_comparison": (
+            "the refined run and the baseline differ in exactly one prescribed number, the "
+            "element size held over the port box, so a frequency difference between them is "
+            "attributable to port-face resolution and to nothing else"
+        ),
+        "matching_rule": dict(MATCHING_RULE),
+        "convention": dict(COMPARISON_CONVENTION),
+        "frozen_tolerances": {
+            "delta_f_relative_max": FROZEN_FREQUENCY_TOLERANCE,
+            "delta_abs_p_max": FROZEN_PARTICIPATION_TOLERANCE,
+            "status": "unchanged; this comparison does not gate anything",
+        },
+        "available": False,
+    }
+    if entry.get("status") != "COMPLETED":
+        out["reason"] = f"this run is {entry.get('status')}"
+        return out
+
+    results = root or (REPO_ROOT / "results")
+    record = results / baseline_record
+    summary_path = record / "summary.json"
+    if not summary_path.exists():
+        out["reason"] = f"the baseline record {baseline_record} is not on disk"
+        return out
+    baseline_summary = json.loads(summary_path.read_text())
+    baseline_rung = baseline_summary.get("rung") or {}
+    if baseline_rung.get("status") != "COMPLETED":
+        out["reason"] = f"the baseline record is {baseline_rung.get('status')}"
+        return out
+    if baseline_rung.get("port_refinement") is not None:
+        out["reason"] = "the named baseline is itself port-refined; it is not a baseline"
+        return out
+
+    floor = COUPLED_SOLVER_RULES["band_floor_GHz"]
+    ceiling = COUPLED_SOLVER_RULES["band_ceiling_GHz"]
+    baseline_modes = rebuild_admitted(baseline_rung["admission"]["modes"], floor, ceiling)
+    this_modes = rebuild_admitted(entry["admission"]["modes"], floor, ceiling)
+
+    match = match_runs("baseline vs refined", baseline_modes, this_modes)
+    out["match"] = match.as_dict()
+    out["baseline_admitted_in_window"] = [r.mode for r in baseline_modes]
+    out["this_admitted_in_window"] = [r.mode for r in this_modes]
+    out["baseline_dof"] = baseline_rung.get("dof_measured")
+    out["this_dof"] = entry.get("dof_measured")
+    out["baseline_wall_clock_s"] = (baseline_rung.get("run") or {}).get("wall_clock_s")
+    out["this_wall_clock_s"] = (entry.get("run") or {}).get("wall_clock_s")
+
+    baseline_derived = {
+        m["mode"]: m for m in ((baseline_rung.get("port_diagnostic") or {}).get("modes") or [])
+    }
+    this_derived = {
+        m["mode"]: m for m in ((entry.get("port_diagnostic") or {}).get("modes") or [])
+    }
+
+    if not match.comparable:
+        out["reason"] = match.reason
+        return out
+
+    out["available"] = True
+    out["pairs"] = []
+    for pair in match.pairs:
+        baseline_port = baseline_derived.get(pair.a.mode) or {}
+        this_port = this_derived.get(pair.b.mode) or {}
+        bp = (baseline_port.get("participation") or {}).get("from_probes")
+        tp = (this_port.get("participation") or {}).get("from_probes")
+        out["pairs"].append({
+            "baseline_mode": pair.a.mode,
+            "refined_mode": pair.b.mode,
+            "baseline_frequency_GHz": pair.a.frequency_GHz,
+            "refined_frequency_GHz": pair.b.frequency_GHz,
+            "delta_f_GHz": pair.b.frequency_GHz - pair.a.frequency_GHz,
+            "delta_f_relative": pair.delta_f_relative,
+            "delta_abs_p_relative": pair.delta_abs_participation_relative.get(1),
+            "guard": pair.guard,
+            "separation_margin": pair.separation_margin,
+            "port_participation_from_probes": {"baseline": bp, "refined": tp},
+            "delta_port_participation": (tp - bp) if (bp is not None and tp is not None) else None,
+        })
+    return out
+
+
+def port_resolution_sensitivity(
+    baseline_comparison: dict[str, Any],
+    ladder_convergence: dict[str, Any],
+) -> dict[str, Any]:
+    """Is the ladder's frequency movement attributable to port-face resolution?
+
+    The quantity that decides it, per tracked mode, is
+
+        sensitivity = |delta_f(baseline -> refined)| / |delta_f(L2 -> L3)|
+
+    The denominator is what a 1.5x GLOBAL refinement bought at 84 % more DOF;
+    the numerator is what refining the port box alone bought at about 1 % more.
+    A ratio near or above 1 says the port face was the binding constraint and
+    the global ladder was refining the wrong region. A ratio near 0 says the
+    port face was not what the ladder was buying, and the cause is elsewhere.
+
+    Reported per mode and never averaged: the two tracked modes have port
+    participations of 0.9985 and 9e-4, so they are not expected to behave alike,
+    and an average over them would hide exactly the signal being looked for.
+    """
+    out: dict[str, Any] = {
+        "question": (
+            "is the large L1/L2/L3 frequency movement sensitive to port-face resolution?"
+        ),
+        "statistic": (
+            "|delta_f(baseline -> refined)| / |delta_f(L2 -> L3)|, per tracked mode, where the "
+            "numerator changes only the port box and the denominator changes the whole mesh"
+        ),
+        "available": False,
+    }
+    if not baseline_comparison.get("available"):
+        out["reason"] = "the baseline comparison is unavailable: " + str(
+            baseline_comparison.get("reason")
+        )
+        return out
+    per_mode = (ladder_convergence or {}).get("per_mode") or {}
+    if not per_mode:
+        out["reason"] = "the ladder convergence series is unavailable"
+        return out
+
+    ladder_steps: dict[float, dict[str, Any]] = {}
+    for key, block in per_mode.items():
+        freq = (block or {}).get("frequency") or {}
+        values = freq.get("values") or []
+        if len(values) < 3:
+            continue
+        ladder_steps[round(values[1], 9)] = {
+            "key": key,
+            "role": block.get("role"),
+            "L2_to_L3_delta_GHz": values[2] - values[1],
+            "values": values,
+        }
+
+    rows = []
+    for pair in baseline_comparison["pairs"]:
+        baseline_f = pair["baseline_frequency_GHz"]
+        step = ladder_steps.get(round(baseline_f, 9))
+        if step is None:
+            # Match by nearest baseline frequency rather than give up: the
+            # ladder series and this comparison are both keyed on the same
+            # committed L2 run, so a miss means a float round-trip, not a
+            # different mode.
+            if ladder_steps:
+                nearest = min(ladder_steps, key=lambda v: abs(v - baseline_f))
+                if abs(nearest - baseline_f) / max(abs(baseline_f), 1e-12) < 1e-6:
+                    step = ladder_steps[nearest]
+        if step is None:
+            rows.append({
+                "refined_mode": pair["refined_mode"],
+                "available": False,
+                "reason": "this mode is not in the ladder's tracked series",
+            })
+            continue
+        global_step = step["L2_to_L3_delta_GHz"]
+        local_step = pair["delta_f_GHz"]
+        rows.append({
+            "tracked": step["key"],
+            "role": step["role"],
+            "refined_mode": pair["refined_mode"],
+            "available": True,
+            "ladder_frequencies_L1_L2_L3_GHz": step["values"],
+            "baseline_frequency_GHz": baseline_f,
+            "refined_frequency_GHz": pair["refined_frequency_GHz"],
+            "port_only_delta_f_GHz": local_step,
+            "global_L2_to_L3_delta_f_GHz": global_step,
+            "sensitivity": (
+                abs(local_step) / abs(global_step) if global_step else None
+            ),
+            "port_participation_from_probes": pair["port_participation_from_probes"],
+        })
+    out["available"] = any(r.get("available") for r in rows)
+    out["per_mode"] = rows
+    out["what_it_cannot_say"] = [
+        "it does not establish convergence, identify a limit or measure an order",
+        "one refined mesh is one point: a large sensitivity says the port face matters, "
+        "not that resolving it further would settle the frequency",
+        "a small sensitivity does not make the mesh adequate; it relocates the question",
+    ]
+    return out
+
+
 def refinement_trend(comparison: dict[str, Any], entry: dict[str, Any], reference_meta: dict[str, Any]) -> dict[str, Any]:
     """What one extra rung can and cannot say about convergence."""
     out: dict[str, Any] = {
@@ -1049,7 +1366,29 @@ def refinement_trend(comparison: dict[str, Any], entry: dict[str, Any], referenc
 
 
 def next_level_disposition(entry: dict[str, Any], dry_runs: dict[str, Any]) -> dict[str, Any]:
-    """Whether level 3 remains justified and affordable. Advisory only."""
+    """What, if anything, is queued after this run. Advisory only.
+
+    A port-refined run is not a rung, so "is level 3 affordable" is the wrong
+    question for it and answering it anyway would read as though a further
+    global level were queued. For a refined run this returns the refinement's
+    own disposition instead: nothing is queued, and the next mesh needs its own
+    approval.
+    """
+    if entry.get("port_refinement") is not None:
+        return {
+            "queued": None,
+            "decision": (
+                "STOP — this is a port-refined diagnostic run, not a ladder rung. It is "
+                "compared against the plain rung at the same level and stops there. A "
+                "further refined mesh is a separate approval and this script will not "
+                "start one."
+            ),
+            "not_a_rung": (
+                "it carries a size constraint the other rungs do not, so it is excluded "
+                "from the convergence fit by earlier_rungs()"
+            ),
+            "port_refinement": entry["port_refinement"],
+        }
     level3 = dry_runs.get("L3") or {}
     dof3 = (level3.get("measured") or {}).get(f"dof_order{FINITE_ELEMENT_ORDER}")
     within = dof3 is not None and dof3 <= DOF_BUDGET
@@ -1314,15 +1653,104 @@ def render_report(summary: dict[str, Any]) -> str:
             add(f"- {level}: **{verdict}**")
         add("")
 
-    add("## 10. Is the next level justified and affordable?")
+    # The headline sections for a port-refined run. Placed before "what next"
+    # because they are what the run exists to answer; omitted entirely for a
+    # plain rung, which has neither.
+    derived = (summary.get("rung") or {}).get("port_diagnostic") or {}
+    if derived.get("available"):
+        add("## 5b. Port participation, from a conversion derived from source")
+        add("")
+        factors = derived["conversion"]["factors"]
+        add(f"`kappa = 1/(t_nd * Ls_nd) = {derived['conversion']['kappa']:.10f}`, from "
+            f"`Lc = {factors['Lc_m']:.6e} m` measured on this run's own mesh, "
+            f"`L = {factors['inductance_H']:.6e} H`, the port face "
+            f"`{factors['port_length_mm']:.6g} x {factors['port_width_mm']:.6g} mm` and "
+            f"`t_nd = {factors['probe_thickness_nd']}`. Nothing is fitted and no solver "
+            f"output is read to form it.")
+        add("")
+        add("| mode | f (GHz) | p from probes | p reported (E_ind) | p from closure | probe/closure | E_ind/E_port |")
+        add("|---|---|---|---|---|---|---|")
+        for row in derived["modes"]:
+            part = row["participation"]
+            add(f"| {row['mode']} | {row['frequency_GHz']:.6f} | "
+                f"{part['from_probes']:.6e} | {part['reported_E_ind']:.6e} | "
+                f"{part['from_closure']:.6e} | {row['probe_over_closure']:.8f} | "
+                f"{row['uniformity_factor_E_ind_over_E_port']:.4e} |")
+        add("")
+        worst = derived.get("worst_relative_disagreement_probe_vs_closure")
+        if worst is not None:
+            add(f"Worst relative disagreement between the independent evaluation and the "
+                f"closure requirement: **{worst:.2e}**. They share no input — the first "
+                f"reads `surface-Q.csv`, `eig.csv` and geometry, the second reads "
+                f"`domain-E.csv` — so their agreement is evidence. The closure number is "
+                f"**not** an independent measurement of the port energy.")
+        add("")
+
+    baseline = summary.get("baseline_comparison") or {}
+    if baseline.get("available"):
+        add("## 5c. Against the plain rung at the same level")
+        add("")
+        add(f"Baseline `{baseline['baseline']}`. {baseline['why_this_comparison']}.")
+        add("")
+        add("| baseline mode | refined mode | f baseline (GHz) | f refined (GHz) | Δf (GHz) | Δf rel | Δ\\|p\\| rel | p_port baseline | p_port refined |")
+        add("|---|---|---|---|---|---|---|---|---|")
+        for pair in baseline["pairs"]:
+            port = pair["port_participation_from_probes"]
+            bp = f"{port['baseline']:.6e}" if port.get("baseline") is not None else "n/a"
+            tp = f"{port['refined']:.6e}" if port.get("refined") is not None else "n/a"
+            dp = pair.get("delta_abs_p_relative")
+            add(f"| {pair['baseline_mode']} | {pair['refined_mode']} | "
+                f"{pair['baseline_frequency_GHz']:.6f} | {pair['refined_frequency_GHz']:.6f} | "
+                f"{pair['delta_f_GHz']:+.6f} | {pair['delta_f_relative']:.3e} | "
+                f"{(f'{dp:.3e}' if dp is not None else 'n/a')} | {bp} | {tp} |")
+        add("")
+        add(f"DOF {baseline.get('baseline_dof')} -> {baseline.get('this_dof')}; "
+            f"wall clock {baseline.get('baseline_wall_clock_s')} s -> "
+            f"{baseline.get('this_wall_clock_s')} s.")
+        add("")
+    elif baseline.get("reason") and baseline.get("reason") != "not a port-refined run":
+        add("## 5c. Against the plain rung at the same level")
+        add("")
+        add(f"Not available: {baseline['reason']}")
+        add("")
+
+    sensitivity = summary.get("port_resolution_sensitivity") or {}
+    if sensitivity.get("available"):
+        add("## 5d. Is the ladder's frequency movement sensitive to port-face resolution?")
+        add("")
+        add(f"Statistic: {sensitivity['statistic']}.")
+        add("")
+        add("| tracked | role | f(L1,L2,L3) GHz | port-only Δf | global L2→L3 Δf | sensitivity |")
+        add("|---|---|---|---|---|---|")
+        for row in sensitivity["per_mode"]:
+            if not row.get("available"):
+                add(f"| {row.get('refined_mode')} | — | — | — | — | {row.get('reason')} |")
+                continue
+            freqs = ", ".join(f"{v:.6f}" for v in row["ladder_frequencies_L1_L2_L3_GHz"])
+            sens = row.get("sensitivity")
+            add(f"| {row['tracked']} | {row['role']} | {freqs} | "
+                f"{row['port_only_delta_f_GHz']:+.6f} | "
+                f"{row['global_L2_to_L3_delta_f_GHz']:+.6f} | "
+                f"{(f'{sens:.4f}' if sens is not None else 'n/a')} |")
+        add("")
+        for caveat in sensitivity["what_it_cannot_say"]:
+            add(f"- {caveat}")
+        add("")
+
+    add("## 10. What happens next")
     add("")
     nxt = summary["next_level"]
-    add(f"Level 3 measures **{nxt['dof_measured']} DOF** at order 1 against the "
-        f"{nxt['dof_budget']} rule: {'inside' if nxt['within_dof_budget'] else 'OUTSIDE'}.")
-    if nxt.get("projected_wall_clock"):
-        p = nxt["projected_wall_clock"]
-        add(f"Projected wall clock {p['linear_s']:.0f} s (linear in DOF) to {p['quadratic_s']:.0f} s "
-            f"(quadratic), against the {nxt['cap_s']} s cap. {nxt['projection_note']}.")
+    if nxt.get("dof_measured") is not None:
+        add(f"Level 3 measures **{nxt['dof_measured']} DOF** at order 1 against the "
+            f"{nxt['dof_budget']} rule: {'inside' if nxt['within_dof_budget'] else 'OUTSIDE'}.")
+        if nxt.get("projected_wall_clock"):
+            p = nxt["projected_wall_clock"]
+            add(f"Projected wall clock {p['linear_s']:.0f} s (linear in DOF) to "
+                f"{p['quadratic_s']:.0f} s (quadratic), against the {nxt['cap_s']} s cap. "
+                f"{nxt['projection_note']}.")
+    else:
+        # A port-refined run is not a rung, so there is no "next level" to cost.
+        add(nxt.get("not_a_rung", "This run is not a point on the ladder's h-sequence."))
     add("")
     add(f"**{nxt['decision']}**")
     add("")
@@ -1454,6 +1882,28 @@ def main(argv: list[str] | None = None) -> int:
                 "order2_source": f"{REFERENCE_RECORD}/P1 (level 1, order 2)",
             }
 
+    # A port-refined run is compared against the PLAIN rung at the same level:
+    # the two differ in exactly one prescribed number, so a frequency movement
+    # between them is attributable to the port face and to nothing else. This is
+    # the comparison the experiment exists for; the level-1 comparison above is
+    # kept because it is what every other rung reports.
+    baseline_comparison: dict[str, Any] = {"available": False, "reason": "not a port-refined run"}
+    sensitivity: dict[str, Any] = {"available": False, "reason": "not a port-refined run"}
+    if port_refinement is not None:
+        baseline_record = (
+            json.loads(Path(args.approval).read_text()) if args.approval
+            else json.loads(LADDER_APPROVAL.read_text())
+        ).get("baseline_record")
+        if baseline_record:
+            baseline_comparison = compare_against_baseline(entry, baseline_record)
+            sensitivity = port_resolution_sensitivity(baseline_comparison, convergence)
+        else:
+            baseline_comparison = {
+                "available": False,
+                "reason": "the approval record names no baseline_record to compare against",
+            }
+            sensitivity = dict(baseline_comparison)
+
     summary = {
         "schema": SUMMARY_SCHEMA,
         "batch_id": batch_id,
@@ -1487,6 +1937,8 @@ def main(argv: list[str] | None = None) -> int:
             for r in rungs if r.get("port_field_test")
         },
         "trend": refinement_trend(comparison, entry, reference_meta),
+        "baseline_comparison": baseline_comparison,
+        "port_resolution_sensitivity": sensitivity,
         "next_level": next_level_disposition(entry, dry_runs),
         "environment": {
             "python_version": platform.python_version(),

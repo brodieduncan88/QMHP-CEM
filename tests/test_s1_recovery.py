@@ -328,11 +328,16 @@ def _ladder_module():
     return module
 
 
-def test_the_committed_approval_record_authorises_no_refinement():
-    """Nothing in this change starts an experiment; approving it is a later act."""
-    assert _ladder_module().approved_port_refinement() is None
-    approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
-    assert "port_refinement" not in approval
+def test_the_committed_approval_record_now_authorises_R1_only():
+    """The owner approved R1 after review. R2 is prepared and NOT approved.
+
+    This test asserted the opposite before the approval, which was correct then:
+    the change that prepared the experiment could not also start it.
+    """
+    label, refinement, expected_sha = _ladder_module().approved_port_refinement()
+    assert label == "R1"
+    assert refinement.h_port_mm == 0.003333333333333333
+    assert expected_sha == "a49ef282c7f07c56f210a450b291a2e027de530ba7c3e78bbdcead3b67315fee"
 
 
 def test_an_approved_refinement_is_read_from_the_record_and_validated(tmp_path: Path):
@@ -513,3 +518,253 @@ def test_the_recovery_record_preserves_and_references_its_sources():
         assert manifest.verify(source) == [], name
         assert manifest.file_digest(source / "manifest.sha256") == entry["manifest_sha256"], name
     assert manifest.verify(records[-1]) == []
+
+# --- the approved R1 run ------------------------------------------------------
+
+
+def test_the_approval_record_authorises_exactly_the_prepared_R1_mesh():
+    """The owner approved R1. The record must name the mesh that was dry-run.
+
+    The approved h_port is written out to the last double because the hash below
+    is for that exact value; a rounded literal would build a different mesh and
+    the gate would refuse to solve it.
+    """
+    approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
+    refinement = approval["port_refinement"]
+    assert refinement["id"] == "R1"
+    assert refinement["h_port_mm"] == 0.003333333333333333
+    assert refinement["pad_mm"] == EXPERIMENT_PAD_MM
+    assert refinement["transition_mm"] == EXPERIMENT_TRANSITION_MM
+    assert refinement["ports"] == ["port_F1"]
+    assert approval["level"] == EXPERIMENT_BASE_LEVEL
+    assert approval["baseline_record"] == "COUPLED-LADDER-O1-L2-20260916T080802Z"
+    assert (
+        approval["dry_run_mesh_sha256"]["R1"]
+        == "a49ef282c7f07c56f210a450b291a2e027de530ba7c3e78bbdcead3b67315fee"
+    )
+    # R2 is prepared but NOT approved.
+    assert "R2" not in approval["dry_run_mesh_sha256"]
+    assert any("R2" in item for item in approval["explicitly_out_of_scope"])
+
+
+def test_the_approved_refinement_matches_the_predeclared_experiment():
+    """What is approved and what was predeclared must be the same numbers."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "predeclaration_check", REPO_ROOT / "scripts" / "s1_experiment_predeclaration.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    predeclared = module.PREDECLARATION["approval_block_to_paste"]["R1"]
+    approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
+    for key in ("id", "h_port_mm", "pad_mm", "transition_mm", "ports"):
+        assert approval["port_refinement"][key] == predeclared[key], key
+
+
+def test_the_mesh_the_approval_pins_is_the_one_the_mesher_builds():
+    """The gate is only meaningful if the pinned hash is reproducible."""
+    approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
+    refinement = PortRefinement(
+        h_port_mm=approval["port_refinement"]["h_port_mm"],
+        pad_mm=approval["port_refinement"]["pad_mm"],
+        transition_mm=approval["port_refinement"]["transition_mm"],
+        ports=tuple(approval["port_refinement"]["ports"]),
+    )
+    with tempfile.TemporaryDirectory() as scratch:
+        report = dry_run(
+            _cell(), approval["level"], Path(scratch), dof_budget=DOF_BUDGET,
+            halo_mm=HALO_MM, port_refinement=refinement, mesh_filename="m.msh",
+        )
+    assert report.sha256 == approval["dry_run_mesh_sha256"]["R1"]
+    assert report.dof_order1 == EXPERIMENT["R1"]["dof_order1"]
+
+
+def test_a_refined_record_is_excluded_from_the_convergence_fit(tmp_path: Path):
+    """Not by lexicographic luck: by payload, for any label.
+
+    A label sorting BEFORE the plain record (one starting with a digit, say)
+    would otherwise win the level dedup and put a different mesh into a fit that
+    assumes one size prescription scaled by the level factor.
+    """
+    import shutil
+
+    ladder = _ladder_module()
+    root = tmp_path / "results"
+    root.mkdir()
+    for name in (
+        "COUPLED-PILOT-20260916T035733Z",
+        "COUPLED-LADDER-O1-L2-20260916T080802Z",
+        "COUPLED-LADDER-O1-L3-20260916T091212Z",
+    ):
+        shutil.copytree(REPO_ROOT / "results" / name, root / name)
+
+    plain = root / "COUPLED-LADDER-O1-L2-20260916T080802Z"
+    for label in ("R1", "0A", "1P0"):
+        refined = root / f"COUPLED-LADDER-O1-L2-{label}-20260916T999999Z"
+        shutil.copytree(plain, refined)
+        summary = json.loads((refined / "summary.json").read_text())
+        summary["rung"]["port_refinement"] = {"h_port_mm": 0.00333, "pad_mm": 0.01}
+        (refined / "summary.json").write_text(json.dumps(summary))
+
+    sources = [r["source"] for r in ladder.earlier_rungs(root)]
+    assert sources == [
+        "COUPLED-PILOT-20260916T035733Z/P2",
+        "COUPLED-LADDER-O1-L2-20260916T080802Z",
+        "COUPLED-LADDER-O1-L3-20260916T091212Z",
+    ]
+
+    # And with the plain record gone, the level is simply ABSENT rather than
+    # being filled by a mesh that does not belong to the sequence.
+    shutil.rmtree(plain)
+    levels = [r["level"] for r in ladder.earlier_rungs(root)]
+    assert levels == [1, 3]
+
+
+def test_the_derived_diagnostic_runs_on_a_real_record():
+    """The exact post-solve code path, on committed outputs.
+
+    Palace cannot run here, so this is the only way to exercise what the solve
+    will execute. It reproduces the numbers the recovery record published.
+    """
+    from solvers.palace import outputs as pout
+    from solvers.palace.mode_admission import join_modes_by_id
+
+    ladder = _ladder_module()
+    solver = REPO_ROOT / "results/COUPLED-LADDER-O1-L3-20260916T091212Z/L3/solver"
+    result = ladder.derived_port_diagnostic(
+        join_modes_by_id(solver / "postpro"),
+        pout.parse_surface_q_csv(solver / "postpro" / "surface-Q.csv"),
+        config=json.loads((solver / "config.json").read_text()),
+        mesh_path=solver / "coupled_chip_cell_L3.msh",
+        requested_h_gap_mm=0.005,
+    )
+    assert result["available"] is True
+    assert result["conversion"]["kappa"] == pytest.approx(0.38868825288128767, rel=1e-12)
+    assert result["worst_relative_disagreement_probe_vs_closure"] < 1e-5
+    assert len(result["modes"]) == 6
+    for row in result["modes"]:
+        assert row["uniformity_factor_E_ind_over_E_port"] <= 1.0 + 1e-9
+
+
+def test_the_derived_diagnostic_never_costs_a_solve():
+    """A diagnostic that raises must degrade to a reason, not kill the record."""
+    ladder = _ladder_module()
+    result = ladder.derived_port_diagnostic(
+        [], [], config={}, mesh_path=Path("/nonexistent.msh"), requested_h_gap_mm=0.005,
+    )
+    assert result["available"] is False
+    assert result["reason"]
+
+
+def test_the_baseline_comparison_answers_the_question_the_run_exists_for():
+    """Standing the L3 rung in for a refined run exercises the real path.
+
+    Sensitivity comes out exactly 1 because the numerator and the denominator
+    are then the same quantity, which is the correct self-consistency result and
+    pins the mode correspondence and the arithmetic.
+    """
+    ladder = _ladder_module()
+    l3 = json.loads(
+        (REPO_ROOT / "results/COUPLED-LADDER-O1-L3-20260916T091212Z/summary.json").read_text()
+    )
+    entry = dict(l3["rung"])
+    entry["port_refinement"] = {"h_port_mm": 0.003333333333333333}
+
+    comparison = ladder.compare_against_baseline(entry, "COUPLED-LADDER-O1-L2-20260916T080802Z")
+    assert comparison["available"] is True
+    assert comparison["match"]["status"] == "MATCHED"
+    assert len(comparison["pairs"]) == 2
+    assert comparison["pairs"][0]["delta_f_GHz"] == pytest.approx(0.247675, abs=1e-6)
+
+    sensitivity = ladder.port_resolution_sensitivity(comparison, l3["convergence"])
+    assert sensitivity["available"] is True
+    for row in sensitivity["per_mode"]:
+        assert row["available"] is True
+        assert row["sensitivity"] == pytest.approx(1.0, abs=1e-9)
+    assert any("does not establish convergence" in c for c in sensitivity["what_it_cannot_say"])
+
+
+def test_the_baseline_comparison_refuses_a_baseline_that_is_not_one():
+    ladder = _ladder_module()
+    entry = {"status": "COMPLETED", "admission": {"modes": []}}
+    assert not ladder.compare_against_baseline(entry, "NO-SUCH-RECORD")["available"]
+    assert "not on disk" in ladder.compare_against_baseline(entry, "NO-SUCH-RECORD")["reason"]
+    assert not ladder.compare_against_baseline({"status": "TIMEOUT"}, "x")["available"]
+
+
+def test_a_refined_run_reports_stop_rather_than_costing_the_next_level():
+    ladder = _ladder_module()
+    refined = ladder.next_level_disposition({"port_refinement": {"h_port_mm": 0.003}}, {})
+    assert refined["queued"] is None
+    assert refined["decision"].startswith("STOP")
+    assert "not a ladder rung" in refined["decision"]
+    plain = ladder.next_level_disposition(
+        {"port_refinement": None, "dof_measured": 79_944},
+        {"L3": {"measured": {"dof_order1": 147_372}}},
+    )
+    assert plain["decision"].startswith("FOR REVIEW")
+    assert plain["dof_measured"] == 147_372
+
+
+def test_the_renderer_survives_a_refined_summary():
+    """The regression a prepare-only dry run caught before the solve was spent.
+
+    render_report raised KeyError('dof_measured') on a refined run, because
+    next_level_disposition returns the refinement branch and the renderer
+    assumed the level-3 shape.
+    """
+    ladder = _ladder_module()
+    l3 = json.loads(
+        (REPO_ROOT / "results/COUPLED-LADDER-O1-L3-20260916T091212Z/summary.json").read_text()
+    )
+    l3["rung"]["port_refinement"] = {"h_port_mm": 0.003333333333333333, "pad_mm": 0.01}
+    l3["next_level"] = ladder.next_level_disposition(l3["rung"], l3.get("dry_runs") or {})
+    l3["baseline_comparison"] = {"available": False, "reason": "not a port-refined run"}
+    l3["port_resolution_sensitivity"] = {"available": False, "reason": "not a port-refined run"}
+    text = ladder.render_report(l3)
+    assert "STOP" in text
+    assert "could not be rendered" not in text
+
+
+def test_the_approval_describer_never_fails_a_step_that_runs_after_a_solve(tmp_path: Path):
+    """It runs in the commit step; raising there would strand a paid-for solve."""
+    import subprocess
+    import sys
+
+    script = REPO_ROOT / "scripts" / "describe_ladder_approval.py"
+    junk = tmp_path / "junk.json"
+    junk.write_text("{}")
+    done = subprocess.run(
+        [sys.executable, str(script), "--headline", str(junk)],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    )
+    assert done.returncode == 0
+
+    broken = tmp_path / "broken.json"
+    broken.write_text("not json at all")
+    done = subprocess.run(
+        [sys.executable, str(script), "--headline", str(broken)],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    )
+    assert done.returncode == 0
+    assert "record written" in done.stdout
+
+    described = subprocess.run(
+        [sys.executable, str(script), "--approval", str(REPO_ROOT / ".github/ladder-approval.json")],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    )
+    assert described.returncode == 0
+    assert "R1" in described.stdout
+    assert "a49ef282" in described.stdout
+
+
+def test_the_workflow_describes_the_approval_and_builds_its_headline_from_a_script():
+    """A multi-line python -c inside a YAML block scalar broke the file once."""
+    workflow = (REPO_ROOT / ".github" / "workflows" / "palace-order1-ladder.yml").read_text()
+    assert "scripts/describe_ladder_approval.py --approval" in workflow
+    assert "scripts/describe_ladder_approval.py --headline" in workflow
+    import yaml
+
+    parsed = yaml.safe_load(workflow)
+    assert parsed["jobs"]["ladder"]["steps"]

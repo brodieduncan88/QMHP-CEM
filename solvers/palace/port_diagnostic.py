@@ -426,6 +426,69 @@ def compare(
     )
 
 
+class PortConversionError(RuntimeError):
+    """The run's own configuration does not support the derived conversion."""
+
+
+def conversion_from_run(config: dict[str, Any], mesh_report: dict[str, Any]) -> PortConversion:
+    """Derive the conversion for one solve, from its own config and its own mesh.
+
+    Shared by every driver that reports the diagnostic, so the ladder run and
+    the recovery analysis cannot drift apart on how ``kappa`` is formed.
+
+    ``Lc`` is measured from the mesh bounding box rather than read from
+    Palace's log, which prints it to four significant figures. ``l`` is the
+    extent along the declared port direction and ``w`` the remaining in-plane
+    extent, matching ``fem/lumpedelement.cpp:53-69``.
+
+    ``mesh_report`` is a :func:`solvers.palace.mesh_inspection.inspect_mesh`
+    result; only ``largest_extent_mm`` and the port face's bounding box are used.
+    """
+    try:
+        port = config["Boundaries"]["LumpedPort"][0]
+        probes = config["Boundaries"]["Postprocessing"]["Dielectric"]
+        L0_m = float(config["Model"]["L0"])
+    except (KeyError, IndexError, TypeError) as exc:
+        raise PortConversionError(f"the configuration has no lumped port with probes: {exc}") from exc
+
+    thicknesses = {p["Thickness"] for p in probes}
+    permittivities = {p["Permittivity"] for p in probes}
+    sides = {p["Side"] for p in probes}
+    if len(thicknesses) != 1 or len(permittivities) != 1 or len(sides) != 1:
+        raise PortConversionError(
+            "the Default and MA probes must share thickness, permittivity and side for their "
+            f"difference to be 0.5 t |E_t|^2; got {thicknesses}, {permittivities}, {sides}"
+        )
+
+    direction = str(port["Direction"])
+    if direction not in ("+Y", "-Y"):
+        raise PortConversionError(
+            f"the port direction is {direction}; this conversion measures the face assuming "
+            "a +/-Y direction and refuses rather than guessing which extent is the length"
+        )
+
+    face = mesh_report["ports"]["port_F1"]
+    box = face["bounding_box_mm"]
+    length_mm = box["max"][1] - box["min"][1]
+    width_mm = box["max"][0] - box["min"][0]
+
+    return PortConversion(
+        geometry=PortGeometry(
+            length_mm=length_mm,
+            width_mm=width_mm,
+            n_elements=len(port["Attributes"]),
+            direction=direction,
+        ),
+        scales=NonDimensionalisation(
+            Lc_m=mesh_report["largest_extent_mm"] * L0_m,
+            L0_m=L0_m,
+        ),
+        inductance_H=float(port["L"]),
+        probe_thickness_mesh_units=float(next(iter(thicknesses))),
+        probe_permittivity=float(next(iter(permittivities))),
+    )
+
+
 # --------------------------------------------------------------------------
 # Synthetic port fields: the formula is tested against fields whose integrals
 # are known in closed form, so a test failure is a fault in the conversion and
@@ -560,10 +623,12 @@ __all__ = [
     "UNVERIFIED_ASSUMPTIONS",
     "ModeComparison",
     "NonDimensionalisation",
+    "PortConversionError",
     "PortConversion",
     "PortGeometry",
     "SyntheticPortField",
     "compare",
+    "conversion_from_run",
     "cosine_modulated_field",
     "transverse_field",
     "uniform_aligned_field",
