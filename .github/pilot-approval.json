@@ -49,5 +49,14 @@
   "mediator work",
   "any broader redesign"
  ],
- "note": "Committing this file on a palace/** branch starts the pilot. It is the approval record and the trigger at once, so a pilot cannot be started by an unrelated code change."
+ "note": "Committing this file on a palace/** branch starts the pilot. It is the approval record and the trigger at once, so a pilot cannot be started by an unrelated code change.",
+ "reruns": [
+  {
+   "attempt": 1,
+   "workflow_run": 35048375845,
+   "solves": "all three completed; Palace's own output is in that run's log",
+   "why_rerun": "a defect in the runner, not in the science: the container was launched without a --user flag, so Palace wrote postpro/ as root and git could not unlink those files during the rebase, leaving the record uncommitted. The approved pilot is unchanged and is re-run to preserve the evidence in the repository.",
+   "fixed_by": "scripts/palace_coupled_pilot.py now passes --user, as the main Palace adapter already did"
+  }
+ ]
 }

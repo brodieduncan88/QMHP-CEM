@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import platform
 import resource
 import shutil
@@ -125,11 +126,34 @@ def _image_identity(runtime: str, image: str) -> dict[str, Any]:
     return out
 
 
+def _user_flag(runtime: str) -> list[str]:
+    """Run the container as the invoking user, as the main adapter does.
+
+    Without this Palace writes ``postpro/`` as root, and the evidence is then
+    owned by a user the harness cannot manage: the first pilot run produced
+    valid results that git could not commit, because a rebase could not unlink
+    root-owned files. The solver output is evidence, so it must be writable by
+    whoever records it.
+    """
+    if not hasattr(os, "getuid"):
+        return []
+    try:
+        info = subprocess.run(
+            [runtime, "info", "--format", "{{json .SecurityOptions}}"],
+            capture_output=True, text=True, timeout=60, check=False,
+        )
+        if "rootless" in (info.stdout or ""):
+            return []                       # already mapped to this user
+    except Exception:  # noqa: BLE001 - fall through to the explicit mapping
+        pass
+    return ["--user", f"{os.getuid()}:{os.getgid()}"]
+
+
 def _run_palace(runtime: str, image: str, work_dir: Path, name: str, np_: int) -> dict[str, Any]:
     """One container run. Never raises: a failure is a recorded outcome."""
     command = [
         runtime, "run", "--rm", "--network", "none", "--hostname", "localhost",
-        "--name", name, "-e", "HOME=/tmp", "-e", "OMP_NUM_THREADS=1",
+        "--name", name, *_user_flag(runtime), "-e", "HOME=/tmp", "-e", "OMP_NUM_THREADS=1",
         "-e", "OPENBLAS_NUM_THREADS=1",
         "-v", f"{work_dir.resolve()}:{CONTAINER_WORKDIR}", "-w", CONTAINER_WORKDIR,
         image, "-np", str(np_), CONFIG_FILENAME,
