@@ -44,6 +44,7 @@ TARGET_DOCS = [
     DOCS / "implementation-plan.md",
     DOCS / "route-a-identifiability.md",
     DOCS / "execution-proposal.md",
+    DOCS / "pilot-outcome.md",
     REPO_ROOT / "docs" / "v2a" / "submission-recovery.md",
     REPO_ROOT / "config" / "coupled" / "v2a_five_node_candidate.json",
     REPO_ROOT / "config" / "coupled" / "v2a_submission_reconciliation.json",

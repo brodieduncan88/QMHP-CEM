@@ -122,6 +122,13 @@ halo change is **validated rather than assumed**.
 > proposal; what is not acceptable is running P3 at 0.15 mm while leaving the
 > budget rule unmarked.
 
+**Approved and executed; this section is left as it was written.** The
+review approved the pilot with P3 at **0.12 mm**, so the 0.15 mm DOF
+exception above was declined and all three runs stayed inside the 250 000 DOF
+rule. The approval is recorded in `.github/pilot-approval.json` and the
+result in [`pilot-outcome.md`](pilot-outcome.md); the text above is the
+pre-approval proposal and is deliberately not rewritten.
+
 The pilot is **not an extraction**. It produces no coupling, feeds no gate and
 touches no threshold. Its outputs are wall clock, memory, the mode list in the
 declared window, and the site energy participation with its sensitivity to the
@@ -174,6 +181,11 @@ Outcomes, all three predeclared:
   refinement level indicates the level-1 mesh is too coarse for the geometry,
   or the model is wrong. Report and stop; the halo question is not answerable
   from that pilot.
+
+**Outcome reached: the third.** `Δf` exceeded `1e-4` by two to three orders
+of magnitude on every candidate mode pairing, so the pilot returned
+`NOT-A-HALO-VERDICT`. The criteria above were not loosened and `Δp` was not
+carried into `δ_A`. See [`pilot-outcome.md`](pilot-outcome.md).
 
 ### 4.3 How the element order is chosen, from P1 against P2
 
