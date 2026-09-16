@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -447,9 +448,9 @@ def test_the_phasor_parser_keeps_the_phase(tmp_path):
 # --- the corrected statements stay corrected --------------------------------
 
 #: Statements withdrawn by the corrective analysis. Matched against the
-#: document with blockquotes removed, so a correction that *quotes* the old
-#: wording in order to withdraw it does not trip the guard; and against the
-#: driver, where they were code rather than prose.
+#: document with blockquotes and REGISTERED citations removed, so a correction
+#: that names the wording it withdraws does not trip the guard, while any other
+#: appearance of that wording does.
 WITHDRAWN_CLAIMS = [
     # A mechanism asserted where only a correlation was observed.
     r"null-space\s*/\s*gradient artefacts that the divergence-free projection did not\s*remove",
@@ -466,41 +467,131 @@ GUARDED_DOCS = [
     REPO_ROOT / "docs" / "coupled-candidate" / "corrective-analysis.md",
 ]
 
+#: The ONLY quotations exempt from the guard, named one by one.
+#:
+#: A correction has to be able to quote the wording it withdraws, but exempting
+#: italic text in general would exempt a great deal more than that: any future
+#: claim could be slipped past the guard by italicising it. So the exemption is
+#: a closed registry — document basename to the exact flattened strings it may
+#: contain — and it applies only where the string appears wrapped as ``*"..."*``
+#: AND the document also states that it is withdrawn or superseded. Everything
+#: else, italic or not, is the document speaking in its own voice.
+CITATION_EXEMPTIONS: dict[str, tuple[str, ...]] = {
+    "pilot-outcome.md": (
+        "Only mode 1 and mode 2 of each solve are physical circuit modes",
+        "the current direction through the port is not stable under discretisation",
+        "needs a sign convention that survives discretisation",
+        "null-space / gradient artefacts that the divergence-free projection did not remove",
+    ),
+    "corrective-analysis.md": (
+        "Only mode 1 and mode 2 of each solve are physical circuit modes.",
+        # The document quotes this twice, once mid-sentence and once in the
+        # corrections table where it ends the sentence. Both spellings are
+        # registered explicitly; near-duplicates are the price of exactness.
+        "null-space / gradient artefacts that the divergence-free projection did not remove",
+        "null-space / gradient artefacts that the divergence-free projection did not remove.",
+        "the current direction through the port is not stable under discretisation",
+        "bit-for-bit",
+    ),
+}
 
-def _assertions_only(text: str) -> str:
+#: A document may quote a withdrawn claim only if it says so.
+WITHDRAWAL_MARKERS = ("withdrawn", "superseded", "was wrong", "no longer")
+
+
+def _flatten(text: str) -> str:
+    """Drop blockquoted citations, then collapse whitespace."""
+    kept = [line for line in text.splitlines() if not line.lstrip().startswith(">")]
+    return re.sub(r"\s+", " ", "\n".join(kept))
+
+
+def _assertions_only(text: str, exemptions: tuple[str, ...] = ()) -> str:
     """The document speaking in its own voice.
 
-    Two kinds of citation are removed, because a correction has to be able to
-    *name* the wording it withdraws: markdown blockquotes, and inline italic
-    quotations of the form ``*"..."*``. Everything else is the document
-    asserting something, and that is what the guard is on.
+    Removes blockquotes, and then each REGISTERED citation, but only where it
+    appears wrapped as ``*"..."*``. An unregistered quotation is left in place,
+    so italicising a claim does not hide it from the guard.
     """
-    import re
-
-    kept = [line for line in text.splitlines() if not line.lstrip().startswith(">")]
-    body = "\n".join(kept)
-    body = re.sub(r'\*"[^"]*"\*', " ", body, flags=re.DOTALL)
-    return re.sub(r"\s+", " ", body)
+    body = _flatten(text)
+    for claim in exemptions:
+        body = body.replace(f'*"{claim}"*', " ")
+    return body
 
 
 @pytest.mark.parametrize("path", GUARDED_DOCS, ids=lambda p: p.name)
 def test_no_document_repeats_a_withdrawn_claim(path):
-    import re
-
+    """The guard proper: a withdrawn claim may be quoted, never asserted."""
     if not path.exists():
         pytest.skip(f"{path.name} is not present")
-    text = _assertions_only(path.read_text(encoding="utf-8"))
+    text = _assertions_only(
+        path.read_text(encoding="utf-8"), CITATION_EXEMPTIONS.get(path.name, ())
+    )
     for pattern in WITHDRAWN_CLAIMS:
         match = re.search(pattern, text, flags=re.IGNORECASE)
         assert match is None, f"{path.name} repeats a withdrawn claim: {match.group(0)[:120]!r}"
 
 
-def test_the_withdrawn_italic_quotations_are_still_present_to_be_withdrawn():
+def test_the_guard_covers_every_document_that_should_be_guarded():
+    """A guard nobody runs is not a guard. Both documents must exist and be read."""
+    assert len(GUARDED_DOCS) == 2
+    for path in GUARDED_DOCS:
+        assert path.exists(), f"{path} is guarded but missing, so the guard skips it"
+
+
+def test_the_withdrawn_quotations_are_still_present_to_be_withdrawn():
     """The corrections name what they withdraw; they do not quietly delete it."""
     text = (REPO_ROOT / "docs" / "coupled-candidate" / "pilot-outcome.md").read_text(encoding="utf-8")
     assert "is withdrawn" in text
-    assert "null-space / gradient artefacts" in text  # named, inside an italic quotation
+    assert "null-space / gradient artefacts" in text  # named, inside a registered citation
     assert "Only mode 1 and mode 2 of each solve are physical" in text
+
+
+@pytest.mark.parametrize("path", GUARDED_DOCS, ids=lambda p: p.name)
+def test_every_registered_citation_is_used_and_is_actually_withdrawn(path):
+    """No dead registry entries, and no quoting without withdrawing."""
+    if not path.exists():
+        pytest.skip(f"{path.name} is not present")
+    flat = _flatten(path.read_text(encoding="utf-8"))
+    lowered = flat.lower()
+    for claim in CITATION_EXEMPTIONS.get(path.name, ()):
+        assert f'*"{claim}"*' in flat, (
+            f"{path.name}: the registry exempts {claim!r} but the document does not quote it; "
+            f"a dead exemption is a hole waiting to open"
+        )
+    if CITATION_EXEMPTIONS.get(path.name):
+        assert any(marker in lowered for marker in WITHDRAWAL_MARKERS), (
+            f"{path.name} quotes a withdrawn claim but never says it is withdrawn"
+        )
+
+
+def test_the_registry_names_only_documents_the_guard_covers():
+    covered = {p.name for p in GUARDED_DOCS}
+    assert set(CITATION_EXEMPTIONS) <= covered
+
+
+def test_the_exemption_is_not_a_general_licence_to_italicise():
+    """An UNREGISTERED claim in italic quotes is still caught."""
+    registered = "the current direction through the port is not stable under discretisation"
+    unregistered = "Only mode 1 and mode 2 of each solve are physical circuit modes"
+    exemptions = (registered,)
+
+    assert registered not in _assertions_only(f'As noted, *"{registered}"*, now withdrawn.\n', exemptions)
+    # Same shape, same italics — but not in the registry, so it survives.
+    assert unregistered in _assertions_only(f'As noted, *"{unregistered}"*, now withdrawn.\n', exemptions)
+    # A registered claim asserted bare is not a citation and is not exempt.
+    assert registered in _assertions_only(f"{registered}, as the pilot showed.\n", exemptions)
+    # Blockquoted citations remain exempt, as before.
+    assert registered not in _assertions_only(f"> {registered}\n", ())
+
+
+def test_the_exemption_removes_only_the_quoted_span():
+    claim = "the current direction through the port is not stable under discretisation"
+    text = f'Before. *"{claim}"* After.\n'
+    cleaned = _assertions_only(text, (claim,))
+    assert "Before." in cleaned and "After." in cleaned
+    assert claim not in cleaned
+    # An unterminated italic quotation must not swallow the rest of the file.
+    assert claim in _assertions_only(f'*"a stray open quote\n\n{claim}\n', (claim,))
 
 
 def test_the_driver_no_longer_selects_a_mode_by_smallest_participation():
@@ -518,14 +609,6 @@ def test_the_driver_records_energy_balance_keyed_by_mode_not_positionally():
     assert "entry[\"equipartition_residuals\"] = [" not in driver
 
 
-def test_the_citation_exemptions_are_not_a_hole_in_the_guard():
-    """Quoting a withdrawn claim is exempt; asserting it is not."""
-    claim = "the current direction through the port is not stable under discretisation"
-    assert claim not in _assertions_only(f'> {claim}\n')
-    assert claim not in _assertions_only(f'The earlier note that *"{claim}"* is withdrawn.\n')
-    assert claim in _assertions_only(f"{claim}, as the pilot showed.\n")
-    # An unterminated italic quotation must not swallow the rest of the file.
-    assert claim in _assertions_only(f'*"a stray open quote\n\n{claim}\n')
 
 
 def test_the_documents_state_the_same_counts_the_code_computes(record_reports):
