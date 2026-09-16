@@ -35,12 +35,14 @@ import argparse
 import hashlib
 import json
 import math
+import re
 import os
 import platform
 import resource
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import traceback
 from datetime import datetime, timezone
@@ -127,7 +129,37 @@ def _user_flag(runtime: str) -> list[str]:
     return []
 
 
-def _run_palace(runtime: str, image: str, solver_dir: Path, np_processes: int, name: str) -> dict[str, Any]:
+def _run_palace(
+    runtime: str,
+    image: str,
+    solver_dir: Path,
+    np_processes: int,
+    name: str,
+    *,
+    dof_budget: int | None = None,
+    order: int = FINITE_ELEMENT_ORDER,
+) -> dict[str, Any]:
+    """Run Palace, watching its output for the degree-of-freedom line.
+
+    ``dof_budget`` arms the DOF PROBE. A mesh Palace refines itself - a
+    ``Model.Refinement`` block - cannot be counted offline: the refined mesh
+    exists only inside Palace, MFEM has no Python binding here, and Palace's
+    ``--dry-run`` parses the config and exits without loading a mesh. So the
+    250 000-DOF rule cannot be enforced by refusing to launch.
+
+    It can still be enforced BEFORE the expensive work. Palace prints
+
+        H1 (p = 1): 13991, ND (p = 1): 79944, RT (p = 1): 130388
+
+    while assembling, and only afterwards configures the eigensolver. This
+    reads that line as it arrives and kills the container if the ND count
+    exceeds the budget, so the refusal costs seconds of mesh loading and
+    assembly rather than the 45-minute cap. The rule is not relaxed; it is
+    enforced a few seconds later than for a mesh built offline.
+
+    stderr is merged into stdout so a single stream can be read without
+    risking a pipe-buffer deadlock; the log file is the merged stream.
+    """
     command = [
         runtime, "run", "--rm", "--network", "none", "--hostname", "localhost",
         "--name", name, *_user_flag(runtime),
@@ -139,18 +171,56 @@ def _run_palace(runtime: str, image: str, solver_dir: Path, np_processes: int, n
     before = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
     t0 = time.perf_counter()
     timed_out = False
+    lines: list[str] = []
+    probe: dict[str, Any] = {
+        "armed": dof_budget is not None,
+        "budget": dof_budget,
+        "dof_reported": None,
+        "refused": False,
+        "pattern": rf"ND \(p = {order}\): <n>",
+    }
+
+    def _kill() -> None:
+        subprocess.run([runtime, "kill", name], capture_output=True, text=True,
+                       timeout=60, check=False)
+
+    proc = subprocess.Popen(  # noqa: S603
+        command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+    )
+    dof_re = re.compile(rf"ND \(p = {order}\):\s*(\d+)")
+
+    def _pump() -> None:
+        assert proc.stdout is not None
+        for raw in proc.stdout:
+            lines.append(raw)
+            if probe["dof_reported"] is not None or dof_budget is None:
+                continue
+            match = dof_re.search(raw)
+            if not match:
+                continue
+            reported = int(match.group(1))
+            probe["dof_reported"] = reported
+            if reported > dof_budget:
+                # Refuse here, before the eigensolve. This is the 250 000 rule.
+                probe["refused"] = True
+                _kill()
+
+    pump = threading.Thread(target=_pump, daemon=True)
+    pump.start()
     try:
-        proc = subprocess.run(command, capture_output=True, text=True, timeout=SOLVE_TIMEOUT_S)
-        returncode, stdout, stderr = proc.returncode, proc.stdout, proc.stderr
-    except subprocess.TimeoutExpired as exc:
+        returncode = proc.wait(timeout=SOLVE_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
         timed_out = True
         returncode = None
-        stdout = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
-        stderr = exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
-        subprocess.run([runtime, "kill", name], capture_output=True, text=True, timeout=60, check=False)
+        _kill()
+        try:
+            proc.wait(timeout=60)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+    pump.join(timeout=60)
     wall = time.perf_counter() - t0
     after = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
-    (solver_dir / "palace_log.txt").write_text(stdout + ("\n" + stderr if stderr else ""))
+    (solver_dir / "palace_log.txt").write_text("".join(lines))
     return {
         "command": command,
         "returncode": returncode,
@@ -161,9 +231,14 @@ def _run_palace(runtime: str, image: str, solver_dir: Path, np_processes: int, n
         "cap_fraction_used": wall / SOLVE_TIMEOUT_S,
         "runner_cli_peak_rss_kb": after,
         "runner_cli_peak_rss_kb_delta": max(0, after - before),
+        "dof_probe": probe,
         "memory_note": (
             "ru_maxrss measures the container runtime CLI in this process tree, not the solver "
             "inside the container. Solver-side timing is quoted from Palace's own log."
+        ),
+        "stream_note": (
+            "stdout and stderr are merged into one stream so the DOF probe can read the log as "
+            "it arrives without a pipe-buffer deadlock; palace_log.txt is that merged stream."
         ),
     }
 
@@ -503,7 +578,7 @@ def earlier_rungs(root: Path | None = None) -> list[dict[str, Any]]:
         rung = summary.get("rung") or {}
         if rung.get("status") != "COMPLETED":
             continue
-        if rung.get("port_refinement") is not None:
+        if any_refinement(rung) is not None:
             # A port-refined run is not a point on the h-sequence: it carries a
             # size constraint the other rungs do not, so folding it in would put
             # two different size prescriptions into a fit that assumes one,
@@ -887,6 +962,92 @@ LADDER_APPROVAL = REPO_ROOT / ".github" / "ladder-approval.json"
 _PORT_REFINEMENT_KEYS = {"id", "h_port_mm", "pad_mm", "transition_mm", "ports"}
 
 
+#: Keys a ``palace_refinement`` block may carry. Unknown keys are refused
+#: rather than ignored: a typo must not silently become "no refinement".
+_PALACE_REFINEMENT_KEYS = {"id", "boxes"}
+_PALACE_BOX_KEYS = {"Levels", "BoundingBoxMin", "BoundingBoxMax"}
+
+
+def any_refinement(entry: dict[str, Any]) -> Any:
+    """The refinement a record carries, by either mechanism, or ``None``.
+
+    There are two, and they are NOT interchangeable:
+
+    * ``port_refinement`` -- a gmsh ``Box`` size field. Regenerates the mesh,
+      so the meshes are not nested. This is what R1 used.
+    * ``palace_refinement`` -- a Palace ``Model.Refinement.Boxes`` block.
+      Refines the mesh Palace loads, conforming and nested, leaving the mesh
+      file byte-identical.
+
+    Every gate that must fire for "this is a refined run, not a ladder rung"
+    goes through here, so a gate cannot be updated for one mechanism and
+    silently miss the other.
+    """
+    return entry.get("port_refinement") or entry.get("palace_refinement")
+
+
+def approved_palace_refinement(path: Path | None = None) -> tuple[str, list[dict[str, Any]], str | None] | None:
+    """The Palace-side box refinement the approval record authorises, or ``None``.
+
+    Like its gmsh counterpart, every number comes from the approval record: no
+    code change here can introduce a refinement. The mesh hash this returns is
+    the BASELINE's, because a Palace-side refinement reuses the baseline mesh
+    file unchanged - byte-identity is the control, and the existing mesh gate
+    enforces it.
+    """
+    approval_path = LADDER_APPROVAL if path is None else Path(path)
+    if not approval_path.is_file():
+        return None
+    approval = json.loads(approval_path.read_text())
+    block = approval.get("palace_refinement")
+    if block is None:
+        return None
+    if approval.get("port_refinement") is not None:
+        raise LadderError(
+            "the approval record carries BOTH port_refinement and palace_refinement. They are "
+            "different experiments on different meshes; approve one."
+        )
+    unknown = set(block) - _PALACE_REFINEMENT_KEYS
+    if unknown:
+        raise LadderError(f"unknown palace_refinement key(s) in the approval record: {sorted(unknown)}")
+    missing = _PALACE_REFINEMENT_KEYS - set(block)
+    if missing:
+        raise LadderError(f"palace_refinement is missing {sorted(missing)}")
+    label = str(block["id"])
+    if not label.isalnum():
+        raise LadderError(f"palace_refinement id must be alphanumeric, got {label!r}")
+    boxes = block["boxes"]
+    if not isinstance(boxes, list) or not boxes:
+        raise LadderError("palace_refinement.boxes must be a non-empty list")
+    for box in boxes:
+        unknown = set(box) - _PALACE_BOX_KEYS
+        if unknown:
+            raise LadderError(f"unknown box key(s): {sorted(unknown)}")
+        if _PALACE_BOX_KEYS - set(box):
+            raise LadderError(f"a box is missing {sorted(_PALACE_BOX_KEYS - set(box))}")
+        lo, hi = box["BoundingBoxMin"], box["BoundingBoxMax"]
+        if len(lo) != 3 or len(hi) != 3:
+            raise LadderError("BoundingBoxMin/Max must each have three components")
+        if any(a >= b for a, b in zip(lo, hi)):
+            raise LadderError(f"box min {lo} is not strictly below max {hi}")
+        if int(box["Levels"]) < 1:
+            raise LadderError("box Levels must be at least 1")
+
+    baseline = approval.get("baseline_record")
+    if not baseline:
+        raise LadderError(
+            "palace_refinement requires baseline_record: the run exists to be compared against "
+            "the plain rung whose mesh file it reuses."
+        )
+    record = REPO_ROOT / "results" / baseline
+    if not (record / "summary.json").is_file():
+        raise LadderError(
+            f"the approval names baseline_record {baseline!r}, which is not a record on disk."
+        )
+    expected = (approval.get("baseline_mesh_sha256") or "").strip() or None
+    return label, boxes, expected
+
+
 def approved_port_refinement(path: Path | None = None) -> tuple[str, Any, str | None] | None:
     """The local refinement the approval record authorises, or ``None``.
 
@@ -955,6 +1116,8 @@ def execute_level(
     np_processes: int,
     prepare_only: bool,
     port_refinement: Any = None,
+    palace_refinement: list[dict[str, Any]] | None = None,
+    palace_refinement_label: str | None = None,
     expected_mesh_sha256: str | None = None,
 ) -> dict[str, Any]:
     entry: dict[str, Any] = {
@@ -962,6 +1125,11 @@ def execute_level(
         "finite_element_order": FINITE_ELEMENT_ORDER,
         "halo_mm": HALO_MM,
         "port_refinement": None if port_refinement is None else port_refinement.as_dict(),
+        "palace_refinement": None if palace_refinement is None else {
+            "id": palace_refinement_label,
+            "mechanism": "Palace Model.Refinement.Boxes on the loaded mesh; no gmsh, no new mesh file",
+            "boxes": palace_refinement,
+        },
         "status": "NOT-RUN",
     }
     try:
@@ -985,6 +1153,15 @@ def execute_level(
         dof = mesh["measured"][f"dof_order{FINITE_ELEMENT_ORDER}"]
         entry["dof_measured"] = dof
         entry["within_dof_budget"] = dof <= DOF_BUDGET
+        if palace_refinement is not None:
+            # dof_measured is the mesh Palace LOADS. Palace then refines it, so
+            # this does NOT bound what is solved and must not be read as the
+            # run's DOF. The solved count comes from the probe in _run_palace.
+            entry["dof_measured_is"] = (
+                "the loaded mesh, BEFORE Palace's own refinement. It does not bound the solved "
+                "DOF. run.dof_probe.dof_reported is what Palace actually assembled."
+            )
+            entry["dof_solved"] = None
         if not entry["within_dof_budget"]:
             entry["status"] = "REFUSED-DOF-BUDGET"
             entry["failure"] = (
@@ -1008,6 +1185,10 @@ def execute_level(
             save_modes=n_modes,
             port_field_probes=True,
         )
+        if palace_refinement is not None:
+            # The ONLY delta against the baseline config. The mesh file is the
+            # baseline's, byte-identical, and was just hash-checked above.
+            config.setdefault("Model", {}).setdefault("Refinement", {})["Boxes"] = palace_refinement
         (solver_dir / CONFIG_FILENAME).write_text(json.dumps(config, indent=2) + "\n")
         entry["port_inductance_H"] = inductance
         entry["port_size_mm"] = port["size_mm"]
@@ -1018,8 +1199,25 @@ def execute_level(
             entry["status"] = "PREPARED"
             return entry
 
-        run_info = _run_palace(runtime, image, solver_dir, np_processes, f"qmhp-ladder-o1-l{level}")
+        run_info = _run_palace(
+            runtime, image, solver_dir, np_processes, f"qmhp-ladder-o1-l{level}",
+            # Armed only when Palace does the refining: for a mesh built offline
+            # the budget was already enforced by refusing to launch, above.
+            dof_budget=DOF_BUDGET if palace_refinement is not None else None,
+        )
         entry["run"] = run_info
+        probe = run_info.get("dof_probe") or {}
+        if probe.get("dof_reported") is not None:
+            entry["dof_solved"] = probe["dof_reported"]
+        if probe.get("refused"):
+            entry["status"] = "REFUSED-DOF-BUDGET"
+            entry["within_dof_budget"] = False
+            entry["failure"] = (
+                f"Palace assembled {probe['dof_reported']} order-{FINITE_ELEMENT_ORDER} DOF after "
+                f"its own refinement, above the declared {DOF_BUDGET}. The container was killed "
+                f"before the eigensolve. The rule is not relaxed."
+            )
+            return entry
         if run_info["timed_out"]:
             entry["status"] = "TIMEOUT"
             entry["failure"] = f"the solve did not finish inside the {SOLVE_TIMEOUT_S} s cap"
@@ -1209,15 +1407,28 @@ def compare_against_baseline(
     The matching rule, the magnitude convention and the frozen tolerances are
     the unchanged ones; nothing here introduces a threshold.
     """
+    nested = entry.get("palace_refinement") is not None
     out: dict[str, Any] = {
         "baseline": baseline_record,
+        "mechanism": "palace_refinement (nested)" if nested else "port_refinement (gmsh, not nested)",
         "why_this_comparison": (
-            "the refined run and the baseline differ in exactly one prescribed number, the "
-            "element size held over the port box. That is one prescribed number, not one "
-            "physical channel: the box is a 0.040 x 0.060 x 0.020 mm VOLUME, not a face, and "
-            "gmsh re-meshes globally from it, so the two meshes are not nested. A frequency "
-            "difference between them is an observed difference between two runs; it is not "
-            "attributable to the port face, and it does not bound a port contribution"
+            (
+                "the refined run REUSES the baseline's mesh file byte-identically and adds one "
+                "Model.Refinement.Boxes block. MFEM's conforming refinement only inserts edge "
+                "midpoints, so every baseline vertex survives and the two meshes are NESTED. A "
+                "frequency difference between them is therefore attributable to added degrees of "
+                "freedom in the refined region -- which is NOT the same as the port face: the "
+                "region is a volume, the conforming closure refines neighbours outside it, and "
+                "the marked elements are the worst-shaped in the mesh, so element quality is a "
+                "live alternative explanation this run cannot separate"
+            ) if nested else (
+                "the refined run and the baseline differ in exactly one prescribed number, the "
+                "element size held over the port box. That is one prescribed number, not one "
+                "physical channel: the box is a 0.040 x 0.060 x 0.020 mm VOLUME, not a face, and "
+                "gmsh re-meshes globally from it, so the two meshes are not nested. A frequency "
+                "difference between them is an observed difference between two runs; it is not "
+                "attributable to the port face, and it does not bound a port contribution"
+            )
         ),
         "matching_rule": dict(MATCHING_RULE),
         "convention": dict(COMPARISON_CONVENTION),
@@ -1243,8 +1454,8 @@ def compare_against_baseline(
     if baseline_rung.get("status") != "COMPLETED":
         out["reason"] = f"the baseline record is {baseline_rung.get('status')}"
         return out
-    if baseline_rung.get("port_refinement") is not None:
-        out["reason"] = "the named baseline is itself port-refined; it is not a baseline"
+    if any_refinement(baseline_rung) is not None:
+        out["reason"] = "the named baseline is itself refined; it is not a baseline"
         return out
 
     floor = COUPLED_SOLVER_RULES["band_floor_GHz"]
@@ -1420,7 +1631,7 @@ def refinement_trend(comparison: dict[str, Any], entry: dict[str, Any], referenc
     would report is confounded and must not be presented as this run's headline.
     The baseline comparison is the one that isolates the port box.
     """
-    if entry.get("port_refinement") is not None:
+    if any_refinement(entry) is not None:
         return {
             "available": False,
             "reason": (
@@ -1484,20 +1695,20 @@ def next_level_disposition(entry: dict[str, Any], dry_runs: dict[str, Any]) -> d
     own disposition instead: nothing is queued, and the next mesh needs its own
     approval.
     """
-    if entry.get("port_refinement") is not None:
+    if any_refinement(entry) is not None:
         return {
             "queued": None,
             "decision": (
-                "STOP — this is a port-refined diagnostic run, not a ladder rung. It is "
-                "compared against the plain rung at the same level and stops there. A "
-                "further refined mesh is a separate approval and this script will not "
-                "start one."
+                "STOP - this is a refined diagnostic run, not a ladder rung. It is compared "
+                "against the plain rung at the same level and stops there. A further refined "
+                "mesh or a further refinement level is a separate approval and this script "
+                "will not start one."
             ),
             "not_a_rung": (
                 "it carries a size constraint the other rungs do not, so it is excluded "
                 "from the convergence fit by earlier_rungs()"
             ),
-            "port_refinement": entry["port_refinement"],
+            "refinement": any_refinement(entry),
         }
     level3 = dry_runs.get("L3") or {}
     dof3 = (level3.get("measured") or {}).get(f"dof_order{FINITE_ELEMENT_ORDER}")
@@ -1962,6 +2173,18 @@ def main(argv: list[str] | None = None) -> int:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     approved = approved_port_refinement(args.approval)
     label, port_refinement, expected_mesh_sha256 = approved if approved else (None, None, None)
+    # The Palace-side mechanism. Mutually exclusive with the gmsh one, which
+    # approved_palace_refinement() refuses outright rather than resolving.
+    approved_palace = approved_palace_refinement(args.approval)
+    palace_label, palace_boxes, palace_baseline_sha = (
+        approved_palace if approved_palace else (None, None, None)
+    )
+    if palace_label:
+        label = palace_label
+        # A Palace-side refinement REUSES the baseline mesh. The hash gate is
+        # therefore what enforces byte-identity with the baseline, and is the
+        # strongest control this experiment has.
+        expected_mesh_sha256 = palace_baseline_sha
     # A port-refined run is a different experiment from a plain rung, so it
     # gets a different record id and is kept out of the ladder's h-sequence.
     suffix = f"-{label}" if label else ""
@@ -1983,6 +2206,8 @@ def main(argv: list[str] | None = None) -> int:
         args.level, declaration, solver_dir,
         runtime=runtime, image=args.image, np_processes=args.np, prepare_only=args.prepare_only,
         port_refinement=port_refinement,
+        palace_refinement=palace_boxes,
+        palace_refinement_label=palace_label,
         expected_mesh_sha256=expected_mesh_sha256,
     )
     # EVERYTHING from here to the durable write is analysis of a solve that has
@@ -2016,7 +2241,7 @@ def main(argv: list[str] | None = None) -> int:
         # The ladder's convergence fit is over a sequence in h at a fixed size
         # prescription. A locally refined run is not a point on that sequence, so
         # it is compared against the reference rung but never folded into the fit.
-        if entry.get("status") == "COMPLETED" and port_refinement is None:
+        if entry.get("status") == "COMPLETED" and any_refinement(entry) is None:
             from solvers.palace.coupled_mesh import mesh_sizes_mm  # noqa: PLC0415
 
             rungs.append({
@@ -2075,16 +2300,17 @@ def main(argv: list[str] | None = None) -> int:
                     "order2_source": f"{REFERENCE_RECORD}/P1 (level 1, order 2)",
                 }
 
-        # A port-refined run is compared against the PLAIN rung at the same level:
-        # the two differ in exactly one prescribed number. One prescribed number is
-        # not one physical channel - the box is a volume, and gmsh re-meshes globally
-        # from it - so the movement between them is an observed difference, not an
-        # attribution and not a bound on any one region. This is the comparison the
-        # experiment exists for; the level-1 comparison above is kept because it is
-        # what every other rung reports.
-        baseline_comparison: dict[str, Any] = {"available": False, "reason": "not a port-refined run"}
-        sensitivity: dict[str, Any] = {"available": False, "reason": "not a port-refined run"}
-        if port_refinement is not None:
+        # A refined run is compared against the PLAIN rung at the same level. What
+        # that comparison supports depends on the mechanism, and compare_against_
+        # baseline() says which: a gmsh port_refinement regenerates the mesh, so the
+        # movement is an observed difference and nothing more; a Palace
+        # palace_refinement reuses the mesh file and is nested, so the movement is
+        # attributable to added DOF in the refined region -- still not to the port
+        # face. This is the comparison the experiment exists for; the level-1
+        # comparison above is kept because it is what every other rung reports.
+        baseline_comparison: dict[str, Any] = {"available": False, "reason": "not a refined run"}
+        sensitivity: dict[str, Any] = {"available": False, "reason": "not a refined run"}
+        if any_refinement(entry) is not None:
             baseline_record = (
                 json.loads(Path(args.approval).read_text()) if args.approval
                 else json.loads(LADDER_APPROVAL.read_text())

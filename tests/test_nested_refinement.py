@@ -215,3 +215,138 @@ def test_no_palace_job_is_triggered_by_this_candidate():
     for path in ("solvers/palace/**", "docker/palace.Dockerfile", "scripts/palace_golden_run.py"):
         assert path in golden
     assert not str(CANDIDATE.relative_to(REPO_ROOT)).startswith(("solvers/palace", "docker"))
+
+
+# --- the executed path: Palace-side refinement and the DOF probe ---------------
+
+def _ladder():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_ladder_n1", REPO_ROOT / "scripts" / "palace_order1_ladder.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class _FakePopen:
+    """A Palace that prints the real assembly lines and then keeps going."""
+
+    def __init__(self, lines, **_):
+        self.stdout = iter(lines)
+        self.returncode = 0
+        self.waited = False
+
+    def wait(self, timeout=None):
+        self.waited = True
+        return 0
+
+    def kill(self):
+        self.returncode = -9
+
+
+ASSEMBLY = [
+    " Parallel Mesh Stats:\n",
+    " edges            79944       79944\n",
+    "Assembling system matrices, number of global unknowns:\n",
+    " H1 (p = 1): 13991, ND (p = 1): {dof}, RT (p = 1): 130388\n",
+    "Configuring SLEPc eigenvalue solver:\n",
+    " Found 6 converged eigenvalues\n",
+]
+
+
+def _run_with(monkeypatch, tmp_path, dof, budget):
+    ladder = _ladder()
+    lines = [line.format(dof=dof) for line in ASSEMBLY]
+    killed = []
+    monkeypatch.setattr(ladder.subprocess, "Popen", lambda *a, **k: _FakePopen(lines))
+    monkeypatch.setattr(
+        ladder.subprocess, "run",
+        lambda cmd, **k: killed.append(cmd) or type("R", (), {"returncode": 0})(),
+    )
+    info = ladder._run_palace(
+        "docker", "img", tmp_path, 1, "probe-test", dof_budget=budget,
+    )
+    return info, killed
+
+
+def test_the_dof_probe_reads_the_count_palace_actually_assembled(monkeypatch, tmp_path):
+    """Under budget: the count is recorded and nothing is killed."""
+    info, killed = _run_with(monkeypatch, tmp_path, dof=81_000, budget=BUDGET)
+    probe = info["dof_probe"]
+    assert probe["armed"] is True
+    assert probe["dof_reported"] == 81_000
+    assert probe["refused"] is False
+    assert not killed, "an in-budget run must not be killed"
+    assert "ND (p = 1): 81000" in (tmp_path / "palace_log.txt").read_text()
+
+
+def test_the_dof_probe_kills_the_container_when_the_budget_is_exceeded(monkeypatch, tmp_path):
+    """Over budget: refused, and the container is killed.
+
+    This is the 250 000 rule for a mesh that cannot be counted offline. It has
+    to fire on the assembly line, which Palace prints before it configures the
+    eigensolver -- so the refusal costs seconds, not the 45-minute cap.
+    """
+    info, killed = _run_with(monkeypatch, tmp_path, dof=250_001, budget=BUDGET)
+    probe = info["dof_probe"]
+    assert probe["dof_reported"] == 250_001
+    assert probe["refused"] is True
+    assert killed and killed[0][:2] == ["docker", "kill"]
+
+
+def test_the_probe_is_disarmed_when_the_mesh_was_counted_offline(monkeypatch, tmp_path):
+    """A plain rung already refused before launch; the probe must not double up."""
+    info, killed = _run_with(monkeypatch, tmp_path, dof=250_001, budget=None)
+    assert info["dof_probe"]["armed"] is False
+    assert info["dof_probe"]["refused"] is False
+    assert not killed
+
+
+def test_the_approval_refuses_both_mechanisms_at_once(tmp_path):
+    """They are different experiments on different meshes. Approve one."""
+    ladder = _ladder()
+    approval = tmp_path / "a.json"
+    approval.write_text(json.dumps({
+        "level": 2,
+        "baseline_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+        "port_refinement": {"id": "R1", "h_port_mm": 0.003, "pad_mm": 0.01, "transition_mm": 0.02},
+        "palace_refinement": {"id": "N1", "boxes": [
+            {"Levels": 1, "BoundingBoxMin": [0, 0, 0], "BoundingBoxMax": [1, 1, 1]}]},
+    }))
+    with pytest.raises(ladder.LadderError, match="BOTH"):
+        ladder.approved_palace_refinement(approval)
+
+
+@pytest.mark.parametrize(
+    "block, match",
+    [
+        ({"id": "N1"}, "missing"),
+        ({"id": "N1", "boxes": [], "extra": 1}, "unknown"),
+        ({"id": "N1", "boxes": []}, "non-empty"),
+        ({"id": "N1", "boxes": [{"Levels": 0, "BoundingBoxMin": [0, 0, 0],
+                                 "BoundingBoxMax": [1, 1, 1]}]}, "Levels"),
+        ({"id": "N1", "boxes": [{"Levels": 1, "BoundingBoxMin": [1, 1, 1],
+                                 "BoundingBoxMax": [0, 0, 0]}]}, "not strictly below"),
+    ],
+)
+def test_a_malformed_approval_is_refused_rather_than_ignored(tmp_path, block, match):
+    """A typo must not silently become 'no refinement' and solve the wrong thing."""
+    ladder = _ladder()
+    approval = tmp_path / "a.json"
+    approval.write_text(json.dumps({
+        "level": 2,
+        "baseline_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+        "palace_refinement": block,
+    }))
+    with pytest.raises(ladder.LadderError, match=match):
+        ladder.approved_palace_refinement(approval)
+
+
+def test_a_refined_record_is_kept_out_of_the_convergence_fit_by_either_mechanism():
+    """any_refinement() is the single gate; neither mechanism may slip through."""
+    ladder = _ladder()
+    assert ladder.any_refinement({}) is None
+    assert ladder.any_refinement({"port_refinement": None, "palace_refinement": None}) is None
+    assert ladder.any_refinement({"port_refinement": {"id": "R1"}}) == {"id": "R1"}
+    assert ladder.any_refinement({"palace_refinement": {"id": "N1"}}) == {"id": "N1"}
