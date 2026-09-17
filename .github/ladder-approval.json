@@ -1,10 +1,10 @@
 {
  "schema": "qmhp-cem.ladder-approval/0.1.0",
- "what": "one controlled local-refinement run of the S1 coupled chip cell: the approved level at fixed element order 1 and fixed 0.08 mm halo, with one extra local size constraint over a declared box around the lumped-port face",
- "approved_by": "the repository owner, approving R1 only after reviewing COUPLED-S1-RECOVERY",
+ "what": "one nested local-refinement run of the S1 coupled chip cell: the approved level at fixed element order 1 and fixed 0.08 mm halo, with one Palace Model.Refinement.Boxes entry over a declared box around the lumped port. The mesh file is REUSED byte-identically; gmsh does not run.",
+ "approved_by": "the repository owner, approving N1 only after reviewing the nested-refinement feasibility study",
  "approved_utc": "2026-09-16",
  "level": 2,
- "sequential": "one run per invocation. This approval runs R1 ONLY and stops. R2 is prepared and dry-run but is NOT approved and must not be started until R1 is reviewed.",
+ "sequential": "one run per invocation. This approval runs N1 ONLY and stops. A second refinement level, a different box, or R2 are each a separate approval.",
  "dry_runs_first": {
   "requirement": "dry-run levels 2 and 3 and record measured DOF for both before running anything",
   "measured_order1_dof": {
@@ -47,7 +47,8 @@
   "the frozen Delta|p| <= 1e-2 and Delta f <= 1e-4 criteria, reported and not gating"
  ],
  "explicitly_out_of_scope": [
-  "the R2 mesh, which is prepared and dry-run but NOT approved",
+  "a second refinement level or any further box, which is a separate approval",
+  "the R2 gmsh mesh, still prepared and NOT approved",
   "the coupling extraction itself",
   "the Route A inversion on EM data",
   "Route B",
@@ -91,24 +92,64 @@
   }
  ],
  "baseline_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
- "port_refinement": {
-  "id": "R1",
-  "h_port_mm": 0.003333333333333333,
-  "pad_mm": 0.01,
-  "transition_mm": 0.02,
-  "ports": [
-   "port_F1"
-  ]
- },
- "dry_run_mesh_sha256": {
-  "R1": "a49ef282c7f07c56f210a450b291a2e027de530ba7c3e78bbdcead3b67315fee",
-  "note": "measured by an offline dry run on this branch. execute_level refuses with REFUSED-MESH-MISMATCH and launches nothing if the mesh it builds does not hash to this, so the run either solves the approved mesh or solves nothing."
- },
  "h_port_note": "the owner wrote h_port = 0.003333 mm, which is the rounded form of h_gap(level 2)/2 = 0.006666666666666666/2. The exact double is used here because the mesh hash above is for that exact value; a truncated literal could build a different mesh and the hash gate would then correctly refuse to solve it.",
  "what_this_run_answers": {
-  "question": "is the large L1/L2/L3 frequency movement sensitive to port-face resolution?",
-  "statistic": "|delta_f(baseline -> R1)| / |delta_f(L2 -> L3)| per tracked mode: the numerator changes only the port box at +1.0 % DOF, the denominator changed the whole mesh at +84 % DOF",
-  "predeclared_outcomes": "qmhp-cem.s1-port-refinement-experiment/0.1.0, outcomes A to E",
-  "stop_conditions": "the six predeclared in that record; completing R1 means STOP for review"
- }
+  "purpose": "to obtain a frequency difference from a NESTED pair on one mesh file, where the only change is added degrees of freedom in a declared region and the lumped-port geometry is unchanged.",
+  "what_it_does_not_answer": "this is NOT the question R1 was asked. A movement is attributable to added resolution in the refined REGION, which is not the same as port-face resolution.",
+  "remaining_confounds": [
+   "the refined region is a volume, not the port face",
+   "the green closure extends it by an amount not known until the run",
+   "the marked tets average radius-ratio 0.2197 against the mesh's 0.3700, so element quality is a live alternative explanation",
+   "p_Default on the port face is unconverged at every level measured so far",
+   "two points cannot establish an order of convergence, and none is claimed"
+  ]
+ },
+ "palace_refinement": {
+  "id": "N1",
+  "boxes": [
+   {
+    "Levels": 1,
+    "BoundingBoxMin": [
+     -0.62,
+     -0.125,
+     -0.01
+    ],
+    "BoundingBoxMax": [
+     -0.58,
+     -0.065,
+     0.01
+    ]
+   }
+  ]
+ },
+ "baseline_mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+ "mechanism": {
+  "what_refines": "Palace, on the mesh it loads, via Model.Refinement.Boxes",
+  "conforming": "yes -- GeneralRefinement forces nonconforming=0 for 3-D simplex meshes (mesh.cpp:10565-10567)",
+  "nested": "yes -- ParMesh bisection inserts only edge midpoints; every baseline vertex survives (mesh.cpp:10834-10841)",
+  "mesh_file": "the baseline's, byte-identical. execute_level refuses with REFUSED-MESH-MISMATCH unless the mesh it builds hashes to baseline_mesh_sha256.",
+  "propagates_outside_the_box": "YES. Conformity is restored by a green-closure loop that bisects any element needing it, marked or not (pmesh.cpp:3467-3477), plus boundary elements (3568-3580). This is NOT a face-only or box-only change.",
+  "invariant": "w, l, L_s, kappa and Lc are unchanged. w and l come from the bounding box of the port attribute and midpoints cannot extend it; Lc is computed pre-refinement (main.cpp:311-313)."
+ },
+ "dof_rule": {
+  "budget": 250000,
+  "measured_offline": false,
+  "why": "the refined mesh exists only inside Palace at load time; MFEM has no Python binding in this environment and Palace's --dry-run parses the config and exits without loading a mesh (main.cpp:246-256). The 250 000 rule therefore cannot be enforced by refusing to launch.",
+  "how_it_is_enforced": "a DOF PROBE. Palace prints 'ND (p = 1): N' while assembling and only afterwards configures the eigensolver (palace_log.txt line 49 against line 54). The driver streams the log, reads that count and kills the container if it exceeds the budget, recording REFUSED-DOF-BUDGET. Exposure is seconds of loading and assembly, not the cap.",
+  "offline_bounds": {
+   "lower": 81864,
+   "upper_uniform_refinement": 615486,
+   "note": "a lower bound cannot discharge an upper limit; this is an interval, not headroom"
+  },
+  "breach_argument": "a breach needs 170 056 added edges; the marked octasection supplies 1 920 and a full uniform refinement 535 542, so it would take the closure delivering 31.8 % of a uniform refinement -- an 89x expansion of the 221 marked elements.",
+  "rule_unchanged": true
+ },
+ "stop_conditions": [
+  "Palace reports order-1 DOF above 250 000 -> the probe kills the container before the eigensolve; REFUSED-DOF-BUDGET.",
+  "wall clock exceeds the unchanged 45-minute cap -> terminate and record.",
+  "max backward error exceeds the unchanged 1e-6 -> record and stop.",
+  "the admitted set is not {m1, m2}, or matching against the level-1 rung refuses -> record and stop.",
+  "any post-solve analysis raises -> the record is still written, manifested and committed.",
+  "completing N1 means STOP for review, not a second refinement level."
+ ]
 }

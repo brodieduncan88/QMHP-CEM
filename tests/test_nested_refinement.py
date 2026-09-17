@@ -204,13 +204,22 @@ def test_the_marked_region_quality_is_reported_including_the_bad_news(candidate)
     )
 
 
-def test_no_palace_job_is_triggered_by_this_candidate():
-    """The candidate lives outside every workflow trigger path, so committing it
-    starts nothing. The ladder trigger is the approval record alone."""
+def test_the_approval_names_exactly_one_approved_experiment():
+    """N1 is now approved. The record must name it and ONLY it.
+
+    Both mechanisms present would be two experiments on two different meshes;
+    the driver refuses that outright, and this catches it a commit earlier.
+    """
     approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
-    assert approval.get("port_refinement", {}).get("id") == "R1", (
-        "the approval record must still name R1; N1 is not approved"
-    )
+    assert approval.get("palace_refinement", {}).get("id") == "N1"
+    assert "port_refinement" not in approval, "R1 is finished and recorded; it is not re-approved"
+    # Byte-identity with the baseline mesh is the control, so the hash is required.
+    assert approval.get("baseline_mesh_sha256")
+    assert approval.get("baseline_record") == "COUPLED-LADDER-O1-L2-20260916T080802Z"
+    # And the rule it runs under is unchanged.
+    assert approval["constraints"]["dof_budget"] == BUDGET
+    assert approval["constraints"]["per_solve_wall_clock_cap_s"] == 2700
+    assert approval["dof_rule"]["rule_unchanged"] is True
     golden = (REPO_ROOT / ".github" / "workflows" / "palace-golden.yml").read_text()
     for path in ("solvers/palace/**", "docker/palace.Dockerfile", "scripts/palace_golden_run.py"):
         assert path in golden
