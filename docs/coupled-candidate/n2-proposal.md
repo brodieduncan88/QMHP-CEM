@@ -45,10 +45,18 @@ int region_ref_level = 0;
 while (region_ref_level < max_region_ref_levels) {
     // mark elements of mesh.back() having a vertex in the box,
     // for each box with  region_ref_level < box.ref_levels
-    mesh.back()->GeneralRefinement(refs, -1);
+    if (mesh.capacity() > 1) {                                // :347-349
+      mesh.emplace_back(std::make_unique<mfem::ParMesh>(*mesh.back()));
+    }
+    mesh.back()->GeneralRefinement(refs, -1);                 // :350
     region_ref_level++;
 }
 ```
+
+Note the copy at `:347-349`: the marked mesh is **copied and the copy refined**,
+which is how the multigrid hierarchy is built. Capacity is 2 for N1 and 3 for N2,
+both `> 1`, so both take the same branch — the depth changes, the code path does
+not.
 
 On iteration 0, `mesh.back()` is the **original loaded mesh** and the per-box
 test is `0 < box.ref_levels`, which is true for `Levels: 1` and `Levels: 2`
@@ -94,15 +102,23 @@ the children of stage 1 plus any closure element that now has a vertex in it.
 
 **There is no N2 DOF figure here, and there cannot be one yet.** Stage 2 marks
 on the stage-1 mesh, which does not exist offline: MFEM has no Python binding in
-this environment and Palace's `--dry-run` does not load a mesh. For N1, a
-rigorous lower bound was computable (81 864; actual 84 485). **For stage 2 not
-even that is available.** The only rigorous offline statement is:
+this environment and Palace's `--dry-run` does not load a mesh. For N1 a rigorous
+lower bound was computable (81 864; actual 84 485) from the marked submesh's own
+counts; **that method cannot be reapplied**, because it needs the stage-1
+submesh, which is exactly what is missing.
+
+A bound does exist, and an earlier draft of this document wrongly said none did:
 
 ```
-N2 > 84 485          (stage 2 only adds; no upper bound is available)
+84 485  <  N2  <=  4 857 516          (19.4x the 250 000 budget)
 ```
 
-Any other number before the mesh is built would be invented.
+The upper bound is real and computable — the uniform-refinement identity
+`E' = 2E + 3F + T` **composes**, so two uniform levels of the original mesh bound
+any two-level local refinement of it (one level: V=93 935, E=615 486,
+F=1 037 024, T=515 472, Euler 1; a second: 4 857 516). **It is useless for gating
+at 19.4x the budget** — but "computable and useless" is the honest statement, not
+"unavailable". Any tighter figure before the mesh is built would be invented.
 
 **Runtime cannot be extrapolated from DOF.** N1 took **923.5 s** — 11.4× the
 baseline's 81.2 s — for **5.7 %** more DOF, with 69 % of it in preconditioner
@@ -135,11 +151,33 @@ unchanged rules, energy diagnostics, backward error, and **both** participations
 kept distinct:
 
 - `port_participation_from_probes` — **derived** from the boundary quadrature
-- `port_participation_reported_by_palace` — Palace's **rank-one surrogate**,
-  which Cauchy–Schwarz bounds above by the derived value
+- `port_participation_reported_by_palace` — Palace's **rank-one surrogate**.
+  Cauchy–Schwarz bounds `E_ind/E_port ≤ 1` for the **exact** quantities; the
+  derived column is itself an estimate built from the difference
+  `p_Default − p_MA`, so `reported ≤ derived` is *guaranteed for the exact
+  ratio* and *observed* in this data — ~1e-5 margin on m1, ~2.4e-4 on m2.
 
 The L2 → N1 step already computes correctly in the dry run, reproducing N1's
 published +0.053867 and +0.001620 GHz.
+
+**The approval must carry three keys**, or the comparisons silently degrade:
+
+```json
+"baseline_record":     "COUPLED-LADDER-O1-L2-N1-20260917T001735Z",
+"sequence_records":    ["COUPLED-LADDER-O1-L2-20260916T080802Z",
+                        "COUPLED-LADDER-O1-L2-N1-20260917T001735Z"],
+"baseline_mesh_sha256": "d8dc1a92…"
+```
+
+`sequence_records` is a **new top-level approval key**. Without it the `L2 → N1`
+step is never computed and only the primary comparison appears. It is validated
+to end at `baseline_record`, and every entry must be a record on disk.
+
+`refinement_sequence.available` keys on the **primary** step alone. The earlier
+step runs between two committed records and is always available, so reporting
+"any step available" would have called the analysis available in precisely the
+likeliest failure mode — a `TIMEOUT` on this run, with the only new comparison
+missing.
 
 **Matching rules are unchanged. An ambiguous correspondence is reported as
 unavailable and is never repaired by changing the criteria.** N2 is excluded
@@ -174,7 +212,9 @@ admission `|R−1| ≤ 1e-3`, the matching rule, the 0.5–9.0 GHz window, the
 
 **Nothing in this branch starts it.** `.github/ladder-approval.json` still names
 N1; the ladder triggers on that file alone; `experiments/` is outside every
-trigger path. A test asserts each.
+trigger path. A test asserts that the approval still names N1 and that the
+candidate directory sits outside the golden-run paths; the trigger lists
+themselves were checked by hand against the workflow files, not by a test.
 
 ## 7. What N2 would not establish, whatever it shows
 

@@ -242,6 +242,10 @@ def _run_palace(
                 probe["ambiguous"] = len(set(probe["dof_reported_all"])) > 1
                 largest = max(probe["dof_reported_all"])
                 probe["dof_reported"] = largest
+                # seen_at_wall_s is the FIRST sighting; if more than one count is
+                # ever seen, dof_reported is the largest and the two refer to
+                # different lines, so the ambiguity flag is what a reader must
+                # go by rather than the timestamp.
                 if largest > dof_budget and not probe["refused"]:
                     probe["refused"] = True
                     _kill()
@@ -1529,46 +1533,54 @@ def _derived_diagnostic_for_record(record: Path, summary: dict[str, Any]) -> dic
         return {"available": False, "reason": f"{type(exc).__name__}: {exc}"}
 
 
-def refinement_region_key(refinement: Any) -> tuple | None:
-    """The geometric region a Palace refinement constrains, WITHOUT its depth.
+def refinement_boxes_by_region(refinement: Any) -> dict[tuple, int] | None:
+    """Map each box's REGION to its depth, order-insensitively.
 
-    Two runs are points on one nested sequence only if they refine the same
-    region to different depths. Comparing the region alone is what lets the
-    depth differ.
+    Keyed by geometry so that reordering the boxes in the approval does not make
+    two identical prescriptions look different, and depth is kept PER BOX so a
+    regression in one box cannot hide behind an increase in another.
     """
     if not isinstance(refinement, dict) or not refinement.get("boxes"):
         return None
-    return tuple(
-        (tuple(b.get("BoundingBoxMin") or ()), tuple(b.get("BoundingBoxMax") or ()))
-        for b in refinement["boxes"]
-    )
+    out: dict[tuple, int] = {}
+    for b in refinement["boxes"]:
+        key = (tuple(b.get("BoundingBoxMin") or ()), tuple(b.get("BoundingBoxMax") or ()))
+        out[key] = max(out.get(key, 0), int(b.get("Levels", 0)))
+    return out
 
 
 def refinement_depth(refinement: Any) -> int | None:
-    """Total refinement levels, or None if this is not a Palace refinement."""
-    if not isinstance(refinement, dict) or not refinement.get("boxes"):
-        return None
-    return max(int(b.get("Levels", 0)) for b in refinement["boxes"])
+    """Deepest refinement level, or None if this is not a Palace refinement."""
+    by_region = refinement_boxes_by_region(refinement)
+    return max(by_region.values()) if by_region else None
 
 
 def is_prior_point_of_same_sequence(entry: dict[str, Any], baseline_rung: dict[str, Any]) -> bool:
-    """Is the baseline the SAME refinement, one or more levels shallower?
+    """Is the baseline the SAME refinement, strictly shallower in every box?
 
     A refined baseline is normally refused: for R1 and N1 the meaningful
-    comparison was against the plain rung, and a refined baseline would have
-    confounded two changes at once. A nested sequence is the exception, and a
-    narrow one - the region must be identical and the depth strictly smaller, so
-    the only difference is how many times that same region was refined. Anything
-    else is still refused.
+    comparison was the plain rung, and a refined baseline confounds two changes.
+    A nested sequence is the exception, and it is deliberately narrow:
+
+    * the SET of regions must be identical (order-insensitive), and
+    * every box must be at least as deep as the baseline's, with at least one
+      strictly deeper - so a per-box regression cannot pass by raising some
+      other box, and equal depth is not a step at all.
+
+    It does NOT establish that the two runs share a ladder level, element order
+    or halo. Those are fixed for this campaign and checked by the approval and
+    the mesh hash gate; this predicate is about the refinement alone, and the
+    caller must not read more into it.
     """
     this_r, base_r = entry.get("palace_refinement"), baseline_rung.get("palace_refinement")
     if this_r is None or base_r is None:
         return False
-    region, base_region = refinement_region_key(this_r), refinement_region_key(base_r)
-    if region is None or region != base_region:
+    mine, theirs = refinement_boxes_by_region(this_r), refinement_boxes_by_region(base_r)
+    if not mine or not theirs or set(mine) != set(theirs):
         return False
-    depth, base_depth = refinement_depth(this_r), refinement_depth(base_r)
-    return depth is not None and base_depth is not None and base_depth < depth
+    if any(mine[k] < theirs[k] for k in mine):
+        return False
+    return any(mine[k] > theirs[k] for k in mine)
 
 
 def compare_against_baseline(
@@ -1608,8 +1620,9 @@ def compare_against_baseline(
                 "live alternative explanation this run cannot separate. NOTE the config delta is "
                 "one block but the SOLVER is not identical: Model.Refinement makes Palace reserve "
                 "a mesh hierarchy and keep the coarse mesh (geodata.cpp:204-206, 346-349), so this "
-                "run uses a two-level geometric multigrid preconditioner where the baseline used "
-                "one. Frequencies are unaffected; the wall-clock comparison is not like-for-like"
+                "run uses a DEEPER geometric multigrid hierarchy than its baseline - Palace "
+                "reserves 1 + levels meshes, so the depth tracks the refinement depth. "
+                "Frequencies are unaffected; the wall-clock comparison is not like-for-like"
             ) if nested else (
                 "the refined run and the baseline differ in exactly one prescribed number, the "
                 "element size held over the port box. That is one prescribed number, not one "
@@ -1724,14 +1737,21 @@ def compare_against_baseline(
             "port_participation_from_probes": {"baseline": bp, "refined": tp},
             "delta_port_participation": (tp - bp) if (bp is not None and tp is not None) else None,
             "port_participation_reported_by_palace": {
-                "baseline": abs(pair.a.participation.get(1)) if pair.a.participation else None,
-                "refined": abs(pair.b.participation.get(1)) if pair.b.participation else None,
+                # abs_participation(port) is the safe accessor: a truthiness test on
+                # the dict does NOT establish that port 1 is in it, and abs(None)
+                # raises rather than yielding None.
+                "baseline": pair.a.abs_participation(1),
+                "refined": pair.b.abs_participation(1),
                 "what": "magnitude of Palace's reported E_ind participation; the SURROGATE",
             },
             "participation_note": (
-                "the two columns are different quantities. 'from_probes' is derived from the "
-                "boundary quadrature and accounts for the full tangential field; 'reported' is "
-                "Palace's rank-one surrogate and can only understate it."
+                "the two columns are different quantities and must not be averaged or swapped. "
+                "'from_probes' is DERIVED from the boundary quadrature and accounts for the full "
+                "tangential field; 'reported' is Palace's rank-one E_ind surrogate. "
+                "Cauchy-Schwarz bounds E_ind/E_port <= 1 for the EXACT quantities; 'from_probes' "
+                "is itself an estimate built from the difference p_Default - p_MA, so "
+                "reported <= derived is guaranteed for the exact ratio and OBSERVED for these "
+                "numbers - on the L2 -> N1 step it holds with ~1e-5 margin."
             ),
         })
     return out
@@ -1792,7 +1812,18 @@ def refinement_sequence(
     step["from"], step["to"], step["is_this_run"] = chain[-1], "this run", True
     step["primary"] = True
     out["steps"].append(step)
-    out["available"] = any(s.get("available") for s in out["steps"])
+    # Keyed on the PRIMARY step, not on any step. The earlier steps run between
+    # two committed records and are ALWAYS available, so "any" would report the
+    # sequence as available in precisely the likeliest failure mode - a TIMEOUT
+    # on this run - while the only new comparison was unavailable.
+    out["available"] = bool(step.get("available"))
+    out["primary_step_available"] = bool(step.get("available"))
+    out["earlier_steps_available"] = [bool(x.get("available")) for x in out["steps"][:-1]]
+    if not step.get("available"):
+        out["reason"] = (
+            "the primary step (this run against the previous point) is unavailable: "
+            f"{step.get('reason')}"
+        )
     return out
 
 
@@ -2243,7 +2274,11 @@ def render_report(summary: dict[str, Any]) -> str:
 
     baseline = summary.get("baseline_comparison") or {}
     if baseline.get("available"):
-        add("## 5c. Against the plain rung at the same level")
+        add("## 5c. " + (
+            "Against the previous point of this refinement sequence"
+            if (baseline or {}).get("sequence_step") else
+            "Against the plain rung at the same level"
+        ))
         add("")
         add(f"Baseline `{baseline['baseline']}`. {baseline['why_this_comparison']}.")
         add("")
@@ -2270,9 +2305,44 @@ def render_report(summary: dict[str, Any]) -> str:
             add(baseline.get("baseline_diagnostic_note", ""))
         add("")
     elif baseline.get("reason") and baseline.get("reason") != NOT_REFINED:
-        add("## 5c. Against the plain rung at the same level")
+        add("## 5c. " + (
+            "Against the previous point of this refinement sequence"
+            if (baseline or {}).get("sequence_step") else
+            "Against the plain rung at the same level"
+        ))
         add("")
         add(f"Not available: {baseline['reason']}")
+        add("")
+
+    # 5e before 5d deliberately: for a sequence run this IS the headline, and
+    # 5d's port-face framing is the older question.
+    sequence = summary.get("refinement_sequence") or {}
+    if sequence.get("steps"):
+        add("## 5e. The refinement sequence")
+        add("")
+        add(sequence.get("not_a_convergence_fit", ""))
+        add("")
+        add("| step | role | DOF | mode | Δf (GHz) | Δf rel | p_port derived | p_port reported |")
+        add("|---|---|---|---|---|---|---|---|")
+        for st in sequence["steps"]:
+            role = "**primary**" if st.get("primary") else "earlier"
+            label = f"`{st.get('from','?')}` → `{st.get('to','?')}`"
+            if not st.get("available"):
+                add(f"| {label} | {role} | — | — | — | — | — | *{st.get('reason','unavailable')}* |")
+                continue
+            dof = f"{st.get('baseline_dof')} → {st.get('this_dof')}"
+            for pair in st.get("pairs") or []:
+                d = pair.get("port_participation_from_probes") or {}
+                r = pair.get("port_participation_reported_by_palace") or {}
+                add(
+                    f"| {label} | {role} | {dof} | m{pair.get('baseline_mode')} | "
+                    f"{pair.get('delta_f_GHz'):+.6f} | {pair.get('delta_f_relative'):+.3e} | "
+                    f"{d.get('refined')} | {r.get('refined')} |"
+                )
+                label, role, dof = "", "", ""
+        add("")
+        add("`p_port derived` is from the boundary quadrature; `p_port reported` is Palace's "
+            "rank-one surrogate. They are different quantities and are not interchangeable.")
         add("")
 
     sensitivity = summary.get("port_resolution_sensitivity") or {}
@@ -2286,6 +2356,11 @@ def render_report(summary: dict[str, Any]) -> str:
     if sensitivity.get("available"):
         add("## 5d. Is the ladder's frequency movement sensitive to port-face resolution?")
         add("")
+        if sequence.get("steps"):
+            add("**Read §5e first.** For a sequence run this section's numerator is the step "
+                "against the PREVIOUS refinement point, not against a plain rung, so the "
+                "ratio below is not the port-face question it was written for.")
+            add("")
         add(f"Statistic: {sensitivity['statistic']}.")
         add("")
         add("| tracked | role | f(L1,L2,L3) GHz | port-only Δf | global L2→L3 Δf | sensitivity |")
@@ -2550,6 +2625,8 @@ def main(argv: list[str] | None = None) -> int:
     # and the summary write then failed OUTSIDE the guard - the exact bug class
     # that once destroyed a completed solve.
     sequence: dict[str, Any] = {"available": False, "reason": "analysis did not run"}
+    # NOTE: overwritten below with a case-specific reason - NOT_REFINED for a
+    # plain rung, "no sequence_records approved" for a refined run without them.
     trend: dict[str, Any] = {"available": False, "reason": "analysis did not run"}
     next_level: dict[str, Any] = {"decision": "analysis did not run"}
     reference_meta: dict[str, Any] = {}
@@ -2633,6 +2710,7 @@ def main(argv: list[str] | None = None) -> int:
         # comparison above is kept because it is what every other rung reports.
         baseline_comparison: dict[str, Any] = {"available": False, "reason": NOT_REFINED}
         sensitivity: dict[str, Any] = {"available": False, "reason": NOT_REFINED}
+        sequence = {"available": False, "reason": NOT_REFINED}
         if any_refinement(entry) is not None:
             approval_doc = (
                 json.loads(Path(args.approval).read_text()) if args.approval
@@ -2644,6 +2722,11 @@ def main(argv: list[str] | None = None) -> int:
                 # Every consecutive step, so the primary comparison is read
                 # beside the earlier ones rather than on its own.
                 sequence = refinement_sequence(entry, sequence_records)
+            else:
+                sequence = {
+                    "available": False,
+                    "reason": "the approval names no sequence_records, so no sequence is computed",
+                }
             if baseline_record:
                 baseline_comparison = compare_against_baseline(entry, baseline_record)
                 sensitivity = port_resolution_sensitivity(baseline_comparison, convergence)
