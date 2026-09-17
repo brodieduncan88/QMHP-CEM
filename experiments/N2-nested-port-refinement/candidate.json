@@ -1,0 +1,61 @@
+{
+ "schema": "qmhp-cem.nested-refinement-candidate/0.2.0",
+ "id": "N2",
+ "purpose": "determine whether the tracked frequencies and participation estimates begin STABILISING along L2 -> N1 -> N2. Local stabilisation would NOT establish global mesh convergence.",
+ "not_this": "N2 is NOT the prepared gmsh R2 experiment, which regenerates the mesh and is unapproved.",
+ "mechanism": "Palace Model.Refinement.Boxes, TWO total levels from the ORIGINAL L2 mesh",
+ "pinned": {
+  "original_L2_mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+  "original_L2_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+  "n1_reference_record": "COUPLED-LADDER-O1-L2-N1-20260917T001735Z",
+  "n1_config_sha256": "85c93c2db2c0e3e9323132aba2dc8e7d53ec2acf6e9ddcb878dd1c20bcf110c0",
+  "palace_commit": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+  "mfem_commit": "c444b17c973cc301590a6ac186fb33587b5881e6"
+ },
+ "refinement_region": {
+  "BoundingBoxMin": [
+   -0.62,
+   -0.125,
+   -0.01
+  ],
+  "BoundingBoxMax": [
+   -0.58,
+   -0.065,
+   0.01
+  ],
+  "Levels": 2,
+  "unchanged_from_N1": "the box is byte-identical to N1's; only Levels differs (1 -> 2)",
+  "total_not_additional": "TWO TOTAL levels from the original mesh, i.e. ONE beyond N1."
+ },
+ "first_stage_reproduces_N1": {
+  "verified": true,
+  "how": "read from the pinned source, not assumed. geodata.cpp:251 loops 'while (region_ref_level < max_region_ref_levels)'. On iteration 0, mesh.back() is the ORIGINAL loaded mesh and the per-box test is 'region_ref_level < box.ref_levels', i.e. 0 < Levels, true for Levels 1 and 2 alike. Same input mesh, same box, same marking criterion, same GeneralRefinement call -> iteration 0 of Levels:2 IS N1's single stage. N1 is therefore a genuine intermediate point of this sequence, not a parallel run.",
+  "second_stage": "iteration 1 marks on the ONCE-REFINED mesh using the same box, so it refines the children of stage 1 plus any closure element that now has a vertex in the box."
+ },
+ "dof": {
+  "original_L2_measured": 79944,
+  "n1_measured": 84485,
+  "n1_added": 4541,
+  "n2_measured": null,
+  "why_no_n2_number": "the refined mesh exists only inside Palace; MFEM has no Python binding here and Palace's --dry-run does not load a mesh. Stage 2 marks on the stage-1 mesh, which does not exist offline, so NO offline bound for stage 2 is computable - not even the lower bound that was available for stage 1. Any N2 DOF figure before the run would be invented.",
+  "rigorous_offline_statement": "N2 > 84485 (stage 2 only adds). No upper bound.",
+  "budget": 250000,
+  "enforcement": "the DOF probe. Palace prints 'ND (p = 1)' ONCE per run from the FINEST space (spaceoperator.cpp:303 -> GetNDSpace() = GetFinestFESpace(); one-shot print_hdr at :175/:202), so a multi-level hierarchy does not produce a coarse count for the probe to read by mistake. The multigrid hierarchy lines use a different format the pattern cannot match. The probe additionally enforces on the LARGEST count seen and flags any ambiguity, and a probe that never fires is REFUSED-DOF-PROBE-SILENT rather than a pass."
+ },
+ "resource_uncertainty": {
+  "n1_wall_clock_s": 923.523767673,
+  "cap_s": 2700,
+  "n1_cap_fraction": 0.34204583987888887,
+  "do_not_extrapolate": "N1 took 11.4x the baseline's wall clock for 5.7 % more DOF, so runtime is NOT proportional to DOF here and an N2 estimate from DOF alone would be meaningless. 69 % of N1 was preconditioner application over 622 coarse solves.",
+  "hierarchy_change_disclosed": "AUTOMATIC, not chosen: Model.Refinement makes Palace reserve 1 + levels meshes (geodata.cpp:204-206) and push a copy before each refinement (:346-349). The baseline ran ONE multigrid level, N1 ran TWO (log lines 74-75), and N2 will run THREE. No solver setting is changed to make N2 fit; the preconditioner is the pinned default.",
+  "primary_risk": "EXCEEDING THE 45-MINUTE CAP, not the DOF budget. N1 used 34.2 % of the cap with a 2-level hierarchy. A 3-level hierarchy on a larger problem could plausibly exceed it. That is a recorded TIMEOUT, not a silent overrun."
+ },
+ "comparisons": {
+  "primary": "N1 -> N2",
+  "alongside": "original L2 -> N1",
+  "mechanism": "refinement_sequence(), which calls compare_against_baseline per consecutive step",
+  "rules_unchanged": "the same matching rule, magnitude convention and frozen tolerances. An ambiguous correspondence is reported as UNAVAILABLE and is never repaired by changing the criteria.",
+  "excluded_from": "the gmsh L1/L2/L3 convergence fit, by earlier_rungs()",
+  "no_extrapolation": "no order is fitted and no continuum limit is inferred from three points. The refinement is LOCAL: stabilisation here would be local stabilisation, NOT global mesh convergence."
+ }
+}

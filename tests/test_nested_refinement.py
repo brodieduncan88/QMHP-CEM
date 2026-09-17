@@ -465,3 +465,191 @@ def test_the_not_refined_sentinel_is_one_constant():
     source = (REPO_ROOT / "scripts" / "palace_order1_ladder.py").read_text()
     assert ladder.NOT_REFINED == "not a refined run"
     assert '"not a port-refined run"' not in source, "the stale literal must be gone"
+
+
+# --- N2: one further level on the same region ---------------------------------
+
+N2_CANDIDATE = REPO_ROOT / "experiments" / "N2-nested-port-refinement"
+N1_RECORD = REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-N1-20260917T001735Z"
+L2_RECORD = REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-20260916T080802Z"
+
+
+@pytest.fixture(scope="module")
+def n2():
+    return json.loads((N2_CANDIDATE / "candidate.json").read_text())
+
+
+def test_n2_pins_the_original_mesh_the_n1_record_and_the_stack(n2):
+    """The three things that must not drift between now and approval."""
+    pin = n2["pinned"]
+    assert pin["original_L2_mesh_sha256"] == hashlib.sha256(MSH.read_bytes()).hexdigest()
+    assert pin["original_L2_record"] == L2_RECORD.name
+    assert pin["n1_reference_record"] == N1_RECORD.name
+    assert (N1_RECORD / "summary.json").is_file(), "the N1 reference must be on disk"
+    assert pin["palace_commit"] == "a61c8cbe0cacf496cde3c62e93085fae0d6299ac"
+    assert pin["mfem_commit"] == "c444b17c973cc301590a6ac186fb33587b5881e6"
+
+
+def test_n2_is_two_total_levels_on_n1s_unchanged_box(n2):
+    """TWO TOTAL levels from the original mesh -- one beyond N1, not two beyond."""
+    region = n2["refinement_region"]
+    assert region["Levels"] == 2
+    n1_box = json.loads((N1_RECORD / "L2" / "solver" / "config.json").read_text())
+    n1_box = n1_box["Model"]["Refinement"]["Boxes"][0]
+    assert n1_box["Levels"] == 1, "N1 is the one-level point"
+    assert region["BoundingBoxMin"] == n1_box["BoundingBoxMin"]
+    assert region["BoundingBoxMax"] == n1_box["BoundingBoxMax"]
+
+    cfg = json.loads((N2_CANDIDATE / "config.candidate.json").read_text())
+    box = cfg["Model"]["Refinement"]["Boxes"][0]
+    assert box["Levels"] == 2
+    assert (box["BoundingBoxMin"], box["BoundingBoxMax"]) == (
+        n1_box["BoundingBoxMin"], n1_box["BoundingBoxMax"]
+    )
+    # The mesh is the ORIGINAL L2 file, not a regenerated one.
+    assert cfg["Model"]["Mesh"] == "coupled_chip_cell_L2.msh"
+
+
+def test_the_n2_config_differs_from_n1s_only_in_the_level_count(n2):
+    """Everything the approval froze must be untouched: the delta is one integer."""
+    n1 = json.loads((N1_RECORD / "L2" / "solver" / "config.json").read_text())
+    n2cfg = json.loads((N2_CANDIDATE / "config.candidate.json").read_text())
+    strip = lambda c: {**c, "Model": {k: v for k, v in c["Model"].items() if k != "Refinement"}}
+    assert strip(n2cfg) == strip(n1), "only Model.Refinement may differ"
+    assert n2cfg["Solver"] == n1["Solver"], "no solver setting is changed to make N2 fit"
+    assert n2cfg["Boundaries"] == n1["Boundaries"]
+    assert n2cfg["Domains"] == n1["Domains"]
+
+
+def test_n2_does_not_invent_a_dof_it_cannot_measure(n2):
+    """Stage 2 marks on the stage-1 mesh, which does not exist offline.
+
+    No bound for stage 2 is computable -- not even the lower bound that stage 1
+    had. A number here would be invented.
+    """
+    dof = n2["dof"]
+    assert dof["n2_measured"] is None
+    assert dof["why_no_n2_number"]
+    assert dof["n1_measured"] == 84_485
+    assert str(dof["n1_measured"]) in dof["rigorous_offline_statement"]
+    assert dof["budget"] == BUDGET
+
+
+def test_n2_discloses_the_hierarchy_change_and_refuses_to_extrapolate_runtime(n2):
+    """N1 took 11.4x the baseline's time for 5.7 % more DOF; DOF does not predict runtime."""
+    res = n2["resource_uncertainty"]
+    assert res["n1_wall_clock_s"] == pytest.approx(923.5, abs=0.1)
+    assert res["cap_s"] == 2700
+    assert "not proportional" in res["do_not_extrapolate"].lower() or \
+           "NOT proportional" in res["do_not_extrapolate"]
+    assert "AUTOMATIC" in res["hierarchy_change_disclosed"]
+    assert "THREE" in res["hierarchy_change_disclosed"], "N2 gets a third multigrid level"
+    assert "CAP" in res["primary_risk"].upper()
+
+
+def test_the_probe_enforces_on_the_largest_count_not_the_first(monkeypatch, tmp_path):
+    """A multi-level hierarchy must not let an earlier, coarser count pass.
+
+    Palace prints this line once from the finest space, so today first == finest.
+    The guard takes the max anyway: enforcing on a coarse count is the one
+    failure it exists to prevent.
+    """
+    ladder = _ladder()
+    lines = [
+        " H1 (p = 1): 13991, ND (p = 1): 79944, RT (p = 1): 130388\n",   # coarse, in budget
+        " H1 (p = 1): 40000, ND (p = 1): 260000, RT (p = 1): 400000\n",  # finest, OVER
+    ]
+    killed = []
+    monkeypatch.setattr(ladder.subprocess, "Popen", lambda *a, **k: _FakePopen(lines))
+    monkeypatch.setattr(ladder.subprocess, "run",
+                        lambda cmd, **k: killed.append(cmd) or type("R", (), {"returncode": 0})())
+    info = ladder._run_palace("docker", "i", tmp_path, 1, "n", dof_budget=BUDGET)
+    probe = info["dof_probe"]
+    assert probe["dof_reported_all"] == [79_944, 260_000]
+    assert probe["dof_reported"] == 260_000, "the largest, not the first"
+    assert probe["ambiguous"] is True, "two distinct counts is an ambiguity worth recording"
+    assert probe["refused"] is True and killed
+
+
+def test_a_shallower_point_of_the_same_sequence_is_a_valid_baseline():
+    """N1 is refined, and IS N2's correct baseline. Anything else still is not."""
+    ladder = _ladder()
+    box = {"Levels": 1, "BoundingBoxMin": [-0.62, -0.125, -0.01],
+           "BoundingBoxMax": [-0.58, -0.065, 0.01]}
+    n1_rung = {"palace_refinement": {"boxes": [box]}}
+    n2_entry = {"palace_refinement": {"boxes": [{**box, "Levels": 2}]}}
+
+    assert ladder.is_prior_point_of_same_sequence(n2_entry, n1_rung) is True
+    # Same depth is not a step.
+    assert ladder.is_prior_point_of_same_sequence(n2_entry, {"palace_refinement": {"boxes": [{**box, "Levels": 2}]}}) is False
+    # Deeper baseline is not a prior point.
+    assert ladder.is_prior_point_of_same_sequence(n1_rung, n2_entry) is False
+    # A DIFFERENT region is not this sequence, whatever its depth.
+    other = {"palace_refinement": {"boxes": [{**box, "Levels": 1,
+                                             "BoundingBoxMin": [0.0, 0.0, 0.0]}]}}
+    assert ladder.is_prior_point_of_same_sequence(n2_entry, other) is False
+    # A gmsh-refined record is never a point of a Palace sequence.
+    assert ladder.is_prior_point_of_same_sequence(n2_entry, {"port_refinement": {"id": "R1"}}) is False
+
+
+def test_sequence_records_must_end_at_the_baseline(tmp_path):
+    """The primary comparison is the LAST step; a mismatch would silently
+    compare against something other than the record named as the baseline."""
+    ladder = _ladder()
+    approval = tmp_path / "a.json"
+    body = {
+        "level": 2,
+        "baseline_record": N1_RECORD.name,
+        "baseline_mesh_sha256": hashlib.sha256(MSH.read_bytes()).hexdigest(),
+        "palace_refinement": {"id": "N2", "boxes": [
+            {"Levels": 2, "BoundingBoxMin": [-0.62, -0.125, -0.01],
+             "BoundingBoxMax": [-0.58, -0.065, 0.01]}]},
+        "sequence_records": [L2_RECORD.name],   # ends at L2, not at the baseline
+    }
+    approval.write_text(json.dumps(body))
+    with pytest.raises(ladder.LadderError, match="must end at baseline_record"):
+        ladder.approved_palace_refinement(approval)
+
+    body["sequence_records"] = [L2_RECORD.name, "COUPLED-LADDER-O1-L2-NOPE"]
+    approval.write_text(json.dumps(body))
+    with pytest.raises(ladder.LadderError, match="not a record on disk"):
+        ladder.approved_palace_refinement(approval)
+
+    body["sequence_records"] = [L2_RECORD.name, N1_RECORD.name]
+    approval.write_text(json.dumps(body))
+    label, boxes, sha = ladder.approved_palace_refinement(approval)
+    assert label == "N2" and boxes[0]["Levels"] == 2
+
+
+def test_the_sequence_reports_both_participations_without_conflating_them():
+    """Derived and reported are different quantities; the record says which."""
+    ladder = _ladder()
+    step = ladder.compare_against_baseline(
+        json.loads((N1_RECORD / "summary.json").read_text())["rung"], L2_RECORD.name,
+    )
+    assert step["available"]
+    for pair in step["pairs"]:
+        derived = pair["port_participation_from_probes"]
+        reported = pair["port_participation_reported_by_palace"]
+        assert derived["baseline"] is not None and reported["baseline"] is not None
+        assert "SURROGATE" in reported["what"]
+        # Cauchy-Schwarz: the surrogate can only understate the derived value.
+        assert reported["baseline"] <= derived["baseline"] * (1 + 1e-9)
+        assert reported["refined"] <= derived["refined"] * (1 + 1e-9)
+
+
+def test_the_sequence_refuses_to_fit_an_order_or_a_limit():
+    """Three local points are not a convergence sequence in h."""
+    ladder = _ladder()
+    out = ladder.refinement_sequence({"palace_refinement": {"boxes": []}}, [])
+    assert out["available"] is False
+    text = out["not_a_convergence_fit"]
+    assert "LOCAL" in text and "NOT global mesh convergence" in text
+    assert "no order is fitted" in text and "no continuum limit" in text
+
+
+def test_n2_is_prepared_but_not_approved():
+    """The live approval must still name N1, which has already run."""
+    approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
+    assert approval["palace_refinement"]["id"] == "N1", "N2 is prepared, not approved"
+    assert not str(N2_CANDIDATE.relative_to(REPO_ROOT)).startswith(("solvers/palace", "docker"))

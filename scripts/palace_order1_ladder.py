@@ -194,6 +194,8 @@ def _run_palace(
         "armed": dof_budget is not None,
         "budget": dof_budget,
         "dof_reported": None,
+        "dof_reported_all": [],
+        "ambiguous": False,
         "refused": False,
         "reader_error": None,
         "line_buffered": line_buffered,
@@ -217,15 +219,30 @@ def _run_palace(
             assert proc.stdout is not None
             for raw in proc.stdout:
                 lines.append(raw)
-                if probe["dof_reported"] is not None or dof_budget is None:
+                if dof_budget is None:
                     continue
                 match = dof_re.search(raw)
                 if not match:
                     continue
                 reported = int(match.group(1))
-                probe["dof_reported"] = reported
-                probe["seen_at_wall_s"] = time.perf_counter() - t0
-                if reported > dof_budget:
+                probe["dof_reported_all"].append(reported)
+                if probe["seen_at_wall_s"] is None:
+                    probe["seen_at_wall_s"] = time.perf_counter() - t0
+                # Enforce on the LARGEST count seen, not the first.
+                #
+                # Palace prints this line once, from the finest space
+                # (spaceoperator.cpp:303 -> GetNDSpace() = GetFinestFESpace(),
+                # behind a one-shot print_hdr flag at :175/:202), and the
+                # multigrid hierarchy lines use a different format this pattern
+                # cannot match. So today first == largest == finest. Taking the
+                # max anyway costs nothing and removes the whole class: with a
+                # multi-level hierarchy, enforcing on an earlier coarse count
+                # would let a breach through, which is the one failure this
+                # guard exists to prevent.
+                probe["ambiguous"] = len(set(probe["dof_reported_all"])) > 1
+                largest = max(probe["dof_reported_all"])
+                probe["dof_reported"] = largest
+                if largest > dof_budget and not probe["refused"]:
                     probe["refused"] = True
                     _kill()
         except Exception as exc:  # noqa: BLE001 - recorded, never swallowed
@@ -1095,13 +1112,32 @@ def approved_palace_refinement(path: Path | None = None) -> tuple[str, list[dict
             f"the approval names baseline_record {baseline!r}, which is not a record on disk."
         )
     baseline_rung = (json.loads((record / "summary.json").read_text()).get("rung") or {})
-    if any_refinement(baseline_rung) is not None:
+    proposed = {"palace_refinement": {"boxes": boxes}}
+    if any_refinement(baseline_rung) is not None and not is_prior_point_of_same_sequence(
+        proposed, baseline_rung
+    ):
         # Checked BEFORE launch, as the gmsh path does. A refined baseline is
-        # not a baseline, and discovering that post-hoc costs a whole solve.
+        # not a baseline UNLESS it is a shallower point of this run's own nested
+        # sequence - same region, fewer levels - which is exactly the N1 -> N2
+        # case. Anything else costs a whole solve to discover post-hoc.
         raise LadderError(
-            f"baseline_record {baseline!r} is itself a refined run. The comparison this run "
-            "exists for needs the PLAIN rung at the same level."
+            f"baseline_record {baseline!r} is itself a refined run and is not a shallower point "
+            "of this run's sequence (same region, fewer levels). The comparison needs either the "
+            "PLAIN rung at the same level or the previous point of the same sequence."
         )
+
+    sequence = approval.get("sequence_records") or []
+    if sequence:
+        if not isinstance(sequence, list):
+            raise LadderError("sequence_records must be a list of record ids, oldest first")
+        for name in sequence:
+            if not (REPO_ROOT / "results" / name / "summary.json").is_file():
+                raise LadderError(f"sequence_records names {name!r}, which is not a record on disk")
+        if sequence[-1] != baseline:
+            raise LadderError(
+                f"sequence_records must end at baseline_record: it ends at {sequence[-1]!r} "
+                f"but baseline_record is {baseline!r}. The primary comparison is the last step."
+            )
     expected = (approval.get("baseline_mesh_sha256") or "").strip() or None
     if not expected:
         # Byte-identity with the baseline mesh IS the control this experiment
@@ -1493,6 +1529,48 @@ def _derived_diagnostic_for_record(record: Path, summary: dict[str, Any]) -> dic
         return {"available": False, "reason": f"{type(exc).__name__}: {exc}"}
 
 
+def refinement_region_key(refinement: Any) -> tuple | None:
+    """The geometric region a Palace refinement constrains, WITHOUT its depth.
+
+    Two runs are points on one nested sequence only if they refine the same
+    region to different depths. Comparing the region alone is what lets the
+    depth differ.
+    """
+    if not isinstance(refinement, dict) or not refinement.get("boxes"):
+        return None
+    return tuple(
+        (tuple(b.get("BoundingBoxMin") or ()), tuple(b.get("BoundingBoxMax") or ()))
+        for b in refinement["boxes"]
+    )
+
+
+def refinement_depth(refinement: Any) -> int | None:
+    """Total refinement levels, or None if this is not a Palace refinement."""
+    if not isinstance(refinement, dict) or not refinement.get("boxes"):
+        return None
+    return max(int(b.get("Levels", 0)) for b in refinement["boxes"])
+
+
+def is_prior_point_of_same_sequence(entry: dict[str, Any], baseline_rung: dict[str, Any]) -> bool:
+    """Is the baseline the SAME refinement, one or more levels shallower?
+
+    A refined baseline is normally refused: for R1 and N1 the meaningful
+    comparison was against the plain rung, and a refined baseline would have
+    confounded two changes at once. A nested sequence is the exception, and a
+    narrow one - the region must be identical and the depth strictly smaller, so
+    the only difference is how many times that same region was refined. Anything
+    else is still refused.
+    """
+    this_r, base_r = entry.get("palace_refinement"), baseline_rung.get("palace_refinement")
+    if this_r is None or base_r is None:
+        return False
+    region, base_region = refinement_region_key(this_r), refinement_region_key(base_r)
+    if region is None or region != base_region:
+        return False
+    depth, base_depth = refinement_depth(this_r), refinement_depth(base_r)
+    return depth is not None and base_depth is not None and base_depth < depth
+
+
 def compare_against_baseline(
     entry: dict[str, Any],
     baseline_record: str,
@@ -1565,9 +1643,25 @@ def compare_against_baseline(
     if baseline_rung.get("status") != "COMPLETED":
         out["reason"] = f"the baseline record is {baseline_rung.get('status')}"
         return out
-    if any_refinement(baseline_rung) is not None:
-        out["reason"] = "the named baseline is itself refined; it is not a baseline"
+    if any_refinement(baseline_rung) is not None and not is_prior_point_of_same_sequence(
+        entry, baseline_rung
+    ):
+        out["reason"] = (
+            "the named baseline is itself refined, and is not a shallower point of this run's "
+            "own refinement sequence (same region, fewer levels); it is not a baseline"
+        )
         return out
+    if is_prior_point_of_same_sequence(entry, baseline_rung):
+        out["sequence_step"] = {
+            "baseline_levels": refinement_depth(baseline_rung.get("palace_refinement")),
+            "this_levels": refinement_depth(entry.get("palace_refinement")),
+            "same_region": True,
+            "note": (
+                "this is a step along one nested refinement sequence: the same region refined "
+                "to a greater depth, on the same original mesh file. It is NOT a comparison "
+                "against a plain rung."
+            ),
+        }
 
     floor = COUPLED_SOLVER_RULES["band_floor_GHz"]
     ceiling = COUPLED_SOLVER_RULES["band_ceiling_GHz"]
@@ -1622,9 +1716,83 @@ def compare_against_baseline(
             "delta_abs_p_relative": pair.delta_abs_participation_relative.get(1),
             "guard": pair.guard,
             "separation_margin": pair.separation_margin,
+            # TWO participations, never conflated:
+            #   derived  - kappa*(p_Default - p_MA)/omega^2, from the surface probes
+            #   reported - Palace's E_ind/(E_elec + E_cap), the rank-one surrogate,
+            #              which is bounded ABOVE by the derived one by Cauchy-Schwarz
+            #              and understates whenever the port field is not uniform.
             "port_participation_from_probes": {"baseline": bp, "refined": tp},
             "delta_port_participation": (tp - bp) if (bp is not None and tp is not None) else None,
+            "port_participation_reported_by_palace": {
+                "baseline": abs(pair.a.participation.get(1)) if pair.a.participation else None,
+                "refined": abs(pair.b.participation.get(1)) if pair.b.participation else None,
+                "what": "magnitude of Palace's reported E_ind participation; the SURROGATE",
+            },
+            "participation_note": (
+                "the two columns are different quantities. 'from_probes' is derived from the "
+                "boundary quadrature and accounts for the full tangential field; 'reported' is "
+                "Palace's rank-one surrogate and can only understate it."
+            ),
         })
+    return out
+
+
+def refinement_sequence(
+    entry: dict[str, Any],
+    prior_records: list[str],
+    root: Path | None = None,
+) -> dict[str, Any]:
+    """Every consecutive step along the nested sequence, including this run.
+
+    For N2 that is L2 -> N1 (both committed, read-only) and N1 -> N2 (this run).
+    The primary comparison is the LAST step; the earlier ones are reported
+    beside it so a reader can see whether the movement is settling rather than
+    being told that it is.
+
+    This reuses compare_against_baseline per step - the same matching rule, the
+    same magnitude convention, the same tolerances. Nothing here introduces a
+    criterion, and an ambiguous correspondence is reported as unavailable
+    rather than repaired.
+
+    IT DOES NOT FIT ANYTHING. Three points on a locally refined region are not
+    a convergence sequence in h: the refinement is local, the closure differs at
+    each step, and the ladder's own L1/L2/L3 fit is a separate and unrelated
+    series that this must never be folded into.
+    """
+    out: dict[str, Any] = {
+        "what": "consecutive steps along one nested local-refinement sequence",
+        "not_a_convergence_fit": (
+            "no order is fitted and no continuum limit is extrapolated. The refinement is "
+            "LOCAL, so even a settling sequence would show local stabilisation, NOT global "
+            "mesh convergence. These points are excluded from the L1/L2/L3 ladder fit."
+        ),
+        "available": False,
+        "steps": [],
+    }
+    results = root or (REPO_ROOT / "results")
+    chain = list(prior_records)
+    if not chain:
+        out["reason"] = "the approval names no sequence_records"
+        return out
+
+    # Earlier steps: both endpoints are committed records, read read-only.
+    for earlier, later in zip(chain, chain[1:]):
+        later_summary = results / later / "summary.json"
+        if not later_summary.is_file():
+            out["steps"].append({"from": earlier, "to": later, "available": False,
+                                 "reason": f"{later} is not a record on disk"})
+            continue
+        later_entry = (json.loads(later_summary.read_text()).get("rung") or {})
+        step = compare_against_baseline(later_entry, earlier, root=results)
+        step["from"], step["to"], step["is_this_run"] = earlier, later, False
+        out["steps"].append(step)
+
+    # The final step is this run against the last committed point.
+    step = compare_against_baseline(entry, chain[-1], root=results)
+    step["from"], step["to"], step["is_this_run"] = chain[-1], "this run", True
+    step["primary"] = True
+    out["steps"].append(step)
+    out["available"] = any(s.get("available") for s in out["steps"])
     return out
 
 
@@ -2460,11 +2628,18 @@ def main(argv: list[str] | None = None) -> int:
         # comparison above is kept because it is what every other rung reports.
         baseline_comparison: dict[str, Any] = {"available": False, "reason": NOT_REFINED}
         sensitivity: dict[str, Any] = {"available": False, "reason": NOT_REFINED}
+        sequence: dict[str, Any] = {"available": False, "reason": "no sequence_records approved"}
         if any_refinement(entry) is not None:
-            baseline_record = (
+            approval_doc = (
                 json.loads(Path(args.approval).read_text()) if args.approval
                 else json.loads(LADDER_APPROVAL.read_text())
-            ).get("baseline_record")
+            )
+            baseline_record = approval_doc.get("baseline_record")
+            sequence_records = approval_doc.get("sequence_records") or []
+            if sequence_records:
+                # Every consecutive step, so the primary comparison is read
+                # beside the earlier ones rather than on its own.
+                sequence = refinement_sequence(entry, sequence_records)
             if baseline_record:
                 baseline_comparison = compare_against_baseline(entry, baseline_record)
                 sensitivity = port_resolution_sensitivity(baseline_comparison, convergence)
@@ -2515,6 +2690,7 @@ def main(argv: list[str] | None = None) -> int:
         },
         "trend": trend,
         "baseline_comparison": baseline_comparison,
+        "refinement_sequence": sequence,
         "port_resolution_sensitivity": sensitivity,
         "next_level": next_level,
         "post_solve_analysis_failed": analysis_failed,
