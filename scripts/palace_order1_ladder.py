@@ -2545,6 +2545,11 @@ def main(argv: list[str] | None = None) -> int:
     order_two: dict[str, Any] = {"available": False, "reason": "analysis did not run"}
     baseline_comparison: dict[str, Any] = {"available": False, "reason": "analysis did not run"}
     sensitivity: dict[str, Any] = {"available": False, "reason": "analysis did not run"}
+    # Defaulted HERE, before the try, with every other summary field. Initialising
+    # it inside the guarded window left it unbound when the analysis raised early,
+    # and the summary write then failed OUTSIDE the guard - the exact bug class
+    # that once destroyed a completed solve.
+    sequence: dict[str, Any] = {"available": False, "reason": "analysis did not run"}
     trend: dict[str, Any] = {"available": False, "reason": "analysis did not run"}
     next_level: dict[str, Any] = {"decision": "analysis did not run"}
     reference_meta: dict[str, Any] = {}
@@ -2628,7 +2633,6 @@ def main(argv: list[str] | None = None) -> int:
         # comparison above is kept because it is what every other rung reports.
         baseline_comparison: dict[str, Any] = {"available": False, "reason": NOT_REFINED}
         sensitivity: dict[str, Any] = {"available": False, "reason": NOT_REFINED}
-        sequence: dict[str, Any] = {"available": False, "reason": "no sequence_records approved"}
         if any_refinement(entry) is not None:
             approval_doc = (
                 json.loads(Path(args.approval).read_text()) if args.approval

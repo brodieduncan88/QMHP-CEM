@@ -653,3 +653,63 @@ def test_n2_is_prepared_but_not_approved():
     approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
     assert approval["palace_refinement"]["id"] == "N1", "N2 is prepared, not approved"
     assert not str(N2_CANDIDATE.relative_to(REPO_ROOT)).startswith(("solvers/palace", "docker"))
+
+
+def test_every_summary_field_has_a_default_before_the_guarded_window():
+    """A field initialised INSIDE the post-solve guard is unbound if the analysis
+    raises early, and the summary write then fails OUTSIDE the guard.
+
+    That is how a completed solve was destroyed once, and adding
+    `refinement_sequence` reintroduced it. This asserts structurally that every
+    name the summary reads is bound before the `try`, so the next field added
+    cannot repeat it.
+    """
+    import ast
+
+    source = (REPO_ROOT / "scripts" / "palace_order1_ladder.py").read_text()
+    tree = ast.parse(source)
+    main = next(n for n in ast.walk(tree)
+                if isinstance(n, ast.FunctionDef) and n.name == "main")
+
+    # The guarded window is the try whose handler records post-solve failure.
+    guard = next(n for n in ast.walk(main)
+                 if isinstance(n, ast.Try)
+                 and any("analysis_failed" in ast.dump(h) for h in n.handlers))
+
+    bound_before = set()
+    for node in main.body:
+        if node is guard:
+            break
+        for sub in ast.walk(node):
+            if isinstance(sub, ast.AnnAssign) and isinstance(sub.target, ast.Name):
+                bound_before.add(sub.target.id)
+            elif isinstance(sub, ast.Assign):
+                for t in sub.targets:
+                    if isinstance(t, ast.Name):
+                        bound_before.add(t.id)
+
+    # Names the summary dict reads, that are also assigned inside the guard.
+    assigned_in_guard = {
+        sub.target.id if isinstance(sub, ast.AnnAssign) else t.id
+        for node in guard.body for sub in ast.walk(node)
+        if isinstance(sub, ast.AnnAssign) and isinstance(sub.target, ast.Name)
+        for t in [sub.target]
+    } | {
+        t.id
+        for node in guard.body for sub in ast.walk(node)
+        if isinstance(sub, ast.Assign)
+        for t in sub.targets if isinstance(t, ast.Name)
+    }
+
+    summary_assign = next(
+        n for n in ast.walk(main)
+        if isinstance(n, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id == "summary" for t in n.targets)
+    )
+    read_by_summary = {n.id for n in ast.walk(summary_assign.value) if isinstance(n, ast.Name)}
+
+    at_risk = (read_by_summary & assigned_in_guard) - bound_before
+    assert not at_risk, (
+        f"{sorted(at_risk)} are read by the summary but only bound inside the guarded "
+        f"window; an early analysis failure would raise UnboundLocalError outside the guard"
+    )
