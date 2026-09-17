@@ -232,8 +232,24 @@ def _ladder():
 class _FakePopen:
     """A Palace that prints the real assembly lines and then keeps going."""
 
+    class _Pipe:
+        """A closable line iterator, as subprocess hands back."""
+
+        def __init__(self, lines):
+            self._it = iter(lines)
+            self.closed = False
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            return next(self._it)
+
+        def close(self):
+            self.closed = True
+
     def __init__(self, lines, **_):
-        self.stdout = iter(lines)
+        self.stdout = self._Pipe(lines)
         self.returncode = 0
         self.waited = False
 
@@ -278,6 +294,8 @@ def test_the_dof_probe_reads_the_count_palace_actually_assembled(monkeypatch, tm
     assert probe["dof_reported"] == 81_000
     assert probe["refused"] is False
     assert not killed, "an in-budget run must not be killed"
+    assert info["dof_probe"]["reader_error"] is None
+    assert info["dof_probe"]["seen_at_wall_s"] is not None, "when the count arrived is recorded"
     assert "ND (p = 1): 81000" in (tmp_path / "palace_log.txt").read_text()
 
 
@@ -350,3 +368,91 @@ def test_a_refined_record_is_kept_out_of_the_convergence_fit_by_either_mechanism
     assert ladder.any_refinement({"port_refinement": None, "palace_refinement": None}) is None
     assert ladder.any_refinement({"port_refinement": {"id": "R1"}}) == {"id": "R1"}
     assert ladder.any_refinement({"palace_refinement": {"id": "N1"}}) == {"id": "N1"}
+
+
+def test_a_silent_probe_refuses_rather_than_publishing_a_budget_claim(monkeypatch, tmp_path):
+    """Armed and never fired means the 250 000 rule was never applied.
+
+    A COMPLETED record would then assert budget compliance on the UNREFINED
+    count. Refuse instead.
+    """
+    ladder = _ladder()
+    lines = [line for line in ASSEMBLY if "ND (p = 1)" not in line]  # Palace never prints it
+    monkeypatch.setattr(ladder.subprocess, "Popen", lambda *a, **k: _FakePopen(lines))
+    monkeypatch.setattr(ladder.subprocess, "run",
+                        lambda cmd, **k: type("R", (), {"returncode": 0})())
+    info = ladder._run_palace("docker", "i", tmp_path, 1, "n", dof_budget=BUDGET)
+    assert info["dof_probe"]["armed"] is True
+    assert info["dof_probe"]["dof_reported"] is None
+    assert info["dof_probe"]["refused"] is False, "nothing to refuse on; the miss is the problem"
+
+
+def test_a_reader_failure_is_recorded_and_does_not_silently_disarm(monkeypatch, tmp_path):
+    """An unguarded reader would disarm the probe AND truncate the log, silently."""
+    ladder = _ladder()
+
+    class _Exploding(_FakePopen):
+        def __init__(self, *a, **k):
+            super().__init__(["first\n"], **k)
+            self._boom = True
+
+        class _Pipe:
+            def __init__(self, *_):
+                self._n = 0
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                self._n += 1
+                if self._n == 1:
+                    return "first\n"
+                raise UnicodeDecodeError("utf-8", b"", 0, 1, "bad byte")
+
+            def close(self):
+                pass
+
+    monkeypatch.setattr(ladder.subprocess, "Popen", lambda *a, **k: _Exploding())
+    monkeypatch.setattr(ladder.subprocess, "run",
+                        lambda cmd, **k: type("R", (), {"returncode": 0})())
+    info = ladder._run_palace("docker", "i", tmp_path, 1, "n", dof_budget=BUDGET)
+    assert info["dof_probe"]["reader_error"], "the failure must reach the record"
+    assert "UnicodeDecodeError" in info["dof_probe"]["reader_error"]
+
+
+def test_the_approval_requires_the_baseline_mesh_hash(tmp_path):
+    """Byte-identity is the control. Without the hash the gate is skipped, so a
+    missing key must refuse rather than silently drop it."""
+    ladder = _ladder()
+    approval = tmp_path / "a.json"
+    body = {
+        "level": 2,
+        "baseline_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+        "palace_refinement": {"id": "N1", "boxes": [
+            {"Levels": 1, "BoundingBoxMin": [-0.62, -0.125, -0.01],
+             "BoundingBoxMax": [-0.58, -0.065, 0.01]}]},
+    }
+    approval.write_text(json.dumps(body))
+    with pytest.raises(ladder.LadderError, match="baseline_mesh_sha256"):
+        ladder.approved_palace_refinement(approval)
+
+    # And the gmsh path's key is NOT accepted in its place.
+    approval.write_text(json.dumps({**body, "dry_run_mesh_sha256": {"N1": "deadbeef"}}))
+    with pytest.raises(ladder.LadderError, match="baseline_mesh_sha256"):
+        ladder.approved_palace_refinement(approval)
+
+
+def test_a_record_reports_the_dof_it_solved_not_the_one_it_loaded():
+    """Reporting the loaded 79 944 as a refined run's DOF would be false."""
+    ladder = _ladder()
+    assert ladder.solved_dof({"dof_measured": 79_944}) == 79_944
+    assert ladder.solved_dof({"dof_measured": 79_944, "dof_solved": 96_300}) == 96_300
+    assert ladder.solved_dof({}) is None
+
+
+def test_the_not_refined_sentinel_is_one_constant():
+    """Two copies drifted apart once and every plain rung grew two empty sections."""
+    ladder = _ladder()
+    source = (REPO_ROOT / "scripts" / "palace_order1_ladder.py").read_text()
+    assert ladder.NOT_REFINED == "not a refined run"
+    assert '"not a port-refined run"' not in source, "the stale literal must be gone"

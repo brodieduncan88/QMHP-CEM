@@ -25,9 +25,29 @@ from pathlib import Path
 def describe_approval(path: Path) -> str:
     approval = json.loads(path.read_text())
     lines = [f"level: {approval.get('level')}"]
+    palace = approval.get("palace_refinement")
+    if palace is not None:
+        # This step is the human-visible record of what a run is about to spend.
+        # Reading only port_refinement printed "none (plain ladder rung)" for a
+        # Palace-refined run, which is the opposite of true.
+        lines.append(f"refinement: {palace.get('id')} via Palace Model.Refinement.Boxes")
+        lines.append("  mesh: the baseline's, REUSED byte-identically (gmsh does not run)")
+        for box in palace.get("boxes") or []:
+            lines.append(
+                f"  box: Levels={box.get('Levels')}  "
+                f"min={box.get('BoundingBoxMin')}  max={box.get('BoundingBoxMax')} (mm)"
+            )
+        lines.append(f"  baseline_record: {approval.get('baseline_record')}")
+        sha = approval.get("baseline_mesh_sha256")
+        lines.append(
+            f"  mesh hash gate: ACTIVE against {sha[:16]}..." if sha
+            else "  mesh hash gate: INACTIVE - no baseline_mesh_sha256"
+        )
+        lines.append("  DOF: not measurable offline; enforced by the probe on Palace's output")
+        return "\n".join(lines)
     refinement = approval.get("port_refinement")
     if refinement is None:
-        lines.append("port refinement: none (plain ladder rung)")
+        lines.append("refinement: none (plain ladder rung)")
         return "\n".join(lines)
     lines.append(
         f"port refinement: {refinement.get('id')}  "
@@ -52,14 +72,14 @@ def describe_approval(path: Path) -> str:
 def headline(path: Path) -> str:
     summary = json.loads(path.read_text())
     rung = summary.get("rung") or {}
-    refinement = rung.get("port_refinement") or {}
+    refinement = rung.get("port_refinement") or rung.get("palace_refinement") or {}
     label = f"-{refinement['id']}" if refinement.get("id") else ""
     diagnostic = rung.get("port_diagnostic") or {}
     worst = diagnostic.get("worst_relative_disagreement_probe_vs_closure")
     worst_text = f"{worst:.2e}" if isinstance(worst, (int, float)) else "n/a"
     return (
         f"L{summary.get('level')}{label} {rung.get('status')}, "
-        f"{rung.get('dof_measured')} DOF; probe-vs-closure {worst_text}"
+        f"{rung.get('dof_solved') or rung.get('dof_measured')} DOF; probe-vs-closure {worst_text}"
     )
 
 
