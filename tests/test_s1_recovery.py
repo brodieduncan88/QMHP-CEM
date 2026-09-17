@@ -328,13 +328,14 @@ def _ladder_module():
     return module
 
 
-def test_the_committed_approval_record_now_authorises_R1_only():
-    """The owner approved R1 after review. R2 is prepared and NOT approved.
+def test_the_approval_r1_ran_under_authorised_R1_only():
+    """The owner approved R1 after review. R2 was prepared and NOT approved.
 
-    This test asserted the opposite before the approval, which was correct then:
-    the change that prepared the experiment could not also start it.
+    Read from the pinned fixture, not the live approval: this is a fact about
+    what R1 ran under, and it must stay true after the next experiment is
+    approved. See R1_APPROVAL.
     """
-    label, refinement, expected_sha = _ladder_module().approved_port_refinement()
+    label, refinement, expected_sha = _ladder_module().approved_port_refinement(R1_APPROVAL)
     assert label == "R1"
     assert refinement.h_port_mm == 0.003333333333333333
     assert expected_sha == "a49ef282c7f07c56f210a450b291a2e027de530ba7c3e78bbdcead3b67315fee"
@@ -521,6 +522,19 @@ def test_the_recovery_record_preserves_and_references_its_sources():
 
 # --- the approved R1 run ------------------------------------------------------
 
+#: The approval record R1 ACTUALLY RAN UNDER, pinned.
+#:
+#: These tests are about history: what the owner approved for R1, and what R1
+#: then solved. `.github/ladder-approval.json` is the LIVE approval and names
+#: whatever is approved now - it named R1, then N1, and will name something else
+#: next. Reading it here made seven tests assert a historical fact against a
+#: mutable file, so approving the next experiment broke them.
+#:
+#: This is a byte copy of that file at commit e5d49f9, the commit whose push
+#: started R1. It is evidence, not configuration, and nothing may rewrite it.
+R1_APPROVAL = REPO_ROOT / "tests" / "fixtures" / "ladder-approval-R1.json"
+
+
 
 def test_the_approval_record_authorises_exactly_the_prepared_R1_mesh():
     """The owner approved R1. The record must name the mesh that was dry-run.
@@ -529,7 +543,7 @@ def test_the_approval_record_authorises_exactly_the_prepared_R1_mesh():
     is for that exact value; a rounded literal would build a different mesh and
     the gate would refuse to solve it.
     """
-    approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
+    approval = json.loads(R1_APPROVAL.read_text())
     refinement = approval["port_refinement"]
     assert refinement["id"] == "R1"
     assert refinement["h_port_mm"] == 0.003333333333333333
@@ -557,14 +571,14 @@ def test_the_approved_refinement_matches_the_predeclared_experiment():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     predeclared = module.PREDECLARATION["approval_block_to_paste"]["R1"]
-    approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
+    approval = json.loads(R1_APPROVAL.read_text())
     for key in ("id", "h_port_mm", "pad_mm", "transition_mm", "ports"):
         assert approval["port_refinement"][key] == predeclared[key], key
 
 
 def test_the_mesh_the_approval_pins_is_the_one_the_mesher_builds():
     """The gate is only meaningful if the pinned hash is reproducible."""
-    approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
+    approval = json.loads(R1_APPROVAL.read_text())
     refinement = PortRefinement(
         h_port_mm=approval["port_refinement"]["h_port_mm"],
         pad_mm=approval["port_refinement"]["pad_mm"],
@@ -751,7 +765,7 @@ def test_the_approval_describer_never_fails_a_step_that_runs_after_a_solve(tmp_p
     assert "record written" in done.stdout
 
     described = subprocess.run(
-        [sys.executable, str(script), "--approval", str(REPO_ROOT / ".github/ladder-approval.json")],
+        [sys.executable, str(script), "--approval", str(R1_APPROVAL)],
         cwd=REPO_ROOT, capture_output=True, text=True,
     )
     assert described.returncode == 0
@@ -831,9 +845,7 @@ def test_the_refinement_label_reaches_the_record_and_the_commit_headline():
         h_port_mm=0.003333333333333333, pad_mm=0.010, transition_mm=0.020, label="R1",
     )
     assert refinement.as_dict()["id"] == "R1"
-    label, built, _ = _ladder_module().approved_port_refinement(
-        REPO_ROOT / ".github" / "ladder-approval.json"
-    )
+    label, built, _ = _ladder_module().approved_port_refinement(R1_APPROVAL)
     assert built.label == label == "R1"
     assert built.as_dict()["id"] == "R1"
 
@@ -961,10 +973,27 @@ def test_the_renderer_is_total_over_a_partial_refinement_payload(partial):
 R1_RECORD = REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-R1-20260916T120954Z"
 
 
+
+def test_the_pinned_r1_approval_matches_the_record_r1_actually_produced():
+    """Anchors the fixture to executed evidence, so it cannot quietly drift.
+
+    A pinned fixture is only worth having if it is the real thing. The mesh hash
+    the approval gated on must be the mesh the committed R1 record says it
+    solved -- two immutable artefacts, agreeing.
+    """
+    approval = json.loads(R1_APPROVAL.read_text())
+    record = json.loads((R1_RECORD / "summary.json").read_text())
+    assert approval["dry_run_mesh_sha256"]["R1"] == record["rung"]["mesh"]["sha256"]
+    assert approval["baseline_record"] == record["baseline_comparison"]["baseline"]
+    assert approval["port_refinement"]["id"] == record["rung"]["port_refinement"]["id"] == "R1"
+    # And it is NOT the live approval, which has moved on.
+    live = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
+    assert "port_refinement" not in live, "the live approval has moved past R1; that is the point"
+
 def test_the_r1_run_solved_the_approved_mesh_and_nothing_else():
     summary = json.loads((R1_RECORD / "summary.json").read_text())
     rung = summary["rung"]
-    approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
+    approval = json.loads(R1_APPROVAL.read_text())
     assert rung["status"] == "COMPLETED"
     assert rung["mesh"]["sha256"] == approval["dry_run_mesh_sha256"]["R1"]
     assert rung["dof_measured"] == 80_762 <= DOF_BUDGET
