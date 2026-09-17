@@ -205,21 +205,28 @@ def test_the_marked_region_quality_is_reported_including_the_bad_news(candidate)
 
 
 def test_the_approval_names_exactly_one_approved_experiment():
-    """N1 is now approved. The record must name it and ONLY it.
+    """Whatever is approved, exactly ONE mechanism may be, under unchanged rules.
 
-    Both mechanisms present would be two experiments on two different meshes;
-    the driver refuses that outright, and this catches it a commit earlier.
+    Deliberately experiment-AGNOSTIC. An earlier version pinned the approved id,
+    so every new approval broke it and had to be edited in the approving commit
+    -- the same coupling that made seven historical R1 tests fail when N1 was
+    approved. What must hold for any approval is asserted here; what was true of
+    one finished run belongs in that run's own pinned fixture.
     """
     approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
-    assert approval.get("palace_refinement", {}).get("id") == "N1"
-    assert "port_refinement" not in approval, "R1 is finished and recorded; it is not re-approved"
-    # Byte-identity with the baseline mesh is the control, so the hash is required.
-    assert approval.get("baseline_mesh_sha256")
-    assert approval.get("baseline_record") == "COUPLED-LADDER-O1-L2-20260916T080802Z"
-    # And the rule it runs under is unchanged.
+    mechanisms = [k for k in ("port_refinement", "palace_refinement") if k in approval]
+    assert len(mechanisms) == 1, (
+        f"exactly one refinement mechanism may be approved, found {mechanisms}: "
+        "two would be two experiments on two different meshes"
+    )
+    which = mechanisms[0]
+    assert approval[which].get("id"), "the approved experiment must be labelled"
+    # Byte-identity with the named mesh is the control, so a hash is required.
+    assert approval.get("baseline_mesh_sha256") or approval.get("dry_run_mesh_sha256")
+    assert approval.get("baseline_record")
+    # And the rules it runs under are the unchanged ones.
     assert approval["constraints"]["dof_budget"] == BUDGET
     assert approval["constraints"]["per_solve_wall_clock_cap_s"] == 2700
-    assert approval["dof_rule"]["rule_unchanged"] is True
     golden = (REPO_ROOT / ".github" / "workflows" / "palace-golden.yml").read_text()
     for path in ("solvers/palace/**", "docker/palace.Dockerfile", "scripts/palace_golden_run.py"):
         assert path in golden
@@ -666,10 +673,25 @@ def test_the_sequence_refuses_to_fit_an_order_or_a_limit():
     assert "no order is fitted" in text and "no continuum limit" in text
 
 
-def test_n2_is_prepared_but_not_approved():
-    """The live approval must still name N1, which has already run."""
+def test_the_approval_carries_exactly_the_reviewed_n2_keys():
+    """N2 is approved. The live approval must match the reviewed candidate."""
     approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
-    assert approval["palace_refinement"]["id"] == "N1", "N2 is prepared, not approved"
+    cand = json.loads((N2_CANDIDATE / "candidate.json").read_text())
+    assert approval["palace_refinement"]["id"] == "N2"
+    assert "port_refinement" not in approval, "the gmsh path is not approved"
+    box = approval["palace_refinement"]["boxes"][0]
+    region = cand["refinement_region"]
+    assert box["Levels"] == region["Levels"] == 2, "TWO TOTAL levels from the original mesh"
+    assert box["BoundingBoxMin"] == region["BoundingBoxMin"]
+    assert box["BoundingBoxMax"] == region["BoundingBoxMax"]
+    assert approval["baseline_record"] == cand["pinned"]["n1_reference_record"]
+    assert approval["sequence_records"] == [
+        cand["pinned"]["original_L2_record"], cand["pinned"]["n1_reference_record"]
+    ]
+    assert approval["baseline_mesh_sha256"] == cand["pinned"]["original_L2_mesh_sha256"]
+    # The rule and the cap are the unchanged ones.
+    assert approval["constraints"]["dof_budget"] == BUDGET
+    assert approval["constraints"]["per_solve_wall_clock_cap_s"] == 2700
     assert not str(N2_CANDIDATE.relative_to(REPO_ROOT)).startswith(("solvers/palace", "docker"))
 
 

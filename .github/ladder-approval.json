@@ -1,10 +1,10 @@
 {
  "schema": "qmhp-cem.ladder-approval/0.1.0",
- "what": "one nested local-refinement run of the S1 coupled chip cell: the approved level at fixed element order 1 and fixed 0.08 mm halo, with one Palace Model.Refinement.Boxes entry over a declared box around the lumped port. The mesh file is REUSED byte-identically; gmsh does not run.",
- "approved_by": "the repository owner, approving N1 only after reviewing the nested-refinement feasibility study",
+ "what": "one nested local-refinement run of the S1 coupled chip cell: TWO TOTAL refinement levels from the ORIGINAL L2 mesh via Palace Model.Refinement.Boxes, i.e. one level deeper than the completed N1. The mesh file is REUSED byte-identically; gmsh does not run. This is NOT the prepared gmsh R2 experiment.",
+ "approved_by": "the repository owner, approving N2 only after reviewing the N2 preparation",
  "approved_utc": "2026-09-16",
  "level": 2,
- "sequential": "one run per invocation. This approval runs N1 ONLY and stops. A second refinement level, a different box, or R2 are each a separate approval.",
+ "sequential": "one run per invocation. This approval runs N2 ONLY and stops. A third level, a different box, R2 or a rerun of N1 are each a separate approval.",
  "dry_runs_first": {
   "requirement": "dry-run levels 2 and 3 and record measured DOF for both before running anything",
   "measured_order1_dof": {
@@ -47,8 +47,9 @@
   "the frozen Delta|p| <= 1e-2 and Delta f <= 1e-4 criteria, reported and not gating"
  ],
  "explicitly_out_of_scope": [
-  "a second refinement level or any further box, which is a separate approval",
+  "a third refinement level, which is a separate approval",
   "the R2 gmsh mesh, still prepared and NOT approved",
+  "rerunning N1",
   "the coupling extraction itself",
   "the Route A inversion on EM data",
   "Route B",
@@ -91,7 +92,7 @@
    ]
   }
  ],
- "baseline_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+ "baseline_record": "COUPLED-LADDER-O1-L2-N1-20260917T001735Z",
  "h_port_note": "the owner wrote h_port = 0.003333 mm, which is the rounded form of h_gap(level 2)/2 = 0.006666666666666666/2. The exact double is used here because the mesh hash above is for that exact value; a truncated literal could build a different mesh and the hash gate would then correctly refuse to solve it.",
  "what_this_run_answers": {
   "purpose": "to obtain a frequency difference from a NESTED pair on one mesh file, where the only change is added degrees of freedom in a declared region and the lumped-port geometry is unchanged.",
@@ -105,10 +106,10 @@
   ]
  },
  "palace_refinement": {
-  "id": "N1",
+  "id": "N2",
   "boxes": [
    {
-    "Levels": 1,
+    "Levels": 2,
     "BoundingBoxMin": [
      -0.62,
      -0.125,
@@ -137,9 +138,9 @@
   "why": "the refined mesh exists only inside Palace at load time; MFEM has no Python binding in this environment and Palace's --dry-run parses the config and exits without loading a mesh (main.cpp:246-256). The 250 000 rule therefore cannot be enforced by refusing to launch.",
   "how_it_is_enforced": "a DOF PROBE. Palace prints 'ND (p = 1): N' while assembling and only afterwards configures the eigensolver (palace_log.txt line 49 against line 54). The driver streams the log, reads that count and kills the container if it exceeds the budget, recording REFUSED-DOF-BUDGET. Exposure is seconds of loading and assembly, not the cap.",
   "offline_bounds": {
-   "lower": 81864,
-   "upper_uniform_refinement": 615486,
-   "note": "a lower bound cannot discharge an upper limit; this is an interval, not headroom"
+   "lower_trivial": 84485,
+   "upper_loose": 4857516,
+   "note": "the upper bound is two uniform levels of the original mesh, 19.4x the budget. It is NOT a prediction and must NOT be read as an expected N2 size. The exact N2 DOF is unknown offline and is established only by the live probe."
   },
   "breach_argument": "a breach needs 170 056 added edges; the marked octasection supplies 1 920 and a full uniform refinement 535 542, so it would take the closure delivering 31.8 % of a uniform refinement -- an 89x expansion of the 221 marked elements.",
   "rule_unchanged": true
@@ -151,5 +152,9 @@
   "the admitted set is not {m1, m2}, or matching against the level-1 rung refuses -> record and stop.",
   "any post-solve analysis raises -> the record is still written, manifested and committed.",
   "completing N1 means STOP for review, not a second refinement level."
+ ],
+ "sequence_records": [
+  "COUPLED-LADDER-O1-L2-20260916T080802Z",
+  "COUPLED-LADDER-O1-L2-N1-20260917T001735Z"
  ]
 }
