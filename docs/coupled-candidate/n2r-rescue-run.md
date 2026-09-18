@@ -129,5 +129,10 @@ the report now says so on both steps rather than only on this one.
 
 ## 7. Status
 
-Prepared and approved; the outcome is recorded below once the run reports. N2's TIMEOUT stands as
-recorded in `n2-outcome.md` — N2R does not replace it and does not reinterpret it.
+**Executed.** COMPLETED in 159.0 s, 5.9 % of the cap, at exactly the predicted 103,411 DOF, on a
+mesh Palace printed with exactly the four predicted counts and a one-level hierarchy. The outcome,
+the N1 → N2R comparison and what it does and does not establish are in
+[`n2r-outcome.md`](n2r-outcome.md).
+
+N2's TIMEOUT stands as recorded in `n2-outcome.md` — N2R does not replace it and does not
+reinterpret it.

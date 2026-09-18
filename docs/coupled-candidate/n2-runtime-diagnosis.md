@@ -230,6 +230,13 @@ touch — error estimation (0.494 + 6.820 + 31.272 = 38.6 s) and disk I/O
 (25.8 s) — already account for 64.3 s of its 78.5 s, and both grow with problem
 size. A single-level N2 would be dominated by those, not by the solver.
 
+**Outcome.** `MGMaxLevels: 1` was subsequently approved and run as N2R. It completed in 159.0 s
+against N2's 2,700.1 s timeout, at the same 103,411 DOF on a mesh identical to four independent
+counts: preconditioner time 635.561 s → 7.905 s, GMRES 15.37 → 2.00 iterations per solve, zero
+`CoarseSolve` calls. The §8 caveats above were the right ones to state — no factorisation cost was
+predicted, and the run did turn out to be dominated by estimation and I/O (77.4 % of its total).
+See [`n2r-outcome.md`](n2r-outcome.md).
+
 It also does not change the N2 result. N2 refused on time, and that refusal
 stands as recorded in `n2-outcome.md`. This note explains the cause and names a
 configuration that could be proposed later; it does not propose one now, and no
