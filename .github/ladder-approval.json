@@ -1,10 +1,10 @@
 {
  "schema": "qmhp-cem.ladder-approval/0.1.0",
- "what": "one nested local-refinement run of the S1 coupled chip cell: TWO TOTAL refinement levels from the ORIGINAL L2 mesh via Palace Model.Refinement.Boxes, i.e. one level deeper than the completed N1. The mesh file is REUSED byte-identically; gmsh does not run. This is NOT the prepared gmsh R2 experiment.",
- "approved_by": "the repository owner, approving N2 only after reviewing the N2 preparation",
- "approved_utc": "2026-09-16",
+ "what": "ONE rescue re-solve of the N2 discrete problem: the SAME baseline mesh file, the SAME two-level Palace Model.Refinement.Boxes prescription, the SAME order, tolerances and eigenvalue target as the timed-out N2 run, plus ONE Solver.Linear override, MGMaxLevels: 1. This is a preconditioner change, not a numerical-method change. It is NOT a third refinement level, NOT the prepared gmsh R2 experiment and NOT a rerun of N1.",
+ "approved_by": "the repository owner, approving a single N2 rescue run with MGMaxLevels: 1 after reviewing the N2 runtime diagnosis",
+ "approved_utc": "2026-09-18",
  "level": 2,
- "sequential": "one run per invocation. This approval runs N2 ONLY and stops. A third level, a different box, R2 or a rerun of N1 are each a separate approval.",
+ "sequential": "one run per invocation. This approval runs N2R ONLY and stops. A third level, a different box, R2, a rerun of N1 or a second rescue attempt are each a separate approval.",
  "dry_runs_first": {
   "requirement": "dry-run levels 2 and 3 and record measured DOF for both before running anything",
   "measured_order1_dof": {
@@ -36,7 +36,8 @@
   "boundary_postprocessing": "two interface-dielectric probes on the port face, Default and MA, unit thickness and unit permittivity",
   "purpose": "test the supported-but-unproven port-stiffness explanation of the energy-balance failures",
   "changes_the_operator": false,
-  "committed": "surface-Q.csv is committed with the record; the paraview/ tree is uploaded as an artifact only"
+  "committed": "surface-Q.csv is committed with the record; the paraview/ tree is uploaded as an artifact only",
+  "carried_from": "the N2 approval, unchanged. Its 'purpose' field states N2's question, which N2R re-asks; it is not a claim that the rescue run tests anything new."
  },
  "rules_preserved_unchanged": [
   "the admission rule qmhp-cem.mode-admission/0.1.0 (|R - 1| <= 1e-3)",
@@ -48,8 +49,9 @@
  ],
  "explicitly_out_of_scope": [
   "a third refinement level, which is a separate approval",
+  "a second rescue attempt or any other solver setting, each a separate approval",
   "the R2 gmsh mesh, still prepared and NOT approved",
-  "rerunning N1",
+  "rerunning N1 or N2",
   "the coupling extraction itself",
   "the Route A inversion on EM data",
   "Route B",
@@ -59,6 +61,7 @@
   "mediator work",
   "physical redesign",
   "any change to the 250 000-DOF rule or the 45-minute cap",
+  "any change to the tolerances, the eigenvalue target, the mesh or the element order",
   "merging pull request 7"
  ],
  "note": "Committing this file on a palace/** branch starts the approved level. It is the approval record and the trigger at once, so a level cannot be started by an unrelated code change.",
@@ -95,8 +98,9 @@
  "baseline_record": "COUPLED-LADDER-O1-L2-N1-20260917T001735Z",
  "h_port_note": "the owner wrote h_port = 0.003333 mm, which is the rounded form of h_gap(level 2)/2 = 0.006666666666666666/2. The exact double is used here because the mesh hash above is for that exact value; a truncated literal could build a different mesh and the hash gate would then correctly refuse to solve it.",
  "what_this_run_answers": {
-  "purpose": "to obtain a frequency difference from a NESTED pair on one mesh file, where the only change is added degrees of freedom in a declared region and the lumped-port geometry is unchanged.",
-  "what_it_does_not_answer": "this is NOT the question R1 was asked. A movement is attributable to added resolution in the refined REGION, which is not the same as port-face resolution.",
+  "purpose": "to obtain the N1 -> N2 frequency and participation comparison that N2 could not deliver, by solving N2's discrete problem within the cap.",
+  "what_it_does_not_answer": "nothing beyond what N2 was already approved to answer. The field_output block above is N2's, carried unchanged, so the port-face probes still run and still produce a port_field_test verdict - that is the same question N2 was approved to ask, not a new one. N2R adds no question of its own about the physics or the discretisation, and inherits every one of N2's confounds unchanged.",
+  "preconditioner_is_not_a_confound_but_is_not_free": "N1 used the V-cycle, N2R uses the direct preconditioner, so this step is NOT preconditioner-controlled. A preconditioner changes the path to the solution, not the solution: both runs converge their own discrete eigenproblem to the same Solver.Eigenmode.Tol 1e-06 and Solver.Linear.Tol 1e-08. What that leaves is stated honestly rather than certified away. NEITHER of Palace's error columns is a frequency: ErrorType::ABSOLUTE returns the raw residual norm ||(K - lambda M)x|| and ErrorType::BACKWARD divides it by normK + |lambda| normM (slepc.cpp:473-484, :824-837). Neither bounds a frequency without an eigenvalue condition number, which is not computed here, so no measurement in this project certifies the N1 -> N2R frequency difference as free of solver-path effects, and none is claimed. What IS enforced is the project's unchanged backward-error tolerance of 1e-6, which N1 met at 8.76e-11 and which N2R must also meet or stop. The N1 -> N2R frequency difference is therefore reported as an OBSERVED difference between two runs that also differ in preconditioner - not as a measurement of refinement alone. For scale, the L2 -> N1 movements were 3.685e-02 and 4.170e-04 relative, against a frozen Delta f <= 1e-4 that is RELATIVE and dimensionless, not 1e-4 GHz.",
   "remaining_confounds": [
    "the refined region is a volume, not the port face",
    "the green closure extends it by an amount not known until the run",
@@ -106,7 +110,7 @@
   ]
  },
  "palace_refinement": {
-  "id": "N2",
+  "id": "N2R",
   "boxes": [
    {
     "Levels": 2,
@@ -121,7 +125,10 @@
      0.01
     ]
    }
-  ]
+  ],
+  "solver_linear_overrides": {
+   "MGMaxLevels": 1
+  }
  },
  "baseline_mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
  "mechanism": {
@@ -135,26 +142,73 @@
  "dof_rule": {
   "budget": 250000,
   "measured_offline": false,
-  "why": "the refined mesh exists only inside Palace at load time; MFEM has no Python binding in this environment and Palace's --dry-run parses the config and exits without loading a mesh (main.cpp:246-256). The 250 000 rule therefore cannot be enforced by refusing to launch.",
-  "how_it_is_enforced": "a DOF PROBE. Palace prints 'ND (p = 1): N' while assembling and only afterwards configures the eigensolver (palace_log.txt line 49 against line 54). The driver streams the log, reads that count and kills the container if it exceeds the budget, recording REFUSED-DOF-BUDGET. Exposure is seconds of loading and assembly, not the cap.",
-  "offline_bounds": {
-   "lower_trivial": 84485,
-   "upper_loose": 4857516,
-   "note": "the upper bound is two uniform levels of the original mesh, 19.4x the budget. It is NOT a prediction and must NOT be read as an expected N2 size. The exact N2 DOF is unknown offline and is established only by the live probe."
+  "measured_by_N2": 103411,
+  "fraction_of_budget": 0.4136,
+  "why_this_is_a_prediction_not_an_estimate": "N2 ran this exact mesh and box. Its probe read 103 411 at 2.3 s. N2R must reproduce that count; a different one means the mesh is not N2's and the comparison is void.",
+  "how_it_is_enforced": "the DOF probe, unchanged. It matches 'ND (p = 1): N' in Palace's 'Assembling system matrices' line, which prints the FINEST space once per run, before the multigrid hierarchy block. MGMaxLevels: 1 removes hierarchy lines the probe never matched; N2's log confirms the probe read exactly one value.",
+  "mesh_identity_check": {
+   "expected_counts": {
+    "vertices": 17447,
+    "edges": 103411,
+    "faces": 170410,
+    "elements": 84445
+   },
+   "euler": "V - E + F - T = 1, so these are one consistent complex rather than four loose numbers. NECESSARY, not sufficient: the same characteristic holds for the baseline (13991-79944+130388-64434) and for N1 (14667-84485+138118-68299). What GUARANTEES the mesh is the hash gate on the mesh file plus the identical box prescription; these counts are the cross-check that the gate and the box did what they say.",
+   "print_shape": "with one mesh, geodata.cpp:394-400 prints a single un-prefixed 'Parallel Mesh Stats' block carrying the REFINED counts, where N2 printed 'Coarse' and 'Refined' blocks."
   },
-  "breach_argument": "a breach needs 170 056 added edges; the marked octasection supplies 1 920 and a full uniform refinement 535 542, so it would take the closure delivering 31.8 % of a uniform refinement -- an 89x expansion of the 221 marked elements.",
   "rule_unchanged": true
  },
  "stop_conditions": [
-  "Palace reports order-1 DOF above 250 000 -> the probe kills the container before the eigensolve; REFUSED-DOF-BUDGET.",
-  "wall clock exceeds the unchanged 45-minute cap -> terminate and record.",
+  "Palace reports order-1 DOF above 250 000 -> the probe kills the container; REFUSED-DOF-BUDGET.",
+  "the built mesh does not hash to baseline_mesh_sha256 -> REFUSED-MESH-MISMATCH, nothing solved.",
+  "wall clock exceeds the unchanged 45-minute cap -> terminate and record TIMEOUT.",
+  "Palace exits non-zero, including on memory exhaustion -> record RUN_FAILED.",
   "max backward error exceeds the unchanged 1e-6 -> record and stop.",
-  "the admitted set is not {m1, m2}, or matching against the level-1 rung refuses -> record and stop.",
+  "the admitted set is not {m1, m2}, or matching against N1 refuses -> record and stop.",
   "any post-solve analysis raises -> the record is still written, manifested and committed.",
-  "completing N1 means STOP for review, not a second refinement level."
+  "completing N2R means STOP for review. A second rescue attempt is a separate approval."
  ],
  "sequence_records": [
   "COUPLED-LADDER-O1-L2-20260916T080802Z",
   "COUPLED-LADDER-O1-L2-N1-20260917T001735Z"
- ]
+ ],
+ "solver_change": {
+  "key": "Solver.Linear.MGMaxLevels",
+  "from": "unset, i.e. Palace's default 100 (configfile.hpp:777)",
+  "to": 1,
+  "documented_as": "configfile.hpp:776 - 'set to 1 to disable multigrid'. A supported setting.",
+  "why": "N2 did not fail on size: its 103 411 DOF cleared the budget gate in 2.3 s. It failed on time. Palace's own exclusive timers put +844.99 s of the L2 -> N1 regression inside the preconditioner, Krylov and divergence-free rows and -1.81 s everywhere else, against a measured total of +843.19 s, for 5.7 % more unknowns. Box refinement builds mesh levels (geodata.cpp:204-206, :346-350), and ksp.cpp:202 then demotes the preconditioner - a sparse direct solve for an eigenmode problem - to the coarse solver of a V-cycle whose levels barely coarsen (79 944 / 84 485 / 103 411, from marking 221 of 64 434 tets). Measured: 1.00 GMRES iteration per solve in the baseline, 15.37 in N1, 20.05 in N2. Full record in docs/coupled-candidate/n2-runtime-diagnosis.md.",
+  "what_it_changes": "one branch. The reserve at geodata.cpp:204 is skipped, so capacity() stays 1, :346 does not copy, and :350 runs the SAME GeneralRefinement(refs, -1) in place. multigrid.hpp:88 then builds a ONE-level hierarchy and ksp.cpp:202 applies the preconditioner directly.",
+  "what_it_does_not_change": [
+   "the mesh file (the baseline's, hash-gated before launch) or the refined mesh it produces",
+   "the finite element order, the FE spaces or the assembled operators",
+   "Solver.Linear.Type, KSPType, Tol 1e-08 and MaxIts 400",
+   "Solver.Eigenmode N 6, Tol 1e-06, Target 0.5 GHz, Save 6",
+   "the materials, the lumped port, L_s, kappa, Lc and the boundary conditions",
+   "the 250 000-DOF rule and the 45-minute cap"
+  ],
+  "side_effect_paths_checked": {
+   "RebalanceMesh": "fires at geodata.cpp:353-355 only on this path, and is inert here: it returns 1.0 at Mpi::Size(comm)==1 (geodata.cpp:1445-1448) and its only preceding work is gated on save_adapt_mesh, default false (configfile.hpp:169). The run uses one MPI process.",
+   "ReorientTetMesh": "reachable at geodata.cpp:362 when mesh.size()==1, but gated on reorient_tet, default false (configfile.hpp:206) and not set."
+  },
+  "enforced_by_the_driver": "an approval may override ONLY MGMaxLevels and MGUseMesh (scripts/palace_order1_ladder.py::_SOLVER_LINEAR_OVERRIDE_KEYS). Tol, MaxIts, Type and KSPType are refused before any solve is launched, so an approval cannot change what 'converged' means.",
+  "budget_and_cap_unchanged": true
+ },
+ "resource_expectation": {
+  "no_runtime_is_predicted": "the baseline solved 79 944 DOF on this same one-level code path in 81.2 s with an 8.1 s linear-solver stack, but N2R factorises a 1.29x larger operator and sparse-direct cost and memory grow superlinearly with fill. No factorisation at 103 411 DOF has been measured.",
+  "risks": [
+   "the direct factorisation is slower than expected -> TIMEOUT at the unchanged cap",
+   "the direct factorisation exhausts runner memory -> RUN_FAILED"
+  ],
+  "either_is_the_result": "recorded and reported as the outcome. The cap, the budget and the solver configuration are not changed to rescue it, and there is no second attempt under this approval."
+ },
+ "n2_outcome_for_context": {
+  "record": "COUPLED-LADDER-O1-L2-N2-20260917T103405Z",
+  "status": "TIMEOUT",
+  "dof_solved": 103411,
+  "wall_clock_s": 2700.061511455,
+  "cap_fraction": 1.0000227820203704,
+  "progress_when_killed": "EPS restart 2 with 4 of 6 eigenvalues converged; N1 needed 3 restarts",
+  "note": "N2's timeout stands as recorded. N2R does not replace it and does not reinterpret it."
+ }
 }
