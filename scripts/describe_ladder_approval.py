@@ -22,6 +22,41 @@ import sys
 from pathlib import Path
 
 
+#: The driver module cannot be imported here - this script runs on the bare
+#: system python in the workflow's approval step, before the project
+#: environment exists - so the allow-list is read out of its SOURCE instead of
+#: duplicated. Duplication would drift, and a drifted copy asserting
+#: "preconditioning only" is exactly the failure this check exists to prevent.
+LADDER_DRIVER = Path(__file__).resolve().parent / "palace_order1_ladder.py"
+
+
+def _allowed_override_keys(source: Path | None = None) -> set[str] | None:
+    """The driver's ``_SOLVER_LINEAR_OVERRIDE_KEYS``, or ``None`` if unreadable."""
+    import ast
+
+    try:
+        tree = ast.parse((source or LADDER_DRIVER).read_text())
+    except (OSError, SyntaxError):
+        return None
+    for node in ast.walk(tree):
+        targets = (
+            [node.target] if isinstance(node, ast.AnnAssign)
+            else node.targets if isinstance(node, ast.Assign)
+            else []
+        )
+        if not any(
+            isinstance(t, ast.Name) and t.id == "_SOLVER_LINEAR_OVERRIDE_KEYS" for t in targets
+        ):
+            continue
+        value = node.value
+        if isinstance(value, ast.Dict):
+            keys = [k for k in value.keys if isinstance(k, ast.Constant)]
+            if len(keys) == len(value.keys):
+                return {k.value for k in keys}
+        return None
+    return None
+
+
 def describe_approval(path: Path) -> str:
     approval = json.loads(path.read_text())
     lines = [f"level: {approval.get('level')}"]
@@ -44,6 +79,37 @@ def describe_approval(path: Path) -> str:
             else "  mesh hash gate: INACTIVE - no baseline_mesh_sha256"
         )
         lines.append("  DOF: not measurable offline; enforced by the probe on Palace's output")
+        overrides = palace.get("solver_linear_overrides") or {}
+        if overrides:
+            # Without this line a run that changes the preconditioner reads
+            # exactly like one that does not, in the only dump a human sees
+            # before the solve is paid for.
+            lines.append(
+                "  Solver.Linear overrides: "
+                + ", ".join(f"{k}={v!r}" for k, v in sorted(overrides.items()))
+            )
+            allowed = _allowed_override_keys()
+            outside = [k for k in sorted(overrides) if k not in (allowed or ())]
+            if allowed is None:
+                # Never assert the property without having checked it: this dump
+                # is what a human reads before a solve is paid for.
+                lines.append(
+                    "    NOT CHECKED: the driver's allow-list could not be read, so this dump "
+                    "cannot say whether these keys are preconditioning-only"
+                )
+            elif outside:
+                lines.append(
+                    f"    *** OUTSIDE THE ALLOW-LIST: {outside} - these reach past "
+                    f"preconditioning. The driver will REFUSE this approval before launching. ***"
+                )
+            else:
+                lines.append(
+                    "    preconditioning only (checked against the driver's allow-list "
+                    f"{sorted(allowed)}); mesh, spaces, operators, Tol, MaxIts, KSPType "
+                    "and the eigenvalue target are unchanged"
+                )
+        else:
+            lines.append("  Solver.Linear overrides: none (baseline solver configuration)")
         return "\n".join(lines)
     refinement = approval.get("port_refinement")
     if refinement is None:

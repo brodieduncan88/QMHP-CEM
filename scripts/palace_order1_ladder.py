@@ -122,6 +122,30 @@ class LadderError(RuntimeError):
 # --- the solve ----------------------------------------------------------------
 
 
+def dof_probe_pattern(order: int) -> "re.Pattern[str]":
+    """The pattern the DOF guard enforces the 250 000 rule with.
+
+    Module level, so a test can exercise the pattern the driver actually uses
+    rather than a copy of it. The distinction matters: Palace prints DOF counts
+    on TWO kinds of line, and only one of them is the finest space.
+
+        Assembling system matrices, number of global unknowns:
+         H1 (p = 1): 17447, ND (p = 1): 103411, RT (p = 1): 170410   <- this one
+
+        Assembling multigrid hierarchy:
+         Level 0 (p = 1): 79944 unknowns                             <- NOT this one
+         Level 1 (p = 1): 84485 unknowns
+
+    The header line comes from a one-shot print over GetFinestFESpace()
+    (spaceoperator.cpp:171-203, 303), so it carries the count that is actually
+    solved however many mesh levels exist. Loosening this pattern to match the
+    hierarchy lines would make the guard enforce the budget against a COARSE
+    count on a multi-level run - which is why a test pins it against all three
+    committed logs.
+    """
+    return re.compile(rf"ND \(p = {order}\):\s*(\d+)")
+
+
 def _user_flag(runtime: str) -> list[str]:
     """Run the container as this user, so its output is ours to commit."""
     if runtime == "docker" and hasattr(os, "getuid"):
@@ -209,7 +233,7 @@ def _run_palace(
     proc = subprocess.Popen(  # noqa: S603
         command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
     )
-    dof_re = re.compile(rf"ND \(p = {order}\):\s*(\d+)")
+    dof_re = dof_probe_pattern(order)
 
     def _pump() -> None:
         # Guarded whole. An unguarded reader that raises would disarm the probe
@@ -1019,8 +1043,41 @@ _PORT_REFINEMENT_KEYS = {"id", "h_port_mm", "pad_mm", "transition_mm", "ports"}
 
 #: Keys a ``palace_refinement`` block may carry. Unknown keys are refused
 #: rather than ignored: a typo must not silently become "no refinement".
-_PALACE_REFINEMENT_KEYS = {"id", "boxes"}
+_PALACE_REFINEMENT_REQUIRED = {"id", "boxes"}
+_PALACE_REFINEMENT_OPTIONAL = {"solver_linear_overrides"}
+_PALACE_REFINEMENT_KEYS = _PALACE_REFINEMENT_REQUIRED | _PALACE_REFINEMENT_OPTIONAL
 _PALACE_BOX_KEYS = {"Levels", "BoundingBoxMin", "BoundingBoxMax"}
+
+#: The ONLY Solver.Linear keys an approval may override, with the type each
+#: must have, and the argument for why they cannot change the answer at the
+#: settings this campaign runs. In pinned Palace a61c8cbe they are read in
+#: THREE places, not one, and all three have to be checked:
+#:
+#:  1. geodata.cpp:204 - the reserve. With mg_use_mesh false or mg_max_levels
+#:     <= 1 it is skipped, so mesh.capacity() stays 1, :346 makes no copy and
+#:     :350 runs the SAME GeneralRefinement(refs, -1) in place. The refinement
+#:     flags are unchanged, so the FINAL mesh is unchanged; only the
+#:     intermediate levels are not retained.
+#:  2. multigrid.hpp:45, via ConstructFECollections (spaceoperator.cpp:31,34,38)
+#:     - the p-multigrid loop. At Solver.Order 1 it breaks at :57 on p == pmin
+#:     for ND and H1, so exactly ONE collection exists whatever the value is.
+#:  3. multigrid.hpp:88-89, via ConstructFiniteElementSpaceHierarchy
+#:     (spaceoperator.cpp:41,43,45) - coarse_mesh_l = max(0, mesh.size() +
+#:     fecs.size() - 1 - max(1, mg_max_levels)). With (1) leaving mesh.size()
+#:     == 1 and (2) leaving fecs.size() == 1 this is 0 either way, so the sole
+#:     level IS the fully refined mesh - the same finest space a run without
+#:     the override uses at coarse_mesh_l = 0 with a taller hierarchy.
+#:
+#: So the final mesh, the FE spaces and the assembled operators are identical,
+#: and Tol, MaxIts, KSPType and the eigenvalue target are not touched at all.
+#: What changes is ksp.cpp:202: whether the preconditioner is applied directly
+#: or demoted to the coarse solver of a V-cycle. Tol or MaxIts here WOULD change
+#: the answer, or what counts as converged, so they are deliberately absent and
+#: an approval naming them is refused before any solve is launched.
+#:
+#: Point 2 is order-dependent. At an element order above 1 the p-multigrid loop
+#: does not break early and this argument would have to be redone.
+_SOLVER_LINEAR_OVERRIDE_KEYS: dict[str, type] = {"MGMaxLevels": int, "MGUseMesh": bool}
 
 
 #: One sentinel, compared in three places. Two copies drifted apart once
@@ -1057,7 +1114,47 @@ def any_refinement(entry: dict[str, Any]) -> Any:
     return entry.get("port_refinement") or entry.get("palace_refinement")
 
 
-def approved_palace_refinement(path: Path | None = None) -> tuple[str, list[dict[str, Any]], str | None] | None:
+def _validated_solver_linear_overrides(raw: Any) -> dict[str, Any]:
+    """The Solver.Linear overrides an approval may carry, checked against the allow-list.
+
+    An approval is data, not code, so it must not be able to reach into the
+    solver configuration freely: a ``Tol`` here would silently change what
+    "converged" means and the record would still read COMPLETED. Only the keys
+    in :data:`_SOLVER_LINEAR_OVERRIDE_KEYS` are accepted, and anything else is
+    refused before a solve is launched.
+    """
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise LadderError("palace_refinement.solver_linear_overrides must be an object")
+    out: dict[str, Any] = {}
+    for key, value in raw.items():
+        if key not in _SOLVER_LINEAR_OVERRIDE_KEYS:
+            raise LadderError(
+                f"solver_linear_overrides may not set {key!r}. Only "
+                f"{sorted(_SOLVER_LINEAR_OVERRIDE_KEYS)} are accepted: those change how the "
+                "operator is preconditioned, not the operator, the tolerances or the target."
+            )
+        expected = _SOLVER_LINEAR_OVERRIDE_KEYS[key]
+        # bool is a subclass of int, so the int case has to exclude it explicitly
+        # or MGMaxLevels: true would pass and reach Palace as 1.
+        if expected is bool:
+            ok = isinstance(value, bool)
+        else:
+            ok = isinstance(value, expected) and not isinstance(value, bool)
+        if not ok:
+            raise LadderError(
+                f"solver_linear_overrides.{key} must be {expected.__name__}, got {value!r}"
+            )
+        out[key] = value
+    if "MGMaxLevels" in out and out["MGMaxLevels"] < 1:
+        raise LadderError("solver_linear_overrides.MGMaxLevels must be at least 1")
+    return out
+
+
+def approved_palace_refinement(
+    path: Path | None = None,
+) -> tuple[str, list[dict[str, Any]], str | None, dict[str, Any]] | None:
     """The Palace-side box refinement the approval record authorises, or ``None``.
 
     Like its gmsh counterpart, every number comes from the approval record: no
@@ -1081,7 +1178,7 @@ def approved_palace_refinement(path: Path | None = None) -> tuple[str, list[dict
     unknown = set(block) - _PALACE_REFINEMENT_KEYS
     if unknown:
         raise LadderError(f"unknown palace_refinement key(s) in the approval record: {sorted(unknown)}")
-    missing = _PALACE_REFINEMENT_KEYS - set(block)
+    missing = _PALACE_REFINEMENT_REQUIRED - set(block)
     if missing:
         raise LadderError(f"palace_refinement is missing {sorted(missing)}")
     label = str(block["id"])
@@ -1103,6 +1200,8 @@ def approved_palace_refinement(path: Path | None = None) -> tuple[str, list[dict
             raise LadderError(f"box min {lo} is not strictly below max {hi}")
         if int(box["Levels"]) < 1:
             raise LadderError("box Levels must be at least 1")
+
+    overrides = _validated_solver_linear_overrides(block.get("solver_linear_overrides"))
 
     baseline = approval.get("baseline_record")
     if not baseline:
@@ -1154,7 +1253,7 @@ def approved_palace_refinement(path: Path | None = None) -> tuple[str, list[dict
             "file, and byte-identity with it is the control. Without the hash the mesh gate is "
             "skipped. (dry_run_mesh_sha256 is the other mechanism's key and does not apply.)"
         )
-    return label, boxes, expected
+    return label, boxes, expected, overrides
 
 
 def approved_port_refinement(path: Path | None = None) -> tuple[str, Any, str | None] | None:
@@ -1227,6 +1326,7 @@ def execute_level(
     port_refinement: Any = None,
     palace_refinement: list[dict[str, Any]] | None = None,
     palace_refinement_label: str | None = None,
+    solver_linear_overrides: dict[str, Any] | None = None,
     expected_mesh_sha256: str | None = None,
 ) -> dict[str, Any]:
     entry: dict[str, Any] = {
@@ -1238,6 +1338,7 @@ def execute_level(
             "id": palace_refinement_label,
             "mechanism": "Palace Model.Refinement.Boxes on the loaded mesh; no gmsh, no new mesh file",
             "boxes": palace_refinement,
+            "solver_linear_overrides": dict(solver_linear_overrides or {}),
         },
         "status": "NOT-RUN",
     }
@@ -1298,6 +1399,10 @@ def execute_level(
             # The ONLY delta against the baseline config. The mesh file is the
             # baseline's, byte-identical, and was just hash-checked above.
             config.setdefault("Model", {}).setdefault("Refinement", {})["Boxes"] = palace_refinement
+        if solver_linear_overrides:
+            entry["solver_linear_overrides"] = apply_solver_linear_overrides(
+                config, solver_linear_overrides
+            )
         (solver_dir / CONFIG_FILENAME).write_text(json.dumps(config, indent=2) + "\n")
         entry["port_inductance_H"] = inductance
         entry["port_size_mm"] = port["size_mm"]
@@ -1555,6 +1660,99 @@ def refinement_depth(refinement: Any) -> int | None:
     return max(by_region.values()) if by_region else None
 
 
+def apply_solver_linear_overrides(
+    config: dict[str, Any], overrides: dict[str, Any]
+) -> dict[str, Any]:
+    """Apply an approved Solver.Linear override IN PLACE and describe what it did.
+
+    Separate from ``execute_level`` so the description in the record is produced
+    by the same statements that mutate the config, rather than by a test's copy
+    of them: a reordering here cannot leave the record describing a config that
+    was never written.
+
+    The returned block records what was REPLACED - ``None`` when the key was
+    previously unset, i.e. at Palace's default - so a reader can reconstruct the
+    pre-override config from the record without trusting any prose.
+    """
+    linear = config.setdefault("Solver", {}).setdefault("Linear", {})
+    block = {
+        "applied": dict(overrides),
+        "replaced": {k: linear.get(k) for k in overrides},
+        "unchanged": {k: linear[k] for k in ("Type", "KSPType", "Tol", "MaxIts") if k in linear},
+        "invariant": (
+            "MGMaxLevels and MGUseMesh are read in three places in pinned Palace a61c8cbe. "
+            "(1) geodata.cpp:204, the reserve: skipping it leaves mesh.capacity() == 1, so :346 "
+            "makes no copy and :350 runs the SAME GeneralRefinement(refs, -1) in place - the "
+            "final refined mesh is unchanged and only the intermediate levels are not retained. "
+            "(2) multigrid.hpp:45 via ConstructFECollections: at Solver.Order 1 the loop breaks "
+            "at :57 on p == pmin, so exactly one FE collection exists whatever the value. "
+            "(3) multigrid.hpp:88-89 via ConstructFiniteElementSpaceHierarchy: coarse_mesh_l = "
+            "max(0, mesh.size() + fecs.size() - 1 - max(1, mg_max_levels)) is 0 with "
+            "mesh.size() == fecs.size() == 1, so the single level IS the fully refined mesh - "
+            "the same finest space a run without the override uses. The FE spaces and the "
+            "assembled operators are therefore identical, and Tol, MaxIts, KSPType and the "
+            "eigenvalue target are not touched. What changes is ksp.cpp:202: whether the "
+            "preconditioner is applied directly or demoted to the coarse solver of a "
+            "geometric-multigrid V-cycle."
+        ),
+        "one_branch_only_this_path_reaches": (
+            "skipping the reserve also makes mesh.capacity() == 1 true, which is the SOLE gate "
+            "on RebalanceMesh(mesh[0], iodata) at geodata.cpp:353-355 - a call the default path "
+            "cannot execute at all. It is inert here, but CONDITIONALLY: it returns 1.0 "
+            "immediately only when Mpi::Size(comm) == 1 (geodata.cpp:1445-1448), and its only "
+            "preceding work is gated on save_adapt_mesh, default false (configfile.hpp:169). "
+            "This record's run.command states the process count; at more than one rank this "
+            "argument does not hold and would have to be redone. ReorientTetMesh at "
+            "geodata.cpp:362 becomes reachable for the same reason and is gated on "
+            "reorient_tet, default false (configfile.hpp:206)."
+        ),
+        "order_dependence": (
+            "point (2) holds at element order 1, where p == pmin. Above it the p-multigrid loop "
+            "does not break early and the argument would have to be redone."
+        ),
+    }
+    linear.update(overrides)
+    return block
+
+
+def recorded_solver_linear_overrides(entry: dict[str, Any]) -> dict[str, Any]:
+    """The Solver.Linear override a record carries, from either place it is stored."""
+    raw = (entry.get("palace_refinement") or {}).get("solver_linear_overrides") or {}
+    applied = (entry.get("solver_linear_overrides") or {}).get("applied") or {}
+    return {**raw, **applied}
+
+
+def multigrid_levels(entry: dict[str, Any]) -> int:
+    """How many geometric-multigrid levels this run's preconditioner used.
+
+    A COUNT, not a flag. An earlier version asked only "was multigrid switched
+    off?", which answered False both for the plain L2 rung (a genuine ONE-level
+    hierarchy, preconditioner applied directly) and for N1 (TWO levels, a
+    V-cycle) - and so reported the L2 -> N1 step as having the same solver
+    structure on both sides, which this project's own timers refute by 195x.
+
+    Modelled on pinned Palace a61c8cbe at element order 1, where fecs.size() is
+    1 (multigrid.hpp:57, p == pmin):
+
+      mesh.size() = 1 + refinement depth, but only when the reserve at
+                    geodata.cpp:204 runs, i.e. mg_use_mesh and mg_max_levels > 1;
+                    otherwise 1, because :346 makes no copy
+      levels      = mesh.size() - coarse_mesh_l
+                  = min(mesh.size(), max(1, mg_max_levels))   [multigrid.hpp:88]
+
+    Checked against the three committed logs: baseline 1, N1 2, N2 3.
+
+    A gmsh port_refinement run has no Model.Refinement block, so it is 1, which
+    is correct: gmsh regenerates the mesh and Palace loads a single one.
+    """
+    overrides = recorded_solver_linear_overrides(entry)
+    mg_max_levels = overrides.get("MGMaxLevels", 100)
+    mg_use_mesh = overrides.get("MGUseMesh", True)
+    depth = refinement_depth(entry.get("palace_refinement")) or 0
+    mesh_size = 1 + depth if (mg_use_mesh and mg_max_levels > 1) else 1
+    return min(mesh_size, max(1, mg_max_levels))
+
+
 def is_prior_point_of_same_sequence(entry: dict[str, Any], baseline_rung: dict[str, Any]) -> bool:
     """Is the baseline the SAME refinement, strictly shallower in every box?
 
@@ -1605,6 +1803,31 @@ def compare_against_baseline(
     the unchanged ones; nothing here introduces a threshold.
     """
     nested = entry.get("palace_refinement") is not None
+    # The solver clause is DERIVED, not hardcoded. Model.Refinement normally
+    # deepens the multigrid hierarchy, but an approved MGMaxLevels/MGUseMesh
+    # override removes it entirely - the opposite direction - and a record that
+    # states the wrong one misleads exactly the reader who is checking whether
+    # the comparison is like-for-like.
+    this_levels = multigrid_levels(entry)
+    solver_clause = (
+        f"NOTE the config delta is one block plus an approved Solver.Linear override "
+        f"({', '.join(f'{k}={v!r}' for k, v in sorted(recorded_solver_linear_overrides(entry).items()))}), "
+        f"which holds the geometric-multigrid hierarchy to {this_levels} level"
+        f"{'' if this_levels == 1 else 's'} instead of the 1 + levels Model.Refinement would "
+        "otherwise build (geodata.cpp:204, multigrid.hpp:88). The reserve is the only thing "
+        "skipped: the refinement flags and the GeneralRefinement call are unchanged, so the "
+        "mesh and the operators are those of a run without the override. Frequencies are "
+        "converged to the same tolerances either way, leaving an uncertainty of that order "
+        "which must be read against the backward error; the wall-clock comparison is not "
+        "like-for-like"
+        if recorded_solver_linear_overrides(entry) else
+        f"NOTE the config delta is one block but the SOLVER is not identical: Model.Refinement "
+        f"makes Palace reserve a mesh hierarchy and keep the coarse mesh (geodata.cpp:204-206, "
+        f"346-349), so this run's preconditioner is a {this_levels}-level geometric multigrid "
+        "V-cycle - the depth tracks the refinement depth, and a baseline refined less far ran "
+        "fewer levels. Frequencies are unaffected; the wall-clock comparison is not "
+        "like-for-like"
+    )
     out: dict[str, Any] = {
         "baseline": baseline_record,
         "mechanism": "palace_refinement (nested)" if nested else "port_refinement (gmsh, not nested)",
@@ -1617,12 +1840,7 @@ def compare_against_baseline(
                 "freedom in the refined region -- which is NOT the same as the port face: the "
                 "region is a volume, the conforming closure refines neighbours outside it, and "
                 "the marked elements are the worst-shaped in the mesh, so element quality is a "
-                "live alternative explanation this run cannot separate. NOTE the config delta is "
-                "one block but the SOLVER is not identical: Model.Refinement makes Palace reserve "
-                "a mesh hierarchy and keep the coarse mesh (geodata.cpp:204-206, 346-349), so this "
-                "run uses a DEEPER geometric multigrid hierarchy than its baseline - Palace "
-                "reserves 1 + levels meshes, so the depth tracks the refinement depth. "
-                "Frequencies are unaffected; the wall-clock comparison is not like-for-like"
+                "live alternative explanation this run cannot separate. " + solver_clause
             ) if nested else (
                 "the refined run and the baseline differ in exactly one prescribed number, the "
                 "element size held over the port box. That is one prescribed number, not one "
@@ -1689,6 +1907,34 @@ def compare_against_baseline(
     out["this_dof"] = solved_dof(entry)
     out["baseline_wall_clock_s"] = (baseline_rung.get("run") or {}).get("wall_clock_s")
     out["this_wall_clock_s"] = (entry.get("run") or {}).get("wall_clock_s")
+
+    # Stated here, where BOTH sides are known, rather than inferred from one of
+    # them. A wall-clock or iteration-count difference across a preconditioner
+    # change is not a property of the discretisation, and a reader must be told
+    # which of the two it is looking at.
+    base_levels = multigrid_levels(baseline_rung)
+    out["preconditioner"] = {
+        "this_multigrid_levels": this_levels,
+        "baseline_multigrid_levels": base_levels,
+        "same_on_both_sides": this_levels == base_levels,
+        "derived_from": (
+            "the recorded refinement depth and Solver.Linear overrides, modelled on pinned "
+            "Palace multigrid.hpp:88 at element order 1. Checked against the committed logs: "
+            "the plain L2 rung ran 1 level, N1 ran 2, N2 ran 3."
+        ),
+        "note": (
+            f"{base_levels} level(s) on the baseline against {this_levels} here, so at one "
+            "level the preconditioner is applied directly and at more it is demoted to the "
+            "coarse solver of a V-cycle (ksp.cpp:202). Both runs still converge their own "
+            "discrete eigenproblem to the same Solver.Eigenmode.Tol and Solver.Linear.Tol, so "
+            "this changes the path to the solution and not the solution, up to those "
+            "tolerances - but it does NOT make the wall-clock or iteration-count columns "
+            "comparable."
+            if this_levels != base_levels else
+            f"the same {this_levels}-level structure on both sides; no solver-side caveat "
+            "applies to this step."
+        ),
+    }
 
     baseline_block = baseline_rung.get("port_diagnostic") or {}
     if not baseline_block.get("modes"):
@@ -2115,6 +2361,31 @@ def render_report(summary: dict[str, Any]) -> str:
             if mesh_sha:
                 add(f"Mesh `sha256 {mesh_sha}` - gated against the baseline's before launch.")
                 add("")
+            # A second declared delta, when there is one. Reported here because a
+            # reader comparing this record against its baseline must be told that
+            # the solver configuration differs, not only the mesh refinement.
+            overrides = (entry.get("solver_linear_overrides") or {})
+            applied = overrides.get("applied") or {}
+            if applied:
+                shown = ", ".join(f"`{k} = {v!r}`" for k, v in sorted(applied.items()))
+                replaced = overrides.get("replaced") or {}
+                was = ", ".join(
+                    f"`{k}` {'was ' + repr(v) if v is not None else 'was unset (Palace default)'}"
+                    for k, v in sorted(replaced.items())
+                )
+                add(f"`Solver.Linear` also carries an approved override: {shown} ({was}).")
+                add("")
+                kept = overrides.get("unchanged") or {}
+                if kept:
+                    add("Unchanged alongside it: "
+                        + ", ".join(f"`{k} = {v!r}`" for k, v in sorted(kept.items()))
+                        + ".")
+                    add("")
+                add("This changes how the operator is preconditioned, not the operator. "
+                    "Comparisons against a baseline solved without it are therefore "
+                    "comparisons of the discretisation, carrying the convergence "
+                    "tolerances as their uncertainty - see the backward error in section 2.")
+                add("")
             add("**This is not a ladder rung.** It carries a refinement the other rungs do "
                 "not, so it is excluded from the convergence fit and compared against the "
                 "plain rung at its own level.")
@@ -2300,6 +2571,14 @@ def render_report(summary: dict[str, Any]) -> str:
         add(f"DOF {baseline.get('baseline_dof')} -> {baseline.get('this_dof')}; "
             f"wall clock {_secs(baseline.get('baseline_wall_clock_s'))} s -> "
             f"{_secs(baseline.get('this_wall_clock_s'))} s.")
+        # Printed right under the wall-clock line it qualifies: a reader must not
+        # take that column as a like-for-like measurement across a solver change.
+        pc = baseline.get("preconditioner") or {}
+        if pc and not pc.get("same_on_both_sides", True):
+            add("")
+            add(f"**Different preconditioner structure**: "
+                f"{pc.get('baseline_multigrid_levels')} multigrid level(s) on the baseline "
+                f"against {pc.get('this_multigrid_levels')} here. {pc.get('note', '')}")
         if baseline.get("baseline_diagnostic_recomputed"):
             add("")
             add(baseline.get("baseline_diagnostic_note", ""))
@@ -2569,8 +2848,8 @@ def main(argv: list[str] | None = None) -> int:
     # The Palace-side mechanism. Mutually exclusive with the gmsh one, which
     # approved_palace_refinement() refuses outright rather than resolving.
     approved_palace = approved_palace_refinement(args.approval)
-    palace_label, palace_boxes, palace_baseline_sha = (
-        approved_palace if approved_palace else (None, None, None)
+    palace_label, palace_boxes, palace_baseline_sha, palace_solver_overrides = (
+        approved_palace if approved_palace else (None, None, None, {})
     )
     if palace_label:
         label = palace_label
@@ -2601,6 +2880,7 @@ def main(argv: list[str] | None = None) -> int:
         port_refinement=port_refinement,
         palace_refinement=palace_boxes,
         palace_refinement_label=palace_label,
+        solver_linear_overrides=palace_solver_overrides,
         expected_mesh_sha256=expected_mesh_sha256,
     )
     # EVERYTHING from here to the durable write is analysis of a solve that has
