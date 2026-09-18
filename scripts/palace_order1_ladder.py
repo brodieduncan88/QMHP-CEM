@@ -1817,9 +1817,10 @@ def compare_against_baseline(
         "otherwise build (geodata.cpp:204, multigrid.hpp:88). The reserve is the only thing "
         "skipped: the refinement flags and the GeneralRefinement call are unchanged, so the "
         "mesh and the operators are those of a run without the override. Frequencies are "
-        "converged to the same tolerances either way, leaving an uncertainty of that order "
-        "which must be read against the backward error; the wall-clock comparison is not "
-        "like-for-like"
+        "converged to the same tolerances either way, leaving an uncertainty of that order. "
+        "Whether the wall-clock column is like-for-like depends on the BASELINE's own level "
+        "count, which this sentence cannot know; the preconditioner block states it for both "
+        "sides"
         if recorded_solver_linear_overrides(entry) else
         f"NOTE the config delta is one block but the SOLVER is not identical: Model.Refinement "
         f"makes Palace reserve a mesh hierarchy and keep the coarse mesh (geodata.cpp:204-206, "

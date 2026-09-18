@@ -683,6 +683,7 @@ CANDIDATE_FOR_ID = {
     "N1": REPO_ROOT / "experiments" / "N1-nested-port-refinement",
     "N2": REPO_ROOT / "experiments" / "N2-nested-port-refinement",
     "N2R": REPO_ROOT / "experiments" / "N2R-rescue-preconditioner",
+    "N1R": REPO_ROOT / "experiments" / "N1R-controlled-preconditioner",
 }
 
 
@@ -1070,13 +1071,13 @@ def test_the_approval_and_candidate_do_not_claim_the_counts_identify_the_mesh():
     """The prose must match what the check actually establishes."""
     approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
     block = approval.get("palace_refinement")
-    if block is None or block["id"] != "N2R":
-        pytest.skip("the live approval is not the N2R rescue run")
-    euler = approval["dof_rule"]["mesh_identity_check"]["euler"]
+    check = (approval.get("dof_rule") or {}).get("mesh_identity_check")
+    if block is None or not check:
+        pytest.skip("the live approval carries no mesh-identity pre-declaration")
+    euler = check["euler"]
     assert "NECESSARY, not sufficient" in euler
     assert "hash gate" in euler
-    cand = json.loads(
-        (REPO_ROOT / "experiments" / "N2R-rescue-preconditioner" / "candidate.json").read_text())
+    cand = json.loads((CANDIDATE_FOR_ID[block["id"]] / "candidate.json").read_text())
     why = cand["mesh_identity_check"]["why"]
     assert "NECESSARY, not sufficient" in why and "hash gate" in why
 
@@ -1125,7 +1126,10 @@ def test_the_frozen_frequency_criterion_is_never_written_with_a_unit():
     for path in (
         REPO_ROOT / ".github" / "ladder-approval.json",
         REPO_ROOT / "experiments" / "N2R-rescue-preconditioner" / "candidate.json",
+        REPO_ROOT / "experiments" / "N1R-controlled-preconditioner" / "candidate.json",
         REPO_ROOT / "docs" / "coupled-candidate" / "n2r-rescue-run.md",
+        REPO_ROOT / "docs" / "coupled-candidate" / "n2r-outcome.md",
+        REPO_ROOT / "docs" / "coupled-candidate" / "n1r-control.md",
         REPO_ROOT / "docs" / "coupled-candidate" / "n2-runtime-diagnosis.md",
     ):
         if not path.exists():
@@ -1249,3 +1253,104 @@ def test_the_prelaunch_dump_never_asserts_what_it_has_not_checked(tmp_path):
     assert "'Tol'" in dump({"MGMaxLevels": 1, "Tol": 1e-4})
     ok = dump({"MGMaxLevels": 1})
     assert "OUTSIDE THE ALLOW-LIST" not in ok and "checked against the driver's allow-list" in ok
+
+
+def test_the_N1R_control_is_N1s_problem_with_N2Rs_solver():
+    """The control is only a control if it changes exactly what N2R changed."""
+    cand_dir = CANDIDATE_FOR_ID["N1R"]
+    cand = json.loads((cand_dir / "candidate.json").read_text())
+    n1_cfg = json.loads((N1_RECORD / "L2" / "solver" / "config.json").read_text())
+    n1r_cfg = json.loads((cand_dir / "config.candidate.json").read_text())
+    n2r_cfg = json.loads(
+        (REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z"
+         / "L2" / "solver" / "config.json").read_text())
+
+    # N1's config plus exactly the key N2R added, with the same value.
+    linear = dict(n1r_cfg["Solver"]["Linear"])
+    assert linear.pop("MGMaxLevels") == n2r_cfg["Solver"]["Linear"]["MGMaxLevels"] == 1
+    n1r_cfg["Solver"]["Linear"] = linear
+    assert n1r_cfg == n1_cfg
+    # The same box and depth as N1, one shallower than N2R.
+    assert cand["refinement_region"]["Levels"] == 1
+    assert n1_cfg["Model"]["Refinement"]["Boxes"][0]["Levels"] == 1
+    assert n2r_cfg["Model"]["Refinement"]["Boxes"][0]["Levels"] == 2
+    for key in ("BoundingBoxMin", "BoundingBoxMax"):
+        assert cand["refinement_region"][key] == n2r_cfg["Model"]["Refinement"]["Boxes"][0][key]
+    # Its baseline is the plain rung, as N1's was - not N1, which is equal depth.
+    assert cand["approval_must_carry"]["baseline_record"] == L2_RECORD.name
+    # Empty on purpose: a one-step "sequence" would print a report banner saying
+    # the step is not against a plain rung, which for N1R is exactly what it is.
+    assert cand["approval_must_carry"]["sequence_records"] == []
+    # The expected counts are N1's own refined-mesh counts, read from N1's log.
+    counts = _mesh_counts((N1_RECORD / "L2" / "solver" / "palace_log.txt").read_text())[-1]
+    assert cand["mesh_identity_check"]["expected"] == counts
+    assert cand["dof"]["n1r_expected"] == counts["edges"] == 84485
+
+
+def test_the_entry_derived_clause_never_asserts_like_for_likeness():
+    """Only the both-sides preconditioner block may say whether wall clock compares.
+
+    The clause built before the baseline is loaded once ended 'the wall-clock
+    comparison is not like-for-like' whenever the entry carried an override -
+    false for L2 -> N1R and N1R -> N2R, where both sides ran one level, and in
+    direct contradiction of the same record's preconditioner block.
+    """
+    ladder = _ladder()
+    entry = {"palace_refinement": {"boxes": [{"Levels": 1, "BoundingBoxMin": [0, 0, 0],
+                                              "BoundingBoxMax": [1, 1, 1]}],
+                                   "solver_linear_overrides": {"MGMaxLevels": 1}}}
+    text = ladder.compare_against_baseline(entry, "no-such-record")["why_this_comparison"]
+    assert "not like-for-like" not in text
+    assert "preconditioner block" in text
+
+    # And on a real same-level pair the both-sides block is the one that speaks.
+    n2r = json.loads((REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z"
+                      / "summary.json").read_text())["rung"]
+    synthetic_n1r = json.loads((N1_RECORD / "summary.json").read_text())["rung"]
+    synthetic_n1r["palace_refinement"]["solver_linear_overrides"] = {"MGMaxLevels": 1}
+    assert ladder.multigrid_levels(synthetic_n1r) == ladder.multigrid_levels(n2r) == 1
+
+
+def _csc():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "controlled_sequence_comparison",
+        REPO_ROOT / "scripts" / "controlled_sequence_comparison.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_the_offline_comparison_cannot_write_into_a_record_or_read_the_wrong_one(tmp_path):
+    csc = _csc()
+    for bad in (REPO_ROOT / "results", REPO_ROOT / "results" / "x.json",
+                N1_RECORD / "controlled.json"):
+        with pytest.raises(SystemExit, match="never go inside results/"):
+            csc._guarded_output_path(str(bad))
+    assert csc._guarded_output_path(str(tmp_path / "ok.json")) == (tmp_path / "ok.json").resolve()
+
+    with pytest.raises(SystemExit, match="not a record on disk"):
+        csc._require_n1r_control("COUPLED-LADDER-O1-L2-NOPE")
+    # N1 is refined at Levels 1 but carries no override and the wrong id: refused.
+    with pytest.raises(SystemExit, match="not the N1R control"):
+        csc._require_n1r_control(N1_RECORD.name)
+    # N2R has the override but is Levels 2 and the wrong id: refused.
+    with pytest.raises(SystemExit, match="not the N1R control"):
+        csc._require_n1r_control("COUPLED-LADDER-O1-L2-N2R-20260918T061455Z")
+
+
+def test_the_same_problem_check_reads_the_solved_configs():
+    """Identity is established from the records, not inherited from the allow-list."""
+    csc = _csc()
+    ladder = csc._ladder()
+    same = csc.same_problem_two_solver_paths(ladder, N1_RECORD.name, N1_RECORD.name)
+    assert same["available"] and same["identity"]["config_differs_only_in"] == []
+    assert all(p["delta_f_GHz"] == 0 for p in same["pairs"])
+
+    different = csc.same_problem_two_solver_paths(
+        ladder, N1_RECORD.name, "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z")
+    assert different["available"] is False
+    delta = different["identity"]["config_differs_only_in"]
+    assert "Model.Refinement.Boxes[0].Levels" in delta and "Solver.Linear.MGMaxLevels" in delta
+    assert different["identity"]["configs_equal_outside_preconditioner"] is False
