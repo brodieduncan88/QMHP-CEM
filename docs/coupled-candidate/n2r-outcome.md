@@ -96,6 +96,12 @@ The driver now derives multigrid depth from each record and discloses any step
 that crosses a change — including `L2 → N1`, which crossed one too (1 level → 2)
 and had never been flagged.
 
+**This was subsequently measured.** N1R re-solved N1's problem with N2R's one-level configuration;
+N1 vs N1R differ in `Solver.Linear.MGMaxLevels` and nothing else, and their tracked frequencies
+differ by **4.618e-09** and **7.718e-10** relative — four orders below the frozen tolerance and six
+below the movements below. The Δf figures in §3 are therefore refinement effects to six significant
+figures, and the controlled sequence reproduces them. See [`n1r-outcome.md`](n1r-outcome.md).
+
 Neither of Palace's error columns bounds the resulting uncertainty:
 `ErrorType::ABSOLUTE` is the raw residual norm and `BACKWARD` divides it by
 `‖K‖ + |λ|‖M‖` (`slepc.cpp:473-484`), so neither is a frequency without an

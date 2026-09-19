@@ -83,4 +83,7 @@ physics N1 was not already approved to ask.
 
 ## 5. Status
 
-Prepared. Outcome recorded in `n1r-outcome.md` once the run reports.
+**Executed.** COMPLETED in 110.7 s, 4.1 % of the cap, at exactly the predicted 84,485 DOF and
++4,541 added, on a mesh Palace printed with exactly the four predicted counts in a single
+un-prefixed block with a one-level hierarchy. The solver-path effect it measures is ~5e-09
+relative. See [`n1r-outcome.md`](n1r-outcome.md).
