@@ -13,6 +13,7 @@ import copy
 import hashlib
 import importlib.util
 import json
+import re
 import sys
 import types
 from pathlib import Path
@@ -500,3 +501,34 @@ def test_golden_prepare_still_matches_the_committed_record(tmp_path):
 
     golden = Candidate.model_validate(json.loads(GOLDEN.read_text()))
     tv.test_golden_prepare_still_matches_the_committed_record(golden, tmp_path)
+
+
+# --- the campaign index stays navigable ---------------------------------------------------
+
+
+def test_every_coupled_candidate_record_is_listed_in_the_readme():
+    """The index drifted nine records behind before this guard existed.
+
+    A reader arriving at the campaign navigates from README.md. A record that is
+    committed but unlisted is, for that reader, not there - and the outcome
+    records are where the executed runs and their limits are written down.
+    """
+    docs = REPO_ROOT / "docs" / "coupled-candidate"
+    readme = (docs / "README.md").read_text()
+    present = {p.name for p in docs.glob("*.md")} - {"README.md"}
+    linked = set(re.findall(r"\]\(([a-z0-9][a-z0-9.-]*\.md)\)", readme))
+
+    assert not (present - linked), f"committed but unlisted: {sorted(present - linked)}"
+    assert not (linked - present), f"listed but absent: {sorted(linked - present)}"
+
+
+def test_the_readme_does_not_still_claim_no_solve_has_been_run():
+    """It said so at checkpoint A. Seven solves later it was still saying it."""
+    readme = (REPO_ROOT / "docs" / "coupled-candidate" / "README.md").read_text()
+    for line in readme.splitlines():
+        if "No coupled EM solve has been run" in line:
+            assert line.lstrip().startswith(">"), (
+                "the checkpoint-A claim may only appear inside the superseding note"
+            )
+    # And what IS still true must be stated, since the distinction is the point.
+    assert "no coupling extraction has been run" in readme.lower()

@@ -2,8 +2,15 @@
 
 **Milestone:** v0.2 — First source-bound coupled EM candidate and independent
 coupling extraction. **This checkpoint (A):** candidate definition and
-extraction admission. No coupled EM solve has been run; nothing here is
-coupled EM evidence.
+extraction admission.
+
+> **Superseded in part.** At checkpoint A no coupled EM solve had been run.
+> Solves have since been executed and recorded — the pilot, the three-rung
+> order-1 ladder, R1, and the nested-refinement runs N1, N2, N2R and N1R. Each
+> has its own outcome record in the table below and its own committed record
+> under `results/`. The candidate definition and the extraction admission are
+> unchanged; **no coupling extraction has been run**, and none of the executed
+> solves is coupling evidence.
 
 | document | content |
 |---|---|
@@ -17,6 +24,15 @@ coupled EM evidence.
 | [`order1-ladder-outcome.md`](order1-ladder-outcome.md) | the three-rung order-1 mesh-refinement check: no observed order of convergence on either tracked mode, the port-stiffness mechanism reproducing at level 3, and the calibration flaw that hid it. **Superseded in part** by `s1-numerical-recovery.md` |
 | [`r1-port-refinement-outcome.md`](r1-port-refinement-outcome.md) | the executed R1 run: refining only the port box moved the fluxonium-like mode by 23.9 % of what a full global refinement bought, and the readout-like mode the other way. Partial sensitivity, with the derived diagnostic holding to 1.31e-06 on a mesh it had never seen |
 | [`s1-numerical-recovery.md`](s1-numerical-recovery.md) | the port-stiffness conversion derived from pinned Palace v0.13.0 rather than fitted, and reproducing the closure defect on all twelve committed rows to 2e-8; what the L1/L2/L3 meshes actually have on the port face against what the size rule asked for; one controlled local-refinement experiment, dry-run and predeclared, awaiting approval |
+| [`nested-refinement-feasibility.md`](nested-refinement-feasibility.md) | whether the preserved L2 mesh can be locally refined **without** regenerating through gmsh, verified against pinned Palace/MFEM rather than assumed: `Model.Refinement.Boxes` is conforming and nested, every baseline vertex survives, and the closure refines elements outside the box. The offline marking: 221 of 64 434 tets |
+| [`n1-nested-refinement-outcome.md`](n1-nested-refinement-outcome.md) | the executed N1 run: one nested level on the byte-identical L2 mesh, 84 485 DOF, both tracked modes moving the **same** way — unlike R1 — and the derived diagnostic holding on a mesh it had never seen |
+| [`n2-proposal.md`](n2-proposal.md) | the N2 preparation: two total levels from the original mesh, why iteration 0 reproduces N1's stage exactly, and why no N2 DOF or runtime could be predicted offline |
+| [`n2-outcome.md`](n2-outcome.md) | N2 **refused on time**: 103 411 DOF cleared the budget gate in 2.3 s, then the run hit 100 % of the 2 700 s cap with no eigenvalues. The refusal is the result; the primary comparison was unavailable |
+| [`n2-runtime-diagnosis.md`](n2-runtime-diagnosis.md) | why, offline from the logs and pinned sources: refinement builds mesh levels, and `ksp.cpp:202` then demotes a sparse **direct** preconditioner to the coarse solver of a V-cycle whose levels barely coarsen. The whole regression is in the linear-solver stack. Names `MGMaxLevels: 1` as a supported configuration that leaves the discrete problem untouched |
+| [`n2r-rescue-run.md`](n2r-rescue-run.md) | the N2R preparation: N2's problem plus that one key, with the config delta shown **by diff** rather than argued, and a falsifiable mesh-identity pre-declaration |
+| [`n2r-outcome.md`](n2r-outcome.md) | N2R **completed in 159.0 s**, 5.9 % of the cap, against N2's timeout on the identical problem. Every pre-declaration held. Gives the N1 → N2R comparison N2 could not, and says plainly that the step crosses a preconditioner change |
+| [`n1r-control.md`](n1r-control.md) | the N1R preparation: N1's problem with N2R's solver, so the sequence has one solver strategy throughout and N1 vs N1R measures the solver-path effect directly |
+| [`n1r-outcome.md`](n1r-outcome.md) | N1R completed in 110.7 s. The solver-path effect on the tracked pair is **~5e-09 relative** — four orders below the frozen tolerance — so the campaign's refinement movements are refinement effects. The controlled sequence **confirms** the reported one to six significant figures |
 | [`implementation-plan.md`](implementation-plan.md) | file-by-file plan; what this checkpoint implements ([A]) and what execution implements ([B]) |
 | `config/coupled/v2a_five_node_candidate.json` | the machine-readable declaration (schema `qmhp-cem.coupled-candidate/0.2.0`) |
 | `config/coupled/source_register.json` | every cited source with path, revision and sha256 |
