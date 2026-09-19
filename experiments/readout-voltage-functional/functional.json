@@ -1,0 +1,121 @@
+{
+ "label": "readout-voltage functional, defined before any evaluation; no value computed in this record",
+ "registered_basis": {
+  "coordinate": "node R1 = the coupling-pad flux, per coupling-definition.md section 2 ('single-mode representation of a distributed resonator at its coupling node')",
+  "conductor_R1": "R1.coupling_pad + R1.cpw centre conductor",
+  "reference_conductor": "the chip ground plane: the z = 0 PEC sheet outside the etch regions, continuous with the package floor (sheet_pec, physical 4, with outer_pec 2)",
+  "F_port_convention": "from ground (\u2212Y side) to the island (+Y side); V_port = V_F1 \u2212 V_ground"
+ },
+ "geometry_mm": {
+  "frame": "centre of the top surface of the chip substrate (spec \u00a77.3); +X/+Y chip plane, +Z from chip toward lid",
+  "F1_island": [
+   -0.6749999999999999,
+   -0.075,
+   -0.525,
+   0.075
+  ],
+  "R1_coupling_pad": [
+   -0.505,
+   -0.05,
+   -0.405,
+   0.05
+  ],
+  "pad_etch": [
+   -0.535,
+   -0.08,
+   -0.375,
+   0.08
+  ],
+  "island_etch": [
+   -0.715,
+   -0.11499999999999999,
+   -0.485,
+   0.11499999999999999
+  ],
+  "P_F1_port_face": [
+   -0.61,
+   -0.115,
+   -0.59,
+   -0.075
+  ],
+  "P_F1_direction": "+Y",
+  "P_F1_length_mm_along_direction": 0.04,
+  "P_F1_width_mm": 0.02,
+  "gap_pad_to_ground_mm": 0.03,
+  "gap_pad_to_island_mm": 0.02
+ },
+ "readout_functional": {
+  "definition": "V_R = (1/w_R) * integral over Gamma_R of E . l_hat dS, evaluated on the eigenmode field E of mode m; Palace's own lumped-port rule (lumpedportoperator.cpp InitializeLinearForms: V = 1/w * int E.l dS for rectangular ports) applied to a surface that carries no element",
+  "surfaces": {
+   "Gamma_R_plusY": {
+    "x": [
+     -0.485,
+     -0.405
+    ],
+    "y": [
+     0.05,
+     0.08
+    ],
+    "z": 0.0,
+    "l_hat": [
+     0,
+     -1,
+     0
+    ],
+    "meaning": "from the ground plane at y = +0.080 to the pad edge at y = +0.050: V_R = V_pad - V_ground in the P_F1 sign convention"
+   },
+   "Gamma_R_minusY": {
+    "x": [
+     -0.485,
+     -0.405
+    ],
+    "y": [
+     -0.08,
+     -0.05
+    ],
+    "z": 0.0,
+    "l_hat": [
+     0,
+     1,
+     0
+    ],
+    "meaning": "from the ground plane at y = -0.080 to the pad edge at y = -0.050; the mirror surface, kept as the path-independence check"
+   }
+  },
+  "width_normalisation_mm": 0.07999999999999996,
+  "why_not_the_full_pad_edge": "for x in [-0.505, -0.485] the island's etch (|y| <= 0.11499999999999999) removes the ground beyond y = +-0.08, so the pad-to-ground gap there is 0.065 mm, not 0.030 mm; the clean rectangle is the part of the edge that faces ground across the declared 0.030 mm",
+  "why_not_the_minus_X_side": "the pad's -X side faces the F1 island across the 0.020 mm coupling gap, not the ground",
+  "why_not_the_plus_X_side": "the pad's +X edge joins the CPW centre conductor (|y| <= 0.025) and otherwise faces the merged pad/slot etch, with no ground at a uniform distance",
+  "why_not_the_declared_P_R1_tap": "P_R1 sits 0.150 mm from the shorted end (current antinode) and is a Route B excitation surface; the resonator's standing-wave profile there differs between modes, so a tap voltage is not the coupling-node coordinate",
+  "units": "the exported field arrays are Palace's nondimensional E; V_nd = (1/lambda) (1/w_mm) int E_nd . l_hat dS_mm with lambda = Lc/L0 in mm; V [V] = sqrt(Z0) * V_nd; every factor cancels in rho_m = V_mR / V_mF"
+ },
+ "palace_dimensionalisation": {
+  "source": "palace/utils/iodata.cpp DimensionalizeValue (VOLTAGE: Hc*Z0*Lc with Hc = 1/sqrt(Z0 Lc^2)), NondimensionalizeInputs (Lc = largest bounding-box extent when Model.Lc is absent); postoperator.cpp WriteFields/ScaleGridFunctions (mesh written in input units, E coefficients rescaled so the exported values are the nondimensional field)",
+  "mu0": 1.2566370614359173e-06,
+  "epsilon0": 8.8541878176e-12,
+  "Z0_ohm": 376.73031346220444,
+  "sqrt_Z0": 19.409541814844687,
+  "Model_Lc_in_config": false,
+  "L0": 0.001,
+  "Lc_m": 0.004,
+  "lambda_Lc_over_L0_in_mesh_units": 4.0,
+  "voltage_from_nondimensional": "V = sqrt(Z0) * V_nd = 19.409541815 * V_nd"
+ },
+ "F_port_cross_check_recipe": {
+  "target": "port-V.csv Re{V[1]}, Im{V[1]} for m = 1, 2 of N1R and N2R (independent reconstruction reported by the user at ~2e-6 relative; to be reproduced, not fitted)",
+  "steps": [
+   "open the boundary data collection (paraview/eigenmode_boundary) for the cycle of mode m; select cells with attribute 10 (port_F1)",
+   "for each triangle, int E.y dS = area * mean of the three per-element vertex values of E_real (and E_imag) . y_hat; the order-1 Nedelec field is linear in each element, so this is exact up to Float32",
+   "sum, divide by w = 0.020 mm and by lambda = 4.0, multiply by sqrt(Z0); compare Re and Im separately with port-V.csv",
+   "tangential continuity of the Nedelec space makes E.y_hat on the z = 0 face the same from either neighbouring element, so the side chosen by the boundary export (larger permittivity) does not matter for this integral"
+  ],
+  "expected_floor": "Float32 on values (6e-8 relative) and on coordinates (about 3e-8 mm on 0.04 mm) gives an order-1e-6 relative floor, the size of the reported 2e-6"
+ },
+ "diagnostics_if_evaluated": {
+  "rho_m": "V_mR / V_mF, complex, same mode, global eigenvector phase cancels; Im(rho)/Re(rho) is the non-reality diagnostic",
+  "r12": "rho_1 / rho_2, complex; not replaced by its magnitude",
+  "path_check": "V_R(Gamma_R_plusY) vs V_R(Gamma_R_minusY): their difference bounds the Faraday path dependence and the mesh asymmetry",
+  "mesh_check": "N1R vs N2R: same base L2 mesh and identical readout-gap discretisation; the difference measures the port-box refinement's effect on the ratio, not readout-gap convergence",
+  "status": "NOT EVALUATED in this record: the field artefacts could not be retrieved from this environment (see artefacts.json)"
+ }
+}
