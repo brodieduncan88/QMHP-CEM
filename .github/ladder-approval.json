@@ -1,10 +1,10 @@
 {
  "schema": "qmhp-cem.ladder-approval/0.1.0",
- "what": "ONE rescue re-solve of the N2 discrete problem: the SAME baseline mesh file, the SAME two-level Palace Model.Refinement.Boxes prescription, the SAME order, tolerances and eigenvalue target as the timed-out N2 run, plus ONE Solver.Linear override, MGMaxLevels: 1. This is a preconditioner change, not a numerical-method change. It is NOT a third refinement level, NOT the prepared gmsh R2 experiment and NOT a rerun of N1.",
- "approved_by": "the repository owner, approving a single N2 rescue run with MGMaxLevels: 1 after reviewing the N2 runtime diagnosis",
+ "what": "ONE control run: N1's discrete problem - the SAME baseline mesh file, the SAME one-level Palace Model.Refinement.Boxes prescription, the SAME order, tolerances and eigenvalue target as the completed N1 - plus the ONE Solver.Linear override N2R used, MGMaxLevels: 1. It exists so that the refinement step N1R -> N2R has the same preconditioner strategy on both sides, and so that N1 vs N1R measures the solver-path effect on an identical discrete problem. It is NOT a new refinement level, NOT the prepared gmsh R2 experiment, and NOT a re-interpretation of N1.",
+ "approved_by": "the repository owner, approving a single controlled rerun of N1 with MGMaxLevels: 1 after reviewing the N2R outcome",
  "approved_utc": "2026-09-18",
  "level": 2,
- "sequential": "one run per invocation. This approval runs N2R ONLY and stops. A third level, a different box, R2, a rerun of N1 or a second rescue attempt are each a separate approval.",
+ "sequential": "one run per invocation. This approval runs N1R ONLY and stops. Any other level, box, solver setting, R2 or a rerun of any completed run is a separate approval.",
  "dry_runs_first": {
   "requirement": "dry-run levels 2 and 3 and record measured DOF for both before running anything",
   "measured_order1_dof": {
@@ -37,7 +37,7 @@
   "purpose": "test the supported-but-unproven port-stiffness explanation of the energy-balance failures",
   "changes_the_operator": false,
   "committed": "surface-Q.csv is committed with the record; the paraview/ tree is uploaded as an artifact only",
-  "carried_from": "the N2 approval, unchanged. Its 'purpose' field states N2's question, which N2R re-asks; it is not a claim that the rescue run tests anything new."
+  "carried_from": "the N1 and N2 approvals, unchanged. Its 'purpose' field states the question N1 was approved to ask, which N1R re-asks on the identical problem; it is not a claim that this control run tests anything new."
  },
  "rules_preserved_unchanged": [
   "the admission rule qmhp-cem.mode-admission/0.1.0 (|R - 1| <= 1e-3)",
@@ -49,9 +49,8 @@
  ],
  "explicitly_out_of_scope": [
   "a third refinement level, which is a separate approval",
-  "a second rescue attempt or any other solver setting, each a separate approval",
   "the R2 gmsh mesh, still prepared and NOT approved",
-  "rerunning N1 or N2",
+  "rerunning N2, N2R or the plain rungs",
   "the coupling extraction itself",
   "the Route A inversion on EM data",
   "Route B",
@@ -62,7 +61,8 @@
   "physical redesign",
   "any change to the 250 000-DOF rule or the 45-minute cap",
   "any change to the tolerances, the eigenvalue target, the mesh or the element order",
-  "merging pull request 7"
+  "merging pull request 7",
+  "a second control attempt or any other solver setting, each a separate approval"
  ],
  "note": "Committing this file on a palace/** branch starts the approved level. It is the approval record and the trigger at once, so a level cannot be started by an unrelated code change.",
  "level_2_outcome_for_context": {
@@ -95,25 +95,29 @@
    ]
   }
  ],
- "baseline_record": "COUPLED-LADDER-O1-L2-N1-20260917T001735Z",
+ "baseline_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
  "h_port_note": "the owner wrote h_port = 0.003333 mm, which is the rounded form of h_gap(level 2)/2 = 0.006666666666666666/2. The exact double is used here because the mesh hash above is for that exact value; a truncated literal could build a different mesh and the hash gate would then correctly refuse to solve it.",
  "what_this_run_answers": {
-  "purpose": "to obtain the N1 -> N2 frequency and participation comparison that N2 could not deliver, by solving N2's discrete problem within the cap.",
-  "what_it_does_not_answer": "nothing beyond what N2 was already approved to answer. The field_output block above is N2's, carried unchanged, so the port-face probes still run and still produce a port_field_test verdict - that is the same question N2 was approved to ask, not a new one. N2R adds no question of its own about the physics or the discretisation, and inherits every one of N2's confounds unchanged.",
-  "preconditioner_is_not_a_confound_but_is_not_free": "N1 used the V-cycle, N2R uses the direct preconditioner, so this step is NOT preconditioner-controlled. A preconditioner changes the path to the solution, not the solution: both runs converge their own discrete eigenproblem to the same Solver.Eigenmode.Tol 1e-06 and Solver.Linear.Tol 1e-08. What that leaves is stated honestly rather than certified away. NEITHER of Palace's error columns is a frequency: ErrorType::ABSOLUTE returns the raw residual norm ||(K - lambda M)x|| and ErrorType::BACKWARD divides it by normK + |lambda| normM (slepc.cpp:473-484, :824-837). Neither bounds a frequency without an eigenvalue condition number, which is not computed here, so no measurement in this project certifies the N1 -> N2R frequency difference as free of solver-path effects, and none is claimed. What IS enforced is the project's unchanged backward-error tolerance of 1e-6, which N1 met at 8.76e-11 and which N2R must also meet or stop. The N1 -> N2R frequency difference is therefore reported as an OBSERVED difference between two runs that also differ in preconditioner - not as a measurement of refinement alone. For scale, the L2 -> N1 movements were 3.685e-02 and 4.170e-04 relative, against a frozen Delta f <= 1e-4 that is RELATIVE and dimensionless, not 1e-4 GHz.",
+  "purpose": "to put the same solver strategy on both sides of the N1 -> N2 refinement step, and to measure the solver-path effect directly on an identical discrete problem (N1 vs N1R).",
+  "what_it_does_not_answer": "nothing about the physics or the discretisation that N1 was not already approved to ask. The field_output block is N1's and N2's, carried unchanged.",
+  "comparisons": {
+   "computed_by_this_run": "original L2 -> N1R (baseline_record is the plain rung, as for N1)",
+   "computed_offline_afterwards": "N1R -> N2R through the driver's own compare_against_baseline with N1R as the baseline and N2R's committed record as the entry; and N1 vs N1R as a same-problem comparison under the same match_runs rule. scripts/controlled_sequence_comparison.py; output written beside the N1R candidate, never inside a results/ record.",
+   "why_not_at_run_time": "the driver compares a run only against a SHALLOWER baseline, and N2R is deeper than N1R; N2R's record is history and is not modified."
+  },
   "remaining_confounds": [
    "the refined region is a volume, not the port face",
-   "the green closure extends it by an amount not known until the run",
+   "the green closure extends the refinement beyond the marked region: N1 measured it on this exact mesh and box - +4 541 DOF over the loaded mesh, of which 2 621 lie beyond the 221 marked tets (n1-nested-refinement-outcome.md sections 1 and 6) - and N1R must reproduce that count exactly",
    "the marked tets average radius-ratio 0.2197 against the mesh's 0.3700, so element quality is a live alternative explanation",
    "p_Default on the port face is unconverged at every level measured so far",
    "two points cannot establish an order of convergence, and none is claimed"
   ]
  },
  "palace_refinement": {
-  "id": "N2R",
+  "id": "N1R",
   "boxes": [
    {
-    "Levels": 2,
+    "Levels": 1,
     "BoundingBoxMin": [
      -0.62,
      -0.125,
@@ -142,19 +146,19 @@
  "dof_rule": {
   "budget": 250000,
   "measured_offline": false,
-  "measured_by_N2": 103411,
-  "fraction_of_budget": 0.4136,
-  "why_this_is_a_prediction_not_an_estimate": "N2 ran this exact mesh and box. Its probe read 103 411 at 2.3 s. N2R must reproduce that count; a different one means the mesh is not N2's and the comparison is void.",
+  "measured_by_N1": 84485,
+  "fraction_of_budget": 0.3379,
+  "why_this_is_a_prediction_not_an_estimate": "N1 ran this exact mesh and box; its probe read 84 485. N1R must reproduce that count, or the mesh is not N1's and the control is void.",
   "how_it_is_enforced": "the DOF probe, unchanged. It matches 'ND (p = 1): N' in Palace's 'Assembling system matrices' line, which prints the FINEST space once per run, before the multigrid hierarchy block. MGMaxLevels: 1 removes hierarchy lines the probe never matched; N2's log confirms the probe read exactly one value.",
   "mesh_identity_check": {
    "expected_counts": {
-    "vertices": 17447,
-    "edges": 103411,
-    "faces": 170410,
-    "elements": 84445
+    "vertices": 14667,
+    "edges": 84485,
+    "faces": 138118,
+    "elements": 68299
    },
    "euler": "V - E + F - T = 1, so these are one consistent complex rather than four loose numbers. NECESSARY, not sufficient: the same characteristic holds for the baseline (13991-79944+130388-64434) and for N1 (14667-84485+138118-68299). What GUARANTEES the mesh is the hash gate on the mesh file plus the identical box prescription; these counts are the cross-check that the gate and the box did what they say.",
-   "print_shape": "with one mesh, geodata.cpp:394-400 prints a single un-prefixed 'Parallel Mesh Stats' block carrying the REFINED counts, where N2 printed 'Coarse' and 'Refined' blocks."
+   "print_shape": "with one mesh, geodata.cpp:394-400 prints a single un-prefixed 'Parallel Mesh Stats' block carrying the REFINED counts, as N2R did; N1 printed 'Coarse' and 'Refined'."
   },
   "rule_unchanged": true
  },
@@ -164,20 +168,17 @@
   "wall clock exceeds the unchanged 45-minute cap -> terminate and record TIMEOUT.",
   "Palace exits non-zero, including on memory exhaustion -> record RUN_FAILED.",
   "max backward error exceeds the unchanged 1e-6 -> record and stop.",
-  "the admitted set is not {m1, m2}, or matching against N1 refuses -> record and stop.",
+  "the admitted set is not {m1, m2}, or matching against the plain L2 rung refuses -> record and stop.",
   "any post-solve analysis raises -> the record is still written, manifested and committed.",
-  "completing N2R means STOP for review. A second rescue attempt is a separate approval."
+  "completing N1R means STOP for review. A second control attempt, any other solver setting, or any further level is a separate approval."
  ],
- "sequence_records": [
-  "COUPLED-LADDER-O1-L2-20260916T080802Z",
-  "COUPLED-LADDER-O1-L2-N1-20260917T001735Z"
- ],
+ "sequence_records": [],
  "solver_change": {
   "key": "Solver.Linear.MGMaxLevels",
   "from": "unset, i.e. Palace's default 100 (configfile.hpp:777)",
   "to": 1,
   "documented_as": "configfile.hpp:776 - 'set to 1 to disable multigrid'. A supported setting.",
-  "why": "N2 did not fail on size: its 103 411 DOF cleared the budget gate in 2.3 s. It failed on time. Palace's own exclusive timers put +844.99 s of the L2 -> N1 regression inside the preconditioner, Krylov and divergence-free rows and -1.81 s everywhere else, against a measured total of +843.19 s, for 5.7 % more unknowns. Box refinement builds mesh levels (geodata.cpp:204-206, :346-350), and ksp.cpp:202 then demotes the preconditioner - a sparse direct solve for an eigenmode problem - to the coarse solver of a V-cycle whose levels barely coarsen (79 944 / 84 485 / 103 411, from marking 221 of 64 434 tets). Measured: 1.00 GMRES iteration per solve in the baseline, 15.37 in N1, 20.05 in N2. Full record in docs/coupled-candidate/n2-runtime-diagnosis.md.",
+  "why": "N2R's committed record compares it against N1, which ran a two-level V-cycle where N2R ran one level with the preconditioner applied directly. That step is not preconditioner-controlled and the record says so. N1R removes the difference: with it, L2 (1 level, unrefined), N1R (1 level) and N2R (1 level) form a refinement sequence with the same solver strategy at every point. The mechanism and its verification are unchanged from the N2R approval and are recorded in docs/coupled-candidate/n2-runtime-diagnosis.md and n2r-outcome.md.",
   "what_it_changes": "one branch. The reserve at geodata.cpp:204 is skipped, so capacity() stays 1, :346 does not copy, and :350 runs the SAME GeneralRefinement(refs, -1) in place. multigrid.hpp:88 then builds a ONE-level hierarchy and ksp.cpp:202 applies the preconditioner directly.",
   "what_it_does_not_change": [
    "the mesh file (the baseline's, hash-gated before launch) or the refined mesh it produces",
@@ -195,7 +196,7 @@
   "budget_and_cap_unchanged": true
  },
  "resource_expectation": {
-  "no_runtime_is_predicted": "the baseline solved 79 944 DOF on this same one-level code path in 81.2 s with an 8.1 s linear-solver stack, but N2R factorises a 1.29x larger operator and sparse-direct cost and memory grow superlinearly with fill. No factorisation at 103 411 DOF has been measured.",
+  "no_runtime_is_predicted": "N2R solved a LARGER problem, 103 411 DOF, on this configuration in 159.0 s, and N1R's operator is 18 % smaller. That is context. No runtime is predicted.",
   "risks": [
    "the direct factorisation is slower than expected -> TIMEOUT at the unchanged cap",
    "the direct factorisation exhausts runner memory -> RUN_FAILED"
@@ -210,5 +211,14 @@
   "cap_fraction": 1.0000227820203704,
   "progress_when_killed": "EPS restart 2 with 4 of 6 eigenvalues converged; N1 needed 3 restarts",
   "note": "N2's timeout stands as recorded. N2R does not replace it and does not reinterpret it."
- }
+ },
+ "n2r_outcome_for_context": {
+  "record": "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z",
+  "status": "COMPLETED",
+  "dof_solved": 103411,
+  "wall_clock_s": 159.0,
+  "cap_fraction": 0.059,
+  "note": "N2R stands as recorded. N1R does not modify or reinterpret it; the controlled comparison is computed offline from the two records."
+ },
+ "sequence_records_note": "deliberately empty. A one-level run's sequence IS its baseline comparison (original L2 -> N1R, in section 5c of the report); naming the plain rung here would add a one-step 'sequence' whose report banner says the step is 'not against a plain rung', which for N1R is exactly what it is. The solver-controlled sequence L2 -> N1R -> N2R is assembled offline from the records instead."
 }
