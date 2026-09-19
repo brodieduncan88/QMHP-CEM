@@ -1,0 +1,1356 @@
+"""Checks for the prepared nested-refinement candidate (N1).
+
+These verify facts a reader would otherwise have to take on trust: that the
+baseline is untouched, that the marking reproduces, that the budget claim is a
+bound and not a measurement, and that refining the port face cannot move the
+lumped-port geometry. They assert measurements and source-derived invariants;
+they do not assert any interpretation of R1.
+
+Nothing here launches Palace or writes inside a record.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+BASELINE = REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-20260916T080802Z"
+SOLVER = BASELINE / "L2" / "solver"
+MSH = SOLVER / "coupled_chip_cell_L2.msh"
+CANDIDATE = REPO_ROOT / "experiments" / "N1-nested-port-refinement"
+
+PORT_ATTR = 10
+BUDGET = 250_000
+
+
+def _load():
+    txt = MSH.read_text().splitlines()
+    i = txt.index("$Nodes")
+    n = int(txt[i + 1])
+    nodes = {
+        int(p[0]): (float(p[1]), float(p[2]), float(p[3]))
+        for p in (txt[i + 2 + k].split() for k in range(n))
+    }
+    j = txt.index("$Elements")
+    m = int(txt[j + 1])
+    tets, tris = [], []
+    for k in range(m):
+        p = txt[j + 2 + k].split()
+        etype, ntags, phys = int(p[1]), int(p[2]), int(p[3])
+        conn = tuple(int(x) for x in p[3 + ntags:])
+        if etype == 4:
+            tets.append((phys, conn))
+        elif etype == 2:
+            tris.append((phys, conn))
+    return nodes, tets, tris
+
+
+@pytest.fixture(scope="module")
+def mesh():
+    return _load()
+
+
+@pytest.fixture(scope="module")
+def candidate():
+    return json.loads((CANDIDATE / "candidate.json").read_text())
+
+
+def test_the_preserved_baseline_is_the_mesh_the_candidate_names(candidate):
+    """The candidate is derived from the preserved record, not a copy of it."""
+    assert MSH.exists(), "the preserved baseline mesh must be present"
+    assert hashlib.sha256(MSH.read_bytes()).hexdigest() == candidate["baseline_mesh_sha256"]
+    # And the record still verifies against its own manifest entry.
+    manifest = (BASELINE / "manifest.sha256").read_text()
+    rel = str(MSH.relative_to(BASELINE))
+    assert candidate["baseline_mesh_sha256"] in manifest and rel in manifest
+
+
+def test_order_one_dof_is_the_edge_count_the_record_published(mesh):
+    """Anchors the whole budget argument to a number the solver already agreed."""
+    _, tets, _ = mesh
+    edges = set()
+    for _, (a, b, c, d) in tets:
+        for e in ((a, b), (a, c), (a, d), (b, c), (b, d), (c, d)):
+            edges.add(tuple(sorted(e)))
+    published = json.loads((BASELINE / "summary.json").read_text())["rung"]["dof_measured"]
+    assert len(edges) == published == 79_944
+
+
+def test_the_box_marking_reproduces_palace_s_criterion(mesh, candidate):
+    """Marking is 'any vertex inside the closed box' (geodata.cpp:282-306).
+
+    Pinned so the declared box cannot drift from the count it was justified by.
+    """
+    nodes, tets, _ = mesh
+    region = candidate["refinement_region"]
+    lo, hi = region["BoundingBoxMin"], region["BoundingBoxMax"]
+    marked = [
+        i
+        for i, (_, t) in enumerate(tets)
+        if any(all(lo[d] <= nodes[v][d] <= hi[d] for d in range(3)) for v in t)
+    ]
+    assert len(marked) == candidate["marking"]["marked_tets"]
+    assert len(marked) / len(tets) < 0.01, "the region must stay local"
+
+
+def test_the_budget_claim_is_a_bound_and_is_not_presented_as_a_measurement(candidate):
+    """The 250k rule needs a MEASURED DOF. This candidate cannot supply one."""
+    dof = candidate["dof"]
+    assert dof["measured"] is None, "no offline measurement exists; it must not be invented"
+    assert dof["why_not_measured"]
+    assert dof["rigorous_lower_bound"] < BUDGET
+    # The bound is only a bound: green closure can only add.
+    assert dof["rigorous_lower_bound"] > 79_944
+    # The only available upper bound is uniform refinement, and it is OVER budget,
+    # so the offline knowledge is an interval that straddles the limit. A lower
+    # bound cannot discharge an upper limit and must not be quoted as headroom.
+    assert dof["rigorous_upper_bound"] > BUDGET
+    assert dof["rigorous_lower_bound"] < BUDGET < dof["rigorous_upper_bound"]
+    assert "89x" in dof["breach_argument"], "the useful offline argument is the breach argument"
+    # And the gate stays enforceable at launch rather than being weakened.
+    assert "ND (p = 1)" in dof["enforcement"]
+
+
+def test_inserted_midpoints_never_extend_the_port_point_cloud(mesh):
+    """A NECESSARY condition for the lumped-port geometry to be invariant.
+
+    Palace takes the port's w and l from ``mesh::GetBoundingBox`` on attribute 10
+    (lumpedelement.cpp:22-69), and MFEM's bisection inserts only edge midpoints
+    (mesh.cpp:10834-10841). This checks the axis-aligned extent is unmoved by
+    inserting every midpoint.
+
+    It is deliberately NOT the whole claim. Palace's box is ORIENTED, not
+    axis-aligned (geodata.hpp:124-128), so this test checks a necessary
+    condition, not the invariance itself. The two coincide here only because the
+    port is an exactly axis-aligned planar rectangle, which is also asserted
+    below. The remaining step -- that no midpoint can become a new extremum of
+    the oriented box, and that the tie-break is rescued by axes being re-sorted
+    by length -- is argued in the feasibility document, not here.
+    """
+    nodes, _, tris = mesh
+    face = [c for phys, c in tris if phys == PORT_ATTR]
+    verts = {v for c in face for v in c}
+
+    def bbox(points):
+        return tuple(
+            (min(p[d] for p in points), max(p[d] for p in points)) for d in range(3)
+        )
+
+    before = bbox([nodes[v] for v in verts])
+    midpoints = [
+        tuple(0.5 * (nodes[a][d] + nodes[b][d]) for d in range(3))
+        for c in face
+        for a, b in ((c[0], c[1]), (c[1], c[2]), (c[0], c[2]))
+    ]
+    after = bbox([nodes[v] for v in verts] + midpoints)
+    assert before == after
+
+    # Two refinement levels likewise: midpoints of midpoints stay inside.
+    twice = midpoints + [
+        tuple(0.5 * (midpoints[i][d] + midpoints[j][d]) for d in range(3))
+        for i in range(0, len(midpoints), 3)
+        for j in (i + 1, i + 2)
+    ]
+    assert bbox([nodes[v] for v in verts] + twice) == before
+
+    # The declared port is 0.020 x 0.040 mm, planar at z = 0.
+    lengths = sorted(hi - lo for lo, hi in before)
+    assert lengths[0] == pytest.approx(0.0, abs=1e-12), "planar"
+    assert lengths[1] == pytest.approx(0.020, abs=1e-9)
+    assert lengths[2] == pytest.approx(0.040, abs=1e-9)
+
+
+def test_the_candidate_config_changes_only_the_refinement_block(candidate):
+    """Everything the approval froze must be untouched: the delta is one block."""
+    base = json.loads((SOLVER / "config.json").read_text())
+    cand = json.loads((CANDIDATE / "config.candidate.json").read_text())
+
+    assert cand["Model"]["Refinement"] != base["Model"]["Refinement"]
+    boxes = cand["Model"]["Refinement"]["Boxes"]
+    assert len(boxes) == 1 and boxes[0]["Levels"] == 1
+
+    stripped_base = {**base, "Model": {k: v for k, v in base["Model"].items() if k != "Refinement"}}
+    stripped_cand = {**cand, "Model": {k: v for k, v in cand["Model"].items() if k != "Refinement"}}
+    assert stripped_cand == stripped_base, "only Model.Refinement may differ"
+
+    # Specifically: the mesh file, the port and the solver are the baseline's.
+    assert cand["Model"]["Mesh"] == base["Model"]["Mesh"]
+    assert cand["Boundaries"] == base["Boundaries"]
+    assert cand["Solver"] == base["Solver"]
+    assert cand["Domains"] == base["Domains"]
+
+
+def test_the_candidate_records_that_refinement_propagates_outside_the_box(candidate):
+    """Conforming refinement restores conformity by refining neighbours. The
+    record must say so rather than call this a box-only change."""
+    prop = candidate["propagation"]
+    assert prop["conforming"] is True
+    assert "YES" in prop["beyond_the_region"]
+    assert candidate["invariants_by_construction"]["parent_child"]
+
+
+def test_the_marked_region_quality_is_reported_including_the_bad_news(candidate):
+    """The marked tets are thinner than the mesh average; that is recorded."""
+    q = candidate["quality"]
+    assert q["radius_ratio_marked_tets"]["mean"] < q["radius_ratio_all_tets"]["mean"]
+    assert 0.0 < q["radius_ratio_marked_tets"]["min"] <= 1.0
+    # Both are rounded to 6 dp in the record, so compare at that precision.
+    assert q["port_face_mean_edge_after_one_level_mm"] == pytest.approx(
+        q["port_face_mean_edge_mm"] / 2, abs=1e-6
+    )
+
+
+def test_the_approval_names_exactly_one_approved_experiment():
+    """Whatever is approved, exactly ONE mechanism may be, under unchanged rules.
+
+    Deliberately experiment-AGNOSTIC. An earlier version pinned the approved id,
+    so every new approval broke it and had to be edited in the approving commit
+    -- the same coupling that made seven historical R1 tests fail when N1 was
+    approved. What must hold for any approval is asserted here; what was true of
+    one finished run belongs in that run's own pinned fixture.
+    """
+    approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
+    mechanisms = [k for k in ("port_refinement", "palace_refinement") if k in approval]
+    assert len(mechanisms) == 1, (
+        f"exactly one refinement mechanism may be approved, found {mechanisms}: "
+        "two would be two experiments on two different meshes"
+    )
+    which = mechanisms[0]
+    assert approval[which].get("id"), "the approved experiment must be labelled"
+    # Byte-identity with the named mesh is the control, so a hash is required.
+    assert approval.get("baseline_mesh_sha256") or approval.get("dry_run_mesh_sha256")
+    assert approval.get("baseline_record")
+    # And the rules it runs under are the unchanged ones.
+    assert approval["constraints"]["dof_budget"] == BUDGET
+    assert approval["constraints"]["per_solve_wall_clock_cap_s"] == 2700
+    golden = (REPO_ROOT / ".github" / "workflows" / "palace-golden.yml").read_text()
+    for path in ("solvers/palace/**", "docker/palace.Dockerfile", "scripts/palace_golden_run.py"):
+        assert path in golden
+    assert not str(CANDIDATE.relative_to(REPO_ROOT)).startswith(("solvers/palace", "docker"))
+
+
+# --- the executed path: Palace-side refinement and the DOF probe ---------------
+
+def _ladder():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_ladder_n1", REPO_ROOT / "scripts" / "palace_order1_ladder.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class _FakePopen:
+    """A Palace that prints the real assembly lines and then keeps going."""
+
+    class _Pipe:
+        """A closable line iterator, as subprocess hands back."""
+
+        def __init__(self, lines):
+            self._it = iter(lines)
+            self.closed = False
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            return next(self._it)
+
+        def close(self):
+            self.closed = True
+
+    def __init__(self, lines, **_):
+        self.stdout = self._Pipe(lines)
+        self.returncode = 0
+        self.waited = False
+
+    def wait(self, timeout=None):
+        self.waited = True
+        return 0
+
+    def kill(self):
+        self.returncode = -9
+
+
+ASSEMBLY = [
+    " Parallel Mesh Stats:\n",
+    " edges            79944       79944\n",
+    "Assembling system matrices, number of global unknowns:\n",
+    " H1 (p = 1): 13991, ND (p = 1): {dof}, RT (p = 1): 130388\n",
+    "Configuring SLEPc eigenvalue solver:\n",
+    " Found 6 converged eigenvalues\n",
+]
+
+
+def _run_with(monkeypatch, tmp_path, dof, budget):
+    ladder = _ladder()
+    lines = [line.format(dof=dof) for line in ASSEMBLY]
+    killed = []
+    monkeypatch.setattr(ladder.subprocess, "Popen", lambda *a, **k: _FakePopen(lines))
+    monkeypatch.setattr(
+        ladder.subprocess, "run",
+        lambda cmd, **k: killed.append(cmd) or type("R", (), {"returncode": 0})(),
+    )
+    info = ladder._run_palace(
+        "docker", "img", tmp_path, 1, "probe-test", dof_budget=budget,
+    )
+    return info, killed
+
+
+def test_the_dof_probe_reads_the_count_palace_actually_assembled(monkeypatch, tmp_path):
+    """Under budget: the count is recorded and nothing is killed."""
+    info, killed = _run_with(monkeypatch, tmp_path, dof=81_000, budget=BUDGET)
+    probe = info["dof_probe"]
+    assert probe["armed"] is True
+    assert probe["dof_reported"] == 81_000
+    assert probe["refused"] is False
+    assert not killed, "an in-budget run must not be killed"
+    assert info["dof_probe"]["reader_error"] is None
+    assert info["dof_probe"]["seen_at_wall_s"] is not None, "when the count arrived is recorded"
+    assert "ND (p = 1): 81000" in (tmp_path / "palace_log.txt").read_text()
+
+
+def test_the_dof_probe_kills_the_container_when_the_budget_is_exceeded(monkeypatch, tmp_path):
+    """Over budget: refused, and the container is killed.
+
+    This is the 250 000 rule for a mesh that cannot be counted offline. It has
+    to fire on the assembly line, which Palace prints before it configures the
+    eigensolver -- so the refusal costs seconds, not the 45-minute cap.
+    """
+    info, killed = _run_with(monkeypatch, tmp_path, dof=250_001, budget=BUDGET)
+    probe = info["dof_probe"]
+    assert probe["dof_reported"] == 250_001
+    assert probe["refused"] is True
+    assert killed and killed[0][:2] == ["docker", "kill"]
+
+
+def test_the_probe_is_disarmed_when_the_mesh_was_counted_offline(monkeypatch, tmp_path):
+    """A plain rung already refused before launch; the probe must not double up."""
+    info, killed = _run_with(monkeypatch, tmp_path, dof=250_001, budget=None)
+    assert info["dof_probe"]["armed"] is False
+    assert info["dof_probe"]["refused"] is False
+    assert not killed
+
+
+def test_the_approval_refuses_both_mechanisms_at_once(tmp_path):
+    """They are different experiments on different meshes. Approve one."""
+    ladder = _ladder()
+    approval = tmp_path / "a.json"
+    approval.write_text(json.dumps({
+        "level": 2,
+        "baseline_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+        "port_refinement": {"id": "R1", "h_port_mm": 0.003, "pad_mm": 0.01, "transition_mm": 0.02},
+        "palace_refinement": {"id": "N1", "boxes": [
+            {"Levels": 1, "BoundingBoxMin": [0, 0, 0], "BoundingBoxMax": [1, 1, 1]}]},
+    }))
+    with pytest.raises(ladder.LadderError, match="BOTH"):
+        ladder.approved_palace_refinement(approval)
+
+
+@pytest.mark.parametrize(
+    "block, match",
+    [
+        ({"id": "N1"}, "missing"),
+        ({"id": "N1", "boxes": [], "extra": 1}, "unknown"),
+        ({"id": "N1", "boxes": []}, "non-empty"),
+        ({"id": "N1", "boxes": [{"Levels": 0, "BoundingBoxMin": [0, 0, 0],
+                                 "BoundingBoxMax": [1, 1, 1]}]}, "Levels"),
+        ({"id": "N1", "boxes": [{"Levels": 1, "BoundingBoxMin": [1, 1, 1],
+                                 "BoundingBoxMax": [0, 0, 0]}]}, "not strictly below"),
+    ],
+)
+def test_a_malformed_approval_is_refused_rather_than_ignored(tmp_path, block, match):
+    """A typo must not silently become 'no refinement' and solve the wrong thing."""
+    ladder = _ladder()
+    approval = tmp_path / "a.json"
+    approval.write_text(json.dumps({
+        "level": 2,
+        "baseline_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+        "palace_refinement": block,
+    }))
+    with pytest.raises(ladder.LadderError, match=match):
+        ladder.approved_palace_refinement(approval)
+
+
+def test_a_refined_record_is_kept_out_of_the_convergence_fit_by_either_mechanism():
+    """any_refinement() is the single gate; neither mechanism may slip through."""
+    ladder = _ladder()
+    assert ladder.any_refinement({}) is None
+    assert ladder.any_refinement({"port_refinement": None, "palace_refinement": None}) is None
+    assert ladder.any_refinement({"port_refinement": {"id": "R1"}}) == {"id": "R1"}
+    assert ladder.any_refinement({"palace_refinement": {"id": "N1"}}) == {"id": "N1"}
+
+
+def test_a_silent_probe_refuses_rather_than_publishing_a_budget_claim(monkeypatch, tmp_path):
+    """Armed and never fired means the 250 000 rule was never applied.
+
+    A COMPLETED record would then assert budget compliance on the UNREFINED
+    count. Refuse instead.
+    """
+    ladder = _ladder()
+    lines = [line for line in ASSEMBLY if "ND (p = 1)" not in line]  # Palace never prints it
+    monkeypatch.setattr(ladder.subprocess, "Popen", lambda *a, **k: _FakePopen(lines))
+    monkeypatch.setattr(ladder.subprocess, "run",
+                        lambda cmd, **k: type("R", (), {"returncode": 0})())
+    info = ladder._run_palace("docker", "i", tmp_path, 1, "n", dof_budget=BUDGET)
+    assert info["dof_probe"]["armed"] is True
+    assert info["dof_probe"]["dof_reported"] is None
+    assert info["dof_probe"]["refused"] is False, "nothing to refuse on; the miss is the problem"
+
+
+def test_a_reader_failure_is_recorded_and_does_not_silently_disarm(monkeypatch, tmp_path):
+    """An unguarded reader would disarm the probe AND truncate the log, silently."""
+    ladder = _ladder()
+
+    class _Exploding(_FakePopen):
+        def __init__(self, *a, **k):
+            super().__init__(["first\n"], **k)
+            self._boom = True
+
+        class _Pipe:
+            def __init__(self, *_):
+                self._n = 0
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                self._n += 1
+                if self._n == 1:
+                    return "first\n"
+                raise UnicodeDecodeError("utf-8", b"", 0, 1, "bad byte")
+
+            def close(self):
+                pass
+
+    monkeypatch.setattr(ladder.subprocess, "Popen", lambda *a, **k: _Exploding())
+    monkeypatch.setattr(ladder.subprocess, "run",
+                        lambda cmd, **k: type("R", (), {"returncode": 0})())
+    info = ladder._run_palace("docker", "i", tmp_path, 1, "n", dof_budget=BUDGET)
+    assert info["dof_probe"]["reader_error"], "the failure must reach the record"
+    assert "UnicodeDecodeError" in info["dof_probe"]["reader_error"]
+
+
+def test_the_approval_requires_the_baseline_mesh_hash(tmp_path):
+    """Byte-identity is the control. Without the hash the gate is skipped, so a
+    missing key must refuse rather than silently drop it."""
+    ladder = _ladder()
+    approval = tmp_path / "a.json"
+    body = {
+        "level": 2,
+        "baseline_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+        "palace_refinement": {"id": "N1", "boxes": [
+            {"Levels": 1, "BoundingBoxMin": [-0.62, -0.125, -0.01],
+             "BoundingBoxMax": [-0.58, -0.065, 0.01]}]},
+    }
+    approval.write_text(json.dumps(body))
+    with pytest.raises(ladder.LadderError, match="baseline_mesh_sha256"):
+        ladder.approved_palace_refinement(approval)
+
+    # And the gmsh path's key is NOT accepted in its place.
+    approval.write_text(json.dumps({**body, "dry_run_mesh_sha256": {"N1": "deadbeef"}}))
+    with pytest.raises(ladder.LadderError, match="baseline_mesh_sha256"):
+        ladder.approved_palace_refinement(approval)
+
+
+def test_a_record_reports_the_dof_it_solved_not_the_one_it_loaded():
+    """Reporting the loaded 79 944 as a refined run's DOF would be false."""
+    ladder = _ladder()
+    assert ladder.solved_dof({"dof_measured": 79_944}) == 79_944
+    assert ladder.solved_dof({"dof_measured": 79_944, "dof_solved": 96_300}) == 96_300
+    assert ladder.solved_dof({}) is None
+
+
+def test_the_not_refined_sentinel_is_one_constant():
+    """Two copies drifted apart once and every plain rung grew two empty sections."""
+    ladder = _ladder()
+    source = (REPO_ROOT / "scripts" / "palace_order1_ladder.py").read_text()
+    assert ladder.NOT_REFINED == "not a refined run"
+    assert '"not a port-refined run"' not in source, "the stale literal must be gone"
+
+
+# --- N2: one further level on the same region ---------------------------------
+
+N2_CANDIDATE = REPO_ROOT / "experiments" / "N2-nested-port-refinement"
+N1_RECORD = REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-N1-20260917T001735Z"
+L2_RECORD = REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-20260916T080802Z"
+N2_RECORD = REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-N2-20260917T103405Z"
+
+
+@pytest.fixture(scope="module")
+def n2():
+    return json.loads((N2_CANDIDATE / "candidate.json").read_text())
+
+
+def test_n2_pins_the_original_mesh_the_n1_record_and_the_stack(n2):
+    """The three things that must not drift between now and approval."""
+    pin = n2["pinned"]
+    assert pin["original_L2_mesh_sha256"] == hashlib.sha256(MSH.read_bytes()).hexdigest()
+    assert pin["original_L2_record"] == L2_RECORD.name
+    assert pin["n1_reference_record"] == N1_RECORD.name
+    assert (N1_RECORD / "summary.json").is_file(), "the N1 reference must be on disk"
+    assert pin["palace_commit"] == "a61c8cbe0cacf496cde3c62e93085fae0d6299ac"
+    assert pin["mfem_commit"] == "c444b17c973cc301590a6ac186fb33587b5881e6"
+
+
+def test_n2_is_two_total_levels_on_n1s_unchanged_box(n2):
+    """TWO TOTAL levels from the original mesh -- one beyond N1, not two beyond."""
+    region = n2["refinement_region"]
+    assert region["Levels"] == 2
+    n1_box = json.loads((N1_RECORD / "L2" / "solver" / "config.json").read_text())
+    n1_box = n1_box["Model"]["Refinement"]["Boxes"][0]
+    assert n1_box["Levels"] == 1, "N1 is the one-level point"
+    assert region["BoundingBoxMin"] == n1_box["BoundingBoxMin"]
+    assert region["BoundingBoxMax"] == n1_box["BoundingBoxMax"]
+
+    cfg = json.loads((N2_CANDIDATE / "config.candidate.json").read_text())
+    box = cfg["Model"]["Refinement"]["Boxes"][0]
+    assert box["Levels"] == 2
+    assert (box["BoundingBoxMin"], box["BoundingBoxMax"]) == (
+        n1_box["BoundingBoxMin"], n1_box["BoundingBoxMax"]
+    )
+    # The mesh is the ORIGINAL L2 file, not a regenerated one.
+    assert cfg["Model"]["Mesh"] == "coupled_chip_cell_L2.msh"
+
+
+def test_the_n2_config_differs_from_n1s_only_in_the_level_count(n2):
+    """Everything the approval froze must be untouched: the delta is one integer."""
+    n1 = json.loads((N1_RECORD / "L2" / "solver" / "config.json").read_text())
+    n2cfg = json.loads((N2_CANDIDATE / "config.candidate.json").read_text())
+    strip = lambda c: {**c, "Model": {k: v for k, v in c["Model"].items() if k != "Refinement"}}
+    assert strip(n2cfg) == strip(n1), "only Model.Refinement may differ"
+    assert n2cfg["Solver"] == n1["Solver"], "no solver setting is changed to make N2 fit"
+    assert n2cfg["Boundaries"] == n1["Boundaries"]
+    assert n2cfg["Domains"] == n1["Domains"]
+
+
+def test_n2_does_not_invent_a_dof_it_cannot_measure(n2):
+    """Stage 2 marks on the stage-1 mesh, which does not exist offline.
+
+    No bound for stage 2 is computable -- not even the lower bound that stage 1
+    had. A number here would be invented.
+    """
+    dof = n2["dof"]
+    assert dof["n2_measured"] is None
+    assert dof["why_no_n2_number"]
+    assert dof["n1_measured"] == 84_485
+    assert str(dof["n1_measured"]) in dof["rigorous_offline_statement"]
+    assert dof["budget"] == BUDGET
+
+
+def test_n2_discloses_the_hierarchy_change_and_refuses_to_extrapolate_runtime(n2):
+    """N1 took 11.4x the baseline's time for 5.7 % more DOF; DOF does not predict runtime."""
+    res = n2["resource_uncertainty"]
+    assert res["n1_wall_clock_s"] == pytest.approx(923.5, abs=0.1)
+    assert res["cap_s"] == 2700
+    assert "not proportional" in res["do_not_extrapolate"].lower() or \
+           "NOT proportional" in res["do_not_extrapolate"]
+    assert "AUTOMATIC" in res["hierarchy_change_disclosed"]
+    assert "THREE" in res["hierarchy_change_disclosed"], "N2 gets a third multigrid level"
+    assert "CAP" in res["primary_risk"].upper()
+
+
+def test_the_probe_enforces_on_the_largest_count_not_the_first(monkeypatch, tmp_path):
+    """A multi-level hierarchy must not let an earlier, coarser count pass.
+
+    Palace prints this line once from the finest space, so today first == finest.
+    The guard takes the max anyway: enforcing on a coarse count is the one
+    failure it exists to prevent.
+    """
+    ladder = _ladder()
+    lines = [
+        " H1 (p = 1): 13991, ND (p = 1): 79944, RT (p = 1): 130388\n",   # coarse, in budget
+        " H1 (p = 1): 40000, ND (p = 1): 260000, RT (p = 1): 400000\n",  # finest, OVER
+    ]
+    killed = []
+    monkeypatch.setattr(ladder.subprocess, "Popen", lambda *a, **k: _FakePopen(lines))
+    monkeypatch.setattr(ladder.subprocess, "run",
+                        lambda cmd, **k: killed.append(cmd) or type("R", (), {"returncode": 0})())
+    info = ladder._run_palace("docker", "i", tmp_path, 1, "n", dof_budget=BUDGET)
+    probe = info["dof_probe"]
+    assert probe["dof_reported_all"] == [79_944, 260_000]
+    assert probe["dof_reported"] == 260_000, "the largest, not the first"
+    assert probe["ambiguous"] is True, "two distinct counts is an ambiguity worth recording"
+    assert probe["refused"] is True and killed
+
+
+def test_a_shallower_point_of_the_same_sequence_is_a_valid_baseline():
+    """N1 is refined, and IS N2's correct baseline. Anything else still is not."""
+    ladder = _ladder()
+    box = {"Levels": 1, "BoundingBoxMin": [-0.62, -0.125, -0.01],
+           "BoundingBoxMax": [-0.58, -0.065, 0.01]}
+    n1_rung = {"palace_refinement": {"boxes": [box]}}
+    n2_entry = {"palace_refinement": {"boxes": [{**box, "Levels": 2}]}}
+
+    assert ladder.is_prior_point_of_same_sequence(n2_entry, n1_rung) is True
+    # Same depth is not a step.
+    assert ladder.is_prior_point_of_same_sequence(n2_entry, {"palace_refinement": {"boxes": [{**box, "Levels": 2}]}}) is False
+    # Deeper baseline is not a prior point.
+    assert ladder.is_prior_point_of_same_sequence(n1_rung, n2_entry) is False
+    # A DIFFERENT region is not this sequence, whatever its depth.
+    other = {"palace_refinement": {"boxes": [{**box, "Levels": 1,
+                                             "BoundingBoxMin": [0.0, 0.0, 0.0]}]}}
+    assert ladder.is_prior_point_of_same_sequence(n2_entry, other) is False
+
+    # A per-box REGRESSION must not hide behind an increase in another box.
+    b2 = {"Levels": 1, "BoundingBoxMin": [1.0, 1.0, 1.0], "BoundingBoxMax": [2.0, 2.0, 2.0]}
+    deeper_but_regressed = {"palace_refinement": {"boxes": [{**box, "Levels": 9},
+                                                            {**b2, "Levels": 1}]}}
+    baseline_two = {"palace_refinement": {"boxes": [{**box, "Levels": 1},
+                                                    {**b2, "Levels": 5}]}}
+    assert ladder.is_prior_point_of_same_sequence(deeper_but_regressed, baseline_two) is False
+
+    # Reordering the boxes is the SAME prescription and must still be accepted.
+    reordered = {"palace_refinement": {"boxes": [{**b2, "Levels": 5}, {**box, "Levels": 1}]}}
+    deeper = {"palace_refinement": {"boxes": [{**box, "Levels": 2}, {**b2, "Levels": 5}]}}
+    assert ladder.is_prior_point_of_same_sequence(deeper, reordered) is True
+    # A gmsh-refined record is never a point of a Palace sequence.
+    assert ladder.is_prior_point_of_same_sequence(n2_entry, {"port_refinement": {"id": "R1"}}) is False
+
+
+def test_sequence_records_must_end_at_the_baseline(tmp_path):
+    """The primary comparison is the LAST step; a mismatch would silently
+    compare against something other than the record named as the baseline."""
+    ladder = _ladder()
+    approval = tmp_path / "a.json"
+    body = {
+        "level": 2,
+        "baseline_record": N1_RECORD.name,
+        "baseline_mesh_sha256": hashlib.sha256(MSH.read_bytes()).hexdigest(),
+        "palace_refinement": {"id": "N2", "boxes": [
+            {"Levels": 2, "BoundingBoxMin": [-0.62, -0.125, -0.01],
+             "BoundingBoxMax": [-0.58, -0.065, 0.01]}]},
+        "sequence_records": [L2_RECORD.name],   # ends at L2, not at the baseline
+    }
+    approval.write_text(json.dumps(body))
+    with pytest.raises(ladder.LadderError, match="must end at baseline_record"):
+        ladder.approved_palace_refinement(approval)
+
+    body["sequence_records"] = [L2_RECORD.name, "COUPLED-LADDER-O1-L2-NOPE"]
+    approval.write_text(json.dumps(body))
+    with pytest.raises(ladder.LadderError, match="not a record on disk"):
+        ladder.approved_palace_refinement(approval)
+
+    body["sequence_records"] = [L2_RECORD.name, N1_RECORD.name]
+    approval.write_text(json.dumps(body))
+    label, boxes, sha, overrides = ladder.approved_palace_refinement(approval)
+    assert label == "N2" and boxes[0]["Levels"] == 2
+    assert overrides == {}, "an approval that names no override must yield none"
+
+
+def test_the_sequence_reports_both_participations_without_conflating_them():
+    """Derived and reported are different quantities; the record says which."""
+    ladder = _ladder()
+    step = ladder.compare_against_baseline(
+        json.loads((N1_RECORD / "summary.json").read_text())["rung"], L2_RECORD.name,
+    )
+    assert step["available"]
+    for pair in step["pairs"]:
+        derived = pair["port_participation_from_probes"]
+        reported = pair["port_participation_reported_by_palace"]
+        assert derived["baseline"] is not None and reported["baseline"] is not None
+        assert "SURROGATE" in reported["what"]
+        # Cauchy-Schwarz bounds E_ind/E_port <= 1 for the EXACT quantities. The
+        # derived value is itself an estimate built from the difference
+        # p_Default - p_MA, so this ordering is guaranteed for the exact ratio
+        # and OBSERVED here. Asserted at the margin the data actually has (~1e-5
+        # on mode 1, ~2.4e-4 on mode 2), not at 1e-9, so a run where the
+        # cancellation bites is reported rather than failing this test.
+        assert reported["baseline"] <= derived["baseline"] * (1 + 1e-3)
+        assert reported["refined"] <= derived["refined"] * (1 + 1e-3)
+
+
+def test_the_sequence_refuses_to_fit_an_order_or_a_limit():
+    """Three local points are not a convergence sequence in h."""
+    ladder = _ladder()
+    out = ladder.refinement_sequence({"palace_refinement": {"boxes": []}}, [])
+    assert out["available"] is False
+    text = out["not_a_convergence_fit"]
+    assert "LOCAL" in text and "NOT global mesh convergence" in text
+    assert "no order is fitted" in text and "no continuum limit" in text
+
+
+#: Which prepared candidate each approvable experiment id was reviewed as.
+#: Named explicitly so approving a new id is a deliberate act with a reviewed
+#: candidate behind it, and so this test does not have to be rewritten - and
+#: silently weakened - every time the live approval moves on.
+CANDIDATE_FOR_ID = {
+    "N1": REPO_ROOT / "experiments" / "N1-nested-port-refinement",
+    "N2": REPO_ROOT / "experiments" / "N2-nested-port-refinement",
+    "N2R": REPO_ROOT / "experiments" / "N2R-rescue-preconditioner",
+    "N1R": REPO_ROOT / "experiments" / "N1R-controlled-preconditioner",
+}
+
+
+def test_the_live_approval_matches_the_candidate_it_was_reviewed_as():
+    """Whatever is approved, it must be the prepared experiment of that id.
+
+    Deliberately NOT pinned to one experiment: an earlier version asserted the
+    live approval was N2, so approving anything else broke a test that had
+    nothing to do with the change. History belongs in a pinned fixture; this
+    test is about the LIVE approval, so it follows it.
+    """
+    approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
+    block = approval.get("palace_refinement")
+    if block is None:
+        pytest.skip("no palace_refinement is currently approved")
+    experiment = block["id"]
+    assert experiment in CANDIDATE_FOR_ID, (
+        f"{experiment!r} is approved but has no reviewed candidate directory"
+    )
+    cand = json.loads((CANDIDATE_FOR_ID[experiment] / "candidate.json").read_text())
+    assert cand["id"] == experiment
+    assert "port_refinement" not in approval, "the gmsh path is not approved"
+
+    box = block["boxes"][0]
+    region = cand["refinement_region"]
+    assert box["Levels"] == region["Levels"]
+    assert box["BoundingBoxMin"] == region["BoundingBoxMin"]
+    assert box["BoundingBoxMax"] == region["BoundingBoxMax"]
+    assert approval["baseline_record"] == cand["approval_must_carry"]["baseline_record"]
+    assert approval["sequence_records"] == cand["approval_must_carry"]["sequence_records"]
+    assert approval["baseline_mesh_sha256"] == cand["approval_must_carry"]["baseline_mesh_sha256"]
+    # A solver override must be in the candidate too, and must match it exactly.
+    assert block.get("solver_linear_overrides", {}) == cand["approval_must_carry"].get(
+        "palace_refinement.solver_linear_overrides", {}
+    )
+    # The rule and the cap are the unchanged ones.
+    assert approval["constraints"]["dof_budget"] == BUDGET
+    assert approval["constraints"]["per_solve_wall_clock_cap_s"] == 2700
+    for path in CANDIDATE_FOR_ID.values():
+        assert not str(path.relative_to(REPO_ROOT)).startswith(("solvers/palace", "docker"))
+
+
+def test_every_summary_field_has_a_default_before_the_guarded_window():
+    """A field initialised INSIDE the post-solve guard is unbound if the analysis
+    raises early, and the summary write then fails OUTSIDE the guard.
+
+    That is how a completed solve was destroyed once, and adding
+    `refinement_sequence` reintroduced it. This asserts structurally that every
+    name the summary reads is bound before the `try`, so the next field added
+    cannot repeat it.
+    """
+    import ast
+
+    source = (REPO_ROOT / "scripts" / "palace_order1_ladder.py").read_text()
+    tree = ast.parse(source)
+    main = next(n for n in ast.walk(tree)
+                if isinstance(n, ast.FunctionDef) and n.name == "main")
+
+    # The guarded window is the try whose handler records post-solve failure.
+    guard = next(n for n in ast.walk(main)
+                 if isinstance(n, ast.Try)
+                 and any("analysis_failed" in ast.dump(h) for h in n.handlers))
+
+    bound_before = set()
+    for node in main.body:
+        if node is guard:
+            break
+        for sub in ast.walk(node):
+            if isinstance(sub, ast.AnnAssign) and isinstance(sub.target, ast.Name):
+                bound_before.add(sub.target.id)
+            elif isinstance(sub, ast.Assign):
+                for t in sub.targets:
+                    if isinstance(t, ast.Name):
+                        bound_before.add(t.id)
+
+    # Names the summary dict reads, that are also assigned inside the guard.
+    assigned_in_guard = {
+        sub.target.id if isinstance(sub, ast.AnnAssign) else t.id
+        for node in guard.body for sub in ast.walk(node)
+        if isinstance(sub, ast.AnnAssign) and isinstance(sub.target, ast.Name)
+        for t in [sub.target]
+    } | {
+        t.id
+        for node in guard.body for sub in ast.walk(node)
+        if isinstance(sub, ast.Assign)
+        for t in sub.targets if isinstance(t, ast.Name)
+    }
+
+    summary_assign = next(
+        n for n in ast.walk(main)
+        if isinstance(n, ast.Assign)
+        and any(isinstance(t, ast.Name) and t.id == "summary" for t in n.targets)
+    )
+    read_by_summary = {n.id for n in ast.walk(summary_assign.value) if isinstance(n, ast.Name)}
+
+    at_risk = (read_by_summary & assigned_in_guard) - bound_before
+    assert not at_risk, (
+        f"{sorted(at_risk)} are read by the summary but only bound inside the guarded "
+        f"window; an early analysis failure would raise UnboundLocalError outside the guard"
+    )
+
+
+# ---------------------------------------------------------------------------
+# N2R: the rescue run. The same discrete problem as N2, solved with the
+# preconditioner the unrefined baseline used. These checks exist because the
+# claim "the mathematics is unchanged" is what makes the comparison against N1
+# meaningful, and a free-form solver override would silently break it.
+# ---------------------------------------------------------------------------
+
+
+def _approval_with(tmp_path, overrides, *, levels=2):
+    """A minimal but VALID palace_refinement approval carrying ``overrides``."""
+    body = {
+        "level": 2,
+        "baseline_record": N1_RECORD.name,
+        "baseline_mesh_sha256": json.loads(
+            (N1_RECORD / "summary.json").read_text()
+        )["rung"]["mesh"]["sha256"],
+        "sequence_records": [L2_RECORD.name, N1_RECORD.name],
+        "palace_refinement": {
+            "id": "N2R",
+            "boxes": [{"Levels": levels, "BoundingBoxMin": [-0.62, -0.125, -0.01],
+                       "BoundingBoxMax": [-0.58, -0.065, 0.01]}],
+        },
+    }
+    if overrides is not None:
+        body["palace_refinement"]["solver_linear_overrides"] = overrides
+    path = tmp_path / "approval.json"
+    path.write_text(json.dumps(body))
+    return path
+
+
+def test_an_approval_may_carry_only_preconditioner_overrides(tmp_path):
+    """The allow-list is the guarantee; everything else is refused before launch."""
+    ladder = _ladder()
+    label, boxes, sha, overrides = ladder.approved_palace_refinement(
+        _approval_with(tmp_path, {"MGMaxLevels": 1})
+    )
+    assert label == "N2R" and boxes[0]["Levels"] == 2
+    assert overrides == {"MGMaxLevels": 1}
+
+    label, _, _, overrides = ladder.approved_palace_refinement(
+        _approval_with(tmp_path, {"MGUseMesh": False})
+    )
+    assert overrides == {"MGUseMesh": False}
+
+
+@pytest.mark.parametrize(
+    "overrides, match",
+    [
+        # The whole point: a tolerance here would change what "converged" means
+        # and the record would still read COMPLETED.
+        ({"Tol": 1e-4}, "may not set 'Tol'"),
+        ({"MaxIts": 10}, "may not set 'MaxIts'"),
+        ({"Type": "SuperLU"}, "may not set 'Type'"),
+        ({"KSPType": "CG"}, "may not set 'KSPType'"),
+        ({"MGMaxLevels": 1, "Tol": 1e-4}, "may not set 'Tol'"),
+        # bool is a subclass of int; MGMaxLevels: true must not reach Palace as 1.
+        ({"MGMaxLevels": True}, "must be int"),
+        ({"MGMaxLevels": "1"}, "must be int"),
+        ({"MGMaxLevels": 0}, "at least 1"),
+        ({"MGUseMesh": 0}, "must be bool"),
+    ],
+)
+def test_a_solver_override_outside_the_allow_list_is_refused(tmp_path, overrides, match):
+    ladder = _ladder()
+    with pytest.raises(ladder.LadderError, match=match):
+        ladder.approved_palace_refinement(_approval_with(tmp_path, overrides))
+
+
+def test_the_override_is_not_free_form(tmp_path):
+    ladder = _ladder()
+    with pytest.raises(ladder.LadderError, match="must be an object"):
+        ladder.approved_palace_refinement(_approval_with(tmp_path, ["MGMaxLevels"]))
+
+
+def test_the_allow_list_holds_only_keys_that_cannot_change_the_operator():
+    """A guard on the list itself, so widening it is a deliberate act.
+
+    Every key here must be one that reaches only Palace's mesh-hierarchy
+    decision. If a future change adds a key, this test fails and the reasoning
+    has to be written down again rather than inherited.
+    """
+    ladder = _ladder()
+    assert set(ladder._SOLVER_LINEAR_OVERRIDE_KEYS) == {"MGMaxLevels", "MGUseMesh"}
+    for forbidden in ("Tol", "MaxIts", "Type", "KSPType", "MaxSize", "InitialGuess"):
+        assert forbidden not in ladder._SOLVER_LINEAR_OVERRIDE_KEYS
+
+
+def test_the_committed_N2R_approval_changes_only_the_preconditioner():
+    """The live approval must describe the SAME discrete problem as the N2 record."""
+    ladder = _ladder()
+    approved = ladder.approved_palace_refinement()
+    if approved is None:
+        pytest.skip("no palace_refinement is currently approved")
+    label, boxes, sha, overrides = approved
+    if label != "N2R":
+        pytest.skip(f"the live approval is {label}, not the N2R rescue run")
+
+    n2 = json.loads((N2_RECORD / "summary.json").read_text())["rung"]
+    # Same mesh file, same box prescription: the same discrete problem.
+    assert sha == n2["mesh"]["sha256"]
+    assert boxes == n2["palace_refinement"]["boxes"]
+    # And the only declared delta is on the allow-list.
+    assert overrides and set(overrides) <= set(ladder._SOLVER_LINEAR_OVERRIDE_KEYS)
+
+
+def test_the_override_reaches_the_config_without_touching_the_tolerances():
+    """The REAL application path, run against the config N2 actually solved.
+
+    Deliberately calls the function execute_level calls rather than repeating
+    its statements: a copy here would keep passing after a reordering that left
+    the record describing a config that was never written.
+    """
+    ladder = _ladder()
+    n2_config = json.loads((N2_RECORD / "L2" / "solver" / "config.json").read_text())
+    config = json.loads(json.dumps(n2_config))
+
+    block = ladder.apply_solver_linear_overrides(config, {"MGMaxLevels": 1})
+
+    # The config was mutated in place, and by exactly one key.
+    assert config["Solver"]["Linear"]["MGMaxLevels"] == 1
+    before, after = dict(n2_config["Solver"]["Linear"]), dict(config["Solver"]["Linear"])
+    assert after.pop("MGMaxLevels") == 1
+    assert after == before, "nothing else in Solver.Linear may move"
+    config["Solver"]["Linear"] = before
+    assert config == n2_config, "nothing outside Solver.Linear may move"
+
+    # And the block describes what it did, truthfully.
+    assert block["applied"] == {"MGMaxLevels": 1}
+    assert block["replaced"] == {"MGMaxLevels": None}, (
+        "N2 left MGMaxLevels at Palace's default, so the record must say it replaced nothing"
+    )
+    assert block["unchanged"] == {
+        k: n2_config["Solver"]["Linear"][k] for k in ("Type", "KSPType", "Tol", "MaxIts")
+    }
+    # The invariant must not be reachable without its two caveats.
+    assert "Mpi::Size(comm) == 1" in block["one_branch_only_this_path_reaches"]
+    assert "RebalanceMesh" in block["one_branch_only_this_path_reaches"]
+    assert "order 1" in block["order_dependence"]
+
+    # The eigenvalue problem itself is untouched.
+    assert config["Solver"]["Eigenmode"] == {"N": 6, "Tol": 1e-06, "Target": 0.5, "Save": 6}
+    assert config["Solver"]["Order"] == 1
+
+
+def test_the_override_replacing_a_set_value_records_the_old_one():
+    """`replaced` must distinguish "was unset" from "was something else"."""
+    ladder = _ladder()
+    config = {"Solver": {"Linear": {"Type": "Default", "MGMaxLevels": 8}}}
+    block = ladder.apply_solver_linear_overrides(config, {"MGMaxLevels": 1, "MGUseMesh": False})
+    assert block["replaced"] == {"MGMaxLevels": 8, "MGUseMesh": None}
+    assert config["Solver"]["Linear"]["MGMaxLevels"] == 1
+    assert config["Solver"]["Linear"]["MGUseMesh"] is False
+
+
+def test_execute_level_applies_the_override_through_that_function():
+    """Structural: the wiring, so the tested function is the one that runs."""
+    import ast
+
+    tree = ast.parse((REPO_ROOT / "scripts" / "palace_order1_ladder.py").read_text())
+    fn = next(n for n in ast.walk(tree)
+              if isinstance(n, ast.FunctionDef) and n.name == "execute_level")
+    calls = {
+        n.func.id for n in ast.walk(fn)
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+    }
+    assert "apply_solver_linear_overrides" in calls
+    # And execute_level must not mutate Solver.Linear by any other route.
+    source = ast.get_source_segment(
+        (REPO_ROOT / "scripts" / "palace_order1_ladder.py").read_text(), fn)
+    assert '"Linear"' not in source, "Solver.Linear is touched only through the tested function"
+
+
+def test_the_dof_probe_reads_the_finest_space_at_every_hierarchy_depth():
+    """The DRIVER's pattern, against all three committed logs.
+
+    Exercises ``dof_probe_pattern`` itself rather than a copy: an earlier
+    version compiled its own regex, so loosening the driver's - the exact change
+    that would make the guard read a COARSE hierarchy count - could not fail it.
+    """
+    ladder = _ladder()
+    pattern = ladder.dof_probe_pattern(1)
+    # It is the same object the streaming guard uses, not a lookalike.
+    source = (REPO_ROOT / "scripts" / "palace_order1_ladder.py").read_text()
+    assert "dof_re = dof_probe_pattern(order)" in source
+
+    expected = {L2_RECORD: 79944, N1_RECORD: 84485, N2_RECORD: 103411}
+    for record, finest in expected.items():
+        log = (record / "L2" / "solver" / "palace_log.txt").read_text().splitlines()
+        matched = [int(m.group(1)) for line in log if (m := pattern.search(line))]
+        assert matched == [finest], f"{record.name}: probe read {matched}, wanted [{finest}]"
+
+        # The hierarchy lines carry DOF counts too, including COARSE ones. The
+        # guard must not see them: on N2 the coarsest is 79944, which would pass
+        # a budget the finest 103411 might not.
+        hierarchy = [line for line in log if line.strip().startswith("Level ")]
+        assert not any(pattern.search(line) for line in hierarchy), record.name
+        if record is not L2_RECORD:
+            assert hierarchy, f"{record.name} should have a multi-level hierarchy block"
+            counts = [int(t) for line in hierarchy for t in line.split() if t.isdigit()]
+            assert any(c < finest for c in counts), (
+                f"{record.name}: no coarse count present, so this check proves nothing"
+            )
+
+    # And what the guard enforced is what the record says it enforced.
+    for record, finest in expected.items():
+        rung = json.loads((record / "summary.json").read_text())["rung"]
+        probe = (rung.get("run") or {}).get("dof_probe") or {}
+        if probe.get("dof_reported") is not None:
+            assert probe["dof_reported"] == finest, record.name
+            assert probe["dof_reported"] <= BUDGET
+
+
+def test_the_probe_pattern_is_not_loose_enough_to_match_a_hierarchy_line():
+    """A synthetic negative: the exact loosening that would break the guard."""
+    ladder = _ladder()
+    pattern = ladder.dof_probe_pattern(1)
+    assert pattern.search(" H1 (p = 1): 17447, ND (p = 1): 103411, RT (p = 1): 170410")
+    for line in (" Level 0 (p = 1): 79944 unknowns, 1248876 NNZ",
+                 " Level 1 (p = 1): 84485 unknowns",
+                 " Level 0 (auxiliary) (p = 1): 13991 unknowns, 173879 NNZ"):
+        assert not pattern.search(line), line
+    # Order is honoured, so an order-2 run cannot be gated on an order-1 count.
+    assert not ladder.dof_probe_pattern(2).search("ND (p = 1): 103411")
+
+
+def _mesh_counts(log_text: str) -> list[dict[str, int]]:
+    """Every 'Parallel Mesh Stats' block in a Palace log, parsed from the log."""
+    wanted = ("vertices", "edges", "faces", "elements")
+    blocks, current = [], None
+    for line in log_text.splitlines():
+        if line.strip().endswith("Parallel Mesh Stats:"):
+            if current:
+                blocks.append(current)
+            current = {}
+            continue
+        if current is None:
+            continue
+        parts = line.split()
+        if parts and parts[0] in wanted and len(parts) == 5:
+            current[parts[0]] = int(parts[-1])
+        elif current and len(current) == len(wanted):
+            blocks.append(current)
+            current = None
+    if current and len(current) == len(wanted):
+        blocks.append(current)
+    return blocks
+
+
+def test_the_mesh_counts_are_read_from_the_logs_and_are_one_complex_each():
+    """Parsed, not hardcoded - and χ = 1 is necessary, NOT sufficient.
+
+    The four counts pre-declare what N2R's log must print. They do not identify
+    the mesh on their own: the same characteristic holds for every mesh in this
+    family. What guarantees the mesh is the hash gate plus the identical box.
+    """
+    seen = {}
+    for record in (L2_RECORD, N1_RECORD, N2_RECORD):
+        log = (record / "L2" / "solver" / "palace_log.txt").read_text()
+        blocks = _mesh_counts(log)
+        assert blocks, f"{record.name}: no mesh stats parsed"
+        for b in blocks:
+            assert b["vertices"] - b["edges"] + b["faces"] - b["elements"] == 1, (record.name, b)
+        finest = blocks[-1]
+        rung = json.loads((record / "summary.json").read_text())["rung"]
+        # The edge count IS the order-1 ND dimension, so the two agree.
+        solved = rung.get("dof_solved") or rung.get("dof_measured")
+        assert finest["edges"] == solved, (record.name, finest["edges"], solved)
+        seen[record.name] = finest
+
+    # Necessary, not sufficient: three different meshes, all with χ = 1.
+    assert len({tuple(sorted(v.items())) for v in seen.values()}) == 3
+
+    # The pre-declaration N2R is held to, taken from N2's own log.
+    assert seen[N2_RECORD.name] == {
+        "vertices": 17447, "edges": 103411, "faces": 170410, "elements": 84445
+    }
+    # A refined run prints two blocks (Coarse + Refined); the plain rung one.
+    assert len(_mesh_counts((L2_RECORD / "L2" / "solver" / "palace_log.txt").read_text())) == 1
+    assert len(_mesh_counts((N2_RECORD / "L2" / "solver" / "palace_log.txt").read_text())) == 2
+
+
+def test_the_approval_and_candidate_do_not_claim_the_counts_identify_the_mesh():
+    """The prose must match what the check actually establishes."""
+    approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
+    block = approval.get("palace_refinement")
+    check = (approval.get("dof_rule") or {}).get("mesh_identity_check")
+    if block is None or not check:
+        pytest.skip("the live approval carries no mesh-identity pre-declaration")
+    euler = check["euler"]
+    assert "NECESSARY, not sufficient" in euler
+    assert "hash gate" in euler
+    cand = json.loads((CANDIDATE_FOR_ID[block["id"]] / "candidate.json").read_text())
+    why = cand["mesh_identity_check"]["why"]
+    assert "NECESSARY, not sufficient" in why and "hash gate" in why
+
+
+def test_neither_palace_error_column_is_presented_as_a_frequency():
+    """Both are residual norms. Presenting either in GHz is a category error.
+
+    ErrorType::ABSOLUTE returns ||(K - lambda M)x|| and ErrorType::BACKWARD
+    divides it by normK + |lambda| normM (slepc.cpp:473-484). Neither bounds a
+    frequency without an eigenvalue condition number, which is not computed, so
+    the records must not order one against a frequency tolerance.
+    """
+    approval = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
+    block = approval.get("palace_refinement")
+    if block is None or block["id"] != "N2R":
+        pytest.skip("the live approval is not the N2R rescue run")
+
+    texts = {
+        "approval": approval["what_this_run_answers"][
+            "preconditioner_is_not_a_confound_but_is_not_free"],
+        "candidate": json.loads(
+            (REPO_ROOT / "experiments" / "N2R-rescue-preconditioner" / "candidate.json").read_text()
+        )["comparisons"]["preconditioner_is_not_a_confound_but_is_not_free"],
+        "doc": (REPO_ROOT / "docs" / "coupled-candidate" / "n2r-rescue-run.md").read_text(),
+    }
+    for name, text in texts.items():
+        assert "residual" in text.lower(), name
+        assert "condition number" in text, f"{name}: must say why a residual is not a frequency"
+        assert "observed" in text.lower(), f"{name}: the difference is observed, not certified"
+        # The backward-error tolerance is the rule that IS enforced.
+        assert "1e-6" in text or "1e-06" in text, name
+
+
+def test_the_frozen_frequency_criterion_is_never_written_with_a_unit():
+    """It is a RELATIVE, dimensionless change. "1e-4 GHz" is a different claim.
+
+    Scoped to the files this campaign writes; committed records are history and
+    are not edited.
+    """
+    ladder = _ladder()
+    assert ladder.FROZEN_FREQUENCY_TOLERANCE == 1e-4
+    assert "relative" in "".join(
+        k for k in ladder._FROZEN_CRITERIA if "frequency" in k
+    ), "the frozen criterion is keyed as a RELATIVE change"
+
+    for path in (
+        REPO_ROOT / ".github" / "ladder-approval.json",
+        REPO_ROOT / "experiments" / "N2R-rescue-preconditioner" / "candidate.json",
+        REPO_ROOT / "experiments" / "N1R-controlled-preconditioner" / "candidate.json",
+        REPO_ROOT / "docs" / "coupled-candidate" / "n2r-rescue-run.md",
+        REPO_ROOT / "docs" / "coupled-candidate" / "n2r-outcome.md",
+        REPO_ROOT / "docs" / "coupled-candidate" / "n1r-control.md",
+        REPO_ROOT / "docs" / "coupled-candidate" / "n2-runtime-diagnosis.md",
+    ):
+        if not path.exists():
+            continue
+        text = path.read_text()
+        for bad in ("1e-4 GHz", "1e-04 GHz"):
+            # One mention is allowed, and only to say it is NOT that.
+            for line in text.splitlines():
+                if bad in line:
+                    assert "not 1e-4 GHz" in line or "RELATIVE" in line or "relative" in line, (
+                        f"{path.name}: {line.strip()}"
+                    )
+
+
+def test_the_record_cannot_assert_a_hierarchy_direction_its_own_log_contradicts():
+    """MGMaxLevels: 1 makes the hierarchy SHALLOWER, not deeper.
+
+    The comparison prose used to be hardcoded to "a DEEPER geometric multigrid
+    hierarchy than its baseline", which is true for a plain nested run and the
+    exact inverse for this one. It is derived from a level COUNT now.
+    """
+    ladder = _ladder()
+    base = {"palace_refinement": {"boxes": [{"Levels": 2, "BoundingBoxMin": [0, 0, 0],
+                                             "BoundingBoxMax": [1, 1, 1]}]}}
+
+    plain = ladder.compare_against_baseline(dict(base), "no-such-record")["why_this_comparison"]
+    assert "3-level geometric multigrid V-cycle" in plain
+    assert "holds the geometric-multigrid hierarchy to" not in plain
+
+    for override, levels in (({"MGMaxLevels": 1}, 1), ({"MGUseMesh": False}, 1),
+                             ({"MGMaxLevels": 2}, 2)):
+        entry = json.loads(json.dumps(base))
+        entry["palace_refinement"]["solver_linear_overrides"] = override
+        text = ladder.compare_against_baseline(entry, "no-such-record")["why_this_comparison"]
+        assert f"hierarchy to {levels} level" in text, (override, text)
+        assert "V-cycle - the depth tracks" not in text, override
+
+
+def test_the_multigrid_level_count_reproduces_every_committed_log():
+    """The model is checked against measurement, not asserted.
+
+    A boolean "is multigrid off?" answered False for BOTH the plain L2 rung
+    (one level, preconditioner applied directly) and N1 (two levels, a V-cycle),
+    so a step between them was reported as having the same solver structure on
+    both sides. This project's own timers refute that by 195x.
+    """
+    import re
+
+    ladder = _ladder()
+    for record, expected in ((L2_RECORD, 1), (N1_RECORD, 2), (N2_RECORD, 3)):
+        rung = json.loads((record / "summary.json").read_text())["rung"]
+        log = (record / "L2" / "solver" / "palace_log.txt").read_text()
+        measured = len(set(re.findall(r"^ Level (\d+) \(p = 1\):", log, re.M)))
+        assert measured == expected, f"{record.name}: log shows {measured} primary levels"
+        assert ladder.multigrid_levels(rung) == expected, record.name
+
+    # And the override, which no committed run has yet: read from either place
+    # execute_level stores it.
+    two_levels = {"palace_refinement": {"boxes": [{"Levels": 1, "BoundingBoxMin": [0, 0, 0],
+                                                   "BoundingBoxMax": [1, 1, 1]}]}}
+    assert ladder.multigrid_levels(two_levels) == 2
+    for shape in (
+        {"palace_refinement": {**two_levels["palace_refinement"],
+                               "solver_linear_overrides": {"MGMaxLevels": 1}}},
+        {**two_levels, "solver_linear_overrides": {"applied": {"MGUseMesh": False}}},
+    ):
+        assert ladder.multigrid_levels(shape) == 1, shape
+    # A plain rung, and a gmsh-refined one, are both single-mesh runs.
+    assert ladder.multigrid_levels({}) == 1
+    assert ladder.multigrid_levels({"port_refinement": {"id": "R1"}}) == 1
+
+
+def test_the_step_across_a_preconditioner_change_says_so():
+    """L2 -> N1 crossed one, and the record must not claim otherwise."""
+    ladder = _ladder()
+    n1 = json.loads((N1_RECORD / "summary.json").read_text())["rung"]
+    step = ladder.compare_against_baseline(n1, L2_RECORD.name)
+    assert step["available"]
+    pc = step["preconditioner"]
+    assert (pc["baseline_multigrid_levels"], pc["this_multigrid_levels"]) == (1, 2)
+    assert pc["same_on_both_sides"] is False
+    assert "does NOT make the wall-clock" in pc["note"]
+
+
+def test_the_prelaunch_dump_never_asserts_what_it_has_not_checked(tmp_path):
+    """The dump a human reads before paying for a solve must not lie by default."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "describe_ladder_approval", REPO_ROOT / "scripts" / "describe_ladder_approval.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    # It reads the driver's list out of source rather than duplicating it.
+    ladder = _ladder()
+    assert mod._allowed_override_keys() == set(ladder._SOLVER_LINEAR_OVERRIDE_KEYS)
+
+    # Every way of failing to read it yields None, never a guess.
+    missing = tmp_path / "gone.py"
+    broken = tmp_path / "broken.py"
+    broken.write_text("_SOLVER_LINEAR_OVERRIDE_KEYS = (")
+    computed = tmp_path / "computed.py"
+    computed.write_text("_SOLVER_LINEAR_OVERRIDE_KEYS = dict(a=1)")
+    absent = tmp_path / "absent.py"
+    absent.write_text("x = 1")
+    for path in (missing, broken, computed, absent):
+        assert mod._allowed_override_keys(path) is None, path.name
+
+    live = json.loads((REPO_ROOT / ".github" / "ladder-approval.json").read_text())
+    if live.get("palace_refinement") is None:
+        pytest.skip("no palace_refinement is currently approved")
+
+    def dump(overrides):
+        body = json.loads(json.dumps(live))
+        body["palace_refinement"]["solver_linear_overrides"] = overrides
+        path = tmp_path / "approval.json"
+        path.write_text(json.dumps(body))
+        return mod.describe_approval(path)
+
+    assert "OUTSIDE THE ALLOW-LIST" in dump({"MGMaxLevels": 1, "Tol": 1e-4})
+    assert "'Tol'" in dump({"MGMaxLevels": 1, "Tol": 1e-4})
+    ok = dump({"MGMaxLevels": 1})
+    assert "OUTSIDE THE ALLOW-LIST" not in ok and "checked against the driver's allow-list" in ok
+
+
+def test_the_N1R_control_is_N1s_problem_with_N2Rs_solver():
+    """The control is only a control if it changes exactly what N2R changed."""
+    cand_dir = CANDIDATE_FOR_ID["N1R"]
+    cand = json.loads((cand_dir / "candidate.json").read_text())
+    n1_cfg = json.loads((N1_RECORD / "L2" / "solver" / "config.json").read_text())
+    n1r_cfg = json.loads((cand_dir / "config.candidate.json").read_text())
+    n2r_cfg = json.loads(
+        (REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z"
+         / "L2" / "solver" / "config.json").read_text())
+
+    # N1's config plus exactly the key N2R added, with the same value.
+    linear = dict(n1r_cfg["Solver"]["Linear"])
+    assert linear.pop("MGMaxLevels") == n2r_cfg["Solver"]["Linear"]["MGMaxLevels"] == 1
+    n1r_cfg["Solver"]["Linear"] = linear
+    assert n1r_cfg == n1_cfg
+    # The same box and depth as N1, one shallower than N2R.
+    assert cand["refinement_region"]["Levels"] == 1
+    assert n1_cfg["Model"]["Refinement"]["Boxes"][0]["Levels"] == 1
+    assert n2r_cfg["Model"]["Refinement"]["Boxes"][0]["Levels"] == 2
+    for key in ("BoundingBoxMin", "BoundingBoxMax"):
+        assert cand["refinement_region"][key] == n2r_cfg["Model"]["Refinement"]["Boxes"][0][key]
+    # Its baseline is the plain rung, as N1's was - not N1, which is equal depth.
+    assert cand["approval_must_carry"]["baseline_record"] == L2_RECORD.name
+    # Empty on purpose: a one-step "sequence" would print a report banner saying
+    # the step is not against a plain rung, which for N1R is exactly what it is.
+    assert cand["approval_must_carry"]["sequence_records"] == []
+    # The expected counts are N1's own refined-mesh counts, read from N1's log.
+    counts = _mesh_counts((N1_RECORD / "L2" / "solver" / "palace_log.txt").read_text())[-1]
+    assert cand["mesh_identity_check"]["expected"] == counts
+    assert cand["dof"]["n1r_expected"] == counts["edges"] == 84485
+
+
+def test_the_entry_derived_clause_never_asserts_like_for_likeness():
+    """Only the both-sides preconditioner block may say whether wall clock compares.
+
+    The clause built before the baseline is loaded once ended 'the wall-clock
+    comparison is not like-for-like' whenever the entry carried an override -
+    false for L2 -> N1R and N1R -> N2R, where both sides ran one level, and in
+    direct contradiction of the same record's preconditioner block.
+    """
+    ladder = _ladder()
+    entry = {"palace_refinement": {"boxes": [{"Levels": 1, "BoundingBoxMin": [0, 0, 0],
+                                              "BoundingBoxMax": [1, 1, 1]}],
+                                   "solver_linear_overrides": {"MGMaxLevels": 1}}}
+    text = ladder.compare_against_baseline(entry, "no-such-record")["why_this_comparison"]
+    assert "not like-for-like" not in text
+    assert "preconditioner block" in text
+
+    # And on a real same-level pair the both-sides block is the one that speaks.
+    n2r = json.loads((REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z"
+                      / "summary.json").read_text())["rung"]
+    synthetic_n1r = json.loads((N1_RECORD / "summary.json").read_text())["rung"]
+    synthetic_n1r["palace_refinement"]["solver_linear_overrides"] = {"MGMaxLevels": 1}
+    assert ladder.multigrid_levels(synthetic_n1r) == ladder.multigrid_levels(n2r) == 1
+
+
+def _csc():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "controlled_sequence_comparison",
+        REPO_ROOT / "scripts" / "controlled_sequence_comparison.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_the_offline_comparison_cannot_write_into_a_record_or_read_the_wrong_one(tmp_path):
+    csc = _csc()
+    for bad in (REPO_ROOT / "results", REPO_ROOT / "results" / "x.json",
+                N1_RECORD / "controlled.json"):
+        with pytest.raises(SystemExit, match="never go inside results/"):
+            csc._guarded_output_path(str(bad))
+    assert csc._guarded_output_path(str(tmp_path / "ok.json")) == (tmp_path / "ok.json").resolve()
+
+    with pytest.raises(SystemExit, match="not a record on disk"):
+        csc._require_n1r_control("COUPLED-LADDER-O1-L2-NOPE")
+    # N1 is refined at Levels 1 but carries no override and the wrong id: refused.
+    with pytest.raises(SystemExit, match="not the N1R control"):
+        csc._require_n1r_control(N1_RECORD.name)
+    # N2R has the override but is Levels 2 and the wrong id: refused.
+    with pytest.raises(SystemExit, match="not the N1R control"):
+        csc._require_n1r_control("COUPLED-LADDER-O1-L2-N2R-20260918T061455Z")
+
+
+def test_the_same_problem_check_reads_the_solved_configs():
+    """Identity is established from the records, not inherited from the allow-list."""
+    csc = _csc()
+    ladder = csc._ladder()
+    same = csc.same_problem_two_solver_paths(ladder, N1_RECORD.name, N1_RECORD.name)
+    assert same["available"] and same["identity"]["config_differs_only_in"] == []
+    assert all(p["delta_f_GHz"] == 0 for p in same["pairs"])
+
+    different = csc.same_problem_two_solver_paths(
+        ladder, N1_RECORD.name, "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z")
+    assert different["available"] is False
+    delta = different["identity"]["config_differs_only_in"]
+    assert "Model.Refinement.Boxes[0].Levels" in delta and "Solver.Linear.MGMaxLevels" in delta
+    assert different["identity"]["configs_equal_outside_preconditioner"] is False

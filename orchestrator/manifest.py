@@ -18,7 +18,8 @@ from pathlib import Path
 
 #: Suffixes treated as decision-relevant scientific artifacts.
 DECISION_RELEVANT_SUFFIXES = frozenset(
-    {".json", ".yaml", ".yml", ".gds", ".stl", ".step", ".s2p", ".csv", ".txt", ".msh", ".md"}
+    {".json", ".yaml", ".yml", ".gds", ".stl", ".step", ".s2p", ".csv", ".txt", ".msh", ".md",
+     ".svg", ".geo_unrolled"}
 )
 
 #: Names/directories excluded as transient caches (spec §11.4).
@@ -101,6 +102,36 @@ def write(root: Path, filename: str = "manifest.sha256") -> tuple[Path, str]:
     path = root / filename
     path.write_text(body)
     return path, hashlib.sha256(body.encode()).hexdigest()
+
+
+#: File kinds an evidence commit may contain. Anything else is a bug in the
+#: producing driver rather than evidence: the order-1 ladder's level-2 rung
+#: committed a 123 MB ParaView tree because nothing checked what it had made.
+COMMITTABLE_SUFFIXES = frozenset(
+    {".json", ".yaml", ".yml", ".csv", ".txt", ".md", ".sha256", ".msh", ".svg", ".s2p"}
+)
+
+
+def unexpected_files(root: Path, allowed: frozenset[str] | None = None) -> list[str]:
+    """Files in a record whose kind is not committable, relative to ``root``.
+
+    Advisory in the sense that it decides nothing by itself; the caller refuses
+    to commit when the list is non-empty. Deliberately keyed on the suffix
+    rather than on size: a small stray file is as much a sign that the driver
+    wrote somewhere it should not have as a large one.
+    """
+    suffixes = COMMITTABLE_SUFFIXES if allowed is None else allowed
+    root = Path(root)
+    offenders = []
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(root)
+        if any(part in EXCLUDED_DIRS for part in relative.parts):
+            continue
+        if path.suffix.lower() not in suffixes:
+            offenders.append(relative.as_posix())
+    return offenders
 
 
 def verify(root: Path, filename: str = "manifest.sha256") -> list[str]:

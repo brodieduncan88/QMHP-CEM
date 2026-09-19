@@ -1,0 +1,983 @@
+{
+ "schema": "qmhp-cem.coupled-candidate/0.2.0",
+ "declaration_id": "QMHP-CEM-A-CC-000001",
+ "title": "First source-bound coupled EM candidate: Branch-A fluxonium with one passive readout mode (S1), declared inside the V2A five-node proposal",
+ "status": "CHECKPOINT-A-PROPOSED; not approved for execution; every ENGINEERING-SEED below is unapproved",
+ "master_revision": "v1.5.8f",
+ "created_utc": "2026-09-15T22:30:00Z",
+ "parent_candidate_id": "QMHP-CEM-A-RF-000001",
+ "source_register": "config/coupled/source_register.json",
+ "frame": {
+  "origin": "centre of the top surface of the chip substrate (spec §7.3)",
+  "axes": "+X/+Y chip plane, +Z from chip toward lid",
+  "length_unit": "mm",
+  "frequency_unit": "GHz",
+  "offset_unit": "MHz",
+  "energy_unit": "GHz (E/h)",
+  "capacitance_unit": "fF",
+  "inductance_unit": "nH",
+  "binding": {
+   "class": "SOURCE-BOUND",
+   "source_id": "master_requirements",
+   "locator": "conventions L192-199"
+  }
+ },
+ "proposed_structure": {
+  "name": "v2a_five_node_hypothesis",
+  "description": "Two grounded Branch-A encoded fluxoniums F1, F2; one SQUID-transmon mediator C; two passive readout modes R1, R2. Described in the received V2A assessment; its parameters are absent from every source package in this repository.",
+  "nodes": [
+   "F1",
+   "F2",
+   "C",
+   "R1",
+   "R2"
+  ],
+  "ground": "chip ground plane, continuous with the Object 001 package floor",
+  "elements": [
+   {
+    "id": "F1.junction",
+    "kind": "josephson_junction",
+    "node": "F1",
+    "to": "ground",
+    "E_J_GHz": 5.72,
+    "binding": {
+     "class": "SOURCE-BOUND",
+     "source_id": "master_requirements",
+     "locator": "L27"
+    }
+   },
+   {
+    "id": "F1.superinductor",
+    "kind": "superinductor",
+    "node": "F1",
+    "to": "ground",
+    "E_L_GHz": 1.58,
+    "L_nH": 103.457,
+    "binding": {
+     "class": "SOURCE-BOUND",
+     "source_id": "master_requirements",
+     "locator": "L28"
+    }
+   },
+   {
+    "id": "F2.junction",
+    "kind": "josephson_junction",
+    "node": "F2",
+    "to": "ground",
+    "E_J_GHz": 5.72,
+    "binding": {
+     "class": "SOURCE-BOUND",
+     "source_id": "master_requirements",
+     "locator": "L27",
+     "note": "value bound; the EXISTENCE of a second device in this circuit is proposed by the V2A assessment only"
+    }
+   },
+   {
+    "id": "F2.superinductor",
+    "kind": "superinductor",
+    "node": "F2",
+    "to": "ground",
+    "E_L_GHz": 1.58,
+    "binding": {
+     "class": "SOURCE-BOUND",
+     "source_id": "master_requirements",
+     "locator": "L28",
+     "note": "as F2.junction"
+    }
+   },
+   {
+    "id": "C.squid",
+    "kind": "squid_transmon",
+    "node": "C",
+    "to": "ground",
+    "E_J_sum_GHz": null,
+    "asymmetry_d": null,
+    "E_C_GHz": null,
+    "flux_allocation": "irrotational 0.5/0.5 (registration R1c.2, presumptive, not bound)",
+    "junction_phase_sign": null,
+    "binding": {
+     "class": "UNBOUND",
+     "needed_from": "the V2A audit's own artefacts (five-node capacitance matrix, frozen Hamiltonian file); no seed is proposed because reconstructing E_J, E_C from the reported f_22 would be a reconstruction from a summary"
+    }
+   },
+   {
+    "id": "R1.resonator",
+    "kind": "linear_readout_mode",
+    "node": "R1",
+    "to": "ground",
+    "bare_frequency_GHz": 4.301974466,
+    "binding": {
+     "class": "SOURCE-BOUND",
+     "source_id": "master_requirements",
+     "locator": "L85 (production dressed logical-blind root, the bare w_r of the dressed Hamiltonian L75)"
+    }
+   },
+   {
+    "id": "R2.resonator",
+    "kind": "linear_readout_mode",
+    "node": "R2",
+    "to": "ground",
+    "bare_frequency_GHz": null,
+    "binding": {
+     "class": "UNBOUND",
+     "needed_from": "no source states R2; only '>= 10 MHz same-feedline separation' (Full Edition L361-364)"
+    }
+   }
+  ],
+  "interactions": [
+   {
+    "pair": [
+     "F1",
+     "C"
+    ],
+    "class": "essential",
+    "quantity": "J_F1C = 8 E_C,F1C",
+    "in_S1": false
+   },
+   {
+    "pair": [
+     "F2",
+     "C"
+    ],
+    "class": "essential",
+    "quantity": "J_F2C = 8 E_C,F2C",
+    "in_S1": false
+   },
+   {
+    "pair": [
+     "F1",
+     "R1"
+    ],
+    "class": "essential",
+    "quantity": "g_F1R1 = 8 E_C,F1R1 n_zpf,R1 (Master convention g n (a + a^dag))",
+    "in_S1": true,
+    "source_value_GHz": 0.15,
+    "source_binding": {
+     "class": "SOURCE-BOUND",
+     "source_id": "master_requirements",
+     "locator": "L73-74 (VERIFIED-COMPUTATIONAL)"
+    }
+   },
+   {
+    "pair": [
+     "F2",
+     "R2"
+    ],
+    "class": "essential",
+    "quantity": "g_F2R2",
+    "in_S1": false
+   },
+   {
+    "pair": [
+     "F1",
+     "F2"
+    ],
+    "class": "parasitic",
+    "quantity": "J_F1F2",
+    "in_S1": false
+   },
+   {
+    "pair": [
+     "C",
+     "R1"
+    ],
+    "class": "parasitic",
+    "quantity": "J_CR1",
+    "in_S1": false
+   },
+   {
+    "pair": [
+     "C",
+     "R2"
+    ],
+    "class": "parasitic",
+    "quantity": "J_CR2",
+    "in_S1": false
+   },
+   {
+    "pair": [
+     "R1",
+     "R2"
+    ],
+    "class": "parasitic",
+    "quantity": "J_R1R2",
+    "in_S1": false
+   },
+   {
+    "pair": [
+     "F1",
+     "R2"
+    ],
+    "class": "parasitic",
+    "quantity": "J_F1R2",
+    "in_S1": false
+   },
+   {
+    "pair": [
+     "F2",
+     "R1"
+    ],
+    "class": "parasitic",
+    "quantity": "J_F2R1",
+    "in_S1": false
+   }
+  ],
+  "executable": false,
+  "why_not_executable": "C.squid and R2.resonator are UNBOUND, every coupling geometry is UNBOUND, and no source package supplies them. The full structure cannot be a source-bound candidate."
+ },
+ "executable_scope": {
+  "name": "S1_branchA_fluxonium_plus_readout",
+  "nodes": [
+   "F1",
+   "R1"
+  ],
+  "represents": "a bounded subsystem of the proposed structure: one grounded Branch-A encoded fluxonium capacitively coupled to one passive readout mode, in a bounded chip cell of the Object 001 package",
+  "claims": "numerical extraction of the gauge-invariant triple {E_C,F1F1, f_R1, g_F1R1} of the declared seed geometry by two independent routes; agreement of the routes on g_F1R1 to the 10 % ENGINEERING-RULE; suitability report against the source-bound E_C, w_r and g",
+  "does_not_claim": [
+   "any V2A validation",
+   "any statement about the mediator, F2, R2 or their couplings",
+   "that the seed geometry is the Branch-A device (that is the suitability report, not a claim)",
+   "hardware performance, Purcell, kappa, gate physics"
+  ],
+  "required_interactions": [
+   [
+    "F1",
+    "R1"
+   ]
+  ],
+  "suitability_quantities": [
+   {
+    "id": "E_C_F1F1_GHz",
+    "source_value": 0.6,
+    "invariant": true,
+    "binding": {
+     "class": "SOURCE-BOUND",
+     "source_id": "master_requirements",
+     "locator": "L26"
+    }
+   },
+   {
+    "id": "bare_readout_GHz",
+    "source_value": 4.301974466,
+    "invariant": true,
+    "binding": {
+     "class": "SOURCE-BOUND",
+     "source_id": "master_requirements",
+     "locator": "L85"
+    }
+   },
+   {
+    "id": "g_F1R1_GHz",
+    "source_value": 0.15,
+    "invariant": true,
+    "binding": {
+     "class": "SOURCE-BOUND",
+     "source_id": "master_requirements",
+     "locator": "L73-74"
+    }
+   }
+  ],
+  "not_identifiable": {
+   "quantities": [
+    "E_C,F1R1",
+    "E_C,R1R1",
+    "E_L,R1",
+    "L_R1",
+    "any individual readout-node matrix entry"
+   ],
+   "reason": "the readout node carries no lumped element, so nothing in the EM model fixes the scale of its node flux; the rescaling Phi_R -> s Phi_R, Q_R -> Q_R/s leaves every observable invariant while moving these entries by powers of s. They are conventions, not measurements",
+   "treatment": "never an output and never compared between the routes; shown, if at all, only alongside the gauge they are stated in",
+   "reference": "docs/coupled-candidate/route-a-identifiability.md"
+  }
+ },
+ "geometry": {
+  "kind": "bounded_chip_cell",
+  "rationale": "the full 22 x 22 x 1.5 mm Object 001 cavity with 30-40 um chip features exceeds the runner DOF budget; the cell keeps the source-seeded vertical structure (chip thickness, lid height) and bounds the lateral extent; the wall effect is measured by the box-size ladder of the numerical plan and is an omitted effect, not a route disagreement",
+  "cell": {
+   "x_min_mm": -2.0,
+   "x_max_mm": 2.0,
+   "y_min_mm": -2.0,
+   "y_max_mm": 2.0,
+   "z_substrate_bottom_mm": -0.43,
+   "z_chip_top_mm": 0.0,
+   "z_lid_mm": 1.5,
+   "binding": {
+    "lateral_4mm": {
+     "class": "ENGINEERING-SEED",
+     "approved": false,
+     "rationale": "smallest cell that holds the island, the coupling region and a 7 mm quarter-wave meander with >= 0.5 mm clearance to the walls"
+    },
+    "substrate_thickness_0.43": {
+     "class": "SOURCE-BOUND",
+     "source_id": "object001_seed",
+     "locator": "chip.thickness_mm"
+    },
+    "lid_height_1.50": {
+     "class": "SOURCE-BOUND",
+     "source_id": "object001_seed",
+     "locator": "vacuum_cavity.height_above_chip_mm"
+    }
+   }
+  },
+  "ground_plane": {
+   "surface": "z = 0, whole cell top surface except the etched features below",
+   "model": "zero-thickness PEC sheet",
+   "binding": {
+    "class": "ENGINEERING-SEED",
+    "approved": false,
+    "rationale": "metallisation thickness is not stated by any source; zero-thickness PEC is the Palace cpw-example model"
+   }
+  },
+  "features": [
+   {
+    "id": "F1.island",
+    "shape": "rectangle",
+    "centre_mm": [
+     -0.6,
+     0.0,
+     0.0
+    ],
+    "size_mm": [
+     0.15,
+     0.15
+    ],
+    "gap_to_ground_mm": 0.04,
+    "node": "F1",
+    "binding": {
+     "class": "ENGINEERING-SEED",
+     "approved": false,
+     "rationale": "square island sized so that its coplanar capacitance to ground lands near the source-bound C_Sigma = 32.28 fF (E_C = 0.60 GHz); scaling from typical fluxonium islands; the realised C_Sigma is the suitability quantity, not a design guarantee"
+    }
+   },
+   {
+    "id": "F1.element_site",
+    "shape": "rectangle",
+    "centre_mm": [
+     -0.6,
+     -0.095,
+     0.0
+    ],
+    "size_mm": [
+     0.02,
+     0.04
+    ],
+    "spans": "the -Y gap between F1.island and ground",
+    "hosts": [
+     "F1.junction",
+     "F1.superinductor"
+    ],
+    "binding": {
+     "class": "ENGINEERING-SEED",
+     "approved": false,
+     "rationale": "the junction and superinductor occupy the same node-to-ground gap; one rectangular site of 20 um across the 40 um gap"
+    }
+   },
+   {
+    "id": "R1.coupling_pad",
+    "shape": "rectangle",
+    "centre_mm": [
+     -0.455,
+     0.0,
+     0.0
+    ],
+    "size_mm": [
+     0.1,
+     0.1
+    ],
+    "gap_to_island_mm": 0.02,
+    "gap_to_ground_mm": 0.03,
+    "node": "R1",
+    "binding": {
+     "class": "ENGINEERING-SEED",
+     "approved": false,
+     "rationale": "open-end pad of the resonator facing the island's +X edge across a 20 um gap; the coupling capacitance it realises sets g_F1R1 and is reported against the source-bound 0.150 GHz as suitability, not tuned"
+    }
+   },
+   {
+    "id": "R1.cpw",
+    "shape": "cpw_meander",
+    "centre_width_mm": 0.05,
+    "gap_mm": 0.03,
+    "total_length_mm": 6.983,
+    "path": "from R1.coupling_pad along +X, then a meander of 1.0 mm legs along Y with 0.25 mm pitch inside x in [-0.30, 1.50], y in [-0.75, 0.75], ending in a short to ground",
+    "open_end": "R1.coupling_pad",
+    "shorted_end": "ground",
+    "node": "R1",
+    "binding": {
+     "class": "ENGINEERING-SEED",
+     "approved": false,
+     "rationale": "quarter-wave line at the source-bound bare readout frequency 4.301974466 GHz with eps_eff = (1 + eps_r)/2 = 6.225: lambda/4 = 6.983 mm; 50/30 um CPW is a conventional ~50 Ohm geometry on silicon (the Palace cpw example uses 56 Ohm)"
+    }
+   }
+  ],
+  "clearances_mm": {
+   "island_to_cell_wall_min": 1.325,
+   "meander_to_cell_wall_min": 0.5
+  }
+ },
+ "materials": [
+  {
+   "id": "vacuum",
+   "region": "z in [0, 1.50] above the chip",
+   "permittivity": 1.0,
+   "permeability": 1.0,
+   "loss_tangent": 0.0,
+   "binding": {
+    "class": "SOURCE-BOUND",
+    "source_id": "palace_golden_candidate",
+    "locator": "golden config Materials (vacuum)"
+   }
+  },
+  {
+   "id": "substrate",
+   "region": "z in [-0.43, 0]",
+   "material": "high-resistivity silicon",
+   "permittivity": 11.45,
+   "permeability": 1.0,
+   "loss_tangent": 0.0,
+   "binding": {
+    "class": "ENGINEERING-SEED",
+    "approved": false,
+    "rationale": "no source names the substrate; isotropic silicon eps_r = 11.45 (cryogenic) is proposed; sapphire (anisotropic 9.4/11.5) is the alternative and is NOT chosen here"
+   }
+  },
+  {
+   "id": "metal",
+   "model": "perfect electric conductor, zero thickness",
+   "binding": {
+    "class": "ENGINEERING-SEED",
+    "approved": false,
+    "rationale": "no source names the superconductor; kinetic inductance omitted (see physical_effects)"
+   }
+  }
+ ],
+ "boundary_conditions": [
+  {
+   "surface": "all six outer faces of the cell",
+   "condition": "PEC",
+   "note": "top face = lid at the Object 001 height above chip; bottom face = package recess floor under the chip; lateral faces are artificial walls of the bounded cell (omitted effect)"
+  },
+  {
+   "surface": "ground plane z = 0",
+   "condition": "PEC sheet (internal boundary)"
+  },
+  {
+   "surface": "ports",
+   "condition": "lumped ports as declared; Route A: F1 site inductive, R1 tap absent; Route B: both resistive"
+  },
+  {
+   "surface": "none",
+   "condition": "no absorbing or impedance boundaries"
+  }
+ ],
+ "electrical_nodes": [
+  {
+   "id": "F1",
+   "conductor": "F1.island",
+   "ground_connection": "via F1.junction || F1.superinductor across F1.element_site",
+   "in_S1": true
+  },
+  {
+   "id": "R1",
+   "conductor": "R1.coupling_pad + R1.cpw centre conductor",
+   "ground_connection": "galvanic short at the meander end",
+   "in_S1": true
+  },
+  {
+   "id": "F2",
+   "conductor": null,
+   "in_S1": false,
+   "binding": {
+    "class": "UNBOUND",
+    "needed_from": "geometry"
+   }
+  },
+  {
+   "id": "C",
+   "conductor": null,
+   "in_S1": false,
+   "binding": {
+    "class": "UNBOUND",
+    "needed_from": "geometry and parameters"
+   }
+  },
+  {
+   "id": "R2",
+   "conductor": null,
+   "in_S1": false,
+   "binding": {
+    "class": "UNBOUND",
+    "needed_from": "geometry and frequency"
+   }
+  }
+ ],
+ "lumped_elements_S1": [
+  {
+   "id": "F1.junction",
+   "E_J_GHz": 5.72,
+   "L_J_linear_nH": 28.577,
+   "used_as_linear_element": false,
+   "binding": {
+    "class": "SOURCE-BOUND",
+    "source_id": "master_requirements",
+    "locator": "L27"
+   }
+  },
+  {
+   "id": "F1.superinductor",
+   "E_L_GHz": 1.58,
+   "L_nH": 103.457,
+   "used_as_linear_element": "Route A only (attached as the site inductance, removed in the inversion)",
+   "binding": {
+    "class": "SOURCE-BOUND",
+    "source_id": "master_requirements",
+    "locator": "L28"
+   }
+  },
+  {
+   "id": "F1.junction_intrinsic_capacitance",
+   "C_fF": 0.0,
+   "binding": {
+    "class": "ENGINEERING-SEED",
+    "approved": false,
+    "rationale": "no source states C_J; 0 fF means all of C_Sigma is geometric; any later nonzero value is added ONCE to E_C after extraction (coupling-definition §8.4)"
+   }
+  },
+  {
+   "id": "F1.C_sigma_source_bound",
+   "C_fF": 32.284,
+   "derived_from": "E_C = e^2 / (2 C_Sigma) with E_C = 0.60 GHz",
+   "binding": {
+    "class": "SOURCE-BOUND",
+    "source_id": "master_requirements",
+    "locator": "L26",
+    "note": "suitability reference, not an input"
+   }
+  }
+ ],
+ "readout_structures": [
+  {
+   "id": "R1",
+   "type": "quarter-wave CPW resonator, open end coupled to F1, shorted end to ground",
+   "design_bare_frequency_GHz": 4.301974466,
+   "design_coupling_GHz": 0.15,
+   "feedline": "none modelled (omitted effect); readout tap port P_R1 is the Route B excitation and observation point",
+   "binding": {
+    "frequency": {
+     "class": "SOURCE-BOUND",
+     "source_id": "master_requirements",
+     "locator": "L85"
+    },
+    "coupling": {
+     "class": "SOURCE-BOUND",
+     "source_id": "master_requirements",
+     "locator": "L73-74"
+    },
+    "type_and_dimensions": {
+     "class": "ENGINEERING-SEED",
+     "approved": false,
+     "rationale": "conventional lambda/4 CPW; no source"
+    }
+   }
+  }
+ ],
+ "package_structures": {
+  "included": "Object 001 vertical stack: chip thickness 0.43 mm, vacuum 1.50 mm to the lid, PEC floor and lid",
+  "omitted": "lateral cavity extent 22 x 22 mm, launches, recess walls, lid thickness, mounting; the first package mode 9.635690 GHz (results/PALACE-VERIFY-20260915T115901Z) sets the 9.0 GHz band ceiling",
+  "binding": {
+   "class": "SOURCE-BOUND",
+   "source_id": "object001_seed",
+   "locator": "vacuum_cavity, chip"
+  }
+ },
+ "ports": [
+  {
+   "id": "P_F1",
+   "purpose": "element site of F1 (junction || superinductor)",
+   "node_pair": [
+    "F1",
+    "ground"
+   ],
+   "surface": "F1.element_site",
+   "centre_mm": [
+    -0.6,
+    -0.095,
+    0.0
+   ],
+   "size_mm": [
+    0.02,
+    0.04
+   ],
+   "direction": "+Y",
+   "direction_meaning": "from ground (−Y side) to the island (+Y side); V_port = V_F1 − V_ground",
+   "route_A": {
+    "kind": "lumped inductive",
+    "L_nH": 103.457,
+    "R_ohm": 0.0,
+    "C_fF": 0.0
+   },
+   "route_B": {
+    "kind": "lumped resistive, excited",
+    "R_ohm": 50.0,
+    "L_nH": 0.0,
+    "C_fF": 0.0
+   },
+   "reference_plane": "the port surface itself; no de-embedding",
+   "binding": {
+    "class": "ENGINEERING-SEED",
+    "approved": false,
+    "rationale": "R = 50 Ohm is a reference impedance for the generalised S only; the S->Z conversion removes it exactly; the condition number of (I − S) is recorded"
+   }
+  },
+  {
+   "id": "P_R1",
+   "purpose": "readout tap for Route B excitation/observation",
+   "node_pair": [
+    "R1",
+    "ground"
+   ],
+   "surface": "two elements across both CPW gaps 0.150 mm from the shorted end",
+   "centre_mm": null,
+   "size_mm": [
+    0.03,
+    0.02
+   ],
+   "direction": [
+    "+Y",
+    "-Y"
+   ],
+   "route_A": {
+    "kind": "absent"
+   },
+   "route_B": {
+    "kind": "lumped resistive, excited",
+    "R_ohm": 50.0
+   },
+   "reference_plane": "the port surface; no de-embedding",
+   "binding": {
+    "class": "ENGINEERING-SEED",
+    "approved": false,
+    "rationale": "inductive tap near the current antinode, as in the Palace cpw example multi-element ports; feedline coupling is out of scope"
+   }
+  }
+ ],
+ "nominal_bias": {
+  "F1.phi_ext_rad": "pi",
+  "binding": {
+   "class": "SOURCE-BOUND",
+   "source_id": "master_requirements",
+   "locator": "L29"
+  },
+  "flux_line": "not modelled; the bias enters the circuit model only",
+  "C.f_C_Phi0": null,
+  "C_binding": {
+   "class": "UNBOUND",
+   "needed_from": "V2A audit (reported points 0, 0.2, 0.28 Phi0 are on report only)"
+  }
+ },
+ "physical_effects": {
+  "included": [
+   "3D electrostatic/electromagnetic coupling among the declared conductors",
+   "substrate dielectric (isotropic)",
+   "distributed resonator electromagnetics",
+   "Object 001 vertical stack (chip thickness, lid height, PEC floor/lid)",
+   "the fluxonium nonlinearity, exactly, in the circuit model on the Master grid"
+  ],
+  "omitted": [
+   "lateral package extent and package modes (bounded cell; box-size ladder measures the wall effect)",
+   "kinetic inductance / London penetration depth",
+   "metal thickness",
+   "dielectric, conductor and TLS losses",
+   "superinductor array internal modes and array-junction capacitances",
+   "junction intrinsic capacitance (seed 0 fF)",
+   "feedline, Purcell filter, flux-bias line",
+   "mediator C, F2, R2 and all their couplings",
+   "substrate anisotropy",
+   "wirebonds, airbridges, bump bonds",
+   "temperature, quasiparticles"
+  ]
+ },
+ "parameter_register": [
+  {
+   "id": "E_C_F1",
+   "value": 0.6,
+   "units": "GHz",
+   "binding": {
+    "class": "SOURCE-BOUND",
+    "source_id": "master_requirements",
+    "locator": "L26"
+   },
+   "role": "suitability reference for E_C,F1F1"
+  },
+  {
+   "id": "E_J_F1",
+   "value": 5.72,
+   "units": "GHz",
+   "binding": {
+    "class": "SOURCE-BOUND",
+    "source_id": "master_requirements",
+    "locator": "L27"
+   },
+   "role": "circuit model input"
+  },
+  {
+   "id": "E_L_F1",
+   "value": 1.58,
+   "units": "GHz",
+   "binding": {
+    "class": "SOURCE-BOUND",
+    "source_id": "master_requirements",
+    "locator": "L28"
+   },
+   "role": "circuit model input; Route A site inductance"
+  },
+  {
+   "id": "phi_ext_F1",
+   "value": "pi",
+   "units": "rad",
+   "binding": {
+    "class": "SOURCE-BOUND",
+    "source_id": "master_requirements",
+    "locator": "L29"
+   },
+   "role": "circuit model input"
+  },
+  {
+   "id": "w_r_bare",
+   "value": 4.301974466,
+   "units": "GHz",
+   "binding": {
+    "class": "SOURCE-BOUND",
+    "source_id": "master_requirements",
+    "locator": "L85"
+   },
+   "role": "seed design frequency of R1; suitability reference"
+  },
+  {
+   "id": "g_F1R1_source",
+   "value": 0.15,
+   "units": "GHz",
+   "binding": {
+    "class": "SOURCE-BOUND",
+    "source_id": "master_requirements",
+    "locator": "L73-74"
+   },
+   "role": "suitability reference for the extracted g; not an acceptance target"
+  },
+  {
+   "id": "coupling_rule",
+   "value": 0.1,
+   "units": "relative",
+   "binding": {
+    "class": "SOURCE-BOUND",
+    "source_id": "master_requirements",
+    "locator": "L151 (ENGINEERING-RULE)"
+   },
+   "role": "the unchanged consistency rule"
+  },
+  {
+   "id": "cell_lateral_mm",
+   "value": 4.0,
+   "units": "mm",
+   "binding": {
+    "class": "ENGINEERING-SEED",
+    "approved": false,
+    "rationale": "see geometry.cell"
+   }
+  },
+  {
+   "id": "substrate_eps_r",
+   "value": 11.45,
+   "units": "1",
+   "binding": {
+    "class": "ENGINEERING-SEED",
+    "approved": false,
+    "rationale": "see materials.substrate"
+   }
+  },
+  {
+   "id": "island_size_mm",
+   "value": 0.15,
+   "units": "mm",
+   "binding": {
+    "class": "ENGINEERING-SEED",
+    "approved": false,
+    "rationale": "see geometry.features F1.island"
+   }
+  },
+  {
+   "id": "island_gap_mm",
+   "value": 0.04,
+   "units": "mm",
+   "binding": {
+    "class": "ENGINEERING-SEED",
+    "approved": false,
+    "rationale": "see geometry.features F1.island"
+   }
+  },
+  {
+   "id": "coupling_gap_mm",
+   "value": 0.02,
+   "units": "mm",
+   "binding": {
+    "class": "ENGINEERING-SEED",
+    "approved": false,
+    "rationale": "see R1.coupling_pad"
+   }
+  },
+  {
+   "id": "cpw_centre_mm",
+   "value": 0.05,
+   "units": "mm",
+   "binding": {
+    "class": "ENGINEERING-SEED",
+    "approved": false,
+    "rationale": "see R1.cpw"
+   }
+  },
+  {
+   "id": "cpw_gap_mm",
+   "value": 0.03,
+   "units": "mm",
+   "binding": {
+    "class": "ENGINEERING-SEED",
+    "approved": false,
+    "rationale": "see R1.cpw"
+   }
+  },
+  {
+   "id": "resonator_length_mm",
+   "value": 6.983,
+   "units": "mm",
+   "binding": {
+    "class": "ENGINEERING-SEED",
+    "approved": false,
+    "rationale": "quarter wave at w_r with eps_eff = (1 + eps_r)/2"
+   }
+  },
+  {
+   "id": "port_reference_ohm",
+   "value": 50.0,
+   "units": "Ohm",
+   "binding": {
+    "class": "ENGINEERING-SEED",
+    "approved": false,
+    "rationale": "see ports"
+   }
+  },
+  {
+   "id": "C_J_F1",
+   "value": 0.0,
+   "units": "fF",
+   "binding": {
+    "class": "ENGINEERING-SEED",
+    "approved": false,
+    "rationale": "see lumped_elements_S1"
+   }
+  },
+  {
+   "id": "mediator_E_J_sum",
+   "value": null,
+   "units": "GHz",
+   "binding": {
+    "class": "UNBOUND",
+    "needed_from": "V2A audit artefacts"
+   }
+  },
+  {
+   "id": "mediator_E_C",
+   "value": null,
+   "units": "GHz",
+   "binding": {
+    "class": "UNBOUND",
+    "needed_from": "V2A audit artefacts"
+   }
+  },
+  {
+   "id": "mediator_asymmetry_d",
+   "value": null,
+   "units": "1",
+   "binding": {
+    "class": "UNBOUND",
+    "needed_from": "V2A audit artefacts"
+   }
+  },
+  {
+   "id": "mediator_f_C",
+   "value": null,
+   "units": "Phi0",
+   "binding": {
+    "class": "UNBOUND",
+    "needed_from": "V2A audit artefacts"
+   }
+  },
+  {
+   "id": "R2_frequency",
+   "value": null,
+   "units": "GHz",
+   "binding": {
+    "class": "UNBOUND",
+    "needed_from": "no source"
+   }
+  },
+  {
+   "id": "F2_geometry, C_geometry, R2_geometry, all coupling capacitances",
+   "value": null,
+   "units": "mm / fF",
+   "binding": {
+    "class": "UNBOUND",
+    "needed_from": "no source; the V2A five-node capacitance matrix is not in this repository"
+   }
+  }
+ ],
+ "analytic_seed_values": {
+  "C_sigma_fF": 32.2837,
+  "L_super_nH": 103.457,
+  "L_J_linear_nH": 28.577,
+  "fluxonium_harmonic_mode_GHz": 2.7539,
+  "quarter_wave_mm_at_w_r": 6.9827,
+  "eps_eff": 6.225,
+  "note": "derived from source-bound energies and the seed eps_r by the formulas in coupling-definition.md; not evidence",
+  "readout_lumped_equivalent_at_50_ohm": {
+   "C_R_fF": 739.9,
+   "E_C_RR_MHz": 26.2,
+   "E_L_R_GHz": 88.4,
+   "n_zpf_R": 3.2048,
+   "note": "lumped LC equivalent of a 50 ohm line at the source-bound bare root; used only to size the seed, never as an input"
+  },
+  "coupling_capacitance_implied_by_the_source_bound_g": {
+   "E_C_F1R1_MHz": 5.85,
+   "C_c_fF": 7.21,
+   "formula": "g = 8 E_C,F1R1 n_zpf,R with n_zpf,R = (E_L,R/32 E_C,RR)^(1/4); C_c from (C^-1)_FR = 2 h E_C,FR / e^2 in the small-coupling limit",
+   "note": "what the seed geometry would have to realise to reproduce g = 0.150 GHz; it is a suitability reference, not a design target"
+  },
+  "seed_gap_plausibility_check": {
+   "crude_edge_estimate_fF": 27.6,
+   "method": "parallel-plate over the 100 um facing width with an effective 100 um fringe extent, half-space permittivity (1 + 11.45)/2, 20 um gap",
+   "ratio_to_requirement": 3.8,
+   "statement": "The crude estimate exceeds the 7.2 fF implied by the source-bound g by about 4x, so the declared 20 um coupling gap is expected to over-couple. It is a seed, not a design: the extraction measures what the geometry realises and the suitability report compares it. A wider gap would reduce both the coupling and the mesh cost, but changing the seed is a human decision and is NOT made here.",
+   "classification": "ENGINEERING-SEED plausibility estimate, unapproved; order of magnitude only"
+  }
+ },
+ "extraction": {
+  "definition": "docs/coupled-candidate/coupling-definition.md",
+  "routes": "docs/coupled-candidate/extraction-routes.md",
+  "numerical_plan": "docs/coupled-candidate/numerical-plan.md",
+  "consistency_rule": {
+   "max_relative_disagreement": 0.1,
+   "classification": "ENGINEERING-RULE",
+   "unchanged": true
+  },
+  "resolution_ratio": 10,
+  "resolution_ratio_source": "solvers/palace/verification.py RULES height_shift_to_uncertainty_min_ratio",
+  "target": {
+   "invariant_triple": [
+    "E_C_F1F1_GHz",
+    "f_R1_GHz",
+    "g_F1R1_GHz"
+   ],
+   "statement": "both routes estimate the same gauge-invariant quantities; the individual readout-node matrix entries are not identifiable and are not outputs",
+   "reference": "docs/coupled-candidate/route-a-identifiability.md"
+  }
+ }
+}

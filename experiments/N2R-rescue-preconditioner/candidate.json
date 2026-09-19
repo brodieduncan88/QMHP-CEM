@@ -1,0 +1,169 @@
+{
+ "schema": "qmhp-cem.nested-refinement-candidate/0.2.0",
+ "id": "N2R",
+ "purpose": "re-solve N2's discrete problem - the SAME mesh, the SAME two-level box, the SAME order, tolerances and eigenvalue target - with the preconditioner the unrefined baseline used, so that the N1 -> N2 comparison N2 could not deliver becomes available. This is a solver change, not a numerical-method change: it asks nothing new of the physics.",
+ "not_this": "N2R is NOT a third refinement level, NOT the prepared gmsh R2 experiment, and NOT a rerun of N1. It carries no change to the mesh, the order, the tolerances, the eigenvalue target, the DOF budget or the 45-minute cap.",
+ "mechanism": "identical to N2 - Palace Model.Refinement.Boxes, TWO total levels from the ORIGINAL L2 mesh - plus one Solver.Linear override, MGMaxLevels: 1.",
+ "pinned": {
+  "original_L2_mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+  "original_L2_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+  "n1_reference_record": "COUPLED-LADDER-O1-L2-N1-20260917T001735Z",
+  "n1_config_sha256": "85c93c2db2c0e3e9323132aba2dc8e7d53ec2acf6e9ddcb878dd1c20bcf110c0",
+  "palace_commit": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+  "mfem_commit": "c444b17c973cc301590a6ac186fb33587b5881e6",
+  "n1_config_sha256_is": "the sha256 of results/<n1_reference_record>/L2/solver/config.json, the config N1 actually SOLVED - not experiments/N1-nested-port-refinement/config.candidate.json, which differs.",
+  "n2_reference_record": "COUPLED-LADDER-O1-L2-N2-20260917T103405Z",
+  "n2_solved_config_sha256": "43b7db0e7eef95626127ce48107b7df302007cff7efbe1e2c0c8439a274ede6f",
+  "n2r_candidate_config_sha256": "79304b5f8bd7c67741e995ec7ae7880b41dfcee23d6c3c12984f5baba8c1f33f",
+  "config_delta_is": "config.candidate.json here IS the config N2 solved, byte-for-byte, with one key added: Solver.Linear.MGMaxLevels = 1. Diff the two hashes' sources to confirm; nothing else differs."
+ },
+ "refinement_region": {
+  "BoundingBoxMin": [
+   -0.62,
+   -0.125,
+   -0.01
+  ],
+  "BoundingBoxMax": [
+   -0.58,
+   -0.065,
+   0.01
+  ],
+  "Levels": 2,
+  "unchanged_from_N1": "the box is byte-identical to N1's; only Levels differs (1 -> 2)",
+  "total_not_additional": "TWO TOTAL levels from the original mesh, i.e. ONE beyond N1."
+ },
+ "first_stage_reproduces_N1": {
+  "verified": true,
+  "how": "read from the pinned source, not assumed. geodata.cpp:251 loops 'while (region_ref_level < max_region_ref_levels)'. On iteration 0, mesh.back() is the ORIGINAL loaded mesh and the per-box test is 'region_ref_level < box.ref_levels', i.e. 0 < Levels, true for Levels 1 and 2 alike. Same input mesh, same box, same marking criterion, same GeneralRefinement call -> iteration 0 of Levels:2 IS N1's single stage. N1 is therefore a genuine intermediate point of this sequence, not a parallel run.",
+  "second_stage": "iteration 1 marks on the ONCE-REFINED mesh using the same box, so it refines the children of stage 1 plus any closure element that now has a vertex in the box."
+ },
+ "the_solver_change": {
+  "key": "Solver.Linear.MGMaxLevels",
+  "from": "unset, i.e. Palace's default 100 (configfile.hpp:777)",
+  "to": 1,
+  "documented_as": "configfile.hpp:776 - 'Maximum number of levels for geometric multigrid (set to 1 to disable multigrid)'. This is a supported setting, not a workaround.",
+  "why": "N2 did not fail on size. Its 103 411 DOF passed the budget gate in 2.3 s; it failed on time, and the time went into a preconditioner that refinement had silently demoted. See docs/coupled-candidate/n2-runtime-diagnosis.md for the measured decomposition.",
+  "what_it_changes": "ONE branch. geodata.cpp:204 reserves capacity for intermediate meshes only when mg_use_mesh && mg_max_levels > 1. With mg_max_levels = 1 the reserve is skipped, so mesh.capacity() stays 1, geodata.cpp:346 does not copy, and :350 runs the SAME GeneralRefinement(refs, -1) call in place. multigrid.hpp:88 then builds a one-level hierarchy, and ksp.cpp:202 returns the preconditioner directly instead of demoting it to the coarse solver of a V-cycle.",
+  "what_it_does_not_change": [
+   "the mesh file, which is the baseline's and hash-gated before launch",
+   "the refinement flags and the GeneralRefinement call, hence the final refined mesh",
+   "the finite element order, the ND/H1/RT spaces and the assembled operators",
+   "Solver.Linear.Type, KSPType, Tol (1e-08) and MaxIts (400)",
+   "Solver.Eigenmode N (6), Tol (1e-06), Target (0.5 GHz) and Save (6)",
+   "the materials, the lumped port, L_s, kappa, Lc and the boundary conditions",
+   "the 250 000-DOF rule and the 45-minute cap"
+  ],
+  "two_paths_checked_for_side_effects": {
+   "RebalanceMesh": "fires at geodata.cpp:353-355 only when capacity()==1, i.e. exactly on this path. Verified inert here: it returns 1.0 immediately when Mpi::Size(comm)==1 (geodata.cpp:1445-1448) and its only preceding work is gated on save_adapt_mesh, which defaults false (configfile.hpp:169) and is not set. The run uses one MPI process.",
+   "ReorientTetMesh": "reachable at geodata.cpp:362 when mesh.size()==1, but gated on reorient_tet, which defaults false (configfile.hpp:206) and is not set."
+  },
+  "not_on_the_allow_list": "the driver accepts only MGMaxLevels and MGUseMesh from an approval (_SOLVER_LINEAR_OVERRIDE_KEYS). Tol, MaxIts, Type and KSPType are refused before launch, so an approval cannot change what 'converged' means."
+ },
+ "dof": {
+  "original_L2_measured": 79944,
+  "n1_measured": 84485,
+  "n2_measured": 103411,
+  "n2r_expected": 103411,
+  "why_expected_not_unknown": "unlike N2's preparation, this one is not guessing. N2 ran, its probe read 103 411 at 2.3 s, and N2R solves the same mesh with the same box. The expectation is therefore a falsifiable prediction, not an estimate: a different count means the mesh is not N2's and the comparison is void.",
+  "budget": 250000,
+  "fraction_of_budget": 0.4136,
+  "enforcement": "the DOF probe, unchanged. It matches 'ND (p = 1): N' in Palace's 'Assembling system matrices' line, which prints the FINEST space once per run and is emitted before the multigrid hierarchy block. Removing the hierarchy removes hierarchy lines the probe never matched; N2's log confirms the probe read exactly one value, 103 411."
+ },
+ "mesh_identity_check": {
+  "why": "the whole comparison rests on N2R solving N2's mesh. That is GUARANTEED by the hash gate on the mesh file plus the identical box prescription. The four counts below are the cross-check that both did what they say: Palace prints them for the mesh it solved, and they satisfy V - E + F - T = 1. The characteristic is NECESSARY, not sufficient - it holds for the baseline and N1 too - so a mismatch voids the comparison but a match on its own does not establish identity.",
+  "expected": {
+   "vertices": 17447,
+   "edges": 103411,
+   "faces": 170410,
+   "elements": 84445
+  },
+  "euler_characteristic": 1,
+  "edges_is_the_order1_ND_dimension": true,
+  "print_shape_differs": "N2 printed 'Coarse Parallel Mesh Stats' for the loaded mesh and 'Refined Parallel Mesh Stats' for the finest. With one mesh, geodata.cpp:394-400 prints a single un-prefixed 'Parallel Mesh Stats' block carrying the REFINED counts. Different shape, same numbers."
+ },
+ "resource_uncertainty": {
+  "n1_wall_clock_s": 923.523767673,
+  "n2_wall_clock_s": 2700.061511455,
+  "cap_s": 2700,
+  "do_not_extrapolate": "no runtime is predicted. The baseline solved 79 944 DOF on this same one-level code path in 81.2 s, of which the whole linear-solver stack was 8.1 s, but N2R factorises a 1.29x larger operator and sparse-direct cost and memory grow superlinearly with fill. No factorisation at 103 411 DOF has been measured anywhere in this project.",
+  "primary_risks": [
+   "the direct factorisation is slower than expected -> TIMEOUT at the unchanged cap",
+   "the direct factorisation exhausts runner memory -> the container dies -> RUN_FAILED"
+  ],
+  "either_is_the_result": "a TIMEOUT or a RUN_FAILED is recorded and reported as the outcome. The cap, the budget and the solver configuration are not changed to rescue it."
+ },
+ "comparisons": {
+  "primary": "N1 -> N2R",
+  "alongside": "original L2 -> N1",
+  "mechanism": "refinement_sequence(), which calls compare_against_baseline per consecutive step",
+  "rules_unchanged": "the same matching rule, magnitude convention and frozen tolerances. An ambiguous correspondence is reported as UNAVAILABLE and is never repaired by changing the criteria.",
+  "excluded_from": "the gmsh L1/L2/L3 convergence fit, by earlier_rungs()",
+  "no_extrapolation": "no order is fitted and no continuum limit is inferred from three points. The refinement is LOCAL: stabilisation here would be local stabilisation, NOT global mesh convergence.",
+  "preconditioner_is_not_a_confound_but_is_not_free": "N1 used the V-cycle, N2R uses the direct preconditioner, so this step is NOT preconditioner-controlled. A preconditioner changes the path to the solution, not the solution: both runs converge their own discrete eigenproblem to the same Solver.Eigenmode.Tol 1e-06 and Solver.Linear.Tol 1e-08. What that leaves is stated honestly rather than certified away. NEITHER of Palace's error columns is a frequency: ErrorType::ABSOLUTE returns the raw residual norm ||(K - lambda M)x|| and ErrorType::BACKWARD divides it by normK + |lambda| normM (slepc.cpp:473-484, :824-837). Neither bounds a frequency without an eigenvalue condition number, which is not computed here, so no measurement in this project certifies the N1 -> N2R frequency difference as free of solver-path effects, and none is claimed. What IS enforced is the project's unchanged backward-error tolerance of 1e-6, which N1 met at 8.76e-11 and which N2R must also meet or stop. The N1 -> N2R frequency difference is therefore reported as an OBSERVED difference between two runs that also differ in preconditioner - not as a measurement of refinement alone. For scale, the L2 -> N1 movements were 3.685e-02 and 4.170e-04 relative, against a frozen Delta f <= 1e-4 that is RELATIVE and dimensionless, not 1e-4 GHz."
+ },
+ "approval_must_carry": {
+  "baseline_record": "COUPLED-LADDER-O1-L2-N1-20260917T001735Z",
+  "sequence_records": [
+   "COUPLED-LADDER-O1-L2-20260916T080802Z",
+   "COUPLED-LADDER-O1-L2-N1-20260917T001735Z"
+  ],
+  "baseline_mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+  "palace_refinement.solver_linear_overrides": {
+   "MGMaxLevels": 1
+  },
+  "why_the_baseline_is_N1_and_not_N2": "N2 is at the SAME depth, so is_prior_point_of_same_sequence refuses it - a baseline must be strictly shallower. It has no eigenvalues to compare against in any case."
+ },
+ "invariants_by_construction": {
+  "mesh_file": "byte-identical; refinement is a config block",
+  "existing_vertex_coordinates": "never moved; new vertices are edge midpoints only (mesh.cpp:10834-10841)",
+  "element_attributes": "inherited by children (mesh.cpp:10890,10896)",
+  "boundary_attributes": "inherited by children (BdrBisection, mesh.cpp:10959)",
+  "port_connectivity_and_L_s": "w and l come from mesh::GetBoundingBox on the port attribute (lumpedelement.cpp:22-69). That box is ORIENTED, not axis-aligned (geodata.hpp:124-128). Midpoints are convex combinations so no inserted vertex can become a new extremum; the extremal-point selection is tie-broken by list order and refinement reorders the cloud, but axes are re-sorted by descending length (geodata.cpp:1013-1014), so Lengths() is permutation-invariant. Safe for THIS rectangular planar port; not a general guarantee.",
+  "Lc": "computed from the PRE-refinement bounding box: main.cpp:311-313 orders ReadMesh -> NondimensionalizeInputs -> RefineMesh, and iodata.cpp:448-463 runs under MFEM_VERIFY(!init). Lc cannot see the refinement at all.",
+  "parent_child": "tracked by MFEM as CoarseFineTr.embeddings[i].parent (mesh.cpp:10908)",
+  "holds_at_depth_2": "the arguments are per-refinement and compose: every level inserts only edge midpoints, so no level can extend the port's point cloud, and Lc is computed before ANY refinement (main.cpp:311-313). The participation columns this run compares depend on these surviving a SECOND level, which is why they are restated here rather than assumed."
+ },
+ "marking": {
+  "stage_1": {
+   "criterion": "any vertex of the element inside the closed box (geodata.cpp:282-306)",
+   "marked_tets": 221,
+   "marked_fraction": 0.00343,
+   "marked_submesh": {
+    "E": 307,
+    "F": 464,
+    "T": 221
+   },
+   "material_attributes_touched": [
+    1,
+    3
+   ],
+   "accounting_gap": "boundary elements are bisected too, and Palace adds 9449 interface boundary elements at load; neither appears in the 221/64434 element count. Edge count is unaffected.",
+   "note": "measured offline on the ORIGINAL mesh; unchanged for N2's first stage"
+  },
+  "stage_2": {
+   "marked_tets": null,
+   "why_unknown": "stage 2 marks on the stage-1 mesh, which does not exist offline. The stage-1 in-box vertices survive bisection, so the stage-2 marked set is non-empty, but its size and submesh counts are not computable here."
+  }
+ },
+ "propagation": {
+  "conforming": true,
+  "why": "GeneralRefinement forces nonconforming=0 for 3D simplex meshes (mesh.cpp:10565-10567)",
+  "beyond_the_region": "YES. ParMesh::LocalRefinement (pmesh.cpp:3385) restores conformity by bisecting ANY element needing it, marked or not (pmesh.cpp:3467-3477), with an MPI face exchange (3489-3560) and boundary elements (3568-3580). This is NOT a face-only or box-only change, and its extent is not computable offline.",
+  "MaxNCLevels_and_Nonconformal": "inert for tets; the conforming branch is taken first",
+  "at_depth_2": "the closure runs again on the second level, so propagation outside the box compounds. N1 added 2 621 DOF beyond its marked set; the equivalent figure for stage 2 is not computable offline."
+ },
+ "quality": {
+  "port_face_mean_edge_mm": 0.008453,
+  "port_face_mean_edge_after_one_level_mm": 0.004227,
+  "radius_ratio_all_tets": {
+   "min": 0.05,
+   "mean": 0.37
+  },
+  "radius_ratio_marked_tets": {
+   "min": 0.0913,
+   "mean": 0.2197
+  },
+  "note": "octasection of a tet is not quality-preserving in general; bisection quality is bounded by MFEM's marked-edge scheme but is not measured here",
+  "at_depth_2": "stage 2 refines the CHILDREN of the already worst-shaped elements (marked mean radius-ratio 0.2197 against the mesh's 0.3700). Their quality after one octasection is not knowable offline, so element quality remains an unseparated alternative explanation and may be worse than at depth 1."
+ }
+}

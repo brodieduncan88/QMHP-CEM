@@ -46,7 +46,7 @@ physics and geometry generation are **not**.
 | `models/` physics (§5) | **Implemented** and regression-tested against the frozen pins |
 | `geometry/chip_planar/` gdsfactory cells (§7.1) | **Not implemented** |
 | `geometry/package_picogk/` Object 001 (§7.2) | **Not implemented** — C# project skeleton only |
-| `solvers/palace` | **v0.2 execution path implemented and executed**: mesh, config, container run, parse, provenance. Genuine Palace v0.13.0 runs recorded under `results/PALACE-GOLDEN-*/` (empty Object 001 box, four modes within 5e-5 of closed form, frequencies identical to every printed digit across four runs). See [`docs/palace-execution.md`](docs/palace-execution.md) |
+| `solvers/palace` | **v0.2 execution path implemented and executed**: mesh, config, container run, parse, provenance. Genuine Palace v0.13.0 runs recorded under `results/PALACE-GOLDEN-*/` (empty Object 001 box, four modes within 5e-5 of closed form, frequencies identical to every printed digit across all eleven runs; the `eig.csv` residual columns take two byte patterns, so that digest is not a fixed constant). See [`docs/palace-execution.md`](docs/palace-execution.md) |
 | `solvers/palace` verification | **v0.2 mesh-refinement and height-sensitive campaign**: three meshes of the golden box, an auxiliary 22 × 22 × 7.0/7.7 mm Z benchmark, bounded Object 001 height attempts; records under `results/PALACE-VERIFY-*/`. See [`docs/palace-verification.md`](docs/palace-verification.md) |
 | `solvers/openems` | Wired; container invocation not implemented |
 | `reference/` vendored v1.5.8f release bundle | Vendored, 27/29 hash-verified |

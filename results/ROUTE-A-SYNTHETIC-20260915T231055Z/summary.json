@@ -1,0 +1,1719 @@
+{
+ "L_F_nH": 103.45665367517793,
+ "batch_id": "ROUTE-A-SYNTHETIC-20260915T231055Z",
+ "ended_utc": "2026-09-15T23:10:56.013698+00:00",
+ "gauge_factors": [
+  1.0,
+  0.0001,
+  0.017,
+  53.0,
+  10000.0
+ ],
+ "identifiability_witness": {
+  "L_R_spread_factor": 1e+16,
+  "rows": [
+   {
+    "E_C_FF_GHz": 0.5999972476265819,
+    "L_R_nH": 1.0,
+    "c_FR_per_F": 222079087718.10187,
+    "c_RR_per_F": 730626455034.136,
+    "f_R_GHz": 4.301974466,
+    "f_minus_GHz": 2.7488241604161185,
+    "f_plus_GHz": 4.305219535776149,
+    "g_GHz": 0.15,
+    "gauge_s": 1.0,
+    "p_plus_F": 0.002544061197800465
+   },
+   {
+    "E_C_FF_GHz": 0.5999972476265819,
+    "L_R_nH": 100000000.0,
+    "c_FR_per_F": 2220790877181018.5,
+    "c_RR_per_F": 7.30626455034136e+19,
+    "f_R_GHz": 4.301974466,
+    "f_minus_GHz": 2.7488241604161185,
+    "f_plus_GHz": 4.305219535776149,
+    "g_GHz": 0.14999999999999997,
+    "gauge_s": 0.0001,
+    "p_plus_F": 0.002544061197800464
+   },
+   {
+    "E_C_FF_GHz": 0.5999972476265819,
+    "L_R_nH": 3460.2076124567475,
+    "c_FR_per_F": 13063475748123.639,
+    "c_RR_per_F": 2528119221571404.5,
+    "f_R_GHz": 4.301974466,
+    "f_minus_GHz": 2.7488241604161185,
+    "f_plus_GHz": 4.305219535776149,
+    "g_GHz": 0.15,
+    "gauge_s": 0.017,
+    "p_plus_F": 0.002544061197800465
+   },
+   {
+    "E_C_FF_GHz": 0.5999972476265819,
+    "L_R_nH": 0.000355998576005696,
+    "c_FR_per_F": 4190171466.3792806,
+    "c_RR_per_F": 260101977.58424208,
+    "f_R_GHz": 4.301974466,
+    "f_minus_GHz": 2.7488241604161185,
+    "f_plus_GHz": 4.305219535776149,
+    "g_GHz": 0.15,
+    "gauge_s": 53.0,
+    "p_plus_F": 0.002544061197800465
+   },
+   {
+    "E_C_FF_GHz": 0.5999972476265819,
+    "L_R_nH": 1e-08,
+    "c_FR_per_F": 22207908.771810185,
+    "c_RR_per_F": 7306.26455034136,
+    "f_R_GHz": 4.301974466,
+    "f_minus_GHz": 2.7488241604161185,
+    "f_plus_GHz": 4.305219535776149,
+    "g_GHz": 0.15,
+    "gauge_s": 10000.0,
+    "p_plus_F": 0.002544061197800465
+   }
+  ],
+  "statement": "Every row has the same observables and the same invariant triple; c_FR, c_RR and L_R differ by a factor of 1e+16. The raw readout-node entries are conventions, not measurements."
+ },
+ "noise_draws": 400,
+ "noise_model": "Gaussian relative error on each frequency, and on the smaller of the site participation and its complement, because a participation is bounded in [0, 1] and the solver resolves the smaller energy ratio. Perturbing p multiplicatively when it is near one measures the noise model, not the inversion.",
+ "noise_seed": 20260915,
+ "propagation": [
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 1.383505871314786e-05,
+    "median_relative_error": 2.9206436923929082e-06,
+    "p95_relative_error": 7.578828146367148e-06
+   },
+   "case": "s1_design_point",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 3.3670355302566023e-06,
+    "median_relative_error": 8.215747107845715e-07,
+    "p95_relative_error": 2.4639520005354853e-06
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.0014891687650177752,
+    "median_relative_error": 0.00032347826861362416,
+    "p95_relative_error": 0.0009677490890621273
+   },
+   "p_plus_F": 0.002544061197800465,
+   "sigma_f_relative": 1e-06,
+   "sigma_p_relative": 0.001,
+   "why": "mesh-converged frequencies; participation to 0.1 %"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.00013833724525801465,
+    "median_relative_error": 2.9205218895066795e-05,
+    "p95_relative_error": 7.578933427097584e-05
+   },
+   "case": "s1_design_point",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 3.366964920451198e-05,
+    "median_relative_error": 8.216039392747057e-06,
+    "p95_relative_error": 2.463948689893745e-05
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.014993373620828717,
+    "median_relative_error": 0.003220747587367433,
+    "p95_relative_error": 0.009721122466360515
+   },
+   "p_plus_F": 0.002544061197800465,
+   "sigma_f_relative": 1e-05,
+   "sigma_p_relative": 0.01,
+   "why": "frequencies to 1e-5; participation to 1 %"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.0006732046075084536,
+    "median_relative_error": 0.0001440859133235083,
+    "p95_relative_error": 0.00039003629704331737
+   },
+   "case": "s1_design_point",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.00032967545710915194,
+    "median_relative_error": 6.266024653861464e-05,
+    "p95_relative_error": 0.00018708882569714428
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.015107312061951966,
+    "median_relative_error": 0.003086151381864485,
+    "p95_relative_error": 0.009831879243874754
+   },
+   "p_plus_F": 0.002544061197800465,
+   "sigma_f_relative": 0.0001,
+   "sigma_p_relative": 0.01,
+   "why": "frequencies at the existing 1e-4 convergence rule; participation to 1 %"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.0013820395941558294,
+    "median_relative_error": 0.00029193038066873094,
+    "p95_relative_error": 0.0007579986177191889
+   },
+   "case": "s1_design_point",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.0003366258921027695,
+    "median_relative_error": 8.218962385052886e-05,
+    "p95_relative_error": 0.0002463915584139077
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.1619630673885993,
+    "median_relative_error": 0.03189931223624928,
+    "p95_relative_error": 0.09454342091450833
+   },
+   "p_plus_F": 0.002544061197800465,
+   "sigma_f_relative": 0.0001,
+   "sigma_p_relative": 0.1,
+   "why": "participation to 10 % only"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.0062093564053353765,
+    "median_relative_error": 0.0013616871547160055,
+    "p95_relative_error": 0.0040866245549706914
+   },
+   "case": "s1_design_point",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.003309942190201539,
+    "median_relative_error": 0.0006522009796462126,
+    "p95_relative_error": 0.0018675262190934261
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.016247151358267008,
+    "median_relative_error": 0.0037409812667322353,
+    "p95_relative_error": 0.012666621328045932
+   },
+   "p_plus_F": 0.002544061197800465,
+   "sigma_f_relative": 0.001,
+   "sigma_p_relative": 0.01,
+   "why": "frequencies ten times looser than the convergence rule"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.0001677682175505596,
+    "median_relative_error": 3.765501085904385e-05,
+    "p95_relative_error": 0.00010924734321296516
+   },
+   "case": "strong_coupling",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 3.465945977076905e-05,
+    "median_relative_error": 7.616631623351947e-06,
+    "p95_relative_error": 2.1732273004557862e-05
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.001452562918845731,
+    "median_relative_error": 0.0003154978109978946,
+    "p95_relative_error": 0.0009443663066710517
+   },
+   "p_plus_F": 0.03657414932650386,
+   "sigma_f_relative": 1e-06,
+   "sigma_p_relative": 0.001,
+   "why": "mesh-converged frequencies; participation to 0.1 %"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.0016776644340896984,
+    "median_relative_error": 0.0003764165985966398,
+    "p95_relative_error": 0.001091390016090486
+   },
+   "case": "strong_coupling",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.00034642889253532746,
+    "median_relative_error": 7.616787102766576e-05,
+    "p95_relative_error": 0.00021725247351073184
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.01463243359545785,
+    "median_relative_error": 0.003141814349533755,
+    "p95_relative_error": 0.009489420506790802
+   },
+   "p_plus_F": 0.03657414932650386,
+   "sigma_f_relative": 1e-05,
+   "sigma_p_relative": 0.01,
+   "why": "frequencies to 1e-5; participation to 1 %"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.001864358775461652,
+    "median_relative_error": 0.000403632036702716,
+    "p95_relative_error": 0.0011098784967383682
+   },
+   "case": "strong_coupling",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.000385838488780313,
+    "median_relative_error": 0.00010418830832522517,
+    "p95_relative_error": 0.0002931009384457394
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.014734094603223724,
+    "median_relative_error": 0.00303693653249485,
+    "p95_relative_error": 0.009589638154785467
+   },
+   "p_plus_F": 0.03657414932650386,
+   "sigma_f_relative": 0.0001,
+   "sigma_p_relative": 0.01,
+   "why": "frequencies at the existing 1e-4 convergence rule; participation to 1 %"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.016774870133186848,
+    "median_relative_error": 0.0037508667525038737,
+    "p95_relative_error": 0.010806728688408667
+   },
+   "case": "strong_coupling",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.003447814225712163,
+    "median_relative_error": 0.0007618343039711275,
+    "p95_relative_error": 0.0021655260617554463
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.1589063917537544,
+    "median_relative_error": 0.03113513707869065,
+    "p95_relative_error": 0.0923772732517396
+   },
+   "p_plus_F": 0.03657414932650386,
+   "sigma_f_relative": 0.0001,
+   "sigma_p_relative": 0.1,
+   "why": "participation to 10 % only"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.006198687103523263,
+    "median_relative_error": 0.0013614855230643283,
+    "p95_relative_error": 0.0037290871968334157
+   },
+   "case": "strong_coupling",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.0032262166887303523,
+    "median_relative_error": 0.000624071681069508,
+    "p95_relative_error": 0.001847163466202849
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.01575110261025988,
+    "median_relative_error": 0.0036230415981583497,
+    "p95_relative_error": 0.012278268672781627
+   },
+   "p_plus_F": 0.03657414932650386,
+   "sigma_f_relative": 0.001,
+   "sigma_p_relative": 0.01,
+   "why": "frequencies ten times looser than the convergence rule"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 6.248276988572359e-06,
+    "median_relative_error": 1.3651281603525787e-06,
+    "p95_relative_error": 4.123327442606715e-06
+   },
+   "case": "weak_coupling",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 3.31620224386807e-06,
+    "median_relative_error": 6.547104455761812e-07,
+    "p95_relative_error": 1.8844929746293944e-06
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.0014918470602818049,
+    "median_relative_error": 0.0003240572785269445,
+    "p95_relative_error": 0.0009694591532265207
+   },
+   "p_plus_F": 2.848431780488647e-06,
+   "sigma_f_relative": 1e-06,
+   "sigma_p_relative": 0.001,
+   "why": "mesh-converged frequencies; participation to 0.1 %"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 6.248012764064434e-05,
+    "median_relative_error": 1.3651240254097258e-05,
+    "p95_relative_error": 4.12321270313267e-05
+   },
+   "case": "weak_coupling",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 3.316202258340798e-05,
+    "median_relative_error": 6.547085263597899e-06,
+    "p95_relative_error": 1.8844609554175077e-05
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.015019793100973754,
+    "median_relative_error": 0.003226520939249307,
+    "p95_relative_error": 0.009738072442410338
+   },
+   "p_plus_F": 2.848431780488647e-06,
+   "sigma_f_relative": 1e-05,
+   "sigma_p_relative": 0.01,
+   "why": "frequencies to 1e-5; participation to 1 %"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.0006239845834929076,
+    "median_relative_error": 0.00013628927003762488,
+    "p95_relative_error": 0.00041228118435259695
+   },
+   "case": "weak_coupling",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.000331634927969486,
+    "median_relative_error": 6.545715681420018e-05,
+    "p95_relative_error": 0.00018854386800714498
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.01513464576690729,
+    "median_relative_error": 0.003089706240889843,
+    "p95_relative_error": 0.009849580434916837
+   },
+   "p_plus_F": 2.848431780488647e-06,
+   "sigma_f_relative": 0.0001,
+   "sigma_p_relative": 0.01,
+   "why": "frequencies at the existing 1e-4 convergence rule; participation to 1 %"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.0006245371608563405,
+    "median_relative_error": 0.00013650826763512722,
+    "p95_relative_error": 0.0004122065624349176
+   },
+   "case": "weak_coupling",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.0003316202403536741,
+    "median_relative_error": 6.546893355552553e-05,
+    "p95_relative_error": 0.00018841408247212473
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.16218773619452279,
+    "median_relative_error": 0.031955173174310195,
+    "p95_relative_error": 0.09469064325504459
+   },
+   "p_plus_F": 2.848431780488647e-06,
+   "sigma_f_relative": 0.0001,
+   "sigma_p_relative": 0.1,
+   "why": "participation to 10 % only"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.006213111081738595,
+    "median_relative_error": 0.001362255918563771,
+    "p95_relative_error": 0.004111440251121526
+   },
+   "case": "weak_coupling",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.0033163639699258793,
+    "median_relative_error": 0.0006543679083963722,
+    "p95_relative_error": 0.0018823739991847984
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.016283631633506185,
+    "median_relative_error": 0.0037518542449602567,
+    "p95_relative_error": 0.012696935262090925
+   },
+   "p_plus_F": 2.848431780488647e-06,
+   "sigma_f_relative": 0.001,
+   "sigma_p_relative": 0.01,
+   "why": "frequencies ten times looser than the convergence rule"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 6.053110883904736e-05,
+    "median_relative_error": 1.4148572018279481e-05,
+    "p95_relative_error": 3.9118950008993084e-05
+   },
+   "case": "near_degenerate",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 3.0306931244737344e-05,
+    "median_relative_error": 6.586880892770565e-06,
+    "p95_relative_error": 1.8944729223798706e-05
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.0008529998966135451,
+    "median_relative_error": 0.00017546047640726144,
+    "p95_relative_error": 0.0005740473582606839
+   },
+   "p_plus_F": 0.313567301000895,
+   "sigma_f_relative": 1e-06,
+   "sigma_p_relative": 0.001,
+   "why": "mesh-converged frequencies; participation to 0.1 %"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.0006051641928063217,
+    "median_relative_error": 0.0001415338224452406,
+    "p95_relative_error": 0.0003910068728875293
+   },
+   "case": "near_degenerate",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.0003028737835304361,
+    "median_relative_error": 6.584994688260977e-05,
+    "p95_relative_error": 0.00018955489703718014
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.008740546632678056,
+    "median_relative_error": 0.0017443903302351393,
+    "p95_relative_error": 0.005740364564278413
+   },
+   "p_plus_F": 0.313567301000895,
+   "sigma_f_relative": 1e-05,
+   "sigma_p_relative": 0.01,
+   "why": "frequencies to 1e-5; participation to 1 %"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.0009758898731866007,
+    "median_relative_error": 0.000177136241889272,
+    "p95_relative_error": 0.0004686780615253381
+   },
+   "case": "near_degenerate",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.00033091699126941383,
+    "median_relative_error": 8.744162636999228e-05,
+    "p95_relative_error": 0.00024400760671210902
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.015499752972798871,
+    "median_relative_error": 0.003365168264464752,
+    "p95_relative_error": 0.010448298538447236
+   },
+   "p_plus_F": 0.313567301000895,
+   "sigma_f_relative": 0.0001,
+   "sigma_p_relative": 0.01,
+   "why": "frequencies at the existing 1e-4 convergence rule; participation to 1 %"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.006036951777430733,
+    "median_relative_error": 0.0014201483308631236,
+    "p95_relative_error": 0.003891806624922844
+   },
+   "case": "near_degenerate",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.0030093101840705703,
+    "median_relative_error": 0.0006566119342485274,
+    "p95_relative_error": 0.0019005129417161287
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.11059127991960738,
+    "median_relative_error": 0.016910149648953793,
+    "p95_relative_error": 0.056190297948868394
+   },
+   "p_plus_F": 0.313567301000895,
+   "sigma_f_relative": 0.0001,
+   "sigma_p_relative": 0.1,
+   "why": "participation to 10 % only"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.0052094474436936685,
+    "median_relative_error": 0.0010686016241230457,
+    "p95_relative_error": 0.002967408992242133
+   },
+   "case": "near_degenerate",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.0022359779498423455,
+    "median_relative_error": 0.0004988008811816031,
+    "p95_relative_error": 0.0014861408842473344
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.14800901977997513,
+    "median_relative_error": 0.026531263465064996,
+    "p95_relative_error": 0.08549318243163362
+   },
+   "p_plus_F": 0.313567301000895,
+   "sigma_f_relative": 0.001,
+   "sigma_p_relative": 0.01,
+   "why": "frequencies ten times looser than the convergence rule"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 2.6851254999129045e-05,
+    "median_relative_error": 6.2303237579430805e-06,
+    "p95_relative_error": 1.713446219955062e-05
+   },
+   "case": "far_detuned",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 3.302654872139321e-06,
+    "median_relative_error": 6.312721927415055e-07,
+    "p95_relative_error": 1.8649431815509487e-06
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.001490536960919905,
+    "median_relative_error": 0.00032298201960688933,
+    "p95_relative_error": 0.0009734035138468197
+   },
+   "p_plus_F": 0.00014324907318093744,
+   "sigma_f_relative": 1e-06,
+   "sigma_p_relative": 0.001,
+   "why": "mesh-converged frequencies; participation to 0.1 %"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.000268456983068258,
+    "median_relative_error": 6.23035322900989e-05,
+    "p95_relative_error": 0.00017134165503760905
+   },
+   "case": "far_detuned",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 3.302655300641e-05,
+    "median_relative_error": 6.3127239868787655e-06,
+    "p95_relative_error": 1.8649414699090094e-05
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.015006869407904565,
+    "median_relative_error": 0.0032332208674006524,
+    "p95_relative_error": 0.009756543239176645
+   },
+   "p_plus_F": 0.00014324907318093744,
+   "sigma_f_relative": 1e-05,
+   "sigma_p_relative": 0.01,
+   "why": "frequencies to 1e-5; participation to 1 %"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.0007504868864412983,
+    "median_relative_error": 0.00013938397132421407,
+    "p95_relative_error": 0.0004048475959808702
+   },
+   "case": "far_detuned",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.00033149904749441017,
+    "median_relative_error": 6.534948512115779e-05,
+    "p95_relative_error": 0.00018734850758866193
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.015014744168961505,
+    "median_relative_error": 0.0032366058119675167,
+    "p95_relative_error": 0.009745971682223468
+   },
+   "p_plus_F": 0.00014324907318093744,
+   "sigma_f_relative": 0.0001,
+   "sigma_p_relative": 0.01,
+   "why": "frequencies at the existing 1e-4 convergence rule; participation to 1 %"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.0026790255019844595,
+    "median_relative_error": 0.0006230647971259742,
+    "p95_relative_error": 0.0017131198749987457
+   },
+   "case": "far_detuned",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.00033026595831375793,
+    "median_relative_error": 6.312744565628581e-05,
+    "p95_relative_error": 0.00018649243539781146
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.1620777923373189,
+    "median_relative_error": 0.03204196929404399,
+    "p95_relative_error": 0.09456061070636035
+   },
+   "p_plus_F": 0.00014324907318093744,
+   "sigma_f_relative": 0.0001,
+   "sigma_p_relative": 0.1,
+   "why": "participation to 10 % only"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.006261170773111509,
+    "median_relative_error": 0.0013839281571258392,
+    "p95_relative_error": 0.004067585542045857
+   },
+   "case": "far_detuned",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.0033162239697558382,
+    "median_relative_error": 0.0006544760961584373,
+    "p95_relative_error": 0.0018811788945514048
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.015236748890748756,
+    "median_relative_error": 0.0033378856777803983,
+    "p95_relative_error": 0.010557763361821834
+   },
+   "p_plus_F": 0.00014324907318093744,
+   "sigma_f_relative": 0.001,
+   "sigma_p_relative": 0.01,
+   "why": "frequencies ten times looser than the convergence rule"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 6.43843248565632e-06,
+    "median_relative_error": 1.4604071736062017e-06,
+    "p95_relative_error": 4.1151043577016866e-06
+   },
+   "case": "readout_below_fluxonium",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 5.306536515189565e-06,
+    "median_relative_error": 1.0726633177161568e-06,
+    "p95_relative_error": 2.7939088850666856e-06
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.001488098178827335,
+    "median_relative_error": 0.0003231198962982505,
+    "p95_relative_error": 0.0009652737424897806
+   },
+   "p_plus_F": 0.9983670110195662,
+   "sigma_f_relative": 1e-06,
+   "sigma_p_relative": 0.001,
+   "why": "mesh-converged frequencies; participation to 0.1 %"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 6.438355862319436e-05,
+    "median_relative_error": 1.4604014240597641e-05,
+    "p95_relative_error": 4.1150197700567354e-05
+   },
+   "case": "readout_below_fluxonium",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 5.306290364285949e-05,
+    "median_relative_error": 1.072658566689985e-05,
+    "p95_relative_error": 2.7937379058543912e-05
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.014982809602939925,
+    "median_relative_error": 0.0032171757445289724,
+    "p95_relative_error": 0.009696584051348545
+   },
+   "p_plus_F": 0.9983670110195662,
+   "sigma_f_relative": 1e-05,
+   "sigma_p_relative": 0.01,
+   "why": "frequencies to 1e-5; participation to 1 %"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.0006606493595957306,
+    "median_relative_error": 0.000127303360003364,
+    "p95_relative_error": 0.0003670850500304666
+   },
+   "case": "readout_below_fluxonium",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.0003278021909438607,
+    "median_relative_error": 6.856340558054921e-05,
+    "p95_relative_error": 0.00019836759482742914
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.015136302680270147,
+    "median_relative_error": 0.0030388098042629283,
+    "p95_relative_error": 0.009797584897645631
+   },
+   "p_plus_F": 0.9983670110195662,
+   "sigma_f_relative": 0.0001,
+   "sigma_p_relative": 0.01,
+   "why": "frequencies at the existing 1e-4 convergence rule; participation to 1 %"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.0006437590299171014,
+    "median_relative_error": 0.0001460344119515408,
+    "p95_relative_error": 0.0004114173650196075
+   },
+   "case": "readout_below_fluxonium",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.0005303829988737039,
+    "median_relative_error": 0.00010726105828637344,
+    "p95_relative_error": 0.00027934180599601256
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.16187314277910334,
+    "median_relative_error": 0.031857072411307155,
+    "p95_relative_error": 0.09450627393510955
+   },
+   "p_plus_F": 0.9983670110195662,
+   "sigma_f_relative": 0.0001,
+   "sigma_p_relative": 0.1,
+   "why": "participation to 10 % only"
+  },
+  {
+   "E_C_FF_GHz": {
+    "max_relative_error": 0.006613513110059602,
+    "median_relative_error": 0.0013095428472404327,
+    "p95_relative_error": 0.003742218242848834
+   },
+   "case": "readout_below_fluxonium",
+   "draws": 400,
+   "f_R_GHz": {
+    "max_relative_error": 0.003110165983596516,
+    "median_relative_error": 0.0006841469401003733,
+    "p95_relative_error": 0.0020498690289987294
+   },
+   "failures": 0,
+   "g_GHz": {
+    "max_relative_error": 0.017324847868823098,
+    "median_relative_error": 0.003986591933374783,
+    "p95_relative_error": 0.013107394471841468
+   },
+   "p_plus_F": 0.9983670110195662,
+   "sigma_f_relative": 0.001,
+   "sigma_p_relative": 0.01,
+   "why": "frequencies ten times looser than the convergence rule"
+  }
+ ],
+ "propagation_conclusion": "Across the suite the recovered invariants track the known values to 2.3e-10 relative with noiseless data. Under noise the coupling error is set by the participation, not by the frequencies: at the S1 design point the 95th-percentile relative error on g is 0.95 to 1.27 times the relative error supplied on the participation, while a hundredfold loosening of the frequency error changes it little. Route A therefore needs the energy participation to about 1 % to keep its own uncertainty on g near 1 %. This is a statement about Route A's numerical floor. It is not a comparison against the 10 % agreement rule, which is unchanged and applies between the two routes.",
+ "reads_route_b": false,
+ "recovery": [
+  {
+   "case": "s1_design_point",
+   "design": {
+    "L_F_nH": 103.45665367517793,
+    "f_F_GHz": 2.7539,
+    "f_R_GHz": 4.301974466,
+    "g_GHz": 0.15
+   },
+   "gauge_factors": [
+    1.0,
+    0.0001,
+    0.017,
+    53.0,
+    10000.0
+   ],
+   "gauges": {
+    "0.0001": {
+     "forward_residual": 4.336808689942018e-19,
+     "max_relative_error": 3.789561257387201e-16,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.7488241604161185,
+      "f_plus_GHz": 4.305219535776149,
+      "p_minus_F": 0.9974559388021997,
+      "p_plus_F": 0.002544061197800464,
+      "sum_rule_residual": 2.220446049250313e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.5999972476265819,
+      "f_F_GHz": 2.7538999999999993,
+      "f_R_GHz": 4.301974465999999,
+      "g_GHz": 0.14999999999999994,
+      "g_MHz": 149.99999999999994
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 2.220446049250313e-16
+    },
+    "0.017": {
+     "forward_residual": 4.336808689942018e-19,
+     "max_relative_error": 3.789561257387201e-16,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.7488241604161185,
+      "f_plus_GHz": 4.305219535776149,
+      "p_minus_F": 0.9974559388021997,
+      "p_plus_F": 0.002544061197800465,
+      "sum_rule_residual": 2.220446049250313e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.5999972476265819,
+      "f_F_GHz": 2.7538999999999993,
+      "f_R_GHz": 4.301974465999999,
+      "g_GHz": 0.14999999999999994,
+      "g_MHz": 149.99999999999994
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 2.220446049250313e-16
+    },
+    "1": {
+     "forward_residual": 4.336808689942018e-19,
+     "max_relative_error": 3.789561257387201e-16,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.7488241604161185,
+      "f_plus_GHz": 4.305219535776149,
+      "p_minus_F": 0.9974559388021997,
+      "p_plus_F": 0.002544061197800465,
+      "sum_rule_residual": 2.220446049250313e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.5999972476265819,
+      "f_F_GHz": 2.7538999999999993,
+      "f_R_GHz": 4.301974465999999,
+      "g_GHz": 0.14999999999999994,
+      "g_MHz": 149.99999999999994
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 2.220446049250313e-16
+    },
+    "10000": {
+     "forward_residual": 4.336808689942018e-19,
+     "max_relative_error": 3.789561257387201e-16,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.7488241604161185,
+      "f_plus_GHz": 4.305219535776149,
+      "p_minus_F": 0.9974559388021997,
+      "p_plus_F": 0.002544061197800465,
+      "sum_rule_residual": 2.220446049250313e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.5999972476265819,
+      "f_F_GHz": 2.7538999999999993,
+      "f_R_GHz": 4.301974465999999,
+      "g_GHz": 0.14999999999999994,
+      "g_MHz": 149.99999999999994
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 2.220446049250313e-16
+    },
+    "53": {
+     "forward_residual": 4.336808689942018e-19,
+     "max_relative_error": 3.789561257387201e-16,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.7488241604161185,
+      "f_plus_GHz": 4.305219535776149,
+      "p_minus_F": 0.9974559388021997,
+      "p_plus_F": 0.002544061197800465,
+      "sum_rule_residual": 2.220446049250313e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.5999972476265819,
+      "f_F_GHz": 2.7538999999999993,
+      "f_R_GHz": 4.301974465999999,
+      "g_GHz": 0.14999999999999994,
+      "g_MHz": 149.99999999999994
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 2.220446049250313e-16
+    }
+   },
+   "max_relative_error_over_gauges": 3.789561257387201e-16,
+   "observable_spread_across_gauges": {
+    "f_minus_GHz": 0.0,
+    "f_plus_GHz": 0.0,
+    "p_plus_F": 3.409358779334019e-16
+   },
+   "truth": {
+    "E_C_FF_GHz": 0.5999972476265819,
+    "f_F_GHz": 2.7538999999999993,
+    "f_R_GHz": 4.301974466,
+    "g_GHz": 0.15,
+    "g_MHz": 150.0
+   },
+   "why": "the S1 seed: fluxonium harmonic mode at sqrt(8 E_C E_L), the frozen bare readout root, and the VERIFIED-COMPUTATIONAL g"
+  },
+  {
+   "case": "strong_coupling",
+   "design": {
+    "L_F_nH": 103.45665367517793,
+    "f_F_GHz": 2.7539,
+    "f_R_GHz": 4.301974466,
+    "g_GHz": 0.6
+   },
+   "gauge_factors": [
+    1.0,
+    0.0001,
+    0.017,
+    53.0,
+    10000.0
+   ],
+   "gauges": {
+    "0.0001": {
+     "forward_residual": 6.938893903907228e-18,
+     "max_relative_error": 3.789561257387201e-16,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.6744973410123563,
+      "f_plus_GHz": 4.351782794330827,
+      "p_minus_F": 0.9634258506734962,
+      "p_plus_F": 0.036574149326503845,
+      "sum_rule_residual": 0.0
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.5999972476265819,
+      "f_F_GHz": 2.7538999999999993,
+      "f_R_GHz": 4.301974466,
+      "g_GHz": 0.5999999999999998,
+      "g_MHz": 599.9999999999998
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 0.0
+    },
+    "0.017": {
+     "forward_residual": 1.1102230246251565e-16,
+     "max_relative_error": 3.789561257387201e-16,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.6744973410123563,
+      "f_plus_GHz": 4.351782794330827,
+      "p_minus_F": 0.9634258506734963,
+      "p_plus_F": 0.03657414932650386,
+      "sum_rule_residual": 2.220446049250313e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.5999972476265819,
+      "f_F_GHz": 2.7538999999999993,
+      "f_R_GHz": 4.301974466,
+      "g_GHz": 0.5999999999999998,
+      "g_MHz": 599.9999999999998
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 2.220446049250313e-16
+    },
+    "1": {
+     "forward_residual": 1.1102230246251565e-16,
+     "max_relative_error": 3.789561257387201e-16,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.6744973410123563,
+      "f_plus_GHz": 4.351782794330827,
+      "p_minus_F": 0.9634258506734963,
+      "p_plus_F": 0.03657414932650386,
+      "sum_rule_residual": 2.220446049250313e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.5999972476265819,
+      "f_F_GHz": 2.7538999999999993,
+      "f_R_GHz": 4.301974466,
+      "g_GHz": 0.5999999999999998,
+      "g_MHz": 599.9999999999998
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 2.220446049250313e-16
+    },
+    "10000": {
+     "forward_residual": 1.1102230246251565e-16,
+     "max_relative_error": 3.789561257387201e-16,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.6744973410123563,
+      "f_plus_GHz": 4.351782794330827,
+      "p_minus_F": 0.9634258506734963,
+      "p_plus_F": 0.03657414932650386,
+      "sum_rule_residual": 2.220446049250313e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.5999972476265819,
+      "f_F_GHz": 2.7538999999999993,
+      "f_R_GHz": 4.301974466,
+      "g_GHz": 0.5999999999999998,
+      "g_MHz": 599.9999999999998
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 2.220446049250313e-16
+    },
+    "53": {
+     "forward_residual": 1.1102230246251565e-16,
+     "max_relative_error": 3.789561257387201e-16,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.6744973410123563,
+      "f_plus_GHz": 4.351782794330827,
+      "p_minus_F": 0.9634258506734963,
+      "p_plus_F": 0.03657414932650386,
+      "sum_rule_residual": 2.220446049250313e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.5999972476265819,
+      "f_F_GHz": 2.7538999999999993,
+      "f_R_GHz": 4.301974466,
+      "g_GHz": 0.5999999999999998,
+      "g_MHz": 599.9999999999998
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 2.220446049250313e-16
+    }
+   },
+   "max_relative_error_over_gauges": 3.789561257387201e-16,
+   "observable_spread_across_gauges": {
+    "f_minus_GHz": 0.0,
+    "f_plus_GHz": 0.0,
+    "p_plus_F": 3.794425314974521e-16
+   },
+   "truth": {
+    "E_C_FF_GHz": 0.5999972476265819,
+    "f_F_GHz": 2.7538999999999993,
+    "f_R_GHz": 4.301974466,
+    "g_GHz": 0.6,
+    "g_MHz": 600.0
+   },
+   "why": "four times the reference coupling: strong hybridisation"
+  },
+  {
+   "case": "weak_coupling",
+   "design": {
+    "L_F_nH": 103.45665367517793,
+    "f_F_GHz": 2.7539,
+    "f_R_GHz": 4.301974466,
+    "g_GHz": 0.005
+   },
+   "gauge_factors": [
+    1.0,
+    0.0001,
+    0.017,
+    53.0,
+    10000.0
+   ],
+   "gauges": {
+    "0.0001": {
+     "forward_residual": 4.235164736271502e-22,
+     "max_relative_error": 2.0645831971335673e-16,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.753894350977905,
+      "f_plus_GHz": 4.301978082204507,
+      "p_minus_F": 0.9999971515682197,
+      "p_plus_F": 2.848431780488646e-06,
+      "sum_rule_residual": 2.220446049250313e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.5999972476265819,
+      "f_F_GHz": 2.7538999999999993,
+      "f_R_GHz": 4.301974466000001,
+      "g_GHz": 0.005,
+      "g_MHz": 5.0
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 2.220446049250313e-16
+    },
+    "0.017": {
+     "forward_residual": 4.235164736271502e-22,
+     "max_relative_error": 2.0645831971335673e-16,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.753894350977905,
+      "f_plus_GHz": 4.301978082204507,
+      "p_minus_F": 0.9999971515682197,
+      "p_plus_F": 2.848431780488646e-06,
+      "sum_rule_residual": 2.220446049250313e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.5999972476265819,
+      "f_F_GHz": 2.7538999999999993,
+      "f_R_GHz": 4.301974466000001,
+      "g_GHz": 0.005,
+      "g_MHz": 5.0
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 2.220446049250313e-16
+    },
+    "1": {
+     "forward_residual": 4.235164736271502e-22,
+     "max_relative_error": 2.0645831971335673e-16,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.753894350977905,
+      "f_plus_GHz": 4.301978082204507,
+      "p_minus_F": 0.9999971515682197,
+      "p_plus_F": 2.848431780488647e-06,
+      "sum_rule_residual": 2.220446049250313e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.5999972476265819,
+      "f_F_GHz": 2.7538999999999993,
+      "f_R_GHz": 4.301974466000001,
+      "g_GHz": 0.005000000000000001,
+      "g_MHz": 5.000000000000001
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 2.220446049250313e-16
+    },
+    "10000": {
+     "forward_residual": 4.235164736271502e-22,
+     "max_relative_error": 2.0645831971335673e-16,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.753894350977905,
+      "f_plus_GHz": 4.301978082204507,
+      "p_minus_F": 0.9999971515682197,
+      "p_plus_F": 2.848431780488647e-06,
+      "sum_rule_residual": 2.220446049250313e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.5999972476265819,
+      "f_F_GHz": 2.7538999999999993,
+      "f_R_GHz": 4.301974466000001,
+      "g_GHz": 0.005000000000000001,
+      "g_MHz": 5.000000000000001
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 2.220446049250313e-16
+    },
+    "53": {
+     "forward_residual": 4.235164736271502e-22,
+     "max_relative_error": 2.0645831971335673e-16,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.753894350977905,
+      "f_plus_GHz": 4.301978082204507,
+      "p_minus_F": 0.9999971515682197,
+      "p_plus_F": 2.848431780488647e-06,
+      "sum_rule_residual": 2.220446049250313e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.5999972476265819,
+      "f_F_GHz": 2.7538999999999993,
+      "f_R_GHz": 4.301974466000001,
+      "g_GHz": 0.005000000000000001,
+      "g_MHz": 5.000000000000001
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 2.220446049250313e-16
+    }
+   },
+   "max_relative_error_over_gauges": 2.0645831971335673e-16,
+   "observable_spread_across_gauges": {
+    "f_minus_GHz": 0.0,
+    "f_plus_GHz": 0.0,
+    "p_plus_F": 4.460522556954088e-16
+   },
+   "truth": {
+    "E_C_FF_GHz": 0.5999972476265819,
+    "f_F_GHz": 2.7538999999999993,
+    "f_R_GHz": 4.301974466,
+    "g_GHz": 0.005,
+    "g_MHz": 5.0
+   },
+   "why": "5 MHz: near the resolution floor, where the frequencies carry almost no information"
+  },
+  {
+   "case": "near_degenerate",
+   "design": {
+    "L_F_nH": 103.45665367517793,
+    "f_F_GHz": 4.25,
+    "f_R_GHz": 4.301974466,
+    "g_GHz": 0.15
+   },
+   "gauge_factors": [
+    1.0,
+    0.0001,
+    0.017,
+    53.0,
+    10000.0
+   ],
+   "gauges": {
+    "0.0001": {
+     "forward_residual": 4.363176486776865e-14,
+     "max_relative_error": 1.0029014655779575e-13,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 4.205794050829074,
+      "f_plus_GHz": 4.345202033062071,
+      "p_minus_F": 0.6864326989991048,
+      "p_plus_F": 0.3135673010008949,
+      "sum_rule_residual": 3.3306690738754696e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 1.4289952531645507,
+      "f_F_GHz": 4.249999999999991,
+      "f_R_GHz": 4.301974466000009,
+      "g_GHz": 0.15000000000001504,
+      "g_MHz": 150.00000000001504
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 3.3306690738754696e-16
+    },
+    "0.017": {
+     "forward_residual": 4.374278717023117e-14,
+     "max_relative_error": 1.006602208993374e-13,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 4.205794050829074,
+      "f_plus_GHz": 4.345202033062071,
+      "p_minus_F": 0.6864326989991049,
+      "p_plus_F": 0.313567301000895,
+      "sum_rule_residual": 1.1102230246251565e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 1.4289952531645507,
+      "f_F_GHz": 4.249999999999991,
+      "f_R_GHz": 4.301974466000009,
+      "g_GHz": 0.1500000000000151,
+      "g_MHz": 150.0000000000151
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 1.1102230246251565e-16
+    },
+    "1": {
+     "forward_residual": 4.374278717023117e-14,
+     "max_relative_error": 1.006602208993374e-13,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 4.205794050829074,
+      "f_plus_GHz": 4.345202033062071,
+      "p_minus_F": 0.6864326989991049,
+      "p_plus_F": 0.313567301000895,
+      "sum_rule_residual": 1.1102230246251565e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 1.4289952531645507,
+      "f_F_GHz": 4.249999999999991,
+      "f_R_GHz": 4.301974466000009,
+      "g_GHz": 0.1500000000000151,
+      "g_MHz": 150.0000000000151
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 1.1102230246251565e-16
+    },
+    "10000": {
+     "forward_residual": 4.374278717023117e-14,
+     "max_relative_error": 1.006602208993374e-13,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 4.205794050829074,
+      "f_plus_GHz": 4.345202033062071,
+      "p_minus_F": 0.6864326989991049,
+      "p_plus_F": 0.313567301000895,
+      "sum_rule_residual": 1.1102230246251565e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 1.4289952531645507,
+      "f_F_GHz": 4.249999999999991,
+      "f_R_GHz": 4.301974466000009,
+      "g_GHz": 0.1500000000000151,
+      "g_MHz": 150.0000000000151
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 1.1102230246251565e-16
+    },
+    "53": {
+     "forward_residual": 4.374278717023117e-14,
+     "max_relative_error": 1.006602208993374e-13,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 4.205794050829074,
+      "f_plus_GHz": 4.345202033062071,
+      "p_minus_F": 0.6864326989991049,
+      "p_plus_F": 0.313567301000895,
+      "sum_rule_residual": 1.1102230246251565e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 1.4289952531645507,
+      "f_F_GHz": 4.249999999999991,
+      "f_R_GHz": 4.301974466000009,
+      "g_GHz": 0.1500000000000151,
+      "g_MHz": 150.0000000000151
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 1.1102230246251565e-16
+    }
+   },
+   "max_relative_error_over_gauges": 1.006602208993374e-13,
+   "observable_spread_across_gauges": {
+    "f_minus_GHz": 0.0,
+    "f_plus_GHz": 0.0,
+    "p_plus_F": 3.5406211715359554e-16
+   },
+   "truth": {
+    "E_C_FF_GHz": 1.4289952531645569,
+    "f_F_GHz": 4.250000000000001,
+    "f_R_GHz": 4.301974466,
+    "g_GHz": 0.15,
+    "g_MHz": 150.0
+   },
+   "why": "52 MHz detuning: the avoided crossing, where participation is order one"
+  },
+  {
+   "case": "far_detuned",
+   "design": {
+    "L_F_nH": 103.45665367517793,
+    "f_F_GHz": 1.0,
+    "f_R_GHz": 8.0,
+    "g_GHz": 0.15
+   },
+   "gauge_factors": [
+    1.0,
+    0.0001,
+    0.017,
+    53.0,
+    10000.0
+   ],
+   "gauges": {
+    "0.0001": {
+     "forward_residual": 5.421010862427522e-20,
+     "max_relative_error": 1.5787371410169705e-15,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 0.995476128338199,
+      "f_plus_GHz": 8.000564184975257,
+      "p_minus_F": 0.999856750926819,
+      "p_plus_F": 0.00014324907318093744,
+      "sum_rule_residual": 0.0
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.07911392405063301,
+      "f_F_GHz": 1.0000000000000009,
+      "f_R_GHz": 8.0,
+      "g_GHz": 0.15,
+      "g_MHz": 150.0
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 0.0
+    },
+    "0.017": {
+     "forward_residual": 0.0,
+     "max_relative_error": 1.5787371410169705e-15,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 0.995476128338199,
+      "f_plus_GHz": 8.000564184975257,
+      "p_minus_F": 0.999856750926819,
+      "p_plus_F": 0.0001432490731809375,
+      "sum_rule_residual": 0.0
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.07911392405063301,
+      "f_F_GHz": 1.0000000000000009,
+      "f_R_GHz": 8.0,
+      "g_GHz": 0.15,
+      "g_MHz": 150.0
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 0.0
+    },
+    "1": {
+     "forward_residual": 5.421010862427522e-20,
+     "max_relative_error": 1.5787371410169705e-15,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 0.995476128338199,
+      "f_plus_GHz": 8.000564184975257,
+      "p_minus_F": 0.999856750926819,
+      "p_plus_F": 0.00014324907318093744,
+      "sum_rule_residual": 0.0
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.07911392405063301,
+      "f_F_GHz": 1.0000000000000009,
+      "f_R_GHz": 8.0,
+      "g_GHz": 0.15,
+      "g_MHz": 150.0
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 0.0
+    },
+    "10000": {
+     "forward_residual": 0.0,
+     "max_relative_error": 1.5787371410169705e-15,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 0.995476128338199,
+      "f_plus_GHz": 8.000564184975257,
+      "p_minus_F": 0.999856750926819,
+      "p_plus_F": 0.0001432490731809375,
+      "sum_rule_residual": 0.0
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.07911392405063301,
+      "f_F_GHz": 1.0000000000000009,
+      "f_R_GHz": 8.0,
+      "g_GHz": 0.15,
+      "g_MHz": 150.0
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 0.0
+    },
+    "53": {
+     "forward_residual": 5.421010862427522e-20,
+     "max_relative_error": 1.5787371410169705e-15,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 0.995476128338199,
+      "f_plus_GHz": 8.000564184975257,
+      "p_minus_F": 0.999856750926819,
+      "p_plus_F": 0.00014324907318093744,
+      "sum_rule_residual": 0.0
+     },
+     "recovered": {
+      "E_C_FF_GHz": 0.07911392405063301,
+      "f_F_GHz": 1.0000000000000009,
+      "f_R_GHz": 8.0,
+      "g_GHz": 0.15,
+      "g_MHz": 150.0
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 0.0
+    }
+   },
+   "max_relative_error_over_gauges": 1.5787371410169705e-15,
+   "observable_spread_across_gauges": {
+    "f_minus_GHz": 0.0,
+    "f_plus_GHz": 0.0,
+    "p_plus_F": 3.7843252609252567e-16
+   },
+   "truth": {
+    "E_C_FF_GHz": 0.07911392405063289,
+    "f_F_GHz": 1.0,
+    "f_R_GHz": 8.0,
+    "g_GHz": 0.14999999999999994,
+    "g_MHz": 149.99999999999994
+   },
+   "why": "a factor eight in frequency: the dispersive extreme"
+  },
+  {
+   "case": "readout_below_fluxonium",
+   "design": {
+    "L_F_nH": 103.45665367517793,
+    "f_F_GHz": 4.302,
+    "f_R_GHz": 2.7539,
+    "g_GHz": 0.15
+   },
+   "gauge_factors": [
+    1.0,
+    0.0001,
+    0.017,
+    53.0,
+    10000.0
+   ],
+   "gauges": {
+    "0.0001": {
+     "forward_residual": 5.562217353372034e-14,
+     "max_relative_error": 1.686724833850396e-11,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.750648875003977,
+      "f_plus_GHz": 4.304079457496034,
+      "p_minus_F": 0.0016329889804336379,
+      "p_plus_F": 0.9983670110195667,
+      "sum_rule_residual": 4.440892098500626e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 1.4641775316455454,
+      "f_F_GHz": 4.301999999999965,
+      "f_R_GHz": 2.7539000000000544,
+      "g_GHz": 0.15000000000253008,
+      "g_MHz": 150.00000000253007
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 4.440892098500626e-16
+    },
+    "0.017": {
+     "forward_residual": 5.562217353372034e-14,
+     "max_relative_error": 1.686724833850396e-11,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.750648875003977,
+      "f_plus_GHz": 4.304079457496034,
+      "p_minus_F": 0.0016329889804336374,
+      "p_plus_F": 0.9983670110195667,
+      "sum_rule_residual": 4.440892098500626e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 1.4641775316455454,
+      "f_F_GHz": 4.301999999999965,
+      "f_R_GHz": 2.7539000000000544,
+      "g_GHz": 0.15000000000253008,
+      "g_MHz": 150.00000000253007
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 4.440892098500626e-16
+    },
+    "1": {
+     "forward_residual": 7.622322911737811e-13,
+     "max_relative_error": 2.336292270208999e-10,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.7506488750039773,
+      "f_plus_GHz": 4.304079457496034,
+      "p_minus_F": 0.0016329889804336385,
+      "p_plus_F": 0.9983670110195662,
+      "sum_rule_residual": 2.220446049250313e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 1.4641775316452383,
+      "f_F_GHz": 4.301999999999514,
+      "f_R_GHz": 2.7539000000007596,
+      "g_GHz": 0.15000000003504438,
+      "g_MHz": 150.00000003504437
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 2.220446049250313e-16
+    },
+    "10000": {
+     "forward_residual": 7.622318574929121e-13,
+     "max_relative_error": 2.336292270208999e-10,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.7506488750039773,
+      "f_plus_GHz": 4.304079457496034,
+      "p_minus_F": 0.001632988980433639,
+      "p_plus_F": 0.9983670110195662,
+      "sum_rule_residual": 2.220446049250313e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 1.4641775316452383,
+      "f_F_GHz": 4.301999999999514,
+      "f_R_GHz": 2.7539000000007596,
+      "g_GHz": 0.15000000003504438,
+      "g_MHz": 150.00000003504437
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 2.220446049250313e-16
+    },
+    "53": {
+     "forward_residual": 7.622322911737811e-13,
+     "max_relative_error": 2.336292270208999e-10,
+     "observed": {
+      "L_F_H": 1.0345665367517794e-07,
+      "f_minus_GHz": 2.7506488750039773,
+      "f_plus_GHz": 4.304079457496034,
+      "p_minus_F": 0.0016329889804336385,
+      "p_plus_F": 0.9983670110195662,
+      "sum_rule_residual": 2.220446049250313e-16
+     },
+     "recovered": {
+      "E_C_FF_GHz": 1.4641775316452383,
+      "f_F_GHz": 4.301999999999514,
+      "f_R_GHz": 2.7539000000007596,
+      "g_GHz": 0.15000000003504438,
+      "g_MHz": 150.00000003504437
+     },
+     "roots_considered": 2,
+     "roots_rejected": 1,
+     "sum_rule_residual": 2.220446049250313e-16
+    }
+   },
+   "max_relative_error_over_gauges": 2.336292270208999e-10,
+   "observable_spread_across_gauges": {
+    "f_minus_GHz": 1.614488908001464e-16,
+    "f_plus_GHz": 0.0,
+    "p_plus_F": 5.560194860061328e-16
+   },
+   "truth": {
+    "E_C_FF_GHz": 1.4641775316455692,
+    "f_F_GHz": 4.302,
+    "f_R_GHz": 2.7538999999999993,
+    "g_GHz": 0.15,
+    "g_MHz": 150.0
+   },
+   "why": "mode ordering reversed, so the inversion cannot assume which mode is which"
+  }
+ ],
+ "schema": "qmhp-cem.route-a-synthetic-demo/0.1.0",
+ "started_utc": "2026-09-15T23:10:55.797120+00:00",
+ "statement": "Synthetic software demonstration of the Route A inversion. Every circuit here is written down with known parameters; no Palace solve, no EM model and no Route B quantity is involved. It demonstrates that the inversion recovers the gauge-invariant triple it claims to recover, and measures how solver error propagates into the coupling. It is not evidence about any candidate.",
+ "sum_rules": [
+  {
+   "case": "s1_design_point",
+   "independent_data": 3,
+   "note": "p_minus_F = 1 - p_plus_F holds to machine precision, so Route A supplies three independent numbers (f_plus, f_minus, p_plus_F) for three physical unknowns",
+   "p_minus_F": 0.9974559388021997,
+   "p_plus_F": 0.002544061197800465,
+   "residual": 2.220446049250313e-16,
+   "sum_over_modes_of_p_F": 1.0000000000000002
+  },
+  {
+   "case": "strong_coupling",
+   "independent_data": 3,
+   "note": "p_minus_F = 1 - p_plus_F holds to machine precision, so Route A supplies three independent numbers (f_plus, f_minus, p_plus_F) for three physical unknowns",
+   "p_minus_F": 0.9634258506734963,
+   "p_plus_F": 0.03657414932650386,
+   "residual": 2.220446049250313e-16,
+   "sum_over_modes_of_p_F": 1.0000000000000002
+  },
+  {
+   "case": "weak_coupling",
+   "independent_data": 3,
+   "note": "p_minus_F = 1 - p_plus_F holds to machine precision, so Route A supplies three independent numbers (f_plus, f_minus, p_plus_F) for three physical unknowns",
+   "p_minus_F": 0.9999971515682197,
+   "p_plus_F": 2.848431780488647e-06,
+   "residual": 2.220446049250313e-16,
+   "sum_over_modes_of_p_F": 1.0000000000000002
+  },
+  {
+   "case": "near_degenerate",
+   "independent_data": 3,
+   "note": "p_minus_F = 1 - p_plus_F holds to machine precision, so Route A supplies three independent numbers (f_plus, f_minus, p_plus_F) for three physical unknowns",
+   "p_minus_F": 0.6864326989991049,
+   "p_plus_F": 0.313567301000895,
+   "residual": 1.1102230246251565e-16,
+   "sum_over_modes_of_p_F": 0.9999999999999999
+  },
+  {
+   "case": "far_detuned",
+   "independent_data": 3,
+   "note": "p_minus_F = 1 - p_plus_F holds to machine precision, so Route A supplies three independent numbers (f_plus, f_minus, p_plus_F) for three physical unknowns",
+   "p_minus_F": 0.999856750926819,
+   "p_plus_F": 0.00014324907318093744,
+   "residual": 0.0,
+   "sum_over_modes_of_p_F": 1.0
+  },
+  {
+   "case": "readout_below_fluxonium",
+   "independent_data": 3,
+   "note": "p_minus_F = 1 - p_plus_F holds to machine precision, so Route A supplies three independent numbers (f_plus, f_minus, p_plus_F) for three physical unknowns",
+   "p_minus_F": 0.0016329889804336385,
+   "p_plus_F": 0.9983670110195662,
+   "residual": 2.220446049250313e-16,
+   "sum_over_modes_of_p_F": 0.9999999999999998
+  }
+ ],
+ "worst_recovery_relative_error": 2.336292270208999e-10
+}

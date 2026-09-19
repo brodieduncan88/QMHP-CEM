@@ -1,0 +1,107 @@
+{
+ "Problem": {
+  "Type": "Eigenmode",
+  "Verbose": 2,
+  "Output": "postpro"
+ },
+ "Model": {
+  "Mesh": "coupled_chip_cell_L2.msh",
+  "L0": 0.001,
+  "Refinement": {
+   "UniformLevels": 0,
+   "Boxes": [
+    {
+     "Levels": 1,
+     "BoundingBoxMin": [
+      -0.62,
+      -0.125,
+      -0.01
+     ],
+     "BoundingBoxMax": [
+      -0.58,
+      -0.065,
+      0.01
+     ]
+    }
+   ]
+  }
+ },
+ "Domains": {
+  "Materials": [
+   {
+    "Attributes": [
+     1
+    ],
+    "Permeability": 1.0,
+    "Permittivity": 1.0,
+    "LossTan": 0.0
+   },
+   {
+    "Attributes": [
+     3
+    ],
+    "Permeability": 1.0,
+    "Permittivity": 11.45,
+    "LossTan": 0.0
+   }
+  ]
+ },
+ "Boundaries": {
+  "PEC": {
+   "Attributes": [
+    2,
+    4
+   ]
+  },
+  "LumpedPort": [
+   {
+    "Index": 1,
+    "Attributes": [
+     10
+    ],
+    "Direction": "+Y",
+    "L": 1.0345665367517793e-07
+   }
+  ],
+  "Postprocessing": {
+   "Dielectric": [
+    {
+     "Index": 1,
+     "Attributes": [
+      10
+     ],
+     "Type": "Default",
+     "Thickness": 1.0,
+     "Permittivity": 1.0,
+     "Side": "SmallerRefractiveIndex"
+    },
+    {
+     "Index": 2,
+     "Attributes": [
+      10
+     ],
+     "Type": "MA",
+     "Thickness": 1.0,
+     "Permittivity": 1.0,
+     "Side": "SmallerRefractiveIndex"
+    }
+   ]
+  }
+ },
+ "Solver": {
+  "Order": 1,
+  "Device": "CPU",
+  "Eigenmode": {
+   "N": 6,
+   "Tol": 1e-06,
+   "Target": 0.5,
+   "Save": 6
+  },
+  "Linear": {
+   "Type": "Default",
+   "KSPType": "GMRES",
+   "Tol": 1e-08,
+   "MaxIts": 400
+  }
+ }
+}
