@@ -656,7 +656,7 @@ def test_nothing_in_this_preparation_can_launch_palace():
     # every subprocess this test file runs is one of the declared OFFLINE builders
     import ast
 
-    offline = {"prepare.py", "correspondence.py", "verify_external.py"}
+    offline = {"prepare.py", "correspondence.py", "verify_external.py", "normalisation.py"}
     tree = ast.parse(Path(__file__).read_text())
     runs = [n for n in ast.walk(tree)
             if isinstance(n, ast.Call) and ast.unparse(n.func) == "subprocess.run"]
@@ -890,3 +890,89 @@ def test_the_verification_script_reproduces_its_json_and_touches_no_network():
     assert proc.returncode == 0, proc.stderr
     assert (EXT / "verification.json").read_text() == before
     assert json.loads(before)["all_checks_pass"] is True
+
+
+# --- N: bounded, not measured, and not the binding constraint on E_C --------------------
+
+NORM = REPO_ROOT / "experiments" / "normalisation-N"
+NORM_DOC = REPO_ROOT / "docs" / "coupled-candidate" / "normalisation.md"
+
+
+@pytest.fixture(scope="module")
+def normalisation():
+    return json.loads((NORM / "normalisation.json").read_text())
+
+
+def test_N_is_bounded_two_sidedly_and_the_window_is_delta_saved(normalisation):
+    spectral = json.loads((REPO_ROOT / "experiments" / "fem-spectral-mapping"
+                           / "spectral_compatibility.json").read_text())
+    for record in ("N2R", "N1R"):
+        b = normalisation["records"][record]["bound_on_N"]
+        rec = spectral["records"][record]
+        assert b["lower"] == pytest.approx(rec["sum_abs_p_over_saved_modes"], rel=1e-15)
+        assert b["upper"] == 1.0
+        # the bound is worth nothing for splitting delta_saved, because it IS delta_saved
+        assert b["width_equals_delta_saved"] is True
+        assert b["width"] == pytest.approx(rec["delta_saved"], rel=1e-12)
+        assert "not MEASURED" in b["status"]
+    assert normalisation["records"]["N2R"]["bound_on_N"]["lower"] == pytest.approx(
+        0.999254583556, abs=1e-12)
+
+
+def test_N_is_the_smallest_contribution_to_a_over_N(normalisation):
+    c = normalisation["records"]["N2R"]["a_over_N_budget"]["contributions"]
+    own = c["the_N_normalisation_itself"]["relative"]
+    refine = c["refinement_N1R_to_N2R"]["relative"]
+    far = [v["relative"] for k, v in c.items() if k.startswith("placing")]
+    assert own < refine and all(own < f for f in far), (own, refine, far)
+    assert refine / own > 20
+    assert min(far) / own > 50
+    assert "entire admissible range of N" in c["the_N_normalisation_itself"]["what_it_spans"]
+
+
+def test_the_answer_is_no_and_the_reasoning_is_recorded(normalisation):
+    assert normalisation["answer"].startswith("NO")
+    why = normalisation["why"]
+    assert "smallest of the three" in why["1_N_is_the_smallest_term"]
+    assert "decides whether the dominant term exists" in why["2_but_N_is_still_the_right_lever"]
+    assert "untouched by any measurement of N" in why["3_even_then_E_C_is_not_unblocked"]
+    norm = _norm(NORM_DOC.read_text())
+    assert "not the binding constraint on `E_C`" in norm
+    assert "omitted_weight = δ_saved − (1 − N)" in norm
+    # E_C is not promoted anywhere by this note
+    assert "UNAVAILABLE" in norm
+    spectral = json.loads((REPO_ROOT / "experiments" / "fem-spectral-mapping"
+                           / "spectral_compatibility.json").read_text())
+    assert spectral["E_C_F1F1"]["status"] == "UNAVAILABLE", "the E_C record is untouched"
+
+
+def test_the_measurement_route_is_named_but_not_attempted(normalisation):
+    w = normalisation["what_measuring_N_would_take"]
+    assert "STATIC quantity" in w["it_is_not_an_eigenvalue"]
+    assert "MAGNETOSTATIC" in w["pinned_palace_cannot_do_it_directly"]
+    assert "omits K_port" in w["pinned_palace_cannot_do_it_directly"]
+    assert "DRIVEN" in w["the_plausible_supported_route"]
+    assert "NOT proposed as ready" in w["the_plausible_supported_route"]
+    assert "nothing was launched" in w["not_attempted_here"]
+    assert "no approval exists" in w["not_attempted_here"]
+    # and the approval on disk is still PO1's spent eigenmode approval - nothing re-armed
+    approval = json.loads(APPROVAL.read_text())
+    assert approval.get("port_control") == "PO1-port-removed"
+    assert approval["palace_refinement"]["id"] == "PO1"
+    changed = subprocess.run(["git", "diff", "--name-only", "HEAD"], capture_output=True,
+                             text=True, cwd=REPO_ROOT).stdout.split()
+    assert ".github/ladder-approval.json" not in changed
+
+
+def test_the_normalisation_script_reproduces_its_json_and_touches_no_network():
+    src = (NORM / "normalisation.py").read_text()
+    # network-specific tokens only: a bare "curl" would match K_curl, which this
+    # script legitimately names throughout.
+    for forbidden in ("requests", "urllib", "socket", "http://", "https://",
+                      "subprocess", "docker", "podman"):
+        assert forbidden not in src, forbidden
+    before = (NORM / "normalisation.json").read_text()
+    proc = subprocess.run([sys.executable, str(NORM / "normalisation.py")],
+                          capture_output=True, text=True, cwd=REPO_ROOT)
+    assert proc.returncode == 0, proc.stderr
+    assert (NORM / "normalisation.json").read_text() == before
