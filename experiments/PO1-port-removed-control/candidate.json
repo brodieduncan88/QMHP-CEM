@@ -1,0 +1,126 @@
+{
+ "schema": "qmhp-cem.nested-refinement-candidate/0.2.0",
+ "id": "PO1",
+ "status": "PREPARED, NOT APPROVED, NOT LAUNCHED",
+ "purpose": "solve N2R's discrete problem with the F1 lumped inductive port INACTIVE, so that the eigenvalues are those of the pencil (K - K_port, M): the F-open environment spectrum. It exists to replace an unbounded quantity with a measured one. fem-spectral-mapping.md section 4 records that the difference between the rank-one removal the spectral construction performs and the removal of the assembled port operator is UNBOUNDED BY THE CURRENT EVIDENCE; PO1 measures that environment directly instead of bounding it.",
+ "not_this": "PO1 is NOT a refinement level, NOT a solver study, NOT an extraction and NOT a target amendment. It changes no mesh, no refinement prescription, no order, no tolerance, no eigenvalue target or count, no DOF budget and no time cap. It produces no coupling value and no Route A result.",
+ "mechanism": "one boolean in the existing LumpedPort block: Active = false. Palace assembles the port's boundary mass term 1/L_s into the STIFFNESS only for active ports, so this is exactly K -> K - K_port and nothing else.",
+ "pinned": {
+  "baseline_record": "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z",
+  "baseline_solved_config_sha256": "79304b5f8bd7c67741e995ec7ae7880b41dfcee23d6c3c12984f5baba8c1f33f",
+  "baseline_solved_config_is": "the sha256 of results/<baseline_record>/L2/solver/config.json, the config N2R actually SOLVED",
+  "baseline_mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+  "original_L2_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+  "po1_candidate_config_sha256": "2826e78c026097aeb90dc1f50ec2b08e2afefce7ecbb43270d34b7667e0d1728",
+  "palace_commit": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+  "mfem_commit": "c444b17c973cc301590a6ac186fb33587b5881e6",
+  "config_delta_is": "config.candidate.json here IS the config N2R solved, byte-for-byte, with exactly two additions: Boundaries.LumpedPort[0].Active = false, and a Domains.Postprocessing.Probe block of three declared points. config.delta.txt is the literal unified diff and prepare.py asserts the flattened leaf-path delta exhaustively before writing."
+ },
+ "the_operator_change": {
+  "key": "Boundaries.LumpedPort[0].Active",
+  "from": "unset, i.e. Palace's default true (configfile.cpp:937 reads Active with the existing value as default)",
+  "to": false,
+  "is_exactly": "K -> K - K_port, with K_port(E,E) = INT_Gamma (1/L_s) |E_t|^2 dS, L_s = L (w/l) n_elem",
+  "source": {
+   "assembly_guard": "palace/models/lumpedportoperator.cpp:571-591 AddStiffnessBdrCoefficients returns early at :577 for an inactive port, so the 1/L_s boundary mass term is never added to the stiffness",
+   "other_operator_paths_inert_here": "AddDampingBdrCoefficients (:593) and AddMassBdrCoefficients (:615) skip inactive ports too, but both are already inert for this port because R = C = 0",
+   "attribute_lists": "GetAttrList (:494), GetRsAttrList (:511), GetLsAttrList (:531) and GetCsAttrList (:551) all skip inactive ports; these are the operator-side marker lists",
+   "schema": "docs/src/config/boundaries.md:259 lists Active for a lumped port; configfile.cpp:937 parses it. The prose there names only the damping condition, which is incomplete: the source shows all three Add*BdrCoefficients gate on it. The source is taken as decisive and the prose is not."
+  },
+  "diagnostics_that_SURVIVE_the_change": {
+   "port-V.csv_and_port-I.csv": "PostOperator::UpdatePorts (postoperator.cpp:430) loops over every port with no active check, so the width-averaged line voltage and the derived branch current are still written",
+   "port-EPR.csv": "EigenSolver::PostprocessEPR loops over every port with |L| > 0 with no active check, and GetInductorParticipation (postoperator.cpp:644) has none either, so the rank-one participation is still written",
+   "E_ind_in_domain-E.csv": "GetLumpedInductorEnergy (postoperator.cpp:493) likewise has no active check",
+   "the_port_face_interface_probes": "Boundaries.Postprocessing.Dielectric indices 1 and 2 on attribute 10 are independent of the LumpedPort block and are carried over unchanged from N2R",
+   "what_that_means": "every F-site functional N2R reported is still reported, now as a NON-LOADING diagnostic of a different operator's eigenvectors. They are comparable in kind with N2R's, never in value."
+  },
+  "what_it_does_not_change": [
+   "the mesh file, which is N2R's and hash-gated before launch",
+   "Model.Refinement: UniformLevels 0 and the same single box at Levels 2",
+   "Solver.Order 1 and Solver.Linear.MGMaxLevels 1, with Type, KSPType, Tol 1e-08 and MaxIts 400 unchanged",
+   "Solver.Eigenmode N 6, Tol 1e-06, Target 0.5 GHz and Save 6",
+   "the materials, the PEC set, the port face, its attributes, its Direction and its declared L",
+   "the 250 000-DOF rule and the 2 700 s cap"
+  ]
+ },
+ "the_postprocessing_addition": {
+  "key": "Domains.Postprocessing.Probe",
+  "why": "numerical-plan.md section 2 classifies a mode from probe polarisation fractions at three declared points. The solved N1R and N2R configs carry no probe block and their records carry no probe-E.csv, so that declared classification has never been executable. Without it PO1 could only identify its readout mode by frequency proximity, which this preparation is required not to do.",
+  "cannot_change_an_eigenvalue": "Domains.Postprocessing.Probe is read by the domain postprocessor and adds no bilinear form; it is a GSLIB point evaluation of the solved field. The pinned image is built with GSLIB (extraction-routes.md section 5).",
+  "points_mm": {
+   "1": {"centre": [-0.6, 0.0, 0.01], "over": "F1.island", "from": "island centre (-0.600, 0.000), 0.010 mm above the chip surface"},
+   "2": {"centre": [-0.455, 0.0, 0.01], "over": "R1.coupling_pad, the resonator's open end", "from": "pad centre (-0.455, 0.000), same height"},
+   "3": {"centre": [0.5865, 0.5, 0.01], "over": "R1.cpw at mid-length", "from": "the point at half of the 6.983 mm centre line, computed from solvers.palace.coupled_geometry; it lies inside the CPW conductor rectangle (0.370, 0.475)-(0.670, 0.525)"}
+  },
+  "height_choice": "0.010 mm above z = 0 for all three, fixed before the run and identical across points so that the three values are comparable. It is inside the vacuum domain everywhere; the L2 sizes are h_gap 0.010, h_near 0.0067, h_far 0.2222 mm.",
+  "parser_guard": "a probe outside the mesh yields 0.0 with a Palace log warning; the record's parser checks for that rather than accepting a zero silently."
+ },
+ "null_space": {
+  "extra_directions_relative_to_N2R": 1,
+  "which": "the floating-potential gradient of the F1 island: the field grad(psi) with psi constant on the island, constant on the grounded conductor group, and varying in between.",
+  "why_it_is_null_only_now": "that field is curl-free and has zero tangential trace on every PEC sheet, so it lies in ker(K_curl) always. With the port ACTIVE it is not in ker(K), because its tangential trace on the port face Gamma is non-zero and K_port gives it energy - that is precisely what makes it N2R's mode 1 at 1.526 GHz, whose magnetic energy is 0.18 % of its electric energy. Removing K_port removes its only restoring force.",
+  "why_exactly_one": "one direction per conductor group galvanically isolated from ground once the lumped inductances are gone. Here that is the island alone: R1.coupling_pad, R1.cpw and the ground plane are a single group through the CPW short bar, so they contribute none.",
+  "solver_handling_is_NOT_assumed": "eigensolver.cpp:164-173 builds a DivFreeSolver when Solver.Linear.DivFreeMaxIts > 0 (the default) and installs it as the eigensolver's projector; :191-193 applies it to the starting vector. Whether the island's floating mode lies in that projector's range depends on whether the auxiliary H1 space leaves the island's potential free or constrains it with the other PEC boundaries (space_op.GetAuxBdrTDofLists). That was NOT settled from the pinned source in this preparation, so both outcomes are pre-declared rather than one being assumed:",
+  "case_A_projected_out": "no mode near zero frequency is returned; the lowest returned mode is a field resonance. Expected slot cost: none.",
+  "case_B_returned": "one mode at f ~ 0 is returned and consumes one of the six requested slots. With shift-invert at Target 0.5 GHz it would be found first. Expected slot cost: one, leaving five.",
+  "either_is_recorded": "whichever occurs is reported as the observation. A near-zero mode is never discarded, renamed or filtered out of the record, and the target is not retuned mid-run to avoid it.",
+  "more_than_one_near_zero_mode_would_falsify_this_accounting": "the count above is a prediction: exactly one isolated conductor group means at most one extra null direction. Two or more near-zero modes means this accounting is wrong and the control is reported as such rather than reinterpreted."
+ },
+ "the_falsifiable_check_that_the_operator_really_changed": {
+  "identity": "with K = K_curl alone, every converged eigenpair with lambda > 0 satisfies E_mag = E_elec + E_cap exactly, because E^T K_curl E = lambda E^T M E is the whole Rayleigh identity once the port term is gone",
+  "pre_declared": "E_mag / (E_elec + E_cap) = 1 to solver tolerance for every field-resonant mode of PO1",
+  "contrast_with_N2R": "N2R's two field-resonant modes gave 0.9982 and 0.9991 for that ratio, the deficit being the port energy; its five port-operator-localised modes gave ~1e-5",
+  "if_it_fails": "the port term was not removed, or the mode is not converged. Either way the control is void and is reported void; the check is not relaxed.",
+  "E_ind_must_not_be_used_as_an_equipartition_test_here": "E_ind is still written, from the same rank-one width-averaged voltage, but it now corresponds to no term in the operator. The N2R-style ratio (E_mag + E_ind)/(E_elec + E_cap) is meaningless for PO1 and must not be computed as an equipartition test for it."
+ },
+ "mode_identification": {
+  "principle": "field evidence first; frequency is never a selector. The declared rule of numerical-plan.md section 2 is applied with its probe input finally present.",
+  "declared_before_the_run": true,
+  "quantities": {
+   "probe_share_i": "s_i = |E(P_i)|^2 / sum_j |E(P_j)|^2 over the three declared points, from probe-E.csv, using the complex magnitude |E|^2 = sum_c (Re E_c^2 + Im E_c^2). This is an explicit reading of 'probe polarisation fractions', stated before the run; it is a reading of the declared rule, not a replacement for it.",
+   "resonator_share": "s_2 + s_3",
+   "island_share": "s_1",
+   "port_face_fraction": "p_port from surface-Q.csv through solvers/palace/port_diagnostic.py: the exact tangential-field integral over the F1 element site normalised by E_elec + E_cap. Independent of the probes and of the port's Active flag.",
+   "rank_one_port_weight": "|p| from port-EPR.csv, the non-loading rank-one diagnostic"
+  },
+  "classification": {
+   "readout_like": "resonator_share > 0.5 AND island_share < 0.5 AND port_face_fraction < 0.5",
+   "island_like": "island_share > 0.5 OR port_face_fraction >= 0.5",
+   "other": "anything else, reported as hidden"
+  },
+  "selection": "the readout-like mode of PO1 is the UNIQUE mode satisfying readout_like. If there is none, or more than one, the control is INCONCLUSIVE for mode identity and is recorded that way. No frequency tiebreak is applied, and no threshold is adjusted after seeing the values.",
+  "cross_check_not_a_selector": "the ratio of the two resonator probes, s_2/s_3, characterises the standing-wave profile of the quarter-wave mode and is reported alongside N2R's for the same points. It is reported as a consistency observation and is never used to choose a mode.",
+  "why_the_probes_do_not_settle_the_mapping": "probe classification is mode-IDENTITY evidence. It does not bear on the operator-mapping question of fem-spectral-mapping.md sections 3-5, which is what PO1's eigenvalues address."
+ },
+ "dof_and_resources": {
+  "expected_dof": 103411,
+  "why_a_prediction_not_an_estimate": "the mesh file, the refinement box and the order are N2R's, and N2R's probe read 103 411. The finite element space does not depend on a boundary condition's Active flag, so a different count means the mesh is not N2R's and the comparison is void.",
+  "budget": 250000,
+  "fraction_of_budget": 0.4136,
+  "enforcement": "the existing DOF probe, unchanged: it matches Palace's 'ND (p = 1): N' line for the finest space and refuses before the solve if the count exceeds the budget",
+  "cap_s": 2700,
+  "no_runtime_is_predicted": "N2R solved the same size in 159.0 s, but PO1's operator is not N2R's: K is softer by a positive semidefinite term and the null space is one direction larger, both of which can change GMRES and AMS behaviour in either direction. No runtime is predicted and none is implied by N2R's.",
+  "refusal_conditions_unchanged": [
+   "REFUSED-DOF-BUDGET if the probe reads more than 250 000 degrees of freedom; Palace's solve does not proceed",
+   "TIMEOUT if the run reaches the 2 700 s cap; the timeout is the result, recorded as such, with no second attempt under the approval and no change to the cap",
+   "RUN_FAILED if the container or the solver dies; likewise recorded as the outcome",
+   "the mesh hash gate refuses to launch on any mesh other than d8dc1a92...c14428",
+   "no threshold, tolerance, budget or cap is changed to rescue any of these"
+  ]
+ },
+ "comparison": {
+  "baseline": "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z",
+  "what_is_held_fixed": "mesh file and hash, refinement prescription, order, all solver tolerances, eigenvalue target and count, materials, PEC set, port face geometry and declared L",
+  "what_differs": "one operator term, K_port, and one postprocessing block that cannot affect an eigenvalue",
+  "not_a_refinement_step": "PO1 is at the same depth as N2R, so it is not a rung of the refinement sequence and must not enter the L1/L2/L3 fit or any convergence statement",
+  "the_question_it_answers": "whether the zeros of G_F computed from N2R's saved participations are the F-open environment frequencies. fem-spectral-mapping.md section 5 gives those zeros for N2R as 15.099644 GHz^2 (normalised removal, K - Q/N) and 15.099651 GHz^2 (declared removal, K - Q), i.e. 3.885826 and 3.885827 GHz. PO1's readout-like eigenfrequency is the measured F-open value to compare them against.",
+  "what_the_comparison_is_not": "it is a frequency comparison that tests the operator-removal premise. It is NOT an extraction: no residue, no coupling, no E_C and no triple is computed from PO1, and none is authorised by it.",
+  "if_they_agree": "the rank-one removal is an adequate stand-in for the assembled removal AT THIS DISCRETISATION, for this mode. That is a statement about one mesh, not a continuum result and not a bound.",
+  "if_they_disagree": "the size of the disagreement is the measured operator-mapping error at this discretisation, replacing the unbounded status. It is still one mesh and still not a bound."
+ },
+ "execution_gap": {
+  "not_implemented_here": "the ladder driver cannot yet produce this config. solvers/palace/coupled_config.build_coupled_config has no port-deactivation parameter, and the approval allow-list _SOLVER_LINEAR_OVERRIDE_KEYS admits only MGMaxLevels and MGUseMesh, both under Solver.Linear. A boundary-level override is outside it and is refused before launch, by design.",
+  "what_execution_would_need": "one new declared, validated driver option that sets Boundaries.LumpedPort[<index>].Active, with the same treatment the solver overrides already get: an explicit allow-list entry, a recorded applied/replaced/unchanged block, and a refusal for any key outside it.",
+  "deliberately_left_undone": "implementing it would create the execution path. This preparation is approval material, not an execution trigger. Nothing here touches .github/ladder-approval.json, the file whose commit on a palace/** branch starts a run."
+ }
+}
