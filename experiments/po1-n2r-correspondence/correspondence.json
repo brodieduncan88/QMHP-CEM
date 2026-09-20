@@ -1,0 +1,228 @@
+{
+ "label": "OFFLINE CORRESPONDENCE ATTEMPT - FIELD ARCHIVES UNREACHABLE, CORRESPONDENCE NOT ESTABLISHED",
+ "does_not_alter": "PO1's committed record and its pre-declared verdict INCONCLUSIVE FOR MODE IDENTITY stand exactly as recorded. Nothing here amends them.",
+ "artefacts": {
+  "PO1": {
+   "workflow_run": 35536625799,
+   "artifact_id": 10612713395,
+   "name": "order1-ladder-fields-35536625799-1",
+   "size_in_bytes": 114545095,
+   "digest": "sha256:a156768cbd0723c9988ce4617db1d1c07f29d5376d2cc5e7bf6ee25906ea8dc8",
+   "digest_source": "GitHub Actions artifacts API for this repository"
+  },
+  "N2R": {
+   "workflow_run": 35313973073,
+   "artifact_id": 10533683685,
+   "name": "order1-ladder-fields-35313973073-1",
+   "size_in_bytes": 113746865,
+   "digest": "sha256:1ca851c4da54210270d6834f378bd8e5cf96e4db047beb546ac69a5079eb8b0e",
+   "digest_source": "GitHub Actions artifacts API for this repository",
+   "independently_corroborated": "this digest equals the one supplied separately, before the API was queried, so the two agree on the same archive."
+  },
+  "download_status": "REFUSED BY EGRESS POLICY",
+  "mechanism": "the artifacts API returns HTTP 302 to *.blob.core.windows.net (productionresultssa16 for PO1, productionresultssa10 for N2R). The agent proxy answers 403 to the CONNECT for that host: connect_rejected, organisation policy. No attempt was made to work around it.",
+  "consequence": "steps 2-6 of the declared method - mesh-identity verification, the complex-E overlap matrix, the weighted inner product, the optimal phase and scale, and the weighted RMS difference - DID NOT RUN. No overlap number in this record is computed from fields, because no field was read."
+ },
+ "externally_supplied_numbers": {
+  "status": "NOT REPRODUCED - recorded as unverified third-party input, not adopted as evidence",
+  "claim": {
+   "PO1_m1_to_N2R_m2_overlap": 0.999927,
+   "optimal_phase_weighted_RMS_difference": 0.01208,
+   "PO1_m1_overlaps_with_N2R_m1_m3_m4_m5_m6": [
+    0.012,
+    6e-06,
+    1.1e-05,
+    5.5e-05,
+    0.000287
+   ]
+  },
+  "why_not_adopted": "the task required independent reproduction. The inputs it needs are unreachable here, so nothing in this record confirms or contradicts these values.",
+  "one_internal_consistency_remark": "the quoted overlap with N2R m1, 0.0120, equals the quoted RMS difference to three figures. That is what a near-unit overlap with m2 plus a small residue along m1 would look like, and it is consistent with removing a term supported at the F1 site. It is a remark about the supplied numbers' internal structure, NOT a verification of them."
+ },
+ "normalisation": {
+  "each_run_uses_one_E_elec": {
+   "PO1": true,
+   "N2R": true
+  },
+  "the_two_runs_agree": true,
+  "E_elec_J": 0.006671281904,
+  "why_it_matters": "eigenvectors are scaled to unit electric energy, so a linear or quadratic functional of E has the same normalisation in both runs and may be compared directly. Without this the scalars would not be commensurable at all."
+ },
+ "what_the_committed_records_do_establish": {
+  "method": "compare PO1 m1's frequency-free port-face functionals (p_D, p_MA, |V|) against every N2R mode's, and EXCLUDE any mode differing by a factor of 10.0 or more in any of them.",
+  "uses_no_frequency": true,
+  "exclusion_factor": 10.0,
+  "rows": [
+   {
+    "n2r_mode": 1,
+    "signature": {
+     "p_D": 0.04421922457,
+     "p_MA": 0.002186990275,
+     "p_tangential": 0.042032234295,
+     "abs_V": 11.255115362713745
+    },
+    "ratio_to_PO1_m1": {
+     "p_D": 224.35948359021995,
+     "p_MA": 270.5246742005867,
+     "abs_V": 15.118192631771334
+    },
+    "worst_factor": 270.5246742005867,
+    "excluded": true
+   },
+   {
+    "n2r_mode": 2,
+    "signature": {
+     "p_D": 0.0002706117641,
+     "p_MA": 1.413424454e-05,
+     "p_tangential": 0.00025647751955999997,
+     "abs_V": 0.8791424451851829
+    },
+    "ratio_to_PO1_m1": {
+     "p_D": 1.3730298583323715,
+     "p_MA": 1.7483671248857846,
+     "abs_V": 1.180889258683834
+    },
+    "worst_factor": 1.7483671248857846,
+    "excluded": false
+   },
+   {
+    "n2r_mode": 3,
+    "signature": {
+     "p_D": 2.058197895,
+     "p_MA": 0.1718508609,
+     "p_tangential": 1.8863470341000002,
+     "abs_V": 0.03104996345389631
+    },
+    "ratio_to_PO1_m1": {
+     "p_D": 10442.883640297128,
+     "p_MA": 21257.478228184096,
+     "abs_V": 0.04170719833406325
+    },
+    "worst_factor": 21257.478228184096,
+    "excluded": true
+   },
+   {
+    "n2r_mode": 4,
+    "signature": {
+     "p_D": 2.165262279,
+     "p_MA": 0.1953089698,
+     "p_tangential": 1.9699533091999997,
+     "abs_V": 0.013216642805136554
+    },
+    "ratio_to_PO1_m1": {
+     "p_D": 10986.10686817439,
+     "p_MA": 24159.181697137283,
+     "abs_V": 0.017752972353825083
+    },
+    "worst_factor": 24159.181697137283,
+    "excluded": true
+   },
+   {
+    "n2r_mode": 5,
+    "signature": {
+     "p_D": 9.982777206e-05,
+     "p_MA": 1.147358192e-05,
+     "p_tangential": 8.835419014e-05,
+     "abs_V": 0.4518738247394875
+    },
+    "ratio_to_PO1_m1": {
+     "p_D": 0.5065061091672551,
+     "p_MA": 1.419250486068916,
+     "abs_V": 0.6069698361598748
+    },
+    "worst_factor": 1.9743098491824638,
+    "excluded": false
+   },
+   {
+    "n2r_mode": 6,
+    "signature": {
+     "p_D": 2.630539919,
+     "p_MA": 0.4438337533,
+     "p_tangential": 2.1867061657,
+     "abs_V": 0.14552698396094157
+    },
+    "ratio_to_PO1_m1": {
+     "p_D": 13346.832368261472,
+     "p_MA": 54901.0129963683,
+     "abs_V": 0.19547600408706428
+    },
+    "worst_factor": 54901.0129963683,
+    "excluded": true
+   },
+   {
+    "n2r_mode": 7,
+    "signature": {
+     "p_D": 2.571938861,
+     "p_MA": 0.2967413303,
+     "p_tangential": 2.2751975307,
+     "abs_V": 0.0834685589829019
+    },
+    "ratio_to_PO1_m1": {
+     "p_D": 13049.502344079176,
+     "p_MA": 36706.08535342307,
+     "abs_V": 0.11211735399712693
+    },
+    "worst_factor": 36706.08535342307,
+    "excluded": true
+   },
+   {
+    "n2r_mode": 8,
+    "signature": {
+     "p_D": 0.0003285824146,
+     "p_MA": 2.552101288e-05,
+     "p_tangential": 0.00030306140172,
+     "abs_V": 0.6761067152442761
+    },
+    "ratio_to_PO1_m1": {
+     "p_D": 1.6671613211982552,
+     "p_MA": 3.1568790101871747,
+     "abs_V": 0.9081658633690455
+    },
+    "worst_factor": 3.1568790101871747,
+    "excluded": false
+   },
+   {
+    "n2r_mode": 9,
+    "signature": {
+     "p_D": 2.717038707,
+     "p_MA": 0.2088924611,
+     "p_tangential": 2.5081462459,
+     "abs_V": 0.06906764520194993
+    },
+    "ratio_to_PO1_m1": {
+     "p_D": 13785.709883540794,
+     "p_MA": 25839.42216297063,
+     "abs_V": 0.09277363502155629
+    },
+    "worst_factor": 25839.42216297063,
+    "excluded": true
+   }
+  ],
+  "surviving_candidates": [
+   2,
+   5,
+   8
+  ],
+  "verdict": "6 of 9 N2R modes are excluded. Modes [2, 5, 8] survive and CANNOT be separated by this evidence."
+ },
+ "why_this_cannot_confirm_a_correspondence": "three scalars against roughly 1e5 degrees of freedom, and all three are supported on the F1 port face - precisely where the operator was changed. PO1 m1 and N2R m2 differ by about 37 % in p_D, which is entirely compatible with agreeing to ~1e-2 in a global norm. These functionals are therefore the WORST available proxy for a global overlap: they can rule a mode out, and they can never rule one in.",
+ "frequency_comparison": {
+  "status": "CONDITIONAL - it presumes the correspondence this record did NOT establish",
+  "PO1_m1_measured_GHz": 3.885827871,
+  "predictions": {
+   "conditional_K_minus_Q_GHz2": {
+    "predicted_GHz": 3.885826970414406,
+    "signed_difference_Hz": 900.5855940991125,
+    "absolute_difference_Hz": 900.5855940991125,
+    "relative_difference": 2.317615766823328e-07
+   },
+   "conditional_K_minus_Q_over_N_GHz2": {
+    "predicted_GHz": 3.885825996104303,
+    "signed_difference_Hz": 1874.895696918344,
+    "absolute_difference_Hz": 1874.895696918344,
+    "relative_difference": 4.82495817920995e-07
+   }
+  },
+  "note_on_the_surviving_set": "the three surviving N2R candidates are its field-resonant modes. Choosing among them by frequency is exactly the tiebreak the approval forbids, so this comparison is reported as conditional and is not used to select anything."
+ }
+}

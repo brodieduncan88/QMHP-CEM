@@ -652,15 +652,18 @@ def test_nothing_in_this_preparation_can_launch_palace():
     text = (REC / "prepare.py").read_text()
     for token in forbidden:
         assert token not in text.replace("def main()", "").replace("sys.exit(main())", ""), token
-    # this test file itself runs exactly ONE subprocess, the offline candidate builder
+    # every subprocess this test file runs is one of the declared OFFLINE builders
     import ast
 
+    offline = {"prepare.py", "correspondence.py"}
     tree = ast.parse(Path(__file__).read_text())
     runs = [n for n in ast.walk(tree)
             if isinstance(n, ast.Call) and ast.unparse(n.func) == "subprocess.run"]
     argv = [ast.unparse(n.args[0]) for n in runs]
-    assert len(argv) == 1, argv
-    assert "prepare.py" in argv[0]
+    assert argv, "the builders must actually be exercised"
+    for a in argv:
+        assert "sys.executable" in a, a
+        assert any(name in a for name in offline), a
     # No PO1 CANDIDATE may ever be written under results/. A PO1 RECORD may
     # exist once the approved run has committed one - that is evidence, not a
     # candidate - so it is checked for shape rather than forbidden outright.
@@ -680,3 +683,88 @@ def test_the_single_approval_is_stated(candidate):
     norm = _norm(DOC.read_text())
     assert "The single approval needed" in norm
     assert "no merge of PR #7" in norm
+
+
+# --- the offline correspondence attempt: a negative result, recorded as one -----------
+
+CORR = REPO_ROOT / "experiments" / "po1-n2r-correspondence"
+CORR_DOC = REPO_ROOT / "docs" / "coupled-candidate" / "po1-n2r-field-correspondence.md"
+
+
+@pytest.fixture(scope="module")
+def correspondence():
+    return json.loads((CORR / "correspondence.json").read_text())
+
+
+def test_the_correspondence_is_recorded_as_not_established(correspondence):
+    assert "CORRESPONDENCE NOT ESTABLISHED" in correspondence["label"]
+    assert "stand exactly as recorded" in correspondence["does_not_alter"]
+    norm = _norm(CORR_DOC.read_text())
+    assert "CORRESPONDENCE NOT ESTABLISHED" in norm
+    # PO1's own verdict is untouched by this note
+    assert "INCONCLUSIVE FOR MODE IDENTITY" in norm
+    assert "no overlap number in this note is computed from a field" in norm
+
+
+def test_the_blocked_download_is_stated_and_not_worked_around(correspondence):
+    a = correspondence["artefacts"]
+    assert a["download_status"] == "REFUSED BY EGRESS POLICY"
+    assert "blob.core.windows.net" in a["mechanism"]
+    assert "No attempt was made to work around it." in a["mechanism"]
+    assert "DID NOT RUN" in a["consequence"]
+    # the digests are the repository's own, and N2R's was corroborated independently
+    assert a["PO1"]["digest"].startswith("sha256:a156768c")
+    assert a["N2R"]["digest"] == (
+        "sha256:1ca851c4da54210270d6834f378bd8e5cf96e4db047beb546ac69a5079eb8b0e")
+    assert "supplied separately" in a["N2R"]["independently_corroborated"]
+
+
+def test_the_external_numbers_are_not_adopted(correspondence):
+    e = correspondence["externally_supplied_numbers"]
+    assert e["status"].startswith("NOT REPRODUCED")
+    assert "not adopted" in e["status"]
+    assert "unreachable" in e["why_not_adopted"]
+    assert "NOT a verification" in e["one_internal_consistency_remark"]
+    # the claimed values are preserved verbatim, as input rather than as a result
+    assert e["claim"]["PO1_m1_to_N2R_m2_overlap"] == 0.999927
+
+
+def test_the_exclusion_uses_no_frequency_and_only_excludes(correspondence):
+    w = correspondence["what_the_committed_records_do_establish"]
+    assert w["uses_no_frequency"] is True
+    assert w["exclusion_factor"] == 10.0
+    assert w["surviving_candidates"] == [2, 5, 8]
+    assert len([r for r in w["rows"] if r["excluded"]]) == 6
+    assert "CANNOT be separated" in w["verdict"]
+    why = correspondence["why_this_cannot_confirm_a_correspondence"]
+    assert "rule a mode out, and they can never rule one in" in why
+    # the comparison is only legal because both runs share one normalisation
+    n = correspondence["normalisation"]
+    assert n["the_two_runs_agree"] is True
+    assert n["E_elec_J"] == pytest.approx(6.671281904e-03, rel=1e-12)
+
+
+def test_the_frequency_comparison_is_flagged_conditional(correspondence):
+    f = correspondence["frequency_comparison"]
+    assert f["status"].startswith("CONDITIONAL")
+    assert "did NOT establish" in f["status"]
+    assert "tiebreak the approval forbids" in f["note_on_the_surviving_set"]
+    assert f["PO1_m1_measured_GHz"] == pytest.approx(3.885827871, rel=1e-12)
+    q = f["predictions"]["conditional_K_minus_Q_GHz2"]
+    qn = f["predictions"]["conditional_K_minus_Q_over_N_GHz2"]
+    assert q["signed_difference_Hz"] == pytest.approx(900.6, abs=0.5)
+    assert qn["signed_difference_Hz"] == pytest.approx(1874.9, abs=0.5)
+    assert q["relative_difference"] < 1e-6 and qn["relative_difference"] < 1e-6
+    # both are positive: PO1 m1 sits ABOVE both predictions
+    assert q["signed_difference_Hz"] > 0 and qn["signed_difference_Hz"] > 0
+
+
+def test_the_correspondence_script_reproduces_its_json_and_touches_no_network():
+    src = (CORR / "correspondence.py").read_text()
+    for forbidden in ("requests", "urllib", "curl", "socket", "subprocess", "http"):
+        assert forbidden not in src, forbidden
+    before = (CORR / "correspondence.json").read_text()
+    proc = subprocess.run([sys.executable, str(CORR / "correspondence.py")],
+                          capture_output=True, text=True, cwd=REPO_ROOT)
+    assert proc.returncode == 0, proc.stderr
+    assert (CORR / "correspondence.json").read_text() == before
