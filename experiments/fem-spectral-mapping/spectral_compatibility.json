@@ -8,6 +8,10 @@
   "no Route B",
   "participations never renormalised"
  ],
+ "withdrawn_claims": {
+  "rank_implies_N_below_one": "WITHDRAWN. K_port != f f^T/L does NOT imply N < 1. The exact statement is N - N^2 = u^T K_curl u + u^T (K_port - Q) u with u = K^+ q, so N <= 1 always and N = 1 exactly when the static solution is curl-free AND its port trace is the uniform mode. A rank-2 port term with N = 1 is exhibited in review_checks_reconstructed.json.",
+  "readout_zero_error_bound_2p3e_7": "WITHDRAWN. The mode's diagonal participation in DeltaK = K_port - Q is only the first-order term and does not bound the finite shift after removing DeltaK. The operator-mapping error is UNBOUNDED BY THE CURRENT EVIDENCE, which is not a claim that it is large."
+ },
  "units": {
   "mode_frequencies": "GHz from eig.csv; w_m = f_m^2 in GHz^2",
   "conversion_to_angular_squared": "multiply a GHz^2 quantity by W0 = (2*pi*1e9)^2 = 3.947841760e+19 to obtain (rad/s)^2, which is what models.route_a_inversion.coupling_GHz expects for both k and b",
@@ -332,6 +336,26 @@
         "term_ratio_largest_to_next": 3674496.819848769
        }
       ]
+     },
+     "rank_one_removal_Q_versus_Q_over_N": {
+      "identity": "det(zM - K + Q)/det(zM - K) = z G(z) + 1 - N",
+      "zeros_of_G_are": "the nonzero eigenvalues of (K - Q/N, M), the NORMALISED removal",
+      "roots_of_zG_plus_1_minus_N_are": "the eigenvalues of (K - Q, M), the DECLARED removal",
+      "N_used": 0.9992162018723272,
+      "declared_removal_roots_GHz2": [
+       0.0018022065143336887,
+       15.097977993147632,
+       52.313169128195035,
+       62.07570564708049,
+       74.52343289281652,
+       90.6673632202766
+      ],
+      "readout_root_declared_removal_GHz2": 15.097977993147632,
+      "readout_zero_normalised_removal_GHz2": 15.097970135936688,
+      "relative_difference_readout": 5.204150540338885e-07,
+      "extra_low_root_GHz2": 0.0018022065143336887,
+      "extra_low_root_note": "the declared removal frees the island, so its pencil carries a zero mode; on this truncation that mode appears as a small positive root rather than exactly zero",
+      "caveat": "both root sets are rank-one removals. Neither is the removal of the assembled K_port, and that difference is not bounded by the committed evidence"
      }
     },
     "B_field_resonant_only": {
@@ -408,6 +432,22 @@
         "is_readout_candidate_by_interlacing_only": true
        }
       ]
+     },
+     "rank_one_removal_Q_versus_Q_over_N": {
+      "identity": "det(zM - K + Q)/det(zM - K) = z G(z) + 1 - N",
+      "zeros_of_G_are": "the nonzero eigenvalues of (K - Q/N, M), the NORMALISED removal",
+      "roots_of_zG_plus_1_minus_N_are": "the eigenvalues of (K - Q, M), the DECLARED removal",
+      "N_used": 0.9992081172622,
+      "declared_removal_roots_GHz2": [
+       0.001820781384738323,
+       15.09797809484187
+      ],
+      "readout_root_declared_removal_GHz2": 15.09797809484187,
+      "readout_zero_normalised_removal_GHz2": 15.097970156668692,
+      "relative_difference_readout": 5.25777511544452e-07,
+      "extra_low_root_GHz2": 0.001820781384738323,
+      "extra_low_root_note": "the declared removal frees the island, so its pencil carries a zero mode; on this truncation that mode appears as a small positive root rather than exactly zero",
+      "caveat": "both root sets are rank-one removals. Neither is the removal of the assembled K_port, and that difference is not bounded by the committed evidence"
      }
     }
    },
@@ -983,6 +1023,29 @@
         "term_ratio_largest_to_next": 1603435.2307209326
        }
       ]
+     },
+     "rank_one_removal_Q_versus_Q_over_N": {
+      "identity": "det(zM - K + Q)/det(zM - K) = z G(z) + 1 - N",
+      "zeros_of_G_are": "the nonzero eigenvalues of (K - Q/N, M), the NORMALISED removal",
+      "roots_of_zG_plus_1_minus_N_are": "the eigenvalues of (K - Q, M), the DECLARED removal",
+      "N_used": 0.999254583555896,
+      "declared_removal_roots_GHz2": [
+       0.0017374159349687922,
+       15.099651244155394,
+       104.3257321326179,
+       108.94895219138431,
+       117.53497993273545,
+       120.94524481447087,
+       125.8342501631635,
+       134.7689070531538,
+       138.72242697118654
+      ],
+      "readout_root_declared_removal_GHz2": 15.099651244155394,
+      "readout_zero_normalised_removal_GHz2": 15.099643672274043,
+      "relative_difference_readout": 5.014609295156571e-07,
+      "extra_low_root_GHz2": 0.0017374159349687922,
+      "extra_low_root_note": "the declared removal frees the island, so its pencil carries a zero mode; on this truncation that mode appears as a small positive root rather than exactly zero",
+      "caveat": "both root sets are rank-one removals. Neither is the removal of the assembled K_port, and that difference is not bounded by the committed evidence"
      }
     },
     "B_field_resonant_only": {
@@ -1122,6 +1185,24 @@
         "term_ratio_largest_to_next": 16079.94341078933
        }
       ]
+     },
+     "rank_one_removal_Q_versus_Q_over_N": {
+      "identity": "det(zM - K + Q)/det(zM - K) = z G(z) + 1 - N",
+      "zeros_of_G_are": "the nonzero eigenvalues of (K - Q/N, M), the NORMALISED removal",
+      "roots_of_zG_plus_1_minus_N_are": "the eigenvalues of (K - Q, M), the DECLARED removal",
+      "N_used": 0.99924952433099,
+      "declared_removal_roots_GHz2": [
+       0.0017491992825372945,
+       15.09965130269549,
+       117.53497961441882,
+       134.7689072566978
+      ],
+      "readout_root_declared_removal_GHz2": 15.09965130269549,
+      "readout_zero_normalised_removal_GHz2": 15.099643679464629,
+      "relative_difference_readout": 5.048616392951451e-07,
+      "extra_low_root_GHz2": 0.0017491992825372945,
+      "extra_low_root_note": "the declared removal frees the island, so its pencil carries a zero mode; on this truncation that mode appears as a small positive root rather than exactly zero",
+      "caveat": "both root sets are rank-one removals. Neither is the removal of the assembled K_port, and that difference is not bounded by the committed evidence"
      }
     }
    },
@@ -1263,6 +1344,6 @@
  "environment": {
   "python": "3.11.15",
   "numpy": "2.4.6",
-  "git_head": "07d06c81ad1cd907745fe8d7a3af2361734ba258"
+  "git_head": "46bf8b5c5691be84201d3812b97b774caaccb70c"
  }
 }

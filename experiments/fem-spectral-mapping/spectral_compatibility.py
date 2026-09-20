@@ -79,20 +79,77 @@ def read_record(base: Path):
     return modes
 
 
-def classify(modes):
-    """Separate resonant modes from port-face-localised ones on the OBSERVED gap.
+#: An ad-hoc post-hoc separator on the equipartition defect, used ONLY to label
+#: variant B. It was chosen after seeing the values and is not a declared or
+#: approved criterion; the earlier description of this split as "no threshold is
+#: invented" was wrong. The observed defects fall in two clusters, 1e-7..6e-5 and
+#: ~1.0, and this constant sits between them; every mode's defect is reported so a
+#: reader may apply any rule. Nothing material rests on it: variant A keeps every
+#: mode and differs from variant B by 2e-9 in f_R and 6e-6 in g.
+VARIANT_B_DEFECT_THRESHOLD = 1.0e-2
 
-    No threshold is invented: the two groups are separated by seven orders of
-    magnitude in the equipartition defect (1e-7..6e-5 against ~1.0), so the
-    split is read off the data, and both the defect and the boundary of each
-    group are reported so a reader can apply any rule they prefer.
-    """
+
+def classify(modes):
+    """Label modes by the equipartition defect, using the ad-hoc threshold above."""
     for mo in modes:
         d = abs(mo["equipartition_defect_1_minus_R"])
-        mo["group"] = "field-resonant (equipartition holds)" if d < 1e-2 else \
+        mo["group"] = "field-resonant (equipartition holds)" if d < VARIANT_B_DEFECT_THRESHOLD else \
                       "port-operator-localised (equipartition fails; E_mag is ~1e-5 of E_elec)"
-        mo["included_in_variant_B"] = d < 1e-2
+        mo["included_in_variant_B"] = d < VARIANT_B_DEFECT_THRESHOLD
     return modes
+
+
+#: A root is rejected, not silently realified, if its imaginary part is material
+#: at this relative scale, or if any root is non-finite.
+ROOT_IMAG_RTOL = 1.0e-9
+
+
+def _real_roots(poly, w):
+    """Roots of the numerator polynomial, rejecting materially complex or non-finite ones.
+
+    For non-negative weights and distinct poles the zeros interlace the poles and are
+    real; a materially complex root means the input is not of that form, or the
+    polynomial root-finding is ill-conditioned for it. Either way it is reported as a
+    failure rather than realified.
+    """
+    r = np.roots(poly)
+    if not np.all(np.isfinite(r)):
+        raise RuntimeError(f"non-finite root of the G_F numerator: {r}")
+    scale = max(float(np.max(np.abs(w))), 1e-300)
+    bad = np.abs(r.imag) > ROOT_IMAG_RTOL * np.maximum(np.abs(r), scale)
+    if np.any(bad):
+        raise RuntimeError(
+            "materially complex roots of the G_F numerator, rejected rather than realified: "
+            f"{r[bad]} (relative tolerance {ROOT_IMAG_RTOL:.1e})")
+    return np.sort(r.real)
+
+
+def removed_Q_roots(weights, w_GHz2, N):
+    """Roots of z G(z) + 1 - N = 0: the eigenvalues of (K - Q, M) for this truncation.
+
+    The exact identity det(zM - K + Q)/det(zM - K) = z G(z) + 1 - N (verified in
+    review_checks_reconstructed.py) makes these the DECLARED rank-one removal, whereas
+    the zeros of G are the NORMALISED removal (K - Q/N, M). They coincide only at N = 1.
+    """
+    weights = np.asarray(weights, float)
+    w = np.asarray(w_GHz2, float)
+    # z * Num(z) + (1 - N) * Den(z); z * Num shifts Num UP one degree, i.e. poly[:-1].
+    poly = np.zeros(len(w) + 1)
+    for i in range(len(w)):
+        poly[:-1] = poly[:-1] + weights[i] * np.poly([w[j] for j in range(len(w)) if j != i])
+    poly = poly + (1.0 - N) * np.poly(w)
+    roots = _real_roots(poly, w)
+    # Cross-check against the explicit truncated pencil: with A = diag(w) and
+    # q_m = sqrt(w_m p_m), the declared removal is A - q q^T and the normalised one
+    # is A - q q^T / N. Both must be positive semidefinite, since N <= 1.
+    A = np.diag(w)
+    qv = np.sqrt(np.maximum(weights * w, 0.0))
+    direct = np.sort(np.linalg.eigvalsh(A - np.outer(qv, qv)))
+    if direct.min() < -1e-9 * max(abs(w).max(), 1.0):
+        raise RuntimeError(f"declared rank-one removal is not PSD on this truncation: {direct.min()}")
+    if np.max(np.abs(direct - roots)) > 1e-6 * max(abs(w).max(), 1.0):
+        raise RuntimeError(f"polynomial roots {roots} disagree with the explicit pencil {direct}")
+    return roots
 
 
 def spectral(weights, w_GHz2, N):
@@ -106,7 +163,7 @@ def spectral(weights, w_GHz2, N):
     poly = np.zeros(len(w))
     for i in range(len(w)):
         poly = poly + weights[i] * np.poly([w[j] for j in range(len(w)) if j != i])
-    beta = np.sort(np.roots(poly).real) if len(w) > 1 else np.array([])
+    beta = _real_roots(poly, w) if len(w) > 1 else np.array([])
     out = []
     for b in beta:
         terms = weights / (b - w) ** 2
@@ -127,6 +184,19 @@ def main():
         "label": LABEL,
         "not": ["not a Route A result", "not VERIFIED-COMPUTATIONAL coupling evidence",
                 "not gate input", "no Palace run", "no Route B", "participations never renormalised"],
+        "withdrawn_claims": {
+            "rank_implies_N_below_one": "WITHDRAWN. K_port != f f^T/L does NOT imply N < 1. The exact "
+                                        "statement is N - N^2 = u^T K_curl u + u^T (K_port - Q) u with "
+                                        "u = K^+ q, so N <= 1 always and N = 1 exactly when the static "
+                                        "solution is curl-free AND its port trace is the uniform mode. "
+                                        "A rank-2 port term with N = 1 is exhibited in "
+                                        "review_checks_reconstructed.json.",
+            "readout_zero_error_bound_2p3e_7": "WITHDRAWN. The mode's diagonal participation in "
+                                               "DeltaK = K_port - Q is only the first-order term and does "
+                                               "not bound the finite shift after removing DeltaK. The "
+                                               "operator-mapping error is UNBOUNDED BY THE CURRENT "
+                                               "EVIDENCE, which is not a claim that it is large.",
+        },
         "units": {
             "mode_frequencies": "GHz from eig.csv; w_m = f_m^2 in GHz^2",
             "conversion_to_angular_squared": "multiply a GHz^2 quantity by W0 = (2*pi*1e9)^2 = "
@@ -180,6 +250,32 @@ def main():
                                    for mo in modes if mo not in sel],
                 "normalisation_N_equals_sum_abs_p": spectral(p, w, Nobs),
                 "normalisation_N_equals_one": spectral(p, w, 1.0),
+            }
+            # The zeros of G are the (K - Q/N, M) removal. The declared rank-one removal
+            # (K - Q, M) is the root set of z G(z) + 1 - N; both are recorded, neither is
+            # claimed to be the removal of the assembled K_port.
+            declared = removed_Q_roots(p, w, Nobs)
+            zeros_QoverN = [z["beta_GHz2"] for z in entry["normalisation_N_equals_sum_abs_p"]["zeros"]]
+            lo, hi = w[0], w[1]
+            cand_declared = [b for b in declared if lo < b < hi]
+            cand_norm = [b for b in zeros_QoverN if lo < b < hi]
+            entry["rank_one_removal_Q_versus_Q_over_N"] = {
+                "identity": "det(zM - K + Q)/det(zM - K) = z G(z) + 1 - N",
+                "zeros_of_G_are": "the nonzero eigenvalues of (K - Q/N, M), the NORMALISED removal",
+                "roots_of_zG_plus_1_minus_N_are": "the eigenvalues of (K - Q, M), the DECLARED removal",
+                "N_used": Nobs,
+                "declared_removal_roots_GHz2": [float(b) for b in declared],
+                "readout_root_declared_removal_GHz2": float(cand_declared[0]) if len(cand_declared) == 1 else None,
+                "readout_zero_normalised_removal_GHz2": float(cand_norm[0]) if len(cand_norm) == 1 else None,
+                "relative_difference_readout": (
+                    abs(cand_declared[0] - cand_norm[0]) / cand_norm[0]
+                    if len(cand_declared) == 1 and len(cand_norm) == 1 else None),
+                "extra_low_root_GHz2": float(min(declared)) if len(declared) == len(w) else None,
+                "extra_low_root_note": "the declared removal frees the island, so its pencil carries a "
+                                       "zero mode; on this truncation that mode appears as a small "
+                                       "positive root rather than exactly zero",
+                "caveat": "both root sets are rank-one removals. Neither is the removal of the "
+                          "assembled K_port, and that difference is not bounded by the committed evidence",
             }
             # the zero between the two lowest included modes is the readout candidate
             for key in ("normalisation_N_equals_sum_abs_p", "normalisation_N_equals_one"):

@@ -9,7 +9,9 @@ renormalised.
 | file | content |
 |---|---|
 | `spectral_compatibility.py` | the calculation; writes the JSON beside itself |
-| `spectral_compatibility.json` | per-mode equipartition, the assembled-operator participation against the reported rank-one EPR, the decomposition of the saved sum, every inclusion and exclusion with its reason, and the conditional spectral variants |
+| `spectral_compatibility.json` | per-mode equipartition, the assembled-operator participation against the reported rank-one EPR, the decomposition of the saved sum, every inclusion and exclusion with its reason, the declared-versus-normalised rank-one removal, the conditional spectral variants, and the two withdrawn claims |
+| `review_checks_reconstructed.py` | independent reconstruction of the three review checks against 46bf8b5 (the supplied `QMHP_46bf8b5_review_checks.py` did not reach this environment): a rank-2 and a rank-3 port term with `N = 1`, the exact identity `N − N² = uᵀK_curl u + uᵀ(K_port − Q)u`, a counterexample to the diagonal-participation shift bound, and the determinant identity |
+| `review_checks_reconstructed.json` | its output. SYNTHETIC small matrices only; no QMHP record is read |
 
 Two distinct things are computed:
 

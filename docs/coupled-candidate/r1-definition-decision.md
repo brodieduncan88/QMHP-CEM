@@ -17,16 +17,26 @@
 >    records, and no substitute may be assumed.
 > 3. **§7 "Completeness" is corrected.** `Σ_m p_mF + δ_far = 1` is not the
 >    right statement for this FEM model. The complete-mode sum of Palace's
->    reported EPR is `Σ_all |p_mF| = fᵀK⁻¹f/L`, which is **strictly below 1**;
->    `δ_saved := 1 − Σ_saved |p_mF|` is an **upper bound** on omitted spectral
->    weight, not equal to it, and must not be renamed `δ_far`.
-> 4. **§3 and §7 are qualified.** The zeros of `G_F` correspond to removing
->    the rank-one surrogate `f fᵀ/L`, not the assembled port operator
+>    reported EPR is `N = Σ_all |p_mF| = fᵀK⁺f/L`, which satisfies `N ≤ 1`;
+>    `δ_saved := 1 − Σ_saved |p_mF| = (1 − N) + omitted weight`, both terms
+>    non-negative and **neither measured separately**, so `δ_saved` is an
+>    **upper bound** on omitted spectral weight and must not be renamed
+>    `δ_far`. Corrected 2026-09-20: the further claim that `K_port ≠ f fᵀ/L`
+>    forces `N < 1` is **withdrawn** and false; `N = 1` holds exactly when the
+>    static solution `u = K⁺q` satisfies `K_curl u = 0` and `(K_port − Q)u = 0`,
+>    a condition on alignment, not on rank.
+> 4. **§3 and §7 are qualified.** The zeros of `G_F` correspond to removing a
+>    rank-one term, not the assembled port operator
 >    `K_port = ∫_Γ (1/L_s)|E_t|²`. The committed records show the two differ
 >    (four of N1R's six and five of N2R's nine saved modes are
->    port-operator-localised). The resulting error on the readout zero is
->    bounded at `≲2.3e-7` by committed data; on `a`, and hence on
->    `E_C,F1F1`, it is not bounded.
+>    port-operator-localised). Two further corrections, entered 2026-09-20
+>    after review: the rank-one term removed is the **normalised** `Q/N`, not
+>    the declared `Q`, by the exact identity
+>    `det(zM − K + Q)/det(zM − K) = z G_F(z) + 1 − N`; and the resulting error
+>    against the assembled removal is **UNBOUNDED BY THE CURRENT EVIDENCE**.
+>    The `≲2.3e-7` bound claimed at 46bf8b5 is **withdrawn**: a mode's diagonal
+>    participation in `ΔK` is the first-order term only and does not bound the
+>    finite shift. That status is not a claim that the error is large.
 
 **Status:** assessment and draft only. The registered target is **not changed
 by this document**; a draft amendment is given in §7 for approval, labelled
