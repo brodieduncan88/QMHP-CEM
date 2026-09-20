@@ -1,0 +1,458 @@
+{
+  "schema": "qmhp.local-readout-field-diagnostic/0.1",
+  "classification": "OFFLINE POSTPROCESSING DIAGNOSTIC; NOT COUPLING EXTRACTION",
+  "repository_read_only_pin": "5bc50d01e7c4578feb7df532b3b31956f6cefac1",
+  "functional_source": "https://github.com/brodieduncan88/QMHP-CEM/blob/5bc50d01e7c4578feb7df532b3b31956f6cefac1/experiments/readout-voltage-functional/functional.json",
+  "functional_source_blob_sha": "4a605e89513236695a17a66f261003bec6b6abc8",
+  "definitions": {
+    "surfaces_mm": {
+      "plusY": [
+        -0.485,
+        -0.405,
+        0.05,
+        0.08,
+        -1
+      ],
+      "minusY": [
+        -0.485,
+        -0.405,
+        -0.08,
+        -0.05,
+        1
+      ]
+    },
+    "readout_width_mm": 0.08,
+    "F_port_attribute": 10,
+    "F_port_width_mm": 0.02,
+    "sqrt_Z0": 19.409541814844687,
+    "Lc_over_L0": 4.0,
+    "primary_readout_surface": "plusY",
+    "mirror_check_surface": "minusY",
+    "rho": "complex V_R / reconstructed V_F for each mode",
+    "r12": "complex rho_mode1 / rho_mode2, signs retained",
+    "mirror_relative_difference": "abs(plus-minus) / max(abs(plus),abs(minus))",
+    "mesh_relative_change": "abs(N2R-N1R) / abs(N1R)"
+  },
+  "unit_statement": "Use the pinned recipe for this export, not newer Palace release defaults.",
+  "tests": {
+    "affine_rectangle_abs_error": 0.0,
+    "independent_affine_abs_error": 0.0,
+    "orientation_reversal_abs_difference": 0.0
+  },
+  "environment": {
+    "python": "3.13.5",
+    "numpy": "2.3.5",
+    "vtk": "9.6.2",
+    "shapely": "2.1.2"
+  },
+  "datasets": {
+    "N1R": {
+      "archive": "N1R_fields_35438882836.zip",
+      "archive_sha256": "79c0401c66ec7d281c90312a01409db8a862a9e9d4ce1163b52e4b0e1c111ff0",
+      "archive_size_bytes": 95969529,
+      "run": 35438882836,
+      "artifact": 10583481701,
+      "source_record": "COUPLED-LADDER-O1-L2-N1R-20260919T110053Z",
+      "port_V_source": "https://github.com/brodieduncan88/QMHP-CEM/blob/5bc50d01e7c4578feb7df532b3b31956f6cefac1/results/COUPLED-LADDER-O1-L2-N1R-20260919T110053Z/L2/solver/postpro/port-V.csv",
+      "port_V_blob_sha": "12286f083959af9491c94be42d3496303d76f770",
+      "modes": {
+        "1": {
+          "archive_member": "eigenmode_boundary/Cycle000000/proc000000.vtu",
+          "member_sha256": "39365ea846c2e590a2f0893679a299262324aca278258e666d6592a6bad5561a",
+          "export": {
+            "points_dtype": "float32",
+            "field_dtype": "float32",
+            "exported_points": 72984,
+            "exported_cells": 24328,
+            "cell_connectivity_width": 3
+          },
+          "F_port": {
+            "voltage_reconstructed_V": {
+              "real": -11.03613320208937,
+              "imag": -1.7868028875589355
+            },
+            "voltage_reference_V": {
+              "real": -11.03611108,
+              "imag": -1.786799309
+            },
+            "area_mm2": 0.0008000016033649082,
+            "triangles": 100,
+            "relative_complex_error": 2.004474059433113e-06,
+            "relative_real_error": 2.004518549211983e-06,
+            "relative_imag_error": 2.002776090956079e-06
+          },
+          "readout": {
+            "plusY": {
+              "voltage_V": {
+                "real": 0.042077401410829204,
+                "imag": 0.006812533076972262
+              },
+              "area_mm2": 0.0023999999999999985,
+              "expected_area_mm2": 0.002399999999999999,
+              "contributing_exported_triangles": 106,
+              "triangles_with_clipped_area_above_1e_12_mm2": 88,
+              "area_by_attribute_mm2": {
+                "4": 2.0265579125933173e-10,
+                "25": 0.002399999797344207
+              },
+              "local_geometry_sha256": "140e2c41db0d4d41a8a2369ee026bc8be990d576d0ab19b900913470577c627f",
+              "independent_integration_relative_difference": 4.951005536493159e-16,
+              "independent_area_difference_mm2": 0.0,
+              "rho": {
+                "real": -0.003812694232872605,
+                "imag": -1.114175656044608e-12
+              },
+              "rho_using_reference_VF": {
+                "real": -0.0038127018753192194,
+                "imag": -6.604466446316371e-14
+              }
+            },
+            "minusY": {
+              "voltage_V": {
+                "real": 0.048509288068358324,
+                "imag": 0.007853886464225307
+              },
+              "area_mm2": 0.002399999999999999,
+              "expected_area_mm2": 0.002399999999999999,
+              "contributing_exported_triangles": 105,
+              "triangles_with_clipped_area_above_1e_12_mm2": 87,
+              "area_by_attribute_mm2": {
+                "4": 2.0265579125933178e-10,
+                "25": 0.0023999997973442075
+              },
+              "local_geometry_sha256": "5dc4960c86abb04467e7390470e4a63a879f263064c08b641bfa5504b3904b82",
+              "independent_integration_relative_difference": 1.4554960295232477e-16,
+              "independent_area_difference_mm2": 0.0,
+              "rho": {
+                "real": -0.004395496791940994,
+                "imag": -9.435288510567802e-12
+              },
+              "rho_using_reference_VF": {
+                "real": -0.004395505602600209,
+                "imag": -8.226958074259678e-12
+              }
+            }
+          },
+          "mirror_voltage_relative_difference": 0.13259082798944138
+        },
+        "2": {
+          "archive_member": "eigenmode_boundary/Cycle000001/proc000000.vtu",
+          "member_sha256": "fc3824349cd71a795a586ba143e39ea1275914ea0146759f529724b4ece2661f",
+          "export": {
+            "points_dtype": "float32",
+            "field_dtype": "float32",
+            "exported_points": 72984,
+            "exported_cells": 24328,
+            "cell_connectivity_width": 3
+          },
+          "F_port": {
+            "voltage_reconstructed_V": {
+              "real": -0.6518593795750366,
+              "imag": -0.5781556160484908
+            },
+            "voltage_reference_V": {
+              "real": -0.651858072,
+              "imag": -0.5781544558
+            },
+            "area_mm2": 0.0008000016033649082,
+            "triangles": 100,
+            "relative_complex_error": 2.0063136057133575e-06,
+            "relative_real_error": 2.0059198355372296e-06,
+            "relative_imag_error": 2.0068140599601413e-06
+          },
+          "readout": {
+            "plusY": {
+              "voltage_V": {
+                "real": -2.4307026162227325,
+                "imag": -2.1558704414451038
+              },
+              "area_mm2": 0.0023999999999999985,
+              "expected_area_mm2": 0.002399999999999999,
+              "contributing_exported_triangles": 106,
+              "triangles_with_clipped_area_above_1e_12_mm2": 88,
+              "area_by_attribute_mm2": {
+                "4": 2.0265579125933173e-10,
+                "25": 0.002399999797344207
+              },
+              "local_geometry_sha256": "140e2c41db0d4d41a8a2369ee026bc8be990d576d0ab19b900913470577c627f",
+              "independent_integration_relative_difference": 0.0,
+              "independent_area_difference_mm2": 0.0,
+              "rho": {
+                "real": 3.7288757242778985,
+                "imag": -1.427406419730567e-10
+              },
+              "rho_using_reference_VF": {
+                "real": 3.728883205571815,
+                "imag": 1.5125553171068968e-09
+              }
+            },
+            "minusY": {
+              "voltage_V": {
+                "real": -2.42703842555009,
+                "imag": -2.1526205529023996
+              },
+              "area_mm2": 0.002399999999999999,
+              "expected_area_mm2": 0.002399999999999999,
+              "contributing_exported_triangles": 105,
+              "triangles_with_clipped_area_above_1e_12_mm2": 87,
+              "area_by_attribute_mm2": {
+                "4": 2.0265579125933178e-10,
+                "25": 0.0023999997973442075
+              },
+              "local_geometry_sha256": "5dc4960c86abb04467e7390470e4a63a879f263064c08b641bfa5504b3904b82",
+              "independent_integration_relative_difference": 0.0,
+              "independent_area_difference_mm2": 0.0,
+              "rho": {
+                "real": 3.7232545900295246,
+                "imag": 2.605636724032584e-09
+              },
+              "rho_using_reference_VF": {
+                "real": 3.723262060045683,
+                "imag": 4.258442908846977e-09
+              }
+            }
+          },
+          "mirror_voltage_relative_difference": 0.001507460871322779
+        }
+      },
+      "boundary_mode_fields_available": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "r12": {
+        "plusY": {
+          "real": -0.001022478225286239,
+          "imag": -3.3793694064970806e-13
+        },
+        "minusY": {
+          "real": -0.001180552305961473,
+          "imag": -1.7079675627185112e-12
+        }
+      },
+      "r12_mirror_relative_difference": 0.13389841337567365
+    },
+    "N2R": {
+      "archive": "N2R_fields_35313973073.zip",
+      "archive_sha256": "1ca851c4da54210270d6834f378bd8e5cf96e4db047beb546ac69a5079eb8b0e",
+      "archive_size_bytes": 113746865,
+      "run": 35313973073,
+      "artifact": 10533683685,
+      "source_record": "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z",
+      "port_V_source": "https://github.com/brodieduncan88/QMHP-CEM/blob/5bc50d01e7c4578feb7df532b3b31956f6cefac1/results/COUPLED-LADDER-O1-L2-N2R-20260918T061455Z/L2/solver/postpro/port-V.csv",
+      "port_V_blob_sha": "a16a65f0a5f1b93eb55e72aed0a376ff229f9642",
+      "modes": {
+        "1": {
+          "archive_member": "eigenmode_boundary/Cycle000000/proc000000.vtu",
+          "member_sha256": "494676a1fec27282de791493c56f6085e799c76aaf4f511770d6c467904ad977",
+          "export": {
+            "points_dtype": "float32",
+            "field_dtype": "float32",
+            "exported_points": 76986,
+            "exported_cells": 25662,
+            "cell_connectivity_width": 3
+          },
+          "F_port": {
+            "voltage_reconstructed_V": {
+              "real": -6.07700115032351,
+              "imag": -9.473551964807589
+            },
+            "voltage_reference_V": {
+              "real": -6.076988963,
+              "imag": -9.473532972
+            },
+            "area_mm2": 0.0008000016033649082,
+            "triangles": 400,
+            "relative_complex_error": 2.0050204492353437e-06,
+            "relative_real_error": 2.0054871885706908e-06,
+            "relative_imag_error": 2.004828361911389e-06
+          },
+          "readout": {
+            "plusY": {
+              "voltage_V": {
+                "real": 0.023341035871222455,
+                "imag": 0.03638678258075709
+              },
+              "area_mm2": 0.0023999999999999985,
+              "expected_area_mm2": 0.002399999999999999,
+              "contributing_exported_triangles": 106,
+              "triangles_with_clipped_area_above_1e_12_mm2": 88,
+              "area_by_attribute_mm2": {
+                "4": 2.0265579125933173e-10,
+                "25": 0.002399999797344207
+              },
+              "local_geometry_sha256": "140e2c41db0d4d41a8a2369ee026bc8be990d576d0ab19b900913470577c627f",
+              "independent_integration_relative_difference": 8.025620462063435e-17,
+              "independent_area_difference_mm2": 0.0,
+              "rho": {
+                "real": -0.0038408806490612423,
+                "imag": -2.6534717601461884e-11
+              },
+              "rho_using_reference_VF": {
+                "real": -0.0038408883501054015,
+                "imag": -2.5384758347045187e-11
+              }
+            },
+            "minusY": {
+              "voltage_V": {
+                "real": 0.026973809323277843,
+                "imag": 0.04204998116802727
+              },
+              "area_mm2": 0.002399999999999999,
+              "expected_area_mm2": 0.002399999999999999,
+              "contributing_exported_triangles": 105,
+              "triangles_with_clipped_area_above_1e_12_mm2": 87,
+              "area_by_attribute_mm2": {
+                "4": 2.0265579125933178e-10,
+                "25": 0.0023999997973442075
+              },
+              "local_geometry_sha256": "5dc4960c86abb04467e7390470e4a63a879f263064c08b641bfa5504b3904b82",
+              "independent_integration_relative_difference": 2.083424277218313e-16,
+              "independent_area_difference_mm2": 0.0,
+              "rho": {
+                "real": -0.00443867108584422,
+                "imag": 3.0289396350443887e-12
+              },
+              "rho_using_reference_VF": {
+                "real": -0.004438679985470415,
+                "imag": 4.357944583807351e-12
+              }
+            }
+          },
+          "mirror_voltage_relative_difference": 0.1346777954981723
+        },
+        "2": {
+          "archive_member": "eigenmode_boundary/Cycle000001/proc000000.vtu",
+          "member_sha256": "fd9739f08d9221b9c2987e731cf9b61da5ecae07adc578555270def490ae454c",
+          "export": {
+            "points_dtype": "float32",
+            "field_dtype": "float32",
+            "exported_points": 76986,
+            "exported_cells": 25662,
+            "cell_connectivity_width": 3
+          },
+          "F_port": {
+            "voltage_reconstructed_V": {
+              "real": -0.49016324376525466,
+              "imag": 0.7298181515192134
+            },
+            "voltage_reference_V": {
+              "real": -0.4901622609,
+              "imag": 0.7298166872
+            },
+            "area_mm2": 0.0008000016033649082,
+            "triangles": 400,
+            "relative_complex_error": 2.0060360844274293e-06,
+            "relative_real_error": 2.0051834526780477e-06,
+            "relative_imag_error": 2.0064205697282564e-06
+          },
+          "readout": {
+            "plusY": {
+              "voltage_V": {
+                "real": -1.811550684491191,
+                "imag": 2.6972699159018583
+              },
+              "area_mm2": 0.0023999999999999985,
+              "expected_area_mm2": 0.002399999999999999,
+              "contributing_exported_triangles": 106,
+              "triangles_with_clipped_area_above_1e_12_mm2": 88,
+              "area_by_attribute_mm2": {
+                "4": 2.0265579125933173e-10,
+                "25": 0.002399999797344207
+              },
+              "local_geometry_sha256": "140e2c41db0d4d41a8a2369ee026bc8be990d576d0ab19b900913470577c627f",
+              "independent_integration_relative_difference": 1.3667854710818953e-16,
+              "independent_area_difference_mm2": 0.0,
+              "rho": {
+                "real": 3.6958109505761856,
+                "imag": 8.407827344192044e-10
+              },
+              "rho_using_reference_VF": {
+                "real": 3.6958183645060125,
+                "imag": -1.2754108922595355e-09
+              }
+            },
+            "minusY": {
+              "voltage_V": {
+                "real": -1.808755405123976,
+                "imag": 2.6931079524973986
+              },
+              "area_mm2": 0.002399999999999999,
+              "expected_area_mm2": 0.002399999999999999,
+              "contributing_exported_triangles": 105,
+              "triangles_with_clipped_area_above_1e_12_mm2": 87,
+              "area_by_attribute_mm2": {
+                "4": 2.0265579125933178e-10,
+                "25": 0.0023999997973442075
+              },
+              "local_geometry_sha256": "5dc4960c86abb04467e7390470e4a63a879f263064c08b641bfa5504b3904b82",
+              "independent_integration_relative_difference": 1.3688977201280656e-16,
+              "independent_area_difference_mm2": 0.0,
+              "rho": {
+                "real": 3.690108206652813,
+                "imag": -4.513115153939633e-09
+              },
+              "rho_using_reference_VF": {
+                "real": 3.6901156091427296,
+                "imag": -6.62605433360503e-09
+              }
+            }
+          },
+          "mirror_voltage_relative_difference": 0.0015430291212505177
+        }
+      },
+      "boundary_mode_fields_available": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "r12": {
+        "plusY": {
+          "real": -0.0010392524673001578,
+          "imag": -6.943248021453249e-12
+        },
+        "minusY": {
+          "real": -0.0012028566202589505,
+          "imag": -6.503036419193732e-13
+        }
+      },
+      "r12_mirror_relative_difference": 0.13601301285898243
+    }
+  },
+  "limitations": [
+    "No Palace run or new eigenpair; no repository mutation.",
+    "No g, capacitance, E_C, Route A inversion, Route B or physical validation.",
+    "Exported Float32 point values are promoted for arithmetic, not upgraded in source precision.",
+    "The F-port comparison validates only this limited reconstruction, not readout accuracy.",
+    "Differences between the two readout surfaces are not attributed to a unique cause.",
+    "Same readout surface triangles do not establish readout-gap convergence or full-volume identity.",
+    "These surface integrals have not been established as a unique lumped readout coordinate.",
+    "Incomplete modal evidence and synthetic-to-EM model compatibility remain unresolved."
+  ],
+  "between_meshes": {
+    "plusY": {
+      "r12_signed_change": {
+        "real": -1.6774242013918887e-05,
+        "imag": -6.605311080803541e-12
+      },
+      "r12_relative_change": 0.016405476027838442,
+      "same_exported_readout_triangle_geometry": true
+    },
+    "minusY": {
+      "r12_signed_change": {
+        "real": -2.2304314297477484e-05,
+        "imag": 1.057663920799138e-12
+      },
+      "r12_relative_change": 0.01889311823359854,
+      "same_exported_readout_triangle_geometry": true
+    }
+  },
+  "max_F_port_relative_complex_error": 2.0063136057133575e-06,
+  "conclusion": "The archive-access blocker is removed in this environment. The fixed surface integrals can be evaluated. Their cross-mode ratio is surface-dependent at about 13-14% under the declared mirror metric, and changes by about 1.6-1.9% between these meshes. No unique lumped-coordinate or coupling claim follows."
+}

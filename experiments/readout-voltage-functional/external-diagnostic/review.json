@@ -1,0 +1,344 @@
+{
+ "label": "DERIVED-FROM-EXTERNAL: arithmetic on the supplied results.json; no field integral reproduced here",
+ "source": "supplied/evaluation/results.json",
+ "source_schema": "qmhp.local-readout-field-diagnostic/0.1",
+ "source_classification": "OFFLINE POSTPROCESSING DIAGNOSTIC; NOT COUPLING EXTRACTION",
+ "repository_pin_claimed_by_source": "5bc50d01e7c4578feb7df532b3b31956f6cefac1",
+ "records": {
+  "N1R": {
+   "modes": {
+    "1": {
+     "V_F_reconstructed_V": [
+      -11.03613320208937,
+      -1.7868028875589355
+     ],
+     "V_F_csv_V": [
+      -11.03611108,
+      -1.786799309
+     ],
+     "V_R_plusY_V": [
+      0.042077401410829204,
+      0.006812533076972262
+     ],
+     "V_R_minusY_V": [
+      0.048509288068358324,
+      0.007853886464225307
+     ],
+     "V_plus_minus_V_minus_V": [
+      -0.006431886657529119,
+      -0.0010413533872530448
+     ],
+     "abs_difference_V": 0.00651564139992714,
+     "difference_rel_to_V_R_plusY": 0.15285845742455142,
+     "difference_rel_to_V_R_minusY": 0.13259082798944138,
+     "difference_rel_to_V_R_mirror_metric": 0.13259082798944138,
+     "difference_rel_to_V_F": 0.0005828025590683899,
+     "phase_plusY_minus_minusY_deg": -1.0624658697995883e-07,
+     "rho_plusY": [
+      -0.003812694232872605,
+      -1.114175656044608e-12
+     ],
+     "rho_minusY": [
+      -0.004395496791940994,
+      -9.435288510567802e-12
+     ],
+     "rho_mirror_rel_diff": 0.13259082798944127,
+     "abs_imag_over_abs_rho_plusY": 2.9222790708951045e-10,
+     "abs_imag_over_abs_rho_minusY": 2.1465806840917523e-09,
+     "check_F_port_rel_error_recomputed": 2.004474059433113e-06,
+     "check_F_port_rel_error_matches_supplied": true,
+     "check_rho_plusY_equals_V_over_VF": true,
+     "check_rho_minusY_equals_V_over_VF": true,
+     "check_mirror_voltage_metric_matches_supplied": true
+    },
+    "2": {
+     "V_F_reconstructed_V": [
+      -0.6518593795750366,
+      -0.5781556160484908
+     ],
+     "V_F_csv_V": [
+      -0.651858072,
+      -0.5781544558
+     ],
+     "V_R_plusY_V": [
+      -2.4307026162227325,
+      -2.1558704414451038
+     ],
+     "V_R_minusY_V": [
+      -2.42703842555009,
+      -2.1526205529023996
+     ],
+     "V_plus_minus_V_minus_V": [
+      -0.0036641906726426754,
+      -0.003249888542704138
+     ],
+     "abs_difference_V": 0.004897761613786568,
+     "difference_rel_to_V_R_plusY": 0.001507460871322779,
+     "difference_rel_to_V_R_minusY": 0.0015097367403849075,
+     "difference_rel_to_V_R_mirror_metric": 0.001507460871322779,
+     "difference_rel_to_V_F": 0.00562113424837432,
+     "phase_plusY_minus_minusY_deg": -4.229044746554988e-08,
+     "rho_plusY": [
+      3.7288757242778985,
+      -1.427406419730567e-10
+     ],
+     "rho_minusY": [
+      3.7232545900295246,
+      2.605636724032584e-09
+     ],
+     "rho_mirror_rel_diff": 0.001507460871322833,
+     "abs_imag_over_abs_rho_plusY": 3.827980671055982e-11,
+     "abs_imag_over_abs_rho_minusY": 6.998277074606176e-10,
+     "check_F_port_rel_error_recomputed": 2.0063136057133575e-06,
+     "check_F_port_rel_error_matches_supplied": true,
+     "check_rho_plusY_equals_V_over_VF": true,
+     "check_rho_minusY_equals_V_over_VF": true,
+     "check_mirror_voltage_metric_matches_supplied": true
+    }
+   },
+   "r12_plusY_primary": [
+    -0.001022478225286239,
+    -3.3793694064970806e-13
+   ],
+   "r12_minusY_mirror": [
+    -0.001180552305961473,
+    -1.7079675627185112e-12
+   ],
+   "r12_plus_minus_r12_minus": [
+    0.0001580740806752341,
+    1.3700306220688032e-12
+   ],
+   "r12_mirror_rel_diff": 0.13389841337567365,
+   "r12_abs_imag_over_abs_plusY": 3.305077138000703e-10,
+   "check_r12_plusY_equals_rho1_over_rho2": true,
+   "check_r12_minusY_equals_rho1_over_rho2": true,
+   "check_r12_mirror_metric_matches_supplied": true
+  },
+  "N2R": {
+   "modes": {
+    "1": {
+     "V_F_reconstructed_V": [
+      -6.07700115032351,
+      -9.473551964807589
+     ],
+     "V_F_csv_V": [
+      -6.076988963,
+      -9.473532972
+     ],
+     "V_R_plusY_V": [
+      0.023341035871222455,
+      0.03638678258075709
+     ],
+     "V_R_minusY_V": [
+      0.026973809323277843,
+      0.04204998116802727
+     ],
+     "V_plus_minus_V_minus_V": [
+      -0.0036327734520553885,
+      -0.005663198587270185
+     ],
+     "abs_difference_V": 0.0067282138188985525,
+     "difference_rel_to_V_R_plusY": 0.15563889935738706,
+     "difference_rel_to_V_R_minusY": 0.1346777954981723,
+     "difference_rel_to_V_R_mirror_metric": 0.1346777954981723,
+     "difference_rel_to_V_F": 0.0005977904367829781,
+     "phase_plusY_minus_minusY_deg": 4.3492631362932797e-07,
+     "rho_plusY": [
+      -0.0038408806490612423,
+      -2.6534717601461884e-11
+     ],
+     "rho_minusY": [
+      -0.00443867108584422,
+      3.0289396350443887e-12
+     ],
+     "rho_mirror_rel_diff": 0.13467779549817227,
+     "abs_imag_over_abs_rho_plusY": 6.908498343458626e-09,
+     "abs_imag_over_abs_rho_minusY": 6.823978565801514e-10,
+     "check_F_port_rel_error_recomputed": 2.0050204492353437e-06,
+     "check_F_port_rel_error_matches_supplied": true,
+     "check_rho_plusY_equals_V_over_VF": true,
+     "check_rho_minusY_equals_V_over_VF": true,
+     "check_mirror_voltage_metric_matches_supplied": true
+    },
+    "2": {
+     "V_F_reconstructed_V": [
+      -0.49016324376525466,
+      0.7298181515192134
+     ],
+     "V_F_csv_V": [
+      -0.4901622609,
+      0.7298166872
+     ],
+     "V_R_plusY_V": [
+      -1.811550684491191,
+      2.6972699159018583
+     ],
+     "V_R_minusY_V": [
+      -1.808755405123976,
+      2.6931079524973986
+     ],
+     "V_plus_minus_V_minus_V": [
+      -0.00279527936721502,
+      0.004161963404459623
+     ],
+     "abs_difference_V": 0.0050135342943715,
+     "difference_rel_to_V_R_plusY": 0.0015430291212505177,
+     "difference_rel_to_V_R_minusY": 0.0015454137396551854,
+     "difference_rel_to_V_R_mirror_metric": 0.0015430291212505177,
+     "difference_rel_to_V_F": 0.0057027439233756135,
+     "phase_plusY_minus_minusY_deg": 8.310905592239071e-08,
+     "rho_plusY": [
+      3.6958109505761856,
+      8.407827344192044e-10
+     ],
+     "rho_minusY": [
+      3.690108206652813,
+      -4.513115153939633e-09
+     ],
+     "rho_mirror_rel_diff": 0.0015430291212503707,
+     "abs_imag_over_abs_rho_plusY": 2.2749614243340136e-10,
+     "abs_imag_over_abs_rho_minusY": 1.2230305728712886e-09,
+     "check_F_port_rel_error_recomputed": 2.0060360844274293e-06,
+     "check_F_port_rel_error_matches_supplied": true,
+     "check_rho_plusY_equals_V_over_VF": true,
+     "check_rho_minusY_equals_V_over_VF": true,
+     "check_mirror_voltage_metric_matches_supplied": true
+    }
+   },
+   "r12_plusY_primary": [
+    -0.0010392524673001578,
+    -6.943248021453249e-12
+   ],
+   "r12_minusY_mirror": [
+    -0.0012028566202589505,
+    -6.503036419193732e-13
+   ],
+   "r12_plus_minus_r12_minus": [
+    0.0001636041529587927,
+    -6.292944379533876e-12
+   ],
+   "r12_mirror_rel_diff": 0.13601301285898243,
+   "r12_abs_imag_over_abs_plusY": 6.681002201025224e-09,
+   "check_r12_plusY_equals_rho1_over_rho2": true,
+   "check_r12_minusY_equals_rho1_over_rho2": true,
+   "check_r12_mirror_metric_matches_supplied": true
+  }
+ },
+ "consistency": {},
+ "between_meshes": {
+  "plusY": {
+   "r12_N1R": [
+    -0.001022478225286239,
+    -3.3793694064970806e-13
+   ],
+   "r12_N2R": [
+    -0.0010392524673001578,
+    -6.943248021453249e-12
+   ],
+   "signed_change_N2R_minus_N1R": [
+    -1.6774242013918887e-05,
+    -6.605311080803541e-12
+   ],
+   "relative_change": 0.016405476027838442,
+   "check_matches_supplied": true,
+   "same_exported_readout_triangle_geometry_per_source": true
+  },
+  "minusY": {
+   "r12_N1R": [
+    -0.001180552305961473,
+    -1.7079675627185112e-12
+   ],
+   "r12_N2R": [
+    -0.0012028566202589505,
+    -6.503036419193732e-13
+   ],
+   "signed_change_N2R_minus_N1R": [
+    -2.2304314297477484e-05,
+    1.057663920799138e-12
+   ],
+   "relative_change": 0.01889311823359854,
+   "check_matches_supplied": true,
+   "same_exported_readout_triangle_geometry_per_source": true
+  },
+  "per_mode_voltage_change": {
+   "m1_V_R_plusY_V": {
+    "complex_rel_change": 0.8213385355685183,
+    "magnitude_rel_change": 0.014177408700216115,
+    "phase_change_deg": 48.124380984185926,
+    "note": "the eigenvector's global phase differs between solves, so the complex change mixes a phase rotation with a magnitude change; magnitudes share Palace's unit-energy normalisation, and only ratios between quantities of one solve are free of both"
+   },
+   "m1_V_R_minusY_V": {
+    "complex_rel_change": 0.8223738863555283,
+    "magnitude_rel_change": 0.0166233823375905,
+    "phase_change_deg": 48.124380443013024,
+    "note": "the eigenvector's global phase differs between solves, so the complex change mixes a phase rotation with a magnitude change; magnitudes share Palace's unit-energy normalisation, and only ratios between quantities of one solve are free of both"
+   },
+   "m1_V_F_reconstructed_V": {
+    "complex_rel_change": 0.8182250694619576,
+    "magnitude_rel_change": 0.006734837804990784,
+    "phase_change_deg": 48.12438060510156,
+    "note": "the eigenvector's global phase differs between solves, so the complex change mixes a phase rotation with a magnitude change; magnitudes share Palace's unit-energy normalisation, and only ratios between quantities of one solve are free of both"
+   },
+   "m2_V_R_plusY_V": {
+    "complex_rel_change": 1.5058340046628256,
+    "magnitude_rel_change": 4.2074953763385446e-05,
+    "phase_change_deg": -97.68462886502674,
+    "note": "the eigenvector's global phase differs between solves, so the complex change mixes a phase rotation with a magnitude change; magnitudes share Palace's unit-energy normalisation, and only ratios between quantities of one solve are free of both"
+   },
+   "m2_V_R_minusY_V": {
+    "complex_rel_change": 1.5058071849196348,
+    "magnitude_rel_change": 6.45150635050808e-06,
+    "phase_change_deg": -97.68462899042625,
+    "note": "the eigenvector's global phase differs between solves, so the complex change mixes a phase rotation with a magnitude change; magnitudes share Palace's unit-energy normalisation, and only ratios between quantities of one solve are free of both"
+   },
+   "m2_V_F_reconstructed_V": {
+    "complex_rel_change": 1.5125817284294611,
+    "magnitude_rel_change": 0.008989005774286529,
+    "phase_change_deg": -97.68462888025458,
+    "note": "the eigenvector's global phase differs between solves, so the complex change mixes a phase rotation with a magnitude change; magnitudes share Palace's unit-energy normalisation, and only ratios between quantities of one solve are free of both"
+   }
+  },
+  "per_mode_rho_change": {
+   "m1_plusY": {
+    "signed_change_N2R_minus_N1R": [
+     -2.8186416188637296e-05,
+     -2.5420541945417276e-11
+    ],
+    "relative_change": 0.007392781709487419
+   },
+   "m1_minusY": {
+    "signed_change_N2R_minus_N1R": [
+     -4.317429390322553e-05,
+     1.246422814561219e-11
+    ],
+    "relative_change": 0.009822392313511877
+   },
+   "m2_plusY": {
+    "signed_change_N2R_minus_N1R": [
+     -0.0330647737017129,
+     9.835233763922612e-10
+    ],
+    "relative_change": 0.008867223299085934
+   },
+   "m2_minusY": {
+    "signed_change_N2R_minus_N1R": [
+     -0.03314638337671161,
+     -7.118751877972217e-09
+    ],
+    "relative_change": 0.00890252937993411
+   }
+  }
+ },
+ "surface_vs_mesh_summary": {
+  "surface_dependence_of_r12": {
+   "N1R": 0.13389841337567365,
+   "N2R": 0.13601301285898243
+  },
+  "mesh_dependence_of_r12": {
+   "plusY": 0.016405476027838442,
+   "minusY": 0.01889311823359854
+  },
+  "ratio_surface_to_mesh_effect_plusY": 8.161812138121535
+ },
+ "all_consistency_checks_pass": true
+}

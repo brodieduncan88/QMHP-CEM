@@ -12,3 +12,7 @@ geometry/package_picogk/obj/
 # ARE tracked; only transient caches are ignored (spec §11.4).
 scratch/
 *.tmp
+
+# Large field archives are supplied out of band and must never be committed.
+*_fields_*.zip
+N?R_fields_*/

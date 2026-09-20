@@ -1,0 +1,25 @@
+An independent local evaluation has now used the original N1R/N2R field
+archives with the exact SHA-256 digests and your functional.json at 5bc50d0.
+The archive-access limitation remains true of your session; it is not a
+missing-evidence finding. Do not bypass organisation access controls.
+
+Read the attached diagnostic README, script and results.json. The primary
++Y r12 values are -0.00102247823 (N1R) and -0.00103925247 (N2R); mirror -Y
+values are -0.00118055231 and -0.00120285662. F-port reconstruction agrees
+with the committed CSVs to approximately 2.006e-6 relative at worst.
+
+Keep this as an independently produced POSTPROCESSING DIAGNOSTIC. Do not
+claim your session reproduced it unless it actually runs the script on
+verified local copies through an authorised input mechanism.
+
+Review the implication of the measured mirror-surface difference (about
+13.4-13.6% in r12), separately from the mesh-to-mesh difference (1.64-1.89%).
+Do not average the two surfaces, discard signs, select a different surface
+to improve agreement, or compare this diagnostic to the 10% A/B rule.
+State the remaining limitation in mapping the surface functional to the
+registered lumped readout coordinate. Do not jump directly to g.
+
+No new Palace solve, new target definition, Route A/B execution, guard
+relaxation, physical redesign, broad audit, fan-out or merge of PR #7.
+Do not alter historical records. Stop after a concise review of these
+specific diagnostic results and their limitations.

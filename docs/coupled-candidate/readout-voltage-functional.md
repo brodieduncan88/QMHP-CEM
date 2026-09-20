@@ -152,11 +152,15 @@ element, a port element, or etched dielectric.
 
 So the integration surfaces exist as etched dielectric faces of the volume
 mesh, bounded by the pad on one side and by ground on the other, resolved
-by about three to four elements across the gap. They are **not boundary
-elements**, so `V_R` must come from the volume data collection
-(`paraview/eigenmode`), from the tetrahedra whose faces lie on `z = 0`
-inside `Γ_R`; the port face, by contrast, is a boundary element and can be
-taken from the boundary collection.
+by about three to four elements across the gap. They are not boundary
+elements of the *input* mesh. **Correction (2026-09-20):** Palace adds
+boundary elements at material interfaces when it loads the mesh
+(`geodata.cpp`, "Added … boundary elements for material interfaces"), with a
+new attribute (25 in these exports), so the substrate–vacuum faces at `z = 0`
+inside `Γ_R` *are* present in the boundary data collection and can be
+integrated there; the external diagnostic of
+[`readout-surface-difference-review.md`](readout-surface-difference-review.md)
+did so. The volume collection is not required for `V_R`.
 
 Because the Palace-side refinement of N1R (1 level) and N2R (2 levels) is
 confined to the port box, the readout gap is discretised identically in both
