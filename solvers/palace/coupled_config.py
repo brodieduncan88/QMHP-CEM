@@ -135,6 +135,38 @@ PORT_FIELD_PROBES: dict[str, Any] = {
 }
 
 
+#: PO1, the port-removed control: the two deviations it makes from a plain
+#: rung, pinned HERE in source rather than in the approval record.
+#:
+#: An approval record is data, not code. If it could name a boundary index, an
+#: attribute or a configuration key, it could reach any boundary condition in
+#: the model. It cannot: it carries the single identifier below and nothing
+#: else, and the port this deactivates and the points it probes are fixed in
+#: this module.
+PO1_CONTROL_ID = "PO1-port-removed"
+
+#: The three declared probe points of ``numerical-plan.md`` section 2, placed
+#: from the registered geometry at a common 0.010 mm above the chip surface,
+#: in the spec 7.3 frame (mm; Palace reads ``Center`` in mesh length units).
+#:
+#: 1. over the F1 island, at its centre ``(-0.600, 0.000)``
+#: 2. over the R1 coupling pad, the resonator's open end ``(-0.455, 0.000)``
+#: 3. over the R1 CPW at half its 6.983 mm centre line, inside the conductor
+#:    rectangle ``(0.370, 0.475)-(0.670, 0.525)``
+#:
+#: A probe outside the mesh is given 0.0 with a Palace warning
+#: (``fem/interpolator.cpp`` L47-58), which a reader must check rather than
+#: accept silently. Probes add no bilinear form and cannot move an eigenvalue;
+#: they DO require an image built with GSLIB, or Palace aborts at setup
+#: (``fem/interpolator.cpp`` L63-65). ``docker/palace.Dockerfile`` sets
+#: ``-DPALACE_WITH_GSLIB=ON`` and committed records carry ``probe-E.csv``.
+PO1_PROBES_MM: list[list[float]] = [
+    [-0.600, 0.000, 0.010],
+    [-0.455, 0.000, 0.010],
+    [0.5865, 0.500, 0.010],
+]
+
+
 def build_coupled_config(
     mesh_filename: str,
     *,
@@ -148,6 +180,7 @@ def build_coupled_config(
     probes_mm: list[list[float]] | None = None,
     save_modes: int = 0,
     port_field_probes: bool = False,
+    port_active: bool = True,
 ) -> dict[str, Any]:
     """The Palace configuration document for the coupled chip cell.
 
@@ -155,6 +188,20 @@ def build_coupled_config(
     element site: the superinductor alone. The small junction is never a
     linear element (``coupling-definition.md`` §8), and the port is what makes
     Palace report the energy participation.
+
+    ``port_active=False`` is the ONE port-removed control, PO1. Palace
+    assembles the port's ``1/L_s`` boundary mass term into the **stiffness**
+    only for an active port (``lumpedportoperator.cpp`` L571-591, the guard at
+    :577), so the assembled operator becomes ``K - K_port`` and nothing else.
+    The port block itself stays, with its face, direction and ``L``, because
+    every F-site postprocessing functional loops over ports with no active
+    check -- so ``port-V.csv``, ``port-I.csv``, ``port-EPR.csv`` and ``E_ind``
+    are still written, now as NON-LOADING diagnostics of a different
+    operator's eigenvectors. It also changes one thing automatically:
+    ``GetLsAttrList`` omits an inactive port, and ``spaceoperator.cpp``
+    L120-150 ORs that list into ``aux_bdr_marker``, so the auxiliary H1
+    essential-DOF lists the divergence-free projector uses are not the same
+    lists. That is recorded, not configured; no projector setting is touched.
     """
     if order not in (1, 2):
         raise ValueError("order must be 1 or 2")
@@ -193,19 +240,27 @@ def build_coupled_config(
             ]
         }
 
+    # The F1 element site. Built first so that ``Active`` - when the
+    # port-removed control asks for it - lands after ``L``, in the one place
+    # the prepared PO1 candidate has it.
+    port: dict[str, Any] = {
+        "Index": 1,
+        "Attributes": [TAGS["port_F1"]],
+        "Direction": port_direction,
+        "L": float(port_inductance_H),
+    }
+    if not port_active:
+        # K -> K - K_port. Nothing else about the port changes, and the key is
+        # ABSENT for an active port so that every existing config is unchanged
+        # byte for byte (Palace's default is true, configfile.cpp:937).
+        port["Active"] = False
+
     boundaries: dict[str, Any] = {
         # Outer walls and every zero-thickness metal sheet.
         "PEC": {"Attributes": [TAGS["outer_pec"], TAGS["sheet_pec"]]},
         # The fluxonium element site. Inductive, so Palace writes
         # port-EPR.csv; not excited, because this is an eigenmode solve.
-        "LumpedPort": [
-            {
-                "Index": 1,
-                "Attributes": [TAGS["port_F1"]],
-                "Direction": port_direction,
-                "L": float(port_inductance_H),
-            }
-        ],
+        "LumpedPort": [port],
     }
     if port_field_probes:
         boundaries["Postprocessing"] = {
@@ -264,6 +319,8 @@ def build_coupled_config(
 
 __all__ = [
     "COUPLED_SOLVER_RULES",
+    "PO1_CONTROL_ID",
+    "PO1_PROBES_MM",
     "PORT_FIELD_PROBES",
     "CoupledRun",
     "L0_MM_TO_M",

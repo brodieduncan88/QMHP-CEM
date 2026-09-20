@@ -39,12 +39,14 @@ BASELINE_MESH_SHA256 = "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b
 
 #: The three declared probe points of numerical-plan.md section 2, placed from the
 #: registered geometry (solvers.palace.coupled_geometry) at a fixed 0.010 mm above
-#: the chip surface, in the spec 7.3 frame. Declared here, before the run.
-PROBES_MM: list[list[float]] = [
-    [-0.600, 0.000, 0.010],   # 1: over the F1 island (centre)
-    [-0.455, 0.000, 0.010],   # 2: over the R1 coupling pad, the resonator's open end (centre)
-    [0.5865, 0.500, 0.010],   # 3: over the R1 CPW at half its 6.983 mm centre-line length
-]
+#: the chip surface, in the spec 7.3 frame. IMPORTED, not restated: they are
+#: pinned in solvers/palace/coupled_config.py, which is also what the driver
+#: reads, so the prepared candidate and any generated config cannot drift apart.
+#:   1: over the F1 island (centre)
+#:   2: over the R1 coupling pad, the resonator's open end (centre)
+#:   3: over the R1 CPW at half its 6.983 mm centre-line length
+sys.path.insert(0, str(REPO))
+from solvers.palace.coupled_config import PO1_PROBES_MM as PROBES_MM  # noqa: E402
 PROBE_ROLES = {1: "F1.island", 2: "R1.coupling_pad (resonator open end)", 3: "R1.cpw (mid-length)"}
 
 #: The driver's own serialisation, so the delta below is a true file diff

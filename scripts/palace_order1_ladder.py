@@ -57,6 +57,8 @@ from orchestrator import manifest  # noqa: E402
 from solvers.palace import outputs as pout  # noqa: E402
 from solvers.palace.coupled_config import (  # noqa: E402
     COUPLED_SOLVER_RULES,
+    PO1_CONTROL_ID,
+    PO1_PROBES_MM,
     PORT_FIELD_PROBES,
     build_coupled_config,
     superinductor_henry,
@@ -1080,6 +1082,75 @@ _PALACE_BOX_KEYS = {"Levels", "BoundingBoxMin", "BoundingBoxMax"}
 _SOLVER_LINEAR_OVERRIDE_KEYS: dict[str, type] = {"MGMaxLevels": int, "MGUseMesh": bool}
 
 
+#: PO1, the port-removed control: the ONLY boundary-level deviation an
+#: approval may authorise, and it names no boundary.
+#:
+#: The approval carries ``"port_control": "PO1-port-removed"`` and nothing
+#: else - no index, no attribute, no key, no coordinate. What that identifier
+#: selects is pinned in :mod:`solvers.palace.coupled_config`: port index 1 on
+#: the F1 attribute is deactivated, and the three declared probe points are
+#: added. An approval therefore cannot reach any other boundary condition, and
+#: a typo is refused rather than resolved to something nearby.
+#:
+#: PO1 is a control against ONE baseline, N2R, and it is not a rung: it is the
+#: same discretisation with one operator term removed. Both are checked here,
+#: before anything is launched, so that a PO1 approval cannot be pointed at a
+#: different baseline or write into a record directory that is not its own.
+_PORT_CONTROL_ID = PO1_CONTROL_ID
+_PORT_CONTROL_LABEL = "PO1"
+_PORT_CONTROL_BASELINE_RECORD = "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z"
+
+
+def approved_port_control(path: Path | None = None) -> str | None:
+    """The port-removed control an approval record authorises, or ``None``.
+
+    Narrow by construction. The only accepted value is the single pinned
+    identifier; anything else - another string, a boolean, an object that
+    could carry keys - is refused before a solve is launched. The refusal is
+    deliberate: "unknown value" must not degrade to "no control", because a
+    run that silently kept the port active would be N2R re-solved and would be
+    recorded as the control it is not.
+    """
+    approval_path = LADDER_APPROVAL if path is None else Path(path)
+    if not approval_path.is_file():
+        return None
+    approval = json.loads(approval_path.read_text())
+    if "port_control" not in approval:
+        return None
+    value = approval["port_control"]
+    if not isinstance(value, str) or value != _PORT_CONTROL_ID:
+        raise LadderError(
+            f"port_control must be the exact string {_PORT_CONTROL_ID!r}, got {value!r}. It is an "
+            "identifier, not a boundary specification: the port it deactivates and the probe "
+            "points it adds are pinned in solvers/palace/coupled_config.py and an approval "
+            "cannot name any other boundary, attribute or key."
+        )
+    if approval.get("port_refinement") is not None:
+        raise LadderError(
+            "port_control is a control on the BASELINE mesh and prescription; it cannot be "
+            "combined with port_refinement, which builds a different mesh."
+        )
+    block = approval.get("palace_refinement")
+    if not isinstance(block, dict):
+        raise LadderError(
+            "port_control requires the palace_refinement block that reproduces the baseline's "
+            "refinement prescription. Without it the control would remove the port term from a "
+            "DIFFERENT discrete problem and the comparison it exists for would be impossible."
+        )
+    if str(block.get("id")) != _PORT_CONTROL_LABEL:
+        raise LadderError(
+            f"port_control requires palace_refinement.id == {_PORT_CONTROL_LABEL!r}, got "
+            f"{block.get('id')!r}. The id is the record's directory suffix, and the control must "
+            "not be able to write into the historical record of the baseline it is compared with."
+        )
+    if approval.get("baseline_record") != _PORT_CONTROL_BASELINE_RECORD:
+        raise LadderError(
+            f"port_control is defined against the fixed baseline {_PORT_CONTROL_BASELINE_RECORD!r}, "
+            f"but the approval names baseline_record {approval.get('baseline_record')!r}."
+        )
+    return value
+
+
 #: One sentinel, compared in three places. Two copies drifted apart once
 #: and every plain rung grew two spurious empty report sections.
 NOT_REFINED = "not a refined run"
@@ -1216,8 +1287,19 @@ def approved_palace_refinement(
         )
     baseline_rung = (json.loads((record / "summary.json").read_text()).get("rung") or {})
     proposed = {"palace_refinement": {"boxes": boxes}}
-    if any_refinement(baseline_rung) is not None and not is_prior_point_of_same_sequence(
-        proposed, baseline_rung
+    # The port-removed control is NOT a refinement step, so the refined-baseline
+    # rule below would refuse it for the wrong reason: it wants a baseline that
+    # is strictly shallower, and the control wants one that is IDENTICAL. The
+    # exception is narrow in both directions - it fires only when the approval
+    # carries the pinned port_control identifier, and it demands exact equality
+    # in every box rather than merely "not shallower". Every other approval sees
+    # the unchanged rule.
+    is_port_control = approval.get("port_control") == _PORT_CONTROL_ID
+    same_discretisation = is_port_control and is_identical_refinement(proposed, baseline_rung)
+    if (
+        any_refinement(baseline_rung) is not None
+        and not same_discretisation
+        and not is_prior_point_of_same_sequence(proposed, baseline_rung)
     ):
         # Checked BEFORE launch, as the gmsh path does. A refined baseline is
         # not a baseline UNLESS it is a shallower point of this run's own nested
@@ -1327,6 +1409,7 @@ def execute_level(
     palace_refinement: list[dict[str, Any]] | None = None,
     palace_refinement_label: str | None = None,
     solver_linear_overrides: dict[str, Any] | None = None,
+    port_control: str | None = None,
     expected_mesh_sha256: str | None = None,
 ) -> dict[str, Any]:
     entry: dict[str, Any] = {
@@ -1339,6 +1422,44 @@ def execute_level(
             "mechanism": "Palace Model.Refinement.Boxes on the loaded mesh; no gmsh, no new mesh file",
             "boxes": palace_refinement,
             "solver_linear_overrides": dict(solver_linear_overrides or {}),
+        },
+        "port_control": None if port_control is None else {
+            "id": port_control,
+            "operator_change": (
+                "Boundaries.LumpedPort[0].Active = false. Palace assembles the port's 1/L_s "
+                "boundary mass term into the STIFFNESS only for an active port "
+                "(lumpedportoperator.cpp:571-591, the guard at :577), so the assembled operator "
+                "is K - K_port and nothing else. AddDampingBdrCoefficients (:593) and "
+                "AddMassBdrCoefficients (:615) gate on the same flag and are already inert here "
+                "because R = C = 0."
+            ),
+            "changes_the_operator": True,
+            "probes_mm": [list(c) for c in PO1_PROBES_MM],
+            "probes_change_the_operator": False,
+            "also_changed_automatically": (
+                "GetLsAttrList() omits an inactive port (lumpedportoperator.cpp:531-549), and "
+                "spaceoperator.cpp:120-150 ORs that list into aux_bdr_marker before building "
+                "aux_bdr_tdof_lists, which eigensolver.cpp:164-173 hands to the DivFreeSolver. "
+                "So the auxiliary H1 essential-DOF lists are NOT the baseline's: the port face "
+                "leaves them, the free auxiliary space grows, and the projector's removed "
+                "gradient subspace can only grow with it. This is recorded, not configured: no "
+                "DivFree setting is touched (Tol and MaxIts are Palace's defaults, as in the "
+                "baseline)."
+            ),
+            "f_site_diagnostics_are_non_loading": (
+                "UpdatePorts (postoperator.cpp:430), PostprocessEPR, GetInductorParticipation "
+                "(postoperator.cpp:644) and GetLumpedInductorEnergy (postoperator.cpp:493) loop "
+                "over every port with no active check, so port-V.csv, port-I.csv, port-EPR.csv "
+                "and E_ind are still written. They correspond to no term in this run's operator "
+                "and are REFERENCE diagnostics here, not a physical classification gate."
+            ),
+            "inherited_analysis_is_reference_only": (
+                "this record's admission, roles, port_field_test and port_diagnostic blocks are "
+                "produced by the unchanged driver, whose admission ratio R = (E_mag + E_ind) / "
+                "(E_elec + E_cap) includes an E_ind that no operator term backs here. For a "
+                "port-removed run they are reference diagnostics. The port-removed energy "
+                "balance E_mag / (E_elec + E_cap) is the quantity that tests THIS operator."
+            ),
         },
         "status": "NOT-RUN",
     }
@@ -1394,6 +1515,10 @@ def execute_level(
             port_direction=direction,
             save_modes=n_modes,
             port_field_probes=True,
+            # PO1 only, and both values are pinned in coupled_config: the
+            # approval named an identifier, never a boundary or a coordinate.
+            port_active=port_control is None,
+            probes_mm=None if port_control is None else PO1_PROBES_MM,
         )
         if palace_refinement is not None:
             # The ONLY delta against the baseline config. The mesh file is the
@@ -1781,6 +1906,28 @@ def is_prior_point_of_same_sequence(entry: dict[str, Any], baseline_rung: dict[s
     return any(mine[k] > theirs[k] for k in mine)
 
 
+def is_identical_refinement(entry: dict[str, Any], baseline_rung: dict[str, Any]) -> bool:
+    """Is the baseline the SAME refinement, at the SAME depth in every box?
+
+    Stricter than :func:`is_prior_point_of_same_sequence`, not weaker: the set
+    of regions must be identical AND every box must be at exactly the baseline's
+    depth. It exists for ONE case, the port-removed control, where an identical
+    discretisation is the point rather than a confound - the control and its
+    baseline differ in the assembled operator, so any difference in the mesh
+    would destroy the comparison instead of enabling it.
+
+    It is never a substitute for the plain-rung rule. A refinement STEP still
+    has to be strictly deeper somewhere, which this predicate refuses.
+    """
+    this_r, base_r = entry.get("palace_refinement"), baseline_rung.get("palace_refinement")
+    if this_r is None or base_r is None:
+        return False
+    mine, theirs = refinement_boxes_by_region(this_r), refinement_boxes_by_region(base_r)
+    if not mine or not theirs or set(mine) != set(theirs):
+        return False
+    return all(mine[k] == theirs[k] for k in mine)
+
+
 def compare_against_baseline(
     entry: dict[str, Any],
     baseline_record: str,
@@ -1803,6 +1950,7 @@ def compare_against_baseline(
     the unchanged ones; nothing here introduces a threshold.
     """
     nested = entry.get("palace_refinement") is not None
+    control = entry.get("port_control")
     # The solver clause is DERIVED, not hardcoded. Model.Refinement normally
     # deepens the multigrid hierarchy, but an approved MGMaxLevels/MGUseMesh
     # override removes it entirely - the opposite direction - and a record that
@@ -1831,8 +1979,26 @@ def compare_against_baseline(
     )
     out: dict[str, Any] = {
         "baseline": baseline_record,
-        "mechanism": "palace_refinement (nested)" if nested else "port_refinement (gmsh, not nested)",
+        "mechanism": (
+            f"port-removed control {control['id']} on an IDENTICAL palace_refinement prescription"
+            if control else
+            "palace_refinement (nested)" if nested else "port_refinement (gmsh, not nested)"
+        ),
         "why_this_comparison": (
+            (
+                "THIS RUN IS NOT A REFINEMENT STEP. It carries the port-removed control "
+                f"{control['id']}: the baseline's mesh file and refinement prescription are "
+                "reproduced identically, so the discretisation is the same and the loaded and "
+                "solved DOF counts must match the baseline's. What differs is the assembled "
+                "operator, K -> K - K_port, and - automatically, by the same Active flag - the "
+                "auxiliary H1 essential-DOF lists the divergence-free projector uses "
+                "(GetLsAttrList omits an inactive port; spaceoperator.cpp ORs that list into "
+                "aux_bdr_marker). A frequency difference between the two runs is attributable to "
+                "that PAIR, not to added degrees of freedom and not to the operator alone. The "
+                "baseline's port-loaded frequencies and this run's port-open frequencies are "
+                "different quantities: they are compared, never differenced as a convergence step, "
+                "and this comparison gates nothing."
+            ) if control else
             (
                 "the refined run REUSES the baseline's mesh file byte-identically and adds one "
                 "Model.Refinement.Boxes block. MFEM's conforming refinement only inserts edge "
@@ -2310,6 +2476,25 @@ def render_report(summary: dict[str, Any]) -> str:
     add("")
     add(f"Record `{summary['batch_id']}`. {summary['statement']}")
     add("")
+    control = entry.get("port_control")
+    if control:
+        # Without this the rendered heading reads "mesh-refinement check", which
+        # a port-removed control is not. The record's own blocks already say so;
+        # the report must not contradict them.
+        add(
+            f"> **NOT A REFINEMENT CHECK.** This run carries the port-removed control "
+            f"`{control['id']}`: the baseline's mesh file and refinement prescription are "
+            "reproduced identically and the deviation is one operator term, "
+            "`Boundaries.LumpedPort[0].Active = false`, i.e. `K → K − K_port`. Deactivating the "
+            "port also changes, automatically, the auxiliary H1 essential-DOF lists the "
+            "divergence-free projector uses, so a difference against the baseline is attributable "
+            "to that pair and not to the operator alone. It is **not** a rung: it must not enter "
+            "the L1/L2/L3 convergence fit. `E_ind`, `port-EPR.csv` `|p|` and the derived port "
+            "participation are still written and are **reference diagnostics only** here — they "
+            "back no term in this run's operator. See "
+            "`docs/coupled-candidate/po1-port-removed-control.md`."
+        )
+        add("")
 
     add("## 1. Dry runs (offline, no solver)")
     add("")
@@ -2852,6 +3037,9 @@ def main(argv: list[str] | None = None) -> int:
     palace_label, palace_boxes, palace_baseline_sha, palace_solver_overrides = (
         approved_palace if approved_palace else (None, None, None, {})
     )
+    # The port-removed control. Validated against the same approval record and
+    # refused outright on anything but its one pinned identifier.
+    port_control = approved_port_control(args.approval)
     if palace_label:
         label = palace_label
         # A Palace-side refinement REUSES the baseline mesh. The hash gate is
@@ -2882,6 +3070,7 @@ def main(argv: list[str] | None = None) -> int:
         palace_refinement=palace_boxes,
         palace_refinement_label=palace_label,
         solver_linear_overrides=palace_solver_overrides,
+        port_control=port_control,
         expected_mesh_sha256=expected_mesh_sha256,
     )
     # EVERYTHING from here to the durable write is analysis of a solve that has
