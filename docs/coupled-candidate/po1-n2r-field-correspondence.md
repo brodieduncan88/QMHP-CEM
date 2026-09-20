@@ -8,6 +8,17 @@ IDENTITY** — stand exactly as recorded; nothing here amends them. No coupling,
 no `g`, no registered-definition change, no Palace run.
 Record: `experiments/po1-n2r-correspondence/`.
 
+> **Forward pointer, added later. Nothing below is withdrawn or edited.**
+> The *transport limitation* of §3 — that the archives were unreachable, so
+> steps 2–6 did not run — is superseded by
+> [`po1-n2r-field-correspondence-external.md`](po1-n2r-field-correspondence-external.md),
+> which records an overlap computed where the archives were readable:
+> **PO1 m1 ↔ N2R m2, 0.999927020830**. That note *completes* §5's exclusion
+> rather than contradicting it — the field data refutes m5 and Bessel bounds
+> m8, leaving m2 alone. §2's digests, §5's exclusion and §6's conditional
+> frequency comparison stand as written, and PO1's INCONCLUSIVE verdict is
+> unchanged by either note.
+
 ## 1. The primary question
 
 *Can a full-field comparison on the identical refined mesh establish which N2R

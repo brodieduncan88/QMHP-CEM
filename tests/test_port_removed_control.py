@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -655,15 +656,20 @@ def test_nothing_in_this_preparation_can_launch_palace():
     # every subprocess this test file runs is one of the declared OFFLINE builders
     import ast
 
-    offline = {"prepare.py", "correspondence.py"}
+    offline = {"prepare.py", "correspondence.py", "verify_external.py"}
     tree = ast.parse(Path(__file__).read_text())
     runs = [n for n in ast.walk(tree)
             if isinstance(n, ast.Call) and ast.unparse(n.func) == "subprocess.run"]
     argv = [ast.unparse(n.args[0]) for n in runs]
     assert argv, "the builders must actually be exercised"
     for a in argv:
+        if a.startswith("['git'"):
+            # read-only git queries are allowed; a mutating one is not
+            assert any(q in a for q in ("'diff'", "'log'", "'status'", "'rev-parse'")), a
+            continue
         assert "sys.executable" in a, a
         assert any(name in a for name in offline), a
+    assert any("sys.executable" in a for a in argv), "at least one offline builder must run"
     # No PO1 CANDIDATE may ever be written under results/. A PO1 RECORD may
     # exist once the approved run has committed one - that is evidence, not a
     # candidate - so it is checked for shape rather than forbidden outright.
@@ -768,3 +774,119 @@ def test_the_correspondence_script_reproduces_its_json_and_touches_no_network():
                           capture_output=True, text=True, cwd=REPO_ROOT)
     assert proc.returncode == 0, proc.stderr
     assert (CORR / "correspondence.json").read_text() == before
+
+
+# --- the external full-field correspondence: what it supersedes, and what it does not ----
+
+EXT = REPO_ROOT / "experiments" / "po1-n2r-correspondence-external"
+EXT_DOC = REPO_ROOT / "docs" / "coupled-candidate" / "po1-n2r-field-correspondence-external.md"
+
+
+@pytest.fixture(scope="module")
+def external():
+    return json.loads((EXT / "verification.json").read_text())
+
+
+def test_it_supersedes_only_the_transport_limitation(external):
+    assert "ONLY the transport limitation" in external["supersedes"]
+    assert "Nothing else in that record is withdrawn" in external["supersedes"]
+    assert "INCONCLUSIVE FOR MODE IDENTITY verdict are untouched" in external["supersedes"]
+    norm = _norm(EXT_DOC.read_text())
+    assert "What this supersedes, and only this" in norm
+    assert "`282d216` is not rewritten" in norm
+    # PO1's own record on disk is untouched by this analysis
+    po1 = json.loads((REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-PO1-20260920T204837Z"
+                      / "summary.json").read_text())
+    assert po1["rung"]["status"] == "COMPLETED"
+    assert po1["rung"]["port_control"]["id"] == "PO1-port-removed"
+
+
+def test_the_prior_note_is_annotated_not_rewritten():
+    """The forward pointer must add lines and change none."""
+    prior = REPO_ROOT / "docs" / "coupled-candidate" / "po1-n2r-field-correspondence.md"
+    text = prior.read_text()
+    assert "Forward pointer, added later. Nothing below is withdrawn or edited." in text
+    # the prior note's own findings are still present, verbatim
+    norm = _norm(text)
+    assert "CORRESPONDENCE NOT ESTABLISHED" in norm
+    assert "no overlap number in this note is computed from a field" in norm
+    assert "they rule modes out, and can never rule one in" in norm
+    diff = subprocess.run(["git", "diff", "HEAD", "--numstat", "--", str(prior)],
+                          capture_output=True, text=True, cwd=REPO_ROOT).stdout.split()
+    if diff:                       # before the commit lands, prove the edit was additive
+        added, removed = int(diff[0]), int(diff[1])
+        assert removed == 0, f"{removed} lines were removed from a prior record"
+        assert added > 0
+
+
+def test_the_external_package_is_preserved_verbatim_and_verifies(external):
+    man = external["checks"]["package_manifest"]
+    assert set(man) == {"README.md", "field_overlap_check.py", "results.json"}
+    assert all(v["ok"] for v in man.values()), man
+    # the two artefact digests agree with this repository's own earlier API reading
+    dig = external["checks"]["artefact_digests_match_this_repositorys_api_reading"]
+    assert all(v["ok"] for v in dig.values()), dig
+    assert dig["N2R"]["package"] == (
+        "1ca851c4da54210270d6834f378bd8e5cf96e4db047beb546ac69a5079eb8b0e")
+    # and the large field archives are NOT in the repository
+    assert not list(EXT.rglob("*.zip")) and not list(EXT.rglob("*.vtu"))
+    assert sum(f.stat().st_size for f in EXT.rglob("*") if f.is_file()) < 200_000
+
+
+def test_the_constants_and_export_shape_were_checked_against_this_repository(external):
+    c = external["checks"]["constants_match_the_repository"]
+    assert c["substrate_permittivity"]["ok"] and c["substrate_permittivity"]["declared"] == 11.45
+    assert c["attribute_numbers"]["ok"]
+    assert c["saved_mode_count"]["ok"] and c["saved_mode_count"]["config_Solver_Eigenmode_Save"] == 6
+    e = external["checks"]["export_shape"]
+    assert e["points_equals_four_times_cells"] and e["points"] == 4 * e["cells"]
+    assert "affine inside a tetrahedron" in e["why_it_matters"]
+    # the mesh-identity booleans are the package's, and are labelled as such
+    assert "not verified here" in external["checks"]["mesh_identity_AS_REPORTED_BY_THE_PACKAGE"]["caveat"]
+    assert "No field sample was read in this environment" in external["not_verifiable_here"]
+
+
+def test_the_rms_is_declared_an_identity_not_a_second_measurement(external):
+    a = external["checks"]["internal_algebra"]["rms_is_the_identity_sqrt_one_minus_overlap_squared"]
+    assert a["ok"]
+    assert a["reported_rms"] == pytest.approx(math.sqrt(1 - 0.9999270208301023**2), abs=1e-12)
+    assert "must not be cited as corroboration" in a["consequence"]
+    assert "not a second measurement" in _norm(EXT_DOC.read_text())
+
+
+def test_bessel_closes_the_gap_the_prior_note_left(external):
+    ia = external["checks"]["internal_algebra"]
+    b = ia["bound_on_the_N2R_modes_the_archive_does_not_contain"]
+    assert ia["bessel_over_the_saved_set"]["at_most_one"]
+    assert b["tighter_bound_from_bessel"] < b["loose_bound_orthogonal_to_m2_only"]
+    assert b["tighter_bound_from_bessel"] < 1.0e-3
+    assert b["m2_exceeds_the_tighter_bound_by"] > 1000
+    assert "mass-matrix inner product" in b["why_the_bound_is_valid"]
+    comp = external["checks"]["completes_the_prior_exclusion_analysis"]
+    assert comp["prior_surviving_candidates"] == [2, 5, 8]
+    assert "the partner" in comp["resolution"]["2"]
+    assert "refuted" in comp["resolution"]["5"] and "cannot be the partner" in comp["resolution"]["8"]
+    assert "completed, not contradicted" in comp["note"]
+    assert external["checks"]["internal_algebra"]["best_and_second_best"]["ratio"] > 80
+
+
+def test_g_is_still_blocked_and_the_blockers_are_named(external):
+    norm = _norm(EXT_DOC.read_text())
+    assert "Still blocks `g`, unchanged by this" in norm
+    for blocker in ("The pair, not the operator", "is unmeasured", "One mesh",
+                    "The field evidence is external"):
+        assert blocker in norm, blocker
+    assert "stays **UNAVAILABLE**" in norm
+    assert "no coupling can be formed" in norm
+
+
+def test_the_verification_script_reproduces_its_json_and_touches_no_network():
+    src = (EXT / "verify_external.py").read_text()
+    for forbidden in ("requests", "urllib", "curl", "socket"):
+        assert forbidden not in src, forbidden
+    before = (EXT / "verification.json").read_text()
+    proc = subprocess.run([sys.executable, str(EXT / "verify_external.py")],
+                          capture_output=True, text=True, cwd=REPO_ROOT)
+    assert proc.returncode == 0, proc.stderr
+    assert (EXT / "verification.json").read_text() == before
+    assert json.loads(before)["all_checks_pass"] is True
