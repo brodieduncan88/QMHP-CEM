@@ -1,5 +1,16 @@
 # Pre-declared Faraday consistency test for the two readout surfaces
 
+> **Corrections recorded after the external evaluation (2026-09-20; see
+> `external-faraday/`).** (1) The loop of §2, traversed as declared, is
+> **clockwise viewed from +z** (signed area −0.0585 mm² at `x = −0.45`), so
+> its Stokes normal is −z and the identity of §3 reads
+> `V₊ − V₋ = +iω Φ_z` for the exported +z `B_z`; the `−iω` written below
+> assumed a +z normal and is wrong by a sign. (2) `A_west` of §3 contains the
+> existing `P_F1` port face (attribute 10), which is a boundary element of
+> the input mesh and not an interface element; the flux must include it
+> (4.0–5.5 % of the weighted flux in the four cases), not attribute 25 alone.
+> The text below is kept as declared.
+
 **Status:** declared before any field value has been seen. Nothing here has
 been evaluated. It fixes, ahead of the data, the closed paths, connecting
 segments, spanning surface, width-averaging treatment, phasor convention and

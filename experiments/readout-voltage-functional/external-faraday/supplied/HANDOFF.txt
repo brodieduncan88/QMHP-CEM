@@ -1,0 +1,17 @@
+QMHP FARADAY HANDOFF
+
+These results were computed externally from the hash-verified N1R/N2R field
+archives. Claude did not reproduce them unless it has the original archives.
+
+Review the two corrections before importing any conclusion:
+1) loop orientation implies +iω when using exported +z B_z;
+2) A_west includes P_F1 attribute 10, not attribute 25 alone.
+
+Do not extract g from this package. The supported conclusion is only that the
+two readout path integrals differ by the Faraday magnetic-flux term of the
+stored discrete solution.
+
+Next scientific decision: define how the registered R1 circuit coordinate is
+mapped from this path-dependent distributed field (explicit path/tree/gauge or
+a separately justified modal reduction) before any real-data coupling
+extraction.

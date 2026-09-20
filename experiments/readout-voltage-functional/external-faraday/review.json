@@ -1,0 +1,51 @@
+{
+ "label": "DERIVED-FROM-EXTERNAL and local geometry checks; no field integral reproduced here",
+ "checks": {
+  "loop_signed_area_mm2_at_x_-0.45": -0.05850000000000001,
+  "loop_orientation": "clockwise viewed from +z (negative signed area): Stokes normal is -z, so V+ - V- = +i omega Phi_z with +z B_z",
+  "A_west_area_mm2_from_geometry": 0.028399999999999995,
+  "A_west_area_mm2_reported": 0.0284,
+  "P_F1_face_inside_A_west": true,
+  "P_F1_area_fraction_of_A_west": 0.02816901408450705,
+  "weighted_strip_area_each_mm2_from_geometry": 0.0012,
+  "weighted_strip_area_each_mm2_reported": 0.0012,
+  "comparisons": {
+   "N1R_m1": {
+    "measured_equals_readout_diagnostic_difference_abs": 0.0,
+    "relative_complex_disagreement_recomputed": 9.533453095811348e-07,
+    "relative_complex_disagreement_reported": 9.533453095811348e-07,
+    "phase_error_deg_recomputed": -7.985680976912755e-07,
+    "attribute10_fraction_reported": 0.04044747094996809,
+    "frequency_GHz_reported": 1.515753609
+   },
+   "N1R_m2": {
+    "measured_equals_readout_diagnostic_difference_abs": 0.0,
+    "relative_complex_disagreement_recomputed": 8.567386998094843e-06,
+    "relative_complex_disagreement_reported": 8.567386998094843e-06,
+    "phase_error_deg_recomputed": 2.7849507851510276e-05,
+    "attribute10_fraction_reported": 0.05217935179565623,
+    "frequency_GHz_reported": 3.887131643
+   },
+   "N2R_m1": {
+    "measured_equals_readout_diagnostic_difference_abs": 0.0,
+    "relative_complex_disagreement_recomputed": 8.226176955158053e-07,
+    "relative_complex_disagreement_reported": 8.226176955158053e-07,
+    "phase_error_deg_recomputed": 2.758131795627905e-06,
+    "attribute10_fraction_reported": 0.041891509693339025,
+    "frequency_GHz_reported": 1.526014889
+   },
+   "N2R_m2": {
+    "measured_equals_readout_diagnostic_difference_abs": 0.0,
+    "relative_complex_disagreement_recomputed": 1.1442691094480362e-05,
+    "relative_complex_disagreement_reported": 1.1442691094480362e-05,
+    "phase_error_deg_recomputed": -5.370716241159682e-05,
+    "attribute10_fraction_reported": 0.054923165784342295,
+    "frequency_GHz_reported": 3.887370723
+   }
+  },
+  "N1R_frequencies_equal_committed_eig_csv": true,
+  "N2R_frequencies_equal_committed_eig_csv": true,
+  "t_c_ns": 0.01334256380791072
+ },
+ "all_pass": true
+}

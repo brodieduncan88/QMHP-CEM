@@ -165,6 +165,16 @@ one. Convergence of `V_R` in the readout gap is untested, since both records
 discretise it identically; mode completeness and single-mode adequacy remain
 as before; and nothing here bears on `g`.
 
+> **Outcome and corrections (2026-09-20).** The test below was executed
+> externally on the same archives (`experiments/readout-voltage-functional/external-faraday/`)
+> with two corrections: the loop is clockwise from +z, so the sign is
+> `+iω Φ_z`; and the flux must include the `P_F1` face (attribute 10) inside
+> `A_west`, not attribute 25 alone as written here. With those, the Faraday
+> prediction reproduces `V₊ − V₋` to 8.2e-7 … 1.1e-5 relative in all four
+> cases: the surface difference is the magnetic-flux/path term of the stored
+> discrete solution. The definition decision it forces is in
+> [`r1-definition-decision.md`](r1-definition-decision.md).
+
 ## 5. One proposed next test, for approval, not executed
 
 **Test.** Evaluate the pre-declared Faraday identity of §3 on the same two
