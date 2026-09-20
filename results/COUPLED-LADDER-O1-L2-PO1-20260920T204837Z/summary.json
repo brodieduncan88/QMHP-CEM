@@ -1,0 +1,2167 @@
+{
+ "asymptotic": {
+  "criterion": "clearly pre-asymptotic if any tracked mode yields no positive order, or an order far from the method's expected 2, or an estimated remaining error above 1e-2 at the finest rung. This is a descriptive numerical criterion introduced with this record; it gates nothing and is not a physical threshold.",
+  "per_mode": [
+   {
+    "mode": "L1m1",
+    "reason": "the successive differences shrink by only 1.226, at or below the 1.409 that the refinement ratios impose even as the order tends to zero: no positive order of convergence fits these three rungs",
+    "verdict": "NO-ORDER"
+   },
+   {
+    "mode": "L1m2",
+    "reason": "the successive differences shrink by only 0.9513, at or below the 1.409 that the refinement ratios impose even as the order tends to zero: no positive order of convergence fits these three rungs",
+    "verdict": "NO-ORDER"
+   }
+  ],
+  "still_clearly_pre_asymptotic": true,
+  "worst_remaining_relative_error": Infinity
+ },
+ "baseline_comparison": {
+  "available": false,
+  "baseline": "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z",
+  "convention": {
+   "delta_f": "|f_a - f_b| / f_a, run A the reference (unchanged)",
+   "delta_p": "abs(|p_a| - |p_b|) / max(|p_a|, |p_b|) \u2014 MAGNITUDES. Corrective change from the signed numerator |p_a - p_b|, which is not invariant under the eigenvector phase. The denominator and the 1e-2 tolerance are unchanged.",
+   "signs_preserved": "the signed participation and the complex port current are carried through unchanged in every record; only the comparison uses magnitudes"
+  },
+  "frozen_tolerances": {
+   "delta_abs_p_max": 0.01,
+   "delta_f_relative_max": 0.0001,
+   "status": "unchanged; this comparison does not gate anything"
+  },
+  "matching_rule": {
+   "adjacent_gap_is_over_admitted_modes_only": "a rejected row lying between two admitted ones does not narrow the guard; on this record every rejected row sits above both admitted in-window modes, so it does not bite",
+   "id": "qmhp-cem.mode-matching/0.1.1",
+   "pairing": "two one-to-one pairings over the admitted in-window modes \u2014 by ascending frequency, and by descending |p| \u2014 which must induce the SAME pairing",
+   "refuses_when": "the two runs admit different numbers of in-window modes, the two pairings disagree, or the separation guard fails \u2014 in each case no comparison is reported",
+   "separation_guard": "each pair's frequency shift between runs must be below half the smallest adjacent-mode spacing in either run, so no swap is possible",
+   "separation_guard_is_vacuous_when": "either run admits a single in-window mode: the adjacent-mode spacing is then infinite, so the guard cannot fail and the ordering check cannot fail either. Such a match is reported with guard='VACUOUS' rather than silently as if it had been guarded.",
+   "status": "retrospective for COUPLED-PILOT-20260916T035733Z; prospective for the next confirmatory run",
+   "what_the_ordering_check_can_and_cannot_do": "Each pairing is formed by sorting the two runs SEPARATELY and zipping, so whenever |p| is co-monotone with frequency inside each run the two pairings agree BY CONSTRUCTION, whatever the true correspondence is. The check therefore detects a run whose |p| order inverts against its frequency order; it is NOT independent evidence that the correspondence between the runs is right. On COUPLED-PILOT-20260916T035733Z all three runs are co-monotone, so the check could not have contradicted the frequency pairing there. The separation guard is what carries the correspondence."
+  },
+  "mechanism": "port-removed control PO1-port-removed on an IDENTICAL palace_refinement prescription",
+  "reason": "the named baseline is itself refined, and is not a shallower point of this run's own refinement sequence (same region, fewer levels); it is not a baseline",
+  "why_this_comparison": "THIS RUN IS NOT A REFINEMENT STEP. It carries the port-removed control PO1-port-removed: the baseline's mesh file and refinement prescription are reproduced identically, so the discretisation is the same and the loaded and solved DOF counts must match the baseline's. What differs is the assembled operator, K -> K - K_port, and - automatically, by the same Active flag - the auxiliary H1 essential-DOF lists the divergence-free projector uses (GetLsAttrList omits an inactive port; spaceoperator.cpp ORs that list into aux_bdr_marker). A frequency difference between the two runs is attributable to that PAIR, not to added degrees of freedom and not to the operator alone. The baseline's port-loaded frequencies and this run's port-open frequencies are different quantities: they are compared, never differenced as a convergence step, and this comparison gates nothing."
+ },
+ "batch_id": "COUPLED-LADDER-O1-L2-PO1-20260920T204837Z",
+ "comparison": {
+  "available": false,
+  "convention": {
+   "delta_f": "|f_a - f_b| / f_a, run A the reference (unchanged)",
+   "delta_p": "abs(|p_a| - |p_b|) / max(|p_a|, |p_b|) \u2014 MAGNITUDES. Corrective change from the signed numerator |p_a - p_b|, which is not invariant under the eigenvector phase. The denominator and the 1e-2 tolerance are unchanged.",
+   "signs_preserved": "the signed participation and the complex port current are carried through unchanged in every record; only the comparison uses magnitudes"
+  },
+  "match": {
+   "admitted_in_window_GHz": {
+    "a": [
+     1.158332505,
+     3.693188998
+    ],
+    "b": [
+     3.885827871
+    ]
+   },
+   "comparable": false,
+   "comparison": "L1 vs L2",
+   "convention": {
+    "delta_f": "|f_a - f_b| / f_a, run A the reference (unchanged)",
+    "delta_p": "abs(|p_a| - |p_b|) / max(|p_a|, |p_b|) \u2014 MAGNITUDES. Corrective change from the signed numerator |p_a - p_b|, which is not invariant under the eigenvector phase. The denominator and the 1e-2 tolerance are unchanged.",
+    "signs_preserved": "the signed participation and the complex port current are carried through unchanged in every record; only the comparison uses magnitudes"
+   },
+   "pairs": [],
+   "reason": "the runs admit different numbers of in-window modes (2 and 1); pairing a prefix would assume which mode is missing, so no comparison is reported",
+   "rule": {
+    "adjacent_gap_is_over_admitted_modes_only": "a rejected row lying between two admitted ones does not narrow the guard; on this record every rejected row sits above both admitted in-window modes, so it does not bite",
+    "id": "qmhp-cem.mode-matching/0.1.1",
+    "pairing": "two one-to-one pairings over the admitted in-window modes \u2014 by ascending frequency, and by descending |p| \u2014 which must induce the SAME pairing",
+    "refuses_when": "the two runs admit different numbers of in-window modes, the two pairings disagree, or the separation guard fails \u2014 in each case no comparison is reported",
+    "separation_guard": "each pair's frequency shift between runs must be below half the smallest adjacent-mode spacing in either run, so no swap is possible",
+    "separation_guard_is_vacuous_when": "either run admits a single in-window mode: the adjacent-mode spacing is then infinite, so the guard cannot fail and the ordering check cannot fail either. Such a match is reported with guard='VACUOUS' rather than silently as if it had been guarded.",
+    "status": "retrospective for COUPLED-PILOT-20260916T035733Z; prospective for the next confirmatory run",
+    "what_the_ordering_check_can_and_cannot_do": "Each pairing is formed by sorting the two runs SEPARATELY and zipping, so whenever |p| is co-monotone with frequency inside each run the two pairings agree BY CONSTRUCTION, whatever the true correspondence is. The check therefore detects a run whose |p| order inverts against its frequency order; it is NOT independent evidence that the correspondence between the runs is right. On COUPLED-PILOT-20260916T035733Z all three runs are co-monotone, so the check could not have contradicted the frequency pairing there. The separation guard is what carries the correspondence."
+   },
+   "status": "COUNT_MISMATCH"
+  },
+  "matching_rule": {
+   "adjacent_gap_is_over_admitted_modes_only": "a rejected row lying between two admitted ones does not narrow the guard; on this record every rejected row sits above both admitted in-window modes, so it does not bite",
+   "id": "qmhp-cem.mode-matching/0.1.1",
+   "pairing": "two one-to-one pairings over the admitted in-window modes \u2014 by ascending frequency, and by descending |p| \u2014 which must induce the SAME pairing",
+   "refuses_when": "the two runs admit different numbers of in-window modes, the two pairings disagree, or the separation guard fails \u2014 in each case no comparison is reported",
+   "separation_guard": "each pair's frequency shift between runs must be below half the smallest adjacent-mode spacing in either run, so no swap is possible",
+   "separation_guard_is_vacuous_when": "either run admits a single in-window mode: the adjacent-mode spacing is then infinite, so the guard cannot fail and the ordering check cannot fail either. Such a match is reported with guard='VACUOUS' rather than silently as if it had been guarded.",
+   "status": "retrospective for COUPLED-PILOT-20260916T035733Z; prospective for the next confirmatory run",
+   "what_the_ordering_check_can_and_cannot_do": "Each pairing is formed by sorting the two runs SEPARATELY and zipping, so whenever |p| is co-monotone with frequency inside each run the two pairings agree BY CONSTRUCTION, whatever the true correspondence is. The check therefore detects a run whose |p| order inverts against its frequency order; it is NOT independent evidence that the correspondence between the runs is right. On COUPLED-PILOT-20260916T035733Z all three runs are co-monotone, so the check could not have contradicted the frequency pairing there. The separation guard is what carries the correspondence."
+  },
+  "reason": "the runs admit different numbers of in-window modes (2 and 1); pairing a prefix would assume which mode is missing, so no comparison is reported",
+  "reference": "COUPLED-PILOT-20260916T035733Z/P2 (level 1, order 1)",
+  "reference_admitted_all": [
+   1,
+   2,
+   9
+  ],
+  "reference_admitted_in_window": [
+   1,
+   2
+  ],
+  "reference_dof": 39832,
+  "reference_wall_clock_s": 32.355822464000084,
+  "this_admitted_in_window": [
+   1
+  ]
+ },
+ "convergence": {
+  "all_frequencies_solvable": false,
+  "available": true,
+  "frequency_orders": [],
+  "note": "Three rungs give the FIRST order estimate, not a confirmed one: confirming it needs a fourth, because a three-point fit has no degrees of freedom left to test itself.",
+  "per_mode": {
+   "L1m1": {
+    "abs_participation": {
+     "difference_12": -5.4796000000023604e-05,
+     "difference_23": 0.000247130999999956,
+     "differences_shrinking": false,
+     "h": [
+      0.01,
+      0.006666666666666666,
+      0.005
+     ],
+     "monotone": false,
+     "reason": "the sequence is not monotone in h, so no single power law describes it",
+     "solvable": false,
+     "values": [
+      0.9985099177,
+      0.9985647137,
+      0.9983175827
+     ]
+    },
+    "frequency": {
+     "difference_12": -0.30355409,
+     "difference_23": -0.24767501600000008,
+     "differences_shrinking": true,
+     "h": [
+      0.01,
+      0.006666666666666666,
+      0.005
+     ],
+     "monotone": true,
+     "ratio_floor_for_any_positive_order": 1.4094208396532095,
+     "ratio_of_differences": 1.2256144963769777,
+     "reason": "the successive differences shrink by only 1.226, at or below the 1.409 that the refinement ratios impose even as the order tends to zero: no positive order of convergence fits these three rungs",
+     "solvable": false,
+     "values": [
+      1.158332505,
+      1.461886595,
+      1.709561611
+     ]
+    },
+    "modes_by_level": {
+     "1": 1,
+     "2": 1,
+     "3": 1
+    },
+    "role": "LUMPED_DOMINATED"
+   },
+   "L1m2": {
+    "abs_participation": {
+     "difference_12": 0.00015547174070000005,
+     "difference_23": -0.0001331455586,
+     "differences_shrinking": true,
+     "h": [
+      0.01,
+      0.006666666666666666,
+      0.005
+     ],
+     "monotone": false,
+     "reason": "the sequence is not monotone in h, so no single power law describes it",
+     "solvable": false,
+     "values": [
+      0.0009336025799,
+      0.0007781308392,
+      0.0009112763978
+     ]
+    },
+    "frequency": {
+     "difference_12": -0.192322216,
+     "difference_23": -0.20217197199999948,
+     "differences_shrinking": false,
+     "h": [
+      0.01,
+      0.006666666666666666,
+      0.005
+     ],
+     "monotone": true,
+     "ratio_floor_for_any_positive_order": 1.4094208396532095,
+     "ratio_of_differences": 0.9512803090232532,
+     "reason": "the successive differences shrink by only 0.9513, at or below the 1.409 that the refinement ratios impose even as the order tends to zero: no positive order of convergence fits these three rungs",
+     "solvable": false,
+     "values": [
+      3.693188998,
+      3.885511214,
+      4.087683186
+     ]
+    },
+    "modes_by_level": {
+     "1": 2,
+     "2": 2,
+     "3": 2
+    },
+    "role": "FIELD_DOMINATED"
+   }
+  }
+ },
+ "dof_budget": 250000,
+ "dry_runs": {
+  "L2": {
+   "aborted_reason": null,
+   "dof_budget": 250000,
+   "estimated": {
+    "dof_order2_from_per_tetrahedron_ratio": 528359,
+    "dof_per_tetrahedron_order2": 8.2,
+    "note": "cross-check only, and the only estimated quantity in this report: the 8.2 DOF per tetrahedron was measured on the empty-box mesh family of the verification campaign and is extrapolated here to a different mesh family. Nothing in the disposition uses it.",
+    "ratio_to_measured": 1.2560119240058574
+   },
+   "format": "msh2.2-ascii",
+   "gmsh_version": "4.15.2",
+   "h0_gap_mm": 0.01,
+   "h_far_mm": 0.2222222222222222,
+   "h_gap_mm": 0.006666666666666666,
+   "halo_mm": 0.08,
+   "level": 2,
+   "max_surface_elements": 400000,
+   "measured": {
+    "dof_order1": 79944,
+    "dof_order2": 420664,
+    "edges": 79944,
+    "faces": 130388,
+    "min_gap_elements": 3.0000000000000004,
+    "nodes": 13991,
+    "note": "DOF = edges (order 1) and 2*edges + 2*faces (order 2) for MFEM Nedelec spaces on tetrahedra; both are measured from the mesh topology, not estimated. The count is the assembled space dimension before any essential-boundary elimination, so it is an upper bound on the size Palace factorises, and it is exactly what Palace reports as Problem.DegreesOfFreedom.",
+    "surface_elements_total": 23984,
+    "tetrahedra": 64434,
+    "tetrahedra_by_tag": {
+     "substrate": 28901,
+     "vacuum": 35533
+    },
+    "triangles_by_tag": {
+     "outer_pec": 3040,
+     "port_F1": 25,
+     "port_R1_a": 23,
+     "port_R1_b": 23,
+     "sheet_pec": 11424
+    }
+   },
+   "mesh_file": "coupled_chip_cell_L2.msh",
+   "mesh_path": "/home/runner/work/QMHP-CEM/QMHP-CEM/results/COUPLED-LADDER-O1-L2-PO1-20260920T204837Z/dryrun/L2/coupled_chip_cell_L2.msh",
+   "model": "coupled_chip_cell",
+   "physical_groups": {
+    "outer_pec": 2,
+    "port_F1": 10,
+    "port_R1_a": 11,
+    "port_R1_b": 12,
+    "sheet_pec": 4,
+    "substrate": 3,
+    "vacuum": 1
+   },
+   "port_refinement": null,
+   "scale": 0.6666666666666666,
+   "sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+   "wall_clock_s": 13.70271543199999,
+   "within_budget_order1": true,
+   "within_budget_order2": false
+  },
+  "L3": {
+   "aborted_reason": null,
+   "dof_budget": 250000,
+   "estimated": {
+    "dof_order2_from_per_tetrahedron_ratio": 987034,
+    "dof_per_tetrahedron_order2": 8.2,
+    "note": "cross-check only, and the only estimated quantity in this report: the 8.2 DOF per tetrahedron was measured on the empty-box mesh family of the verification campaign and is extrapolated here to a different mesh family. Nothing in the disposition uses it.",
+    "ratio_to_measured": 1.2629120956453426
+   },
+   "format": "msh2.2-ascii",
+   "gmsh_version": "4.15.2",
+   "h0_gap_mm": 0.01,
+   "h_far_mm": 0.16666666666666666,
+   "h_gap_mm": 0.005,
+   "halo_mm": 0.08,
+   "level": 3,
+   "max_surface_elements": 400000,
+   "measured": {
+    "dof_order1": 147372,
+    "dof_order2": 781554,
+    "edges": 147372,
+    "faces": 243405,
+    "min_gap_elements": 4.0,
+    "nodes": 24338,
+    "note": "DOF = edges (order 1) and 2*edges + 2*faces (order 2) for MFEM Nedelec spaces on tetrahedra; both are measured from the mesh topology, not estimated. The count is the assembled space dimension before any essential-boundary elimination, so it is an upper bound on the size Palace factorises, and it is exactly what Palace reports as Problem.DegreesOfFreedom.",
+    "surface_elements_total": 36036,
+    "tetrahedra": 120370,
+    "tetrahedra_by_tag": {
+     "substrate": 51551,
+     "vacuum": 68819
+    },
+    "triangles_by_tag": {
+     "outer_pec": 5330,
+     "port_F1": 45,
+     "port_R1_a": 39,
+     "port_R1_b": 39,
+     "sheet_pec": 16653
+    }
+   },
+   "mesh_file": "coupled_chip_cell_L3.msh",
+   "mesh_path": "/home/runner/work/QMHP-CEM/QMHP-CEM/results/COUPLED-LADDER-O1-L2-PO1-20260920T204837Z/dryrun/L3/coupled_chip_cell_L3.msh",
+   "model": "coupled_chip_cell",
+   "physical_groups": {
+    "outer_pec": 2,
+    "port_F1": 10,
+    "port_R1_a": 11,
+    "port_R1_b": 12,
+    "sheet_pec": 4,
+    "substrate": 3,
+    "vacuum": 1
+   },
+   "port_refinement": null,
+   "scale": 0.5,
+   "sha256": "93948899be17c6c54f090ef67d0783c349bbd4a8dc882a9092531135f51980b4",
+   "wall_clock_s": 15.079255926000002,
+   "within_budget_order1": true,
+   "within_budget_order2": false
+  }
+ },
+ "environment": {
+  "container_runtime": "docker",
+  "mpi_processes": 1,
+  "os": "Linux 6.17.0-1022-azure",
+  "python_version": "3.11.16"
+ },
+ "finite_element_order": 1,
+ "generated_utc": "2026-09-20T20:51:38.038607+00:00",
+ "halo_mm": 0.08,
+ "level": 2,
+ "next_level": {
+  "decision": "STOP - this is a refined diagnostic run, not a ladder rung. It is compared against the plain rung at the same level and stops there. A further refined mesh or a further refinement level is a separate approval and this script will not start one.",
+  "not_a_rung": "it carries a size constraint the other rungs do not, so it is excluded from the convergence fit by earlier_rungs()",
+  "queued": null,
+  "refinement": {
+   "boxes": [
+    {
+     "BoundingBoxMax": [
+      -0.58,
+      -0.065,
+      0.01
+     ],
+     "BoundingBoxMin": [
+      -0.62,
+      -0.125,
+      -0.01
+     ],
+     "Levels": 2
+    }
+   ],
+   "id": "PO1",
+   "mechanism": "Palace Model.Refinement.Boxes on the loaded mesh; no gmsh, no new mesh file",
+   "solver_linear_overrides": {
+    "MGMaxLevels": 1
+   }
+  }
+ },
+ "order_two_projection": {
+  "available": true,
+  "match": {
+   "admitted_in_window_GHz": {
+    "a": [
+     1.158332505,
+     3.693188998
+    ],
+    "b": [
+     1.707441654,
+     4.184873507
+    ]
+   },
+   "comparable": true,
+   "comparison": "P2 vs P1 (order, level 1)",
+   "convention": {
+    "delta_f": "|f_a - f_b| / f_a, run A the reference (unchanged)",
+    "delta_p": "abs(|p_a| - |p_b|) / max(|p_a|, |p_b|) \u2014 MAGNITUDES. Corrective change from the signed numerator |p_a - p_b|, which is not invariant under the eigenvector phase. The denominator and the 1e-2 tolerance are unchanged.",
+    "signs_preserved": "the signed participation and the complex port current are carried through unchanged in every record; only the comparison uses magnitudes"
+   },
+   "pairs": [
+    {
+     "a": {
+      "frequency_GHz": 1.158332505,
+      "mode": 1
+     },
+     "abs_participation": {
+      "a": {
+       "1": 0.9985099177
+      },
+      "b": {
+       "1": 0.9979639976
+      }
+     },
+     "b": {
+      "frequency_GHz": 1.707441654,
+      "mode": 1
+     },
+     "delta_abs_participation_relative": {
+      "1": 0.0005467347798181873
+     },
+     "delta_f_relative": 0.4740514028828018,
+     "frequency_shift_GHz": 0.549109149,
+     "guard": "APPLIED",
+     "separation_limit_GHz": 1.2387159264999998,
+     "separation_margin": 2.2558646650777257,
+     "signed_participation_preserved": {
+      "a": {
+       "1": 0.9985099177
+      },
+      "b": {
+       "1": 0.9979639976
+      }
+     },
+     "surrogate_relative_bound": {
+      "a": {
+       "1": 4.966567449193151e-09
+      },
+      "b": {
+       "1": 5.3575806226849815e-06
+      }
+     }
+    },
+    {
+     "a": {
+      "frequency_GHz": 3.693188998,
+      "mode": 2
+     },
+     "abs_participation": {
+      "a": {
+       "1": 0.0009336025799
+      },
+      "b": {
+       "1": 0.001203472453
+      }
+     },
+     "b": {
+      "frequency_GHz": 4.184873507,
+      "mode": 2
+     },
+     "delta_abs_participation_relative": {
+      "1": 0.22424266748048283
+     },
+     "delta_f_relative": 0.1331327774631261,
+     "frequency_shift_GHz": 0.4916845089999997,
+     "guard": "APPLIED",
+     "separation_limit_GHz": 1.2387159264999998,
+     "separation_margin": 2.519330798156182,
+     "signed_participation_preserved": {
+      "a": {
+       "1": -0.0009336025799
+      },
+      "b": {
+       "1": 0.001203472453
+      }
+     },
+     "surrogate_relative_bound": {
+      "a": {
+       "1": 1.8946182423415144e-05
+      },
+      "b": {
+       "1": 0.0011345542198648144
+      }
+     }
+    }
+   ],
+   "reason": "the frequency and |p| orderings agree and every pair is inside the separation guard",
+   "rule": {
+    "adjacent_gap_is_over_admitted_modes_only": "a rejected row lying between two admitted ones does not narrow the guard; on this record every rejected row sits above both admitted in-window modes, so it does not bite",
+    "id": "qmhp-cem.mode-matching/0.1.1",
+    "pairing": "two one-to-one pairings over the admitted in-window modes \u2014 by ascending frequency, and by descending |p| \u2014 which must induce the SAME pairing",
+    "refuses_when": "the two runs admit different numbers of in-window modes, the two pairings disagree, or the separation guard fails \u2014 in each case no comparison is reported",
+    "separation_guard": "each pair's frequency shift between runs must be below half the smallest adjacent-mode spacing in either run, so no swap is possible",
+    "separation_guard_is_vacuous_when": "either run admits a single in-window mode: the adjacent-mode spacing is then infinite, so the guard cannot fail and the ordering check cannot fail either. Such a match is reported with guard='VACUOUS' rather than silently as if it had been guarded.",
+    "status": "retrospective for COUPLED-PILOT-20260916T035733Z; prospective for the next confirmatory run",
+    "what_the_ordering_check_can_and_cannot_do": "Each pairing is formed by sorting the two runs SEPARATELY and zipping, so whenever |p| is co-monotone with frequency inside each run the two pairings agree BY CONSTRUCTION, whatever the true correspondence is. The check therefore detects a run whose |p| order inverts against its frequency order; it is NOT independent evidence that the correspondence between the runs is right. On COUPLED-PILOT-20260916T035733Z all three runs are co-monotone, so the check could not have contradicted the frequency pairing there. The separation guard is what carries the correspondence."
+   },
+   "status": "MATCHED"
+  },
+  "order2_source": "COUPLED-PILOT-20260916T035733Z/P1 (level 1, order 2)",
+  "per_mode": {
+   "L1m1": {
+    "available": false,
+    "reason": "the order-1 sequence yields no extrapolated limit, so nothing can be projected"
+   },
+   "L1m2": {
+    "available": false,
+    "reason": "the order-1 sequence yields no extrapolated limit, so nothing can be projected"
+   }
+  }
+ },
+ "port_field_reproduction": {
+  "L2": "EXPLANATION-2-SUPPORTED",
+  "L3": "CALIBRATION-UNSOUND"
+ },
+ "port_resolution_sensitivity": {
+  "available": false,
+  "mechanism_caveat": "this text describes the gmsh mechanism. For a nested Palace refinement the numerator is NOT a global re-mesh and the DOF cost is larger than 1 %; see baseline_comparison.mechanism, which states which one ran.",
+  "question": "is the large L1/L2/L3 frequency movement sensitive to port-face resolution?",
+  "reason": "the baseline comparison is unavailable: the named baseline is itself refined, and is not a shallower point of this run's own refinement sequence (same region, fewer levels); it is not a baseline",
+  "statistic": "|delta_f(baseline -> refined)| / |delta_f(L2 -> L3)|, per tracked mode. This is a RATIO OF OBSERVED FREQUENCY CHANGES between whole runs. It is NOT a causal share and NOT an upper bound on a port contribution: reading it as either would require the numerator to isolate the port (it does not - the box is a volume and the re-mesh is global and non-nested) and an eigenvalue error to decompose additively by mesh region (no such decomposition is available here). Reported as measured; it carries no attribution, and its complement is not 'the rest of the cause'"
+ },
+ "post_solve_analysis_failed": null,
+ "refinement_sequence": {
+  "available": false,
+  "reason": "the approval names no sequence_records, so no sequence is computed"
+ },
+ "rules_unchanged": {
+  "admission": {
+   "admit_when": "abs(R - 1) <= 1e-3",
+   "id": "qmhp-cem.mode-admission/0.1.0",
+   "max_energy_balance_defect": 0.001,
+   "not_used": "participation rank (smallest or largest |p|), mode index, and frequency order are all excluded from admission",
+   "quantity": "R = (E_mag + E_ind) / (E_elec + E_cap), from domain-E.csv",
+   "status": "retrospective for COUPLED-PILOT-20260916T035733Z; prospective for the next confirmatory run",
+   "what_it_does_not_establish": "It does not prove a rejected row is a spurious or null-space mode, and it asserts no mechanism. Establishing the cause needs the per-mode port stiffness energy integral(1/Ls * |E_t|^2) over the port surface, which Palace does not write, or the saved mode fields, which this record does not contain.",
+   "what_it_establishes": "That the mode's REPORTED energies balance. Palace's E_ind is not the port stiffness quadratic form but the rank-one surrogate |V|^2 / (2 w^2 L) built from the port's line-average voltage, which by Cauchy-Schwarz is a lower bound on it. A row failing this check is therefore either not an eigenvector at its reported frequency, or an eigenvector whose stiffness sits in a strongly non-uniform tangential field on the port that the line average grossly understates. The admission rule does not distinguish those, and does not need to: the participation p = E_ind/(E_elec + E_cap) is built from the SAME surrogate, so in either case the reported p for that row is not a quantity two solves may be compared on.",
+   "what_that_means_for_this_rule": "With the port term evaluated correctly the balance closes for EVERY mode, including the rejected ones, so this rule's discriminating power comes from the surrogate's failure rather than from algebraic convergence: it selects modes whose port-face tangential field is close to uniform and aligned with the declared port direction, which is the one configuration E_ind represents exactly. That is a defensible criterion and it is not the same statement as 'this row is an eigenvector'. Reported, not acted on: the quantity, the threshold and the behaviour of this rule are unchanged.",
+   "what_the_missing_integral_turned_out_to_be": "That integral IS recoverable, from the two interface-dielectric probes in surface-Q.csv via a conversion derived from pinned Palace v0.13.0 source and the declared port geometry (solvers.palace.port_diagnostic, record COUPLED-S1-RECOVERY). Evaluated that way it accounts for the whole energy-balance defect on every mode of both probed levels, to 2.1e-8 at level 3 and 4.3e-7 at level 2.",
+   "why_this_quantity": "For an exact eigenpair of the discrete generalised problem K x = w^2 M x, x^H K x = w^2 x^H M x holds identically, so the magnetic-side and electric-side energies are equal by algebra rather than by approximation. Palace normalises each converged eigenvector against Re(M) \u2014 the real-permittivity mass plus any lumped-port capacitance \u2014 which is why E_elec is a per-run constant here (no port capacitance, no loss tangent). R is dimensionless, needs no mesh, no second run and no reference frequency, and is computed from a file the solver already writes.",
+   "why_this_threshold": "Chosen for separation, not for a physical target: it sits far from both observed populations rather than between two close ones. It is not a physical QMHP threshold and gates no coupling."
+  },
+  "comparison_convention": {
+   "delta_f": "|f_a - f_b| / f_a, run A the reference (unchanged)",
+   "delta_p": "abs(|p_a| - |p_b|) / max(|p_a|, |p_b|) \u2014 MAGNITUDES. Corrective change from the signed numerator |p_a - p_b|, which is not invariant under the eigenvector phase. The denominator and the 1e-2 tolerance are unchanged.",
+   "signs_preserved": "the signed participation and the complex port current are carried through unchanged in every record; only the comparison uses magnitudes"
+  },
+  "matching": {
+   "adjacent_gap_is_over_admitted_modes_only": "a rejected row lying between two admitted ones does not narrow the guard; on this record every rejected row sits above both admitted in-window modes, so it does not bite",
+   "id": "qmhp-cem.mode-matching/0.1.1",
+   "pairing": "two one-to-one pairings over the admitted in-window modes \u2014 by ascending frequency, and by descending |p| \u2014 which must induce the SAME pairing",
+   "refuses_when": "the two runs admit different numbers of in-window modes, the two pairings disagree, or the separation guard fails \u2014 in each case no comparison is reported",
+   "separation_guard": "each pair's frequency shift between runs must be below half the smallest adjacent-mode spacing in either run, so no swap is possible",
+   "separation_guard_is_vacuous_when": "either run admits a single in-window mode: the adjacent-mode spacing is then infinite, so the guard cannot fail and the ordering check cannot fail either. Such a match is reported with guard='VACUOUS' rather than silently as if it had been guarded.",
+   "status": "retrospective for COUPLED-PILOT-20260916T035733Z; prospective for the next confirmatory run",
+   "what_the_ordering_check_can_and_cannot_do": "Each pairing is formed by sorting the two runs SEPARATELY and zipping, so whenever |p| is co-monotone with frequency inside each run the two pairings agree BY CONSTRUCTION, whatever the true correspondence is. The check therefore detects a run whose |p| order inverts against its frequency order; it is NOT independent evidence that the correspondence between the runs is right. On COUPLED-PILOT-20260916T035733Z all three runs are co-monotone, so the check could not have contradicted the frequency pairing there. The separation guard is what carries the correspondence."
+  },
+  "solver": {
+   "band_ceiling_GHz": 9.0,
+   "band_floor_GHz": 0.5,
+   "eigenmode_backward_error_max_tolerance": 1e-06,
+   "eigenmode_target_GHz": 0.5,
+   "eigenmodes_requested": 6,
+   "eigenvalue_tolerance": 1e-06,
+   "linear_solver_max_iterations": 400,
+   "linear_solver_tolerance": 1e-08,
+   "mesh_size_rule": "min_gap/2 at conductor and etch edges, min(cell_x, cell_y)/12 beyond the halo",
+   "model": "S1 bounded chip cell: vacuum and substrate volumes, zero-thickness PEC sheets for the ground plane and conductors, PEC outer walls, one lumped inductive port at the F1 element site carrying the declared superinductor. The readout tap surfaces carry no boundary condition in Route A. This is NOT the empty Object 001 box of the golden path."
+  }
+ },
+ "rung": {
+  "admission": {
+   "backward_error_tolerance": 1e-06,
+   "max_energy_balance_defect": 0.001,
+   "modes": [
+    {
+     "absolute_error": 6.520591878e-11,
+     "algebraically_converged": true,
+     "backward_error": 8.721444084e-17,
+     "current_A": {
+      "1": {
+       "abs": 0.0002947326315668292,
+       "im": 0.0001536938458,
+       "re": -0.0002514866316
+      }
+     },
+     "current_phase_deg": {
+      "1": 148.5691785393188
+     },
+     "disposition": "ADMITTED",
+     "energy_J": {
+      "E_cap": 0.0,
+      "E_elec": 0.006671281904,
+      "E_ind": 4.493501334e-06,
+      "E_mag": 0.006671281904
+     },
+     "energy_balance_defect": 0.0006735589049693402,
+     "energy_balance_ratio": 1.0006735589049693,
+     "energy_balanced": true,
+     "frequency_GHz": 3.885827871,
+     "frequency_im_GHz": 7.923038633e-15,
+     "lumped_magnetic_fraction": 0.0006731055287464668,
+     "mode": 1,
+     "participation_abs": {
+      "1": 0.000673558905
+     },
+     "participation_signed": {
+      "1": -0.000673558905
+     },
+     "surrogate_relative_bound": {
+      "1": 0.999999999954481
+     },
+     "voltage_V": {
+      "1": {
+       "abs": 0.7444749274500434,
+       "im": -0.6352384221,
+       "re": -0.3882203816
+      }
+     }
+    },
+    {
+     "absolute_error": 1.553947645e-10,
+     "algebraically_converged": true,
+     "backward_error": 2.078439481e-16,
+     "current_A": {
+      "1": {
+       "abs": 6.288333850522216e-05,
+       "im": 5.205616454e-05,
+       "re": -3.527704629e-05
+      }
+     },
+     "current_phase_deg": {
+      "1": 124.12442504545481
+     },
+     "disposition": "ADMITTED",
+     "energy_J": {
+      "E_cap": 0.0,
+      "E_elec": 0.006671281904,
+      "E_ind": 2.045500605e-07,
+      "E_mag": 0.006671281904
+     },
+     "energy_balance_defect": 3.0661282710564564e-05,
+     "energy_balance_ratio": 1.0000306612827106,
+     "energy_balanced": true,
+     "frequency_GHz": 10.84135952,
+     "frequency_im_GHz": -2.802493616e-14,
+     "lumped_magnetic_fraction": 3.066034262506876e-05,
+     "mode": 2,
+     "participation_abs": {
+      "1": 3.066128271e-05
+     },
+     "participation_signed": {
+      "1": -3.066128271e-05
+     },
+     "surrogate_relative_bound": {
+      "1": 1.000000000018413
+     },
+     "voltage_V": {
+      "1": {
+       "abs": 0.443157019325889,
+       "im": -0.2486075176,
+       "re": -0.3668548023
+      }
+     }
+    },
+    {
+     "absolute_error": 2.090376889e-10,
+     "algebraically_converged": true,
+     "backward_error": 2.795925092e-16,
+     "current_A": {
+      "1": {
+       "abs": 8.81385111283337e-05,
+       "im": -1.945982792e-05,
+       "re": 8.596343549e-05
+      }
+     },
+     "current_phase_deg": {
+      "1": -12.75525512838521
+     },
+     "disposition": "ADMITTED",
+     "energy_J": {
+      "E_cap": 0.0,
+      "E_elec": 0.006671281904,
+      "E_ind": 4.018461864e-07,
+      "E_mag": 0.006671281904
+     },
+     "energy_balance_defect": 6.0235227979044126e-05,
+     "energy_balance_ratio": 1.000060235227979,
+     "energy_balanced": true,
+     "frequency_GHz": 11.60901439,
+     "frequency_im_GHz": -2.747134983e-14,
+     "lumped_magnetic_fraction": 6.023159991490496e-05,
+     "mode": 3,
+     "participation_abs": {
+      "1": 6.023522799e-05
+     },
+     "participation_signed": {
+      "1": 6.023522799e-05
+     },
+     "surrogate_relative_bound": {
+      "1": 0.9999999998181152
+     },
+     "voltage_V": {
+      "1": {
+       "abs": 0.665119000860839,
+       "im": 0.6487052435,
+       "re": 0.1468495569
+      }
+     }
+    },
+    {
+     "absolute_error": 1.315246596e-08,
+     "algebraically_converged": true,
+     "backward_error": 1.759169681e-14,
+     "current_A": {
+      "1": {
+       "abs": 3.146571314234422e-05,
+       "im": 2.221222082e-05,
+       "re": -2.22869547e-05
+      }
+     },
+     "current_phase_deg": {
+      "1": 135.09622497124556
+     },
+     "disposition": "ADMITTED",
+     "energy_J": {
+      "E_cap": 0.0,
+      "E_elec": 0.006671281904,
+      "E_ind": 5.121575621e-08,
+      "E_mag": 0.006671281904
+     },
+     "energy_balance_defect": 7.67704872117747e-06,
+     "energy_balance_ratio": 1.0000076770487212,
+     "energy_balanced": true,
+     "frequency_GHz": 15.4899981,
+     "frequency_im_GHz": 1.041894941e-12,
+     "lumped_magnetic_fraction": 7.676989784595192e-06,
+     "mode": 4,
+     "participation_abs": {
+      "1": 7.677048721e-06
+     },
+     "participation_signed": {
+      "1": -7.677048721e-06
+     },
+     "surrogate_relative_bound": {
+      "1": 1.000000000023117
+     },
+     "voltage_V": {
+      "1": {
+       "abs": 0.3168306868303285,
+       "im": -0.2244090618,
+       "re": -0.2236565606
+      }
+     }
+    },
+    {
+     "absolute_error": 1.959502652e-05,
+     "algebraically_converged": true,
+     "backward_error": 2.620873844e-11,
+     "current_A": {
+      "1": {
+       "abs": 5.6713829826812135e-05,
+       "im": -5.435640955e-05,
+       "re": 1.618144723e-05
+      }
+     },
+     "current_phase_deg": {
+      "1": -73.42217294407878
+     },
+     "disposition": "ADMITTED",
+     "energy_J": {
+      "E_cap": 0.0,
+      "E_elec": 0.006671281904,
+      "E_ind": 1.663820162e-07,
+      "E_mag": 0.006671281905
+     },
+     "energy_balance_defect": 2.4940186697852695e-05,
+     "energy_balance_ratio": 1.0000249401866979,
+     "energy_balanced": true,
+     "frequency_GHz": 17.78163588,
+     "frequency_im_GHz": -2.057264729e-09,
+     "lumped_magnetic_fraction": 2.4939414807997297e-05,
+     "mode": 5,
+     "participation_abs": {
+      "1": 2.49400368e-05
+     },
+     "participation_signed": {
+      "1": 2.49400368e-05
+     },
+     "surrogate_relative_bound": {
+      "1": 1.0000060103300528
+     },
+     "voltage_V": {
+      "1": {
+       "abs": 0.6555396786044307,
+       "im": 0.1870369317,
+       "re": 0.6282909011
+      }
+     }
+    },
+    {
+     "absolute_error": 3.702421848e-07,
+     "algebraically_converged": true,
+     "backward_error": 4.952060043e-13,
+     "current_A": {
+      "1": {
+       "abs": 5.222857071197222e-05,
+       "im": -3.235362219e-05,
+       "re": 4.100081377e-05
+      }
+     },
+     "current_phase_deg": {
+      "1": -38.27686772806829
+     },
+     "disposition": "ADMITTED",
+     "energy_J": {
+      "E_cap": 0.0,
+      "E_elec": 0.006671281904,
+      "E_ind": 1.411057506e-07,
+      "E_mag": 0.006671281904
+     },
+     "energy_balance_defect": 2.1151219905091168e-05,
+     "energy_balance_ratio": 1.000021151219905,
+     "energy_balanced": true,
+     "frequency_GHz": 19.64198631,
+     "frequency_im_GHz": -2.632099746e-11,
+     "lumped_magnetic_fraction": 2.115077254039615e-05,
+     "mode": 6,
+     "participation_abs": {
+      "1": 2.115121991e-05
+     },
+     "participation_signed": {
+      "1": 2.115121991e-05
+     },
+     "surrogate_relative_bound": {
+      "1": 0.9999999997679172
+     },
+     "voltage_V": {
+      "1": {
+       "abs": 0.6668556579065504,
+       "im": 0.5234993849,
+       "re": 0.413091833
+      }
+     }
+    },
+    {
+     "absolute_error": 1.368696777e-05,
+     "algebraically_converged": true,
+     "backward_error": 1.830655583e-11,
+     "current_A": {
+      "1": {
+       "abs": 3.547693287744679e-05,
+       "im": 2.766442112e-05,
+       "re": -2.221019069e-05
+      }
+     },
+     "current_phase_deg": {
+      "1": 128.75899977181535
+     },
+     "disposition": "ADMITTED",
+     "energy_J": {
+      "E_cap": 0.0,
+      "E_elec": 0.006671281904,
+      "E_ind": 6.510593254e-08,
+      "E_mag": 0.006671281903
+     },
+     "energy_balance_defect": 9.758983877006244e-06,
+     "energy_balance_ratio": 1.000009758983877,
+     "energy_balanced": true,
+     "frequency_GHz": 23.39763138,
+     "frequency_im_GHz": 1.33414304e-10,
+     "lumped_magnetic_fraction": 9.759038534920608e-06,
+     "mode": 7,
+     "participation_abs": {
+      "1": 9.759133773e-06
+     },
+     "participation_signed": {
+      "1": -9.759133773e-06
+     },
+     "surrogate_relative_bound": {
+      "1": 0.999984640440715
+     },
+     "voltage_V": {
+      "1": {
+       "abs": 0.5395805124353967,
+       "im": -0.3378022028,
+       "re": -0.4207574137
+      }
+     }
+    },
+    {
+     "absolute_error": 4.380481646e-05,
+     "algebraically_converged": true,
+     "backward_error": 5.858968877e-11,
+     "current_A": {
+      "1": {
+       "abs": 2.856569979211838e-05,
+       "im": -2.102046216e-05,
+       "re": 1.934268273e-05
+      }
+     },
+     "current_phase_deg": {
+      "1": -47.380249923400314
+     },
+     "disposition": "ADMITTED",
+     "energy_J": {
+      "E_cap": 0.0,
+      "E_elec": 0.006671281904,
+      "E_ind": 4.221027356e-08,
+      "E_mag": 0.006671281901
+     },
+     "energy_balance_defect": 6.32671114297878e-06,
+     "energy_balance_ratio": 1.000006326711143,
+     "energy_balanced": true,
+     "frequency_GHz": 23.81796279,
+     "frequency_im_GHz": 7.347952999e-09,
+     "lumped_magnetic_fraction": 6.327120801801673e-06,
+     "mode": 8,
+     "participation_abs": {
+      "1": 6.327160832e-06
+     },
+     "participation_signed": {
+      "1": 6.327160832e-06
+     },
+     "surrogate_relative_bound": {
+      "1": 0.9999289272023961
+     },
+     "voltage_V": {
+      "1": {
+       "abs": 0.4422702995802826,
+       "im": 0.2994743398,
+       "re": 0.3254506686
+      }
+     }
+    }
+   ],
+   "modes_admitted": 8,
+   "modes_computed": 8,
+   "notes": [],
+   "row_correspondence": {
+    "identities_checked": [
+     "|p_j| == E_ind / (E_elec + E_cap)   [port-EPR.csv vs domain-E.csv]",
+     "|V_j| == 2*pi*f * L_j * |I_j|       [port-V.csv vs port-I.csv vs eig.csv]"
+    ],
+    "max_participation_energy_mismatch": 2.346290909072954e-10,
+    "max_port_impedance_mismatch": 3.432680240718809e-10,
+    "modes_checked": 8,
+    "ok": true,
+    "tolerance": {
+     "max_participation_energy_mismatch": 1e-06,
+     "max_port_impedance_mismatch": 1e-06
+    },
+    "worst_impedance_mode": 6,
+    "worst_participation_mode": 6
+   },
+   "rule": {
+    "admit_when": "abs(R - 1) <= 1e-3",
+    "id": "qmhp-cem.mode-admission/0.1.0",
+    "max_energy_balance_defect": 0.001,
+    "not_used": "participation rank (smallest or largest |p|), mode index, and frequency order are all excluded from admission",
+    "quantity": "R = (E_mag + E_ind) / (E_elec + E_cap), from domain-E.csv",
+    "status": "retrospective for COUPLED-PILOT-20260916T035733Z; prospective for the next confirmatory run",
+    "what_it_does_not_establish": "It does not prove a rejected row is a spurious or null-space mode, and it asserts no mechanism. Establishing the cause needs the per-mode port stiffness energy integral(1/Ls * |E_t|^2) over the port surface, which Palace does not write, or the saved mode fields, which this record does not contain.",
+    "what_it_establishes": "That the mode's REPORTED energies balance. Palace's E_ind is not the port stiffness quadratic form but the rank-one surrogate |V|^2 / (2 w^2 L) built from the port's line-average voltage, which by Cauchy-Schwarz is a lower bound on it. A row failing this check is therefore either not an eigenvector at its reported frequency, or an eigenvector whose stiffness sits in a strongly non-uniform tangential field on the port that the line average grossly understates. The admission rule does not distinguish those, and does not need to: the participation p = E_ind/(E_elec + E_cap) is built from the SAME surrogate, so in either case the reported p for that row is not a quantity two solves may be compared on.",
+    "what_that_means_for_this_rule": "With the port term evaluated correctly the balance closes for EVERY mode, including the rejected ones, so this rule's discriminating power comes from the surrogate's failure rather than from algebraic convergence: it selects modes whose port-face tangential field is close to uniform and aligned with the declared port direction, which is the one configuration E_ind represents exactly. That is a defensible criterion and it is not the same statement as 'this row is an eigenvector'. Reported, not acted on: the quantity, the threshold and the behaviour of this rule are unchanged.",
+    "what_the_missing_integral_turned_out_to_be": "That integral IS recoverable, from the two interface-dielectric probes in surface-Q.csv via a conversion derived from pinned Palace v0.13.0 source and the declared port geometry (solvers.palace.port_diagnostic, record COUPLED-S1-RECOVERY). Evaluated that way it accounts for the whole energy-balance defect on every mode of both probed levels, to 2.1e-8 at level 3 and 4.3e-7 at level 2.",
+    "why_this_quantity": "For an exact eigenpair of the discrete generalised problem K x = w^2 M x, x^H K x = w^2 x^H M x holds identically, so the magnetic-side and electric-side energies are equal by algebra rather than by approximation. Palace normalises each converged eigenvector against Re(M) \u2014 the real-permittivity mass plus any lumped-port capacitance \u2014 which is why E_elec is a per-run constant here (no port capacitance, no loss tangent). R is dimensionless, needs no mesh, no second run and no reference frequency, and is computed from a file the solver already writes.",
+    "why_this_threshold": "Chosen for separation, not for a physical target: it sits far from both observed populations rather than between two close ones. It is not a physical QMHP threshold and gates no coupling."
+   },
+   "run": "L2",
+   "separation_decades": null
+  },
+  "dof_added_by_refinement": 23467,
+  "dof_measured": 79944,
+  "dof_measured_is": "the loaded mesh, BEFORE Palace's own refinement. It does not bound the solved DOF. run.dof_probe.dof_reported is what Palace actually assembled.",
+  "dof_solved": 103411,
+  "field_output": {
+   "bytes": 157881610,
+   "moved_to": "/home/runner/work/_temp/paraview",
+   "note": "ParaView field output is uploaded as a workflow artifact and is NOT committed: it runs to ~120 MB per rung and the quantitative test uses surface-Q.csv, which is committed and manifested.",
+   "path": "postpro/paraview",
+   "written": true
+  },
+  "field_output_modes": 6,
+  "finite_element_order": 1,
+  "halo_mm": 0.08,
+  "level": 2,
+  "max_backward_error": 5.858968877e-11,
+  "mesh": {
+   "aborted_reason": null,
+   "dof_budget": 250000,
+   "estimated": {
+    "dof_order2_from_per_tetrahedron_ratio": 528359,
+    "dof_per_tetrahedron_order2": 8.2,
+    "note": "cross-check only, and the only estimated quantity in this report: the 8.2 DOF per tetrahedron was measured on the empty-box mesh family of the verification campaign and is extrapolated here to a different mesh family. Nothing in the disposition uses it.",
+    "ratio_to_measured": 1.2560119240058574
+   },
+   "format": "msh2.2-ascii",
+   "gmsh_version": "4.15.2",
+   "h0_gap_mm": 0.01,
+   "h_far_mm": 0.2222222222222222,
+   "h_gap_mm": 0.006666666666666666,
+   "halo_mm": 0.08,
+   "level": 2,
+   "max_surface_elements": 400000,
+   "measured": {
+    "dof_order1": 79944,
+    "dof_order2": 420664,
+    "edges": 79944,
+    "faces": 130388,
+    "min_gap_elements": 3.0000000000000004,
+    "nodes": 13991,
+    "note": "DOF = edges (order 1) and 2*edges + 2*faces (order 2) for MFEM Nedelec spaces on tetrahedra; both are measured from the mesh topology, not estimated. The count is the assembled space dimension before any essential-boundary elimination, so it is an upper bound on the size Palace factorises, and it is exactly what Palace reports as Problem.DegreesOfFreedom.",
+    "surface_elements_total": 23984,
+    "tetrahedra": 64434,
+    "tetrahedra_by_tag": {
+     "substrate": 28901,
+     "vacuum": 35533
+    },
+    "triangles_by_tag": {
+     "outer_pec": 3040,
+     "port_F1": 25,
+     "port_R1_a": 23,
+     "port_R1_b": 23,
+     "sheet_pec": 11424
+    }
+   },
+   "mesh_file": "coupled_chip_cell_L2.msh",
+   "mesh_path": "/home/runner/work/QMHP-CEM/QMHP-CEM/results/COUPLED-LADDER-O1-L2-PO1-20260920T204837Z/L2/solver/coupled_chip_cell_L2.msh",
+   "model": "coupled_chip_cell",
+   "physical_groups": {
+    "outer_pec": 2,
+    "port_F1": 10,
+    "port_R1_a": 11,
+    "port_R1_b": 12,
+    "sheet_pec": 4,
+    "substrate": 3,
+    "vacuum": 1
+   },
+   "port_refinement": null,
+   "scale": 0.6666666666666666,
+   "sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+   "wall_clock_s": 13.53100615599999,
+   "within_budget_order1": true,
+   "within_budget_order2": false
+  },
+  "palace_metadata": {
+   "ElapsedTime": {
+    "Counts": {
+     "Adaptation": 0,
+     "CoarseSolve": 0,
+     "Construction": 2,
+     "DiskIO": 8,
+     "Div.-FreeProjection": 31,
+     "EigenvalueSolve": 1,
+     "Estimation": 12,
+     "Initialization": 1,
+     "LinearSolve": 29,
+     "OperatorConstruction": 1,
+     "PROMConstruction": 0,
+     "PROMSolve": 0,
+     "Postprocessing": 1,
+     "Preconditioner": 87,
+     "Rebalancing": 1,
+     "Setup": 1,
+     "Solve": 12,
+     "TimeStepping": 0,
+     "Total": 1,
+     "WavePorts": 0
+    },
+    "Durations": {
+     "Adaptation": 0.0,
+     "CoarseSolve": 0.0,
+     "Construction": 8.908486404,
+     "DiskIO": 32.980716531,
+     "Div.-FreeProjection": 5.1390008819999995,
+     "EigenvalueSolve": 2.6765104800000006,
+     "Estimation": 0.752581281,
+     "Initialization": 1.3815882879999999,
+     "LinearSolve": 6.682122690999998,
+     "OperatorConstruction": 5.359094534,
+     "PROMConstruction": 0.0,
+     "PROMSolve": 0.0,
+     "Postprocessing": 2.5050446349999995,
+     "Preconditioner": 6.2343381829999975,
+     "Rebalancing": 1.262e-06,
+     "Setup": 0.055249606,
+     "Solve": 64.33884095900001,
+     "TimeStepping": 0.0,
+     "Total": 137.237399488,
+     "WavePorts": 0.0
+    }
+   },
+   "GitTag": "v0.13.0",
+   "LinearSolver": {
+    "TotalIts": 58,
+    "TotalSolves": 29
+   },
+   "Problem": {
+    "DegreesOfFreedom": 103411,
+    "MPISize": 1,
+    "MeshElements": 84445,
+    "MultigridDegreesOfFreedom": [
+     103411
+    ]
+   }
+  },
+  "palace_refinement": {
+   "boxes": [
+    {
+     "BoundingBoxMax": [
+      -0.58,
+      -0.065,
+      0.01
+     ],
+     "BoundingBoxMin": [
+      -0.62,
+      -0.125,
+      -0.01
+     ],
+     "Levels": 2
+    }
+   ],
+   "id": "PO1",
+   "mechanism": "Palace Model.Refinement.Boxes on the loaded mesh; no gmsh, no new mesh file",
+   "solver_linear_overrides": {
+    "MGMaxLevels": 1
+   }
+  },
+  "palace_timers": {
+   "counts": {
+    "CoarseSolve": 0,
+    "Div.-FreeProjection": 31,
+    "EigenvalueSolve": 1,
+    "Estimation": 12,
+    "LinearSolve": 29,
+    "OperatorConstruction": 1,
+    "Postprocessing": 1,
+    "Preconditioner": 87,
+    "Setup": 1,
+    "Solve": 12,
+    "Total": 1
+   },
+   "durations_s": {
+    "CoarseSolve": 0.0,
+    "Div.-FreeProjection": 5.1390008819999995,
+    "EigenvalueSolve": 2.6765104800000006,
+    "Estimation": 0.752581281,
+    "LinearSolve": 6.682122690999998,
+    "OperatorConstruction": 5.359094534,
+    "Postprocessing": 2.5050446349999995,
+    "Preconditioner": 6.2343381829999975,
+    "Setup": 0.055249606,
+    "Solve": 64.33884095900001,
+    "Total": 137.237399488
+   },
+   "note": "Palace's own timer names. 'Preconditioner' is preconditioner APPLICATION inside the linear solves, not setup; 'Setup' is the separate setup line. The log names no preconditioner type, so none is asserted."
+  },
+  "port_control": {
+   "also_changed_automatically": "GetLsAttrList() omits an inactive port (lumpedportoperator.cpp:531-549), and spaceoperator.cpp:120-150 ORs that list into aux_bdr_marker before building aux_bdr_tdof_lists, which eigensolver.cpp:164-173 hands to the DivFreeSolver. So the auxiliary H1 essential-DOF lists are NOT the baseline's: the port face leaves them, the free auxiliary space grows, and the projector's removed gradient subspace can only grow with it. This is recorded, not configured: no DivFree setting is touched (Tol and MaxIts are Palace's defaults, as in the baseline).",
+   "changes_the_operator": true,
+   "f_site_diagnostics_are_non_loading": "UpdatePorts (postoperator.cpp:430), PostprocessEPR, GetInductorParticipation (postoperator.cpp:644) and GetLumpedInductorEnergy (postoperator.cpp:493) loop over every port with no active check, so port-V.csv, port-I.csv, port-EPR.csv and E_ind are still written. They correspond to no term in this run's operator and are REFERENCE diagnostics here, not a physical classification gate.",
+   "id": "PO1-port-removed",
+   "inherited_analysis_is_reference_only": "this record's admission, roles, port_field_test and port_diagnostic blocks are produced by the unchanged driver, whose admission ratio R = (E_mag + E_ind) / (E_elec + E_cap) includes an E_ind that no operator term backs here. For a port-removed run they are reference diagnostics. The port-removed energy balance E_mag / (E_elec + E_cap) is the quantity that tests THIS operator.",
+   "operator_change": "Boundaries.LumpedPort[0].Active = false. Palace assembles the port's 1/L_s boundary mass term into the STIFFNESS only for an active port (lumpedportoperator.cpp:571-591, the guard at :577), so the assembled operator is K - K_port and nothing else. AddDampingBdrCoefficients (:593) and AddMassBdrCoefficients (:615) gate on the same flag and are already inert here because R = C = 0.",
+   "probes_change_the_operator": false,
+   "probes_mm": [
+    [
+     -0.6,
+     0.0,
+     0.01
+    ],
+    [
+     -0.455,
+     0.0,
+     0.01
+    ],
+    [
+     0.5865,
+     0.5,
+     0.01
+    ]
+   ]
+  },
+  "port_diagnostic": {
+   "available": true,
+   "conversion": {
+    "factors": {
+     "L0_m": 0.001,
+     "Lc_m": 0.004,
+     "inductance_H": 1.0345665367517793e-07,
+     "inductance_nd": 20.582047285188583,
+     "length_scale_Lc_over_L0": 4.0,
+     "port_area_mm2": 0.0008000000000000006,
+     "port_length_mm": 0.039999999999999994,
+     "port_n_elements": 1,
+     "port_width_mm": 0.020000000000000018,
+     "probe_permittivity": 1.0,
+     "probe_thickness_mesh_units": 1.0,
+     "probe_thickness_nd": 0.25,
+     "sheet_inductance_nd": 10.291023642594302,
+     "tc_ns": 0.01334256380791072,
+     "to_square_w_over_l": 0.5000000000000006
+    },
+    "kappa": 0.3886882528812872,
+    "kappa_definition": "1 / (t_nd * Ls_nd); derived, not fitted",
+    "source": {
+     "B_carries_one_over_omega": "palace/drivers/eigensolver.cpp:310-315 B = -1/(i omega) curl E, so E_mag carries 1/omega^2, exactly as E_port does",
+     "E_ind_is_rank_one": "palace/models/lumpedportoperator.cpp:200-213 V = 1/w INT E.l_hat dS; palace/models/postoperator.cpp:493-508 E_ind = 0.5 |L| |I|^2 with I = V/(i w L)",
+     "L_nondimensionalisation": "palace/utils/iodata.cpp:512 data.L /= mu0_ * Lc",
+     "Lc_definition": "palace/utils/iodata.cpp:452-464: Model.Lc if given, else the largest axis-aligned mesh bounding-box extent, in metres",
+     "Ls_definition": "palace/models/lumpedportoperator.cpp:578 Ls = L * GetToSquare(elem); palace/models/lumpedportoperator.hpp:57-60 GetToSquare = (w/l) * elems.size()",
+     "energy_scale_is_1e9_times_SI": "palace/utils/iodata.cpp:565-602: the ENERGY scale factor is Hc^2 Z0 Lc^2 tc with Hc^2 Z0 Lc^2 = 1 W by construction and tc in NANOseconds, so the columns headed (J) in domain-E.csv carry 1e9 x SI joules",
+     "l_and_w_definition": "palace/fem/lumpedelement.cpp:53-69: l is the port bounding-box extent most aligned with the declared direction, w the largest remaining extent",
+     "omega_nondimensionalisation": "palace/utils/iodata.cpp:539 and :575 - frequencies carry 1/(2 pi tc), so omega_nd = 2 pi f_GHz tc",
+     "port_enters_K_as_a_boundary_mass_term": "palace/models/lumpedportoperator.cpp:571-591 assembles the inductive port face with coefficient 1/Ls; palace/models/spaceoperator.cpp:300-307 puts it in the stiffness matrix and :236-238 makes it a VectorFEMassIntegrator, i.e. INT_Gamma (1/Ls) |E_t|^2 dS",
+     "probe_default": "palace/fem/coefficient.hpp:373-391 gives 0.5 * t * eps * |E|^2",
+     "probe_integration": "palace/models/surfacepostoperator.cpp:287-301 integrates the coefficient with BoundaryLFIntegrator against H1, whose basis is a partition of unity, so the sum of the linear form is the plain surface integral",
+     "probe_ma": "palace/fem/coefficient.hpp:393-413 gives 0.5 * (t/eps) * |E_n|^2",
+     "probe_normalisation": "palace/models/postoperator.cpp:419-427 divides by E_m; palace/drivers/basesolver.cpp:538-540 passes the argument named E_elec; palace/drivers/eigensolver.cpp:349 supplies E_elec + E_cap",
+     "probe_side_rule": "palace/fem/coefficient.hpp:330-360 GetLocalVectorValue - the same side rule for both probe types, so the choice cancels in their difference",
+     "t_nondimensionalisation": "palace/utils/iodata.cpp:535 data.t /= Lc / model.L0",
+     "tc_definition": "palace/utils/iodata.cpp:465 tc = 1.0e9 * Lc / c0_ [ns]"
+    },
+    "unverified_assumptions": [
+     {
+      "assumption": "quadrature",
+      "statement": "the probes are integrated by BoundaryLFIntegrator against H1 while the stiffness term is integrated by a libCEED VectorFEMassIntegrator; the two need not use the same quadrature rule",
+      "what_would_settle_it": "a Palace build instrumented to print INT_Gamma (1/Ls)|E_t|^2 dS directly; not available from the saved outputs",
+      "why_it_is_believed_harmless": "both integrands are degree-2 polynomials per face for order-1 Nedelec on affine tetrahedra, which either rule integrates exactly"
+     },
+     {
+      "assumption": "single port element",
+      "statement": "elems.size() == 1, so GetToSquare is w/l with no multiplicity",
+      "what_would_settle_it": "already settled by the committed config.json",
+      "why_it_is_believed_harmless": "the configuration declares LumpedPort[0].Attributes = [10], one attribute and one coplanar rectangle, which builds exactly one UniformElementData"
+     },
+     {
+      "assumption": "tangential trace",
+      "statement": "the boundary VectorFEMassIntegrator on a Nedelec space sees the tangential trace, so the assembled term is INT |E_t|^2 dS and not INT |E|^2 dS",
+      "what_would_settle_it": "the measured agreement, which is reported per mode",
+      "why_it_is_believed_harmless": "it is the defining property of the H(curl)-conforming trace, and the measured agreement with the closure defect would not survive otherwise"
+     }
+    ]
+   },
+   "independence": "p_probe reads surface-Q.csv, eig.csv and geometry; p_closure reads domain-E.csv. They share no input. p_closure is NOT an independent measurement of the port energy and may not be quoted as verifying the closure it comes from.",
+   "modes": [
+    {
+     "backward_error": 8.721444084e-17,
+     "frequency_GHz": 3.885827871,
+     "independence": {
+      "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance",
+      "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+      "reported_E_ind": "Palace's rank-one averaged-voltage surrogate"
+     },
+     "mode": 1,
+     "participation": {
+      "from_closure": 0.0,
+      "from_probes": 0.0006922662863747981,
+      "reported_E_ind": 0.000673558904969338
+     },
+     "probe_over_closure": Infinity,
+     "reported_EPR_signed": -0.000673558905,
+     "tangential_integral_over_E_elec_plus_E_cap": 0.0015120535939759999,
+     "uniformity_factor_E_ind_over_E_port": 0.972976610628512
+    },
+    {
+     "backward_error": 2.078439481e-16,
+     "frequency_GHz": 10.84135952,
+     "independence": {
+      "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance",
+      "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+      "reported_E_ind": "Palace's rank-one averaged-voltage surrogate"
+     },
+     "mode": 2,
+     "participation": {
+      "from_closure": 0.0,
+      "from_probes": 3.1497467110767194e-05,
+      "reported_E_ind": 3.066128271050199e-05
+     },
+     "probe_over_closure": Infinity,
+     "reported_EPR_signed": -3.066128271e-05,
+     "tangential_integral_over_E_elec_plus_E_cap": 0.000535512989504,
+     "uniformity_factor_E_ind_over_E_port": 0.9734523288071198
+    },
+    {
+     "backward_error": 2.795925092e-16,
+     "frequency_GHz": 11.60901439,
+     "independence": {
+      "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance",
+      "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+      "reported_E_ind": "Palace's rank-one averaged-voltage surrogate"
+     },
+     "mode": 3,
+     "participation": {
+      "from_closure": 0.0,
+      "from_probes": 6.191671596319668e-05,
+      "reported_E_ind": 6.023522797905738e-05
+     },
+     "probe_over_closure": Infinity,
+     "reported_EPR_signed": 6.023522799e-05,
+     "tangential_integral_over_E_elec_plus_E_cap": 0.0012070506595040001,
+     "uniformity_factor_E_ind_over_E_port": 0.9728427459696218
+    },
+    {
+     "backward_error": 1.759169681e-14,
+     "frequency_GHz": 15.4899981,
+     "independence": {
+      "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance",
+      "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+      "reported_E_ind": "Palace's rank-one averaged-voltage surrogate"
+     },
+     "mode": 4,
+     "participation": {
+      "from_closure": 0.0,
+      "from_probes": 1.0554544249301934e-05,
+      "reported_E_ind": 7.6770487212198e-06
+     },
+     "probe_over_closure": Infinity,
+     "reported_EPR_signed": -7.677048721e-06,
+     "tangential_integral_over_E_elec_plus_E_cap": 0.000366327143168,
+     "uniformity_factor_E_ind_over_E_port": 0.7273690402811616
+    },
+    {
+     "backward_error": 2.620873844e-11,
+     "frequency_GHz": 17.78163588,
+     "independence": {
+      "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance",
+      "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+      "reported_E_ind": "Palace's rank-one averaged-voltage surrogate"
+     },
+     "mode": 5,
+     "participation": {
+      "from_closure": -1.4989609553595074e-10,
+      "from_probes": 2.56217495667389e-05,
+      "reported_E_ind": 2.494003680165874e-05
+     },
+     "probe_over_closure": -170930.06642453765,
+     "reported_EPR_signed": 2.49400368e-05,
+     "tangential_integral_over_E_elec_plus_E_cap": 0.001171869072664,
+     "uniformity_factor_E_ind_over_E_port": 0.9733932000504317
+    },
+    {
+     "backward_error": 4.952060043e-13,
+     "frequency_GHz": 19.64198631,
+     "independence": {
+      "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance",
+      "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+      "reported_E_ind": "Palace's rank-one averaged-voltage surrogate"
+     },
+     "mode": 6,
+     "participation": {
+      "from_closure": 0.0,
+      "from_probes": 2.172332330933622e-05,
+      "reported_E_ind": 2.115121990503731e-05
+     },
+     "probe_over_closure": Infinity,
+     "reported_EPR_signed": 2.115121991e-05,
+     "tangential_integral_over_E_elec_plus_E_cap": 0.00121233867264,
+     "uniformity_factor_E_ind_over_E_port": 0.9736640938335143
+    },
+    {
+     "backward_error": 1.830655583e-11,
+     "frequency_GHz": 23.39763138,
+     "independence": {
+      "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance",
+      "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+      "reported_E_ind": "Palace's rank-one averaged-voltage surrogate"
+     },
+     "mode": 7,
+     "participation": {
+      "from_closure": 1.4989631758055566e-10,
+      "from_probes": 1.0701176718302609e-05,
+      "reported_E_ind": 9.759133773220326e-06
+     },
+     "probe_over_closure": 71390.52440398809,
+     "reported_EPR_signed": -9.759133773e-06,
+     "tangential_integral_over_E_elec_plus_E_cap": 0.000847426830752,
+     "uniformity_factor_E_ind_over_E_port": 0.9119682844344517
+    },
+    {
+     "backward_error": 5.858968877e-11,
+     "frequency_GHz": 23.81796279,
+     "independence": {
+      "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance",
+      "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+      "reported_E_ind": "Palace's rank-one averaged-voltage surrogate"
+     },
+     "mode": 8,
+     "participation": {
+      "from_closure": 4.4968873069706206e-10,
+      "from_probes": 6.802944995088744e-06,
+      "reported_E_ind": 6.327160831667353e-06
+     },
+     "probe_over_closure": 15128.11980977043,
+     "reported_EPR_signed": 6.327160832e-06,
+     "tangential_integral_over_E_elec_plus_E_cap": 0.00055825557588,
+     "uniformity_factor_E_ind_over_E_port": 0.9300620299348481
+    }
+   ],
+   "supersedes": "port_field_test, which calibrates its constant on the admitted modes. That verdict is preserved in the record as evidence of what the earlier procedure returned; this block is the number to read.",
+   "worst_relative_disagreement_probe_vs_closure": Infinity
+  },
+  "port_field_test": {
+   "available": true,
+   "kappa": 51.40396618592577,
+   "kappa_per_admitted_mode": {
+    "1": 53.810311023766225,
+    "2": 53.8366205358642,
+    "3": 53.802907668203126,
+    "4": 40.22702483917072,
+    "5": 53.833350427026055,
+    "6": 53.84833217924785,
+    "7": 50.43625559938868,
+    "8": 51.43692721473926
+   },
+   "kappa_spread_max_over_min": 1.3386108566202863,
+   "method": "Test the port-stiffness explanation using Palace's own boundary quadrature.",
+   "probes": {
+    "changes_the_operator": false,
+    "default_index": 1,
+    "normal_index": 2,
+    "permittivity": 1.0,
+    "purpose": "measure the port face's true tangential-field integral, against which Palace's rank-one E_ind surrogate can be tested",
+    "reduction": "0.5*|E_t|^2 integrated over the port face = (index 1) - (index 2)",
+    "side": "SmallerRefractiveIndex",
+    "thickness_mesh_units": 1.0
+   },
+   "reason": "every computed mode was admitted, so there is nothing to test",
+   "rows": [
+    {
+     "E_mag_over_E_elec": 1.0,
+     "admitted": true,
+     "cauchy_schwarz_ratio": 1.0468124352338264,
+     "frequency_GHz": 3.885827871,
+     "mode": 1,
+     "normal_fraction": 0.04101788643941089,
+     "port_participation_from_fields": 0.000643438005061095,
+     "reported_balance": 1.0006735589049693,
+     "reported_participation": 0.000673558905,
+     "restored_balance": 1.000643438005061,
+     "s_default": 0.0001970909536,
+     "s_normal": 8.084254353e-06,
+     "s_tangential": 0.00018900669924699998
+    },
+    {
+     "E_mag_over_E_elec": 1.0,
+     "admitted": true,
+     "cauchy_schwarz_ratio": 1.0473242539523047,
+     "frequency_GHz": 10.84135952,
+     "mode": 2,
+     "normal_fraction": 0.049715437359953235,
+     "port_participation_from_fields": 2.927582608183952e-05,
+     "reported_balance": 1.0000306612827106,
+     "reported_participation": 3.066128271e-05,
+     "restored_balance": 1.0000292758260818,
+     "s_default": 7.044113555e-05,
+     "s_normal": 3.502011862e-06,
+     "s_tangential": 6.6939123688e-05
+    },
+    {
+     "E_mag_over_E_elec": 1.0,
+     "admitted": true,
+     "cauchy_schwarz_ratio": 1.0466684121921739,
+     "frequency_GHz": 11.60901439,
+     "mode": 3,
+     "normal_fraction": 0.03902969031353749,
+     "port_participation_from_fields": 5.7549484906916725e-05,
+     "reported_balance": 1.000060235227979,
+     "reported_participation": 6.023522799e-05,
+     "restored_balance": 1.0000575494849069,
+     "s_default": 0.0001570093591,
+     "s_normal": 6.128026662e-06,
+     "s_tangential": 0.00015088133243800001
+    },
+    {
+     "E_mag_over_E_elec": 1.0,
+     "admitted": true,
+     "cauchy_schwarz_ratio": 0.7825665570954472,
+     "frequency_GHz": 15.4899981,
+     "mode": 4,
+     "normal_fraction": 0.10336977742792794,
+     "port_participation_from_fields": 9.810090466290721e-06,
+     "reported_balance": 1.0000076770487212,
+     "reported_participation": 7.677048721e-06,
+     "restored_balance": 1.0000098100904662,
+     "s_default": 5.106998598e-05,
+     "s_normal": 5.279093084e-06,
+     "s_tangential": 4.5790892896e-05
+    },
+    {
+     "E_mag_over_E_elec": 1.000000000149896,
+     "admitted": true,
+     "cauchy_schwarz_ratio": 1.04726063806659,
+     "frequency_GHz": 17.78163588,
+     "mode": 5,
+     "normal_fraction": 0.05040090013615797,
+     "port_participation_from_fields": 2.3814546153518457e-05,
+     "reported_balance": 1.0000249401866979,
+     "reported_participation": 2.49400368e-05,
+     "restored_balance": 1.0000238146960496,
+     "s_default": 0.0001542583961,
+     "s_normal": 7.774762017e-06,
+     "s_tangential": 0.000146483634083
+    },
+    {
+     "E_mag_over_E_elec": 1.0,
+     "admitted": true,
+     "cauchy_schwarz_ratio": 1.0475520893559247,
+     "frequency_GHz": 19.64198631,
+     "mode": 6,
+     "normal_fraction": 0.03671543517681132,
+     "port_participation_from_fields": 2.0191091330842158e-05,
+     "reported_balance": 1.000021151219905,
+     "reported_participation": 2.115121991e-05,
+     "restored_balance": 1.000020191091331,
+     "s_default": 0.0001573183456,
+     "s_normal": 5.77601152e-06,
+     "s_tangential": 0.00015154233408
+    },
+    {
+     "E_mag_over_E_elec": 0.9999999998501037,
+     "admitted": true,
+     "cauchy_schwarz_ratio": 0.9811743984299397,
+     "frequency_GHz": 23.39763138,
+     "mode": 7,
+     "normal_fraction": 0.044153055377679606,
+     "port_participation_from_fields": 9.9463803668506e-06,
+     "reported_balance": 1.000009758983877,
+     "reported_participation": 9.759133773e-06,
+     "restored_balance": 1.0000099462304706,
+     "s_default": 0.0001108214599,
+     "s_normal": 4.893106056e-06,
+     "s_tangential": 0.000105928353844
+    },
+    {
+     "E_mag_over_E_elec": 0.9999999995503113,
+     "admitted": true,
+     "cauchy_schwarz_ratio": 1.0006412156737923,
+     "frequency_GHz": 23.81796279,
+     "mode": 8,
+     "normal_fraction": 0.08647510293178595,
+     "port_participation_from_fields": 6.323106357096775e-06,
+     "reported_balance": 1.000006326711143,
+     "reported_participation": 6.327160832e-06,
+     "restored_balance": 1.0000063226566684,
+     "s_default": 7.638756996e-05,
+     "s_normal": 6.605622975e-06,
+     "s_tangential": 6.9781946985e-05
+    }
+   ],
+   "verdict": "NO-FAILING-ROWS"
+  },
+  "port_inductance_H": 1.0345665367517793e-07,
+  "port_refinement": null,
+  "port_size_mm": [
+   0.02,
+   0.04
+  ],
+  "refinement_took_effect": true,
+  "roles": [
+   {
+    "abs_participation": 0.000673558905,
+    "basis": "E_ind / (E_mag + E_ind) from domain-E.csv; descriptive only",
+    "frequency_GHz": 3.885827871,
+    "label": "FIELD_DOMINATED",
+    "lumped_magnetic_fraction": 0.0006731055287464668,
+    "mode": 1
+   },
+   {
+    "abs_participation": 3.066128271e-05,
+    "basis": "E_ind / (E_mag + E_ind) from domain-E.csv; descriptive only",
+    "frequency_GHz": 10.84135952,
+    "label": "FIELD_DOMINATED",
+    "lumped_magnetic_fraction": 3.066034262506876e-05,
+    "mode": 2
+   },
+   {
+    "abs_participation": 6.023522799e-05,
+    "basis": "E_ind / (E_mag + E_ind) from domain-E.csv; descriptive only",
+    "frequency_GHz": 11.60901439,
+    "label": "FIELD_DOMINATED",
+    "lumped_magnetic_fraction": 6.023159991490496e-05,
+    "mode": 3
+   },
+   {
+    "abs_participation": 7.677048721e-06,
+    "basis": "E_ind / (E_mag + E_ind) from domain-E.csv; descriptive only",
+    "frequency_GHz": 15.4899981,
+    "label": "FIELD_DOMINATED",
+    "lumped_magnetic_fraction": 7.676989784595192e-06,
+    "mode": 4
+   },
+   {
+    "abs_participation": 2.49400368e-05,
+    "basis": "E_ind / (E_mag + E_ind) from domain-E.csv; descriptive only",
+    "frequency_GHz": 17.78163588,
+    "label": "FIELD_DOMINATED",
+    "lumped_magnetic_fraction": 2.4939414807997297e-05,
+    "mode": 5
+   },
+   {
+    "abs_participation": 2.115121991e-05,
+    "basis": "E_ind / (E_mag + E_ind) from domain-E.csv; descriptive only",
+    "frequency_GHz": 19.64198631,
+    "label": "FIELD_DOMINATED",
+    "lumped_magnetic_fraction": 2.115077254039615e-05,
+    "mode": 6
+   },
+   {
+    "abs_participation": 9.759133773e-06,
+    "basis": "E_ind / (E_mag + E_ind) from domain-E.csv; descriptive only",
+    "frequency_GHz": 23.39763138,
+    "label": "FIELD_DOMINATED",
+    "lumped_magnetic_fraction": 9.759038534920608e-06,
+    "mode": 7
+   },
+   {
+    "abs_participation": 6.327160832e-06,
+    "basis": "E_ind / (E_mag + E_ind) from domain-E.csv; descriptive only",
+    "frequency_GHz": 23.81796279,
+    "label": "FIELD_DOMINATED",
+    "lumped_magnetic_fraction": 6.327120801801673e-06,
+    "mode": 8
+   }
+  ],
+  "row_correspondence": {
+   "identities_checked": [
+    "|p_j| == E_ind / (E_elec + E_cap)   [port-EPR.csv vs domain-E.csv]",
+    "|V_j| == 2*pi*f * L_j * |I_j|       [port-V.csv vs port-I.csv vs eig.csv]"
+   ],
+   "max_participation_energy_mismatch": 2.346290909072954e-10,
+   "max_port_impedance_mismatch": 3.432680240718809e-10,
+   "modes_checked": 8,
+   "ok": true,
+   "tolerance": {
+    "max_participation_energy_mismatch": 1e-06,
+    "max_port_impedance_mismatch": 1e-06
+   },
+   "worst_impedance_mode": 6,
+   "worst_participation_mode": 6
+  },
+  "run": {
+   "cap_fraction_used": 0.050948055205555544,
+   "command": [
+    "docker",
+    "run",
+    "--rm",
+    "--network",
+    "none",
+    "--hostname",
+    "localhost",
+    "--name",
+    "qmhp-ladder-o1-l2",
+    "--user",
+    "1001:1001",
+    "--entrypoint",
+    "stdbuf",
+    "-e",
+    "HOME=/tmp",
+    "-e",
+    "OMP_NUM_THREADS=1",
+    "-e",
+    "OPENBLAS_NUM_THREADS=1",
+    "-v",
+    "/home/runner/work/QMHP-CEM/QMHP-CEM/results/COUPLED-LADDER-O1-L2-PO1-20260920T204837Z/L2/solver:/work",
+    "-w",
+    "/work",
+    "qmhp-cem/palace:0.13.0",
+    "-oL",
+    "-eL",
+    "palace",
+    "-np",
+    "1",
+    "config.json"
+   ],
+   "dof_probe": {
+    "ambiguous": false,
+    "armed": true,
+    "budget": 250000,
+    "dof_reported": 103411,
+    "dof_reported_all": [
+     103411
+    ],
+    "line_buffered": true,
+    "reader_error": null,
+    "refused": false,
+    "seen_at_wall_s": 2.140429714999982
+   },
+   "memory_note": "ru_maxrss measures the container runtime CLI in this process tree, not the solver inside the container. Solver-side timing is quoted from Palace's own log.",
+   "returncode": 0,
+   "runner_cli_peak_rss_kb": 242204,
+   "runner_cli_peak_rss_kb_delta": 242204,
+   "started_utc": "2026-09-20T20:49:20.278594+00:00",
+   "stream_note": "stdout and stderr are merged into one stream so the DOF probe can read the log as it arrives without a pipe-buffer deadlock; palace_log.txt is that merged stream.",
+   "timed_out": false,
+   "timeout_s": 2700,
+   "wall_clock_s": 137.55974905499997
+  },
+  "solver_linear_overrides": {
+   "applied": {
+    "MGMaxLevels": 1
+   },
+   "invariant": "MGMaxLevels and MGUseMesh are read in three places in pinned Palace a61c8cbe. (1) geodata.cpp:204, the reserve: skipping it leaves mesh.capacity() == 1, so :346 makes no copy and :350 runs the SAME GeneralRefinement(refs, -1) in place - the final refined mesh is unchanged and only the intermediate levels are not retained. (2) multigrid.hpp:45 via ConstructFECollections: at Solver.Order 1 the loop breaks at :57 on p == pmin, so exactly one FE collection exists whatever the value. (3) multigrid.hpp:88-89 via ConstructFiniteElementSpaceHierarchy: coarse_mesh_l = max(0, mesh.size() + fecs.size() - 1 - max(1, mg_max_levels)) is 0 with mesh.size() == fecs.size() == 1, so the single level IS the fully refined mesh - the same finest space a run without the override uses. The FE spaces and the assembled operators are therefore identical, and Tol, MaxIts, KSPType and the eigenvalue target are not touched. What changes is ksp.cpp:202: whether the preconditioner is applied directly or demoted to the coarse solver of a geometric-multigrid V-cycle.",
+   "one_branch_only_this_path_reaches": "skipping the reserve also makes mesh.capacity() == 1 true, which is the SOLE gate on RebalanceMesh(mesh[0], iodata) at geodata.cpp:353-355 - a call the default path cannot execute at all. It is inert here, but CONDITIONALLY: it returns 1.0 immediately only when Mpi::Size(comm) == 1 (geodata.cpp:1445-1448), and its only preceding work is gated on save_adapt_mesh, default false (configfile.hpp:169). This record's run.command states the process count; at more than one rank this argument does not hold and would have to be redone. ReorientTetMesh at geodata.cpp:362 becomes reachable for the same reason and is gated on reorient_tet, default false (configfile.hpp:206).",
+   "order_dependence": "point (2) holds at element order 1, where p == pmin. Above it the p-multigrid loop does not break early and the argument would have to be redone.",
+   "replaced": {
+    "MGMaxLevels": null
+   },
+   "unchanged": {
+    "KSPType": "GMRES",
+    "MaxIts": 400,
+    "Tol": 1e-08,
+    "Type": "Default"
+   }
+  },
+  "solver_rules": {
+   "band_ceiling_GHz": 9.0,
+   "band_floor_GHz": 0.5,
+   "eigenmode_backward_error_max_tolerance": 1e-06,
+   "eigenmode_target_GHz": 0.5,
+   "eigenmodes_requested": 6,
+   "eigenvalue_tolerance": 1e-06,
+   "linear_solver_max_iterations": 400,
+   "linear_solver_tolerance": 1e-08,
+   "mesh_size_rule": "min_gap/2 at conductor and etch edges, min(cell_x, cell_y)/12 beyond the halo",
+   "model": "S1 bounded chip cell: vacuum and substrate volumes, zero-thickness PEC sheets for the ground plane and conductors, PEC outer walls, one lumped inductive port at the F1 element site carrying the declared superinductor. The readout tap surfaces carry no boundary condition in Route A. This is NOT the empty Object 001 box of the golden path."
+  },
+  "status": "COMPLETED",
+  "within_dof_budget": true
+ },
+ "rungs": [
+  {
+   "dof": 39832,
+   "h_gap_mm": 0.01,
+   "level": 1,
+   "source": "COUPLED-PILOT-20260916T035733Z/P2",
+   "wall_clock_s": 32.355822464000084
+  },
+  {
+   "dof": 79944,
+   "h_gap_mm": 0.006666666666666666,
+   "level": 2,
+   "source": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+   "wall_clock_s": 81.21394736899998
+  },
+  {
+   "dof": 147372,
+   "h_gap_mm": 0.005,
+   "level": 3,
+   "source": "COUPLED-LADDER-O1-L3-20260916T091212Z",
+   "wall_clock_s": 159.13969699100005
+  }
+ ],
+ "schema": "qmhp-cem.coupled-order1-ladder/0.1.0",
+ "statement": "Order-1 mesh-refinement check, one level per invocation, at fixed element order 1 and fixed 0.08 mm halo. Measures whether the discretisation converges, and tests the supported-but-unproven port-stiffness explanation of the energy-balance failures using Palace's own boundary quadrature. NO coupling extraction: no Route A inversion, no g, no charging energy, no capacitance, no circuit parameter. The 250 000-DOF rule, the 45-minute cap and the prospective admission, matching and magnitude rules are unchanged.",
+ "tracking": {
+  "available": true,
+  "chain_is_transitive": true,
+  "pairwise": {
+   "L1->L2": {
+    "admitted_in_window_GHz": {
+     "a": [
+      1.158332505,
+      3.693188998
+     ],
+     "b": [
+      1.461886595,
+      3.885511214
+     ]
+    },
+    "comparable": true,
+    "comparison": "L1 vs L2",
+    "convention": {
+     "delta_f": "|f_a - f_b| / f_a, run A the reference (unchanged)",
+     "delta_p": "abs(|p_a| - |p_b|) / max(|p_a|, |p_b|) \u2014 MAGNITUDES. Corrective change from the signed numerator |p_a - p_b|, which is not invariant under the eigenvector phase. The denominator and the 1e-2 tolerance are unchanged.",
+     "signs_preserved": "the signed participation and the complex port current are carried through unchanged in every record; only the comparison uses magnitudes"
+    },
+    "pairs": [
+     {
+      "a": {
+       "frequency_GHz": 1.158332505,
+       "mode": 1
+      },
+      "abs_participation": {
+       "a": {
+        "1": 0.9985099177
+       },
+       "b": {
+        "1": 0.9985647137
+       }
+      },
+      "b": {
+       "frequency_GHz": 1.461886595,
+       "mode": 1
+      },
+      "delta_abs_participation_relative": {
+       "1": 5.487476099269219e-05
+      },
+      "delta_f_relative": 0.26206127229417603,
+      "frequency_shift_GHz": 0.30355409,
+      "guard": "APPLIED",
+      "separation_limit_GHz": 1.2118123095,
+      "separation_margin": 3.992080322488819,
+      "signed_participation_preserved": {
+       "a": {
+        "1": 0.9985099177
+       },
+       "b": {
+        "1": -0.9985647137
+       }
+      },
+      "surrogate_relative_bound": {
+       "a": {
+        "1": 4.966567449193151e-09
+       },
+       "b": {
+        "1": 3.355670369719604e-05
+       }
+      }
+     },
+     {
+      "a": {
+       "frequency_GHz": 3.693188998,
+       "mode": 2
+      },
+      "abs_participation": {
+       "a": {
+        "1": 0.0009336025799
+       },
+       "b": {
+        "1": 0.0007781308392
+       }
+      },
+      "b": {
+       "frequency_GHz": 3.885511214,
+       "mode": 2
+      },
+      "delta_abs_participation_relative": {
+       "1": 0.16652882505600286
+      },
+      "delta_f_relative": 0.0520748372488247,
+      "frequency_shift_GHz": 0.192322216,
+      "guard": "APPLIED",
+      "separation_limit_GHz": 1.2118123095,
+      "separation_margin": 6.3009481416333095,
+      "signed_participation_preserved": {
+       "a": {
+        "1": -0.0009336025799
+       },
+       "b": {
+        "1": 0.0007781308392
+       }
+      },
+      "surrogate_relative_bound": {
+       "a": {
+        "1": 1.8946182423415144e-05
+       },
+       "b": {
+        "1": 0.002861576085860234
+       }
+      }
+     }
+    ],
+    "reason": "the frequency and |p| orderings agree and every pair is inside the separation guard",
+    "rule": {
+     "adjacent_gap_is_over_admitted_modes_only": "a rejected row lying between two admitted ones does not narrow the guard; on this record every rejected row sits above both admitted in-window modes, so it does not bite",
+     "id": "qmhp-cem.mode-matching/0.1.1",
+     "pairing": "two one-to-one pairings over the admitted in-window modes \u2014 by ascending frequency, and by descending |p| \u2014 which must induce the SAME pairing",
+     "refuses_when": "the two runs admit different numbers of in-window modes, the two pairings disagree, or the separation guard fails \u2014 in each case no comparison is reported",
+     "separation_guard": "each pair's frequency shift between runs must be below half the smallest adjacent-mode spacing in either run, so no swap is possible",
+     "separation_guard_is_vacuous_when": "either run admits a single in-window mode: the adjacent-mode spacing is then infinite, so the guard cannot fail and the ordering check cannot fail either. Such a match is reported with guard='VACUOUS' rather than silently as if it had been guarded.",
+     "status": "retrospective for COUPLED-PILOT-20260916T035733Z; prospective for the next confirmatory run",
+     "what_the_ordering_check_can_and_cannot_do": "Each pairing is formed by sorting the two runs SEPARATELY and zipping, so whenever |p| is co-monotone with frequency inside each run the two pairings agree BY CONSTRUCTION, whatever the true correspondence is. The check therefore detects a run whose |p| order inverts against its frequency order; it is NOT independent evidence that the correspondence between the runs is right. On COUPLED-PILOT-20260916T035733Z all three runs are co-monotone, so the check could not have contradicted the frequency pairing there. The separation guard is what carries the correspondence."
+    },
+    "status": "MATCHED"
+   },
+   "L1->L3 (direct)": {
+    "admitted_in_window_GHz": {
+     "a": [
+      1.158332505,
+      3.693188998
+     ],
+     "b": [
+      1.709561611,
+      4.087683186
+     ]
+    },
+    "comparable": true,
+    "comparison": "L1 vs L3",
+    "convention": {
+     "delta_f": "|f_a - f_b| / f_a, run A the reference (unchanged)",
+     "delta_p": "abs(|p_a| - |p_b|) / max(|p_a|, |p_b|) \u2014 MAGNITUDES. Corrective change from the signed numerator |p_a - p_b|, which is not invariant under the eigenvector phase. The denominator and the 1e-2 tolerance are unchanged.",
+     "signs_preserved": "the signed participation and the complex port current are carried through unchanged in every record; only the comparison uses magnitudes"
+    },
+    "pairs": [
+     {
+      "a": {
+       "frequency_GHz": 1.158332505,
+       "mode": 1
+      },
+      "abs_participation": {
+       "a": {
+        "1": 0.9985099177
+       },
+       "b": {
+        "1": 0.9983175827
+       }
+      },
+      "b": {
+       "frequency_GHz": 1.709561611,
+       "mode": 1
+      },
+      "delta_abs_participation_relative": {
+       "1": 0.00019262202266649798
+      },
+      "delta_f_relative": 0.47588158289661403,
+      "frequency_shift_GHz": 0.5512291060000001,
+      "guard": "APPLIED",
+      "separation_limit_GHz": 1.1890607874999999,
+      "separation_margin": 2.157108132639135,
+      "signed_participation_preserved": {
+       "a": {
+        "1": 0.9985099177
+       },
+       "b": {
+        "1": 0.9983175827
+       }
+      },
+      "surrogate_relative_bound": {
+       "a": {
+        "1": 4.966567449193151e-09
+       },
+       "b": {
+        "1": 1.7711902745642085e-05
+       }
+      }
+     },
+     {
+      "a": {
+       "frequency_GHz": 3.693188998,
+       "mode": 2
+      },
+      "abs_participation": {
+       "a": {
+        "1": 0.0009336025799
+       },
+       "b": {
+        "1": 0.0009112763978
+       }
+      },
+      "b": {
+       "frequency_GHz": 4.087683186,
+       "mode": 2
+      },
+      "delta_abs_participation_relative": {
+       "1": 0.023914010715770987
+      },
+      "delta_f_relative": 0.10681668016817791,
+      "frequency_shift_GHz": 0.39449418799999947,
+      "guard": "APPLIED",
+      "separation_limit_GHz": 1.1890607874999999,
+      "separation_margin": 3.014140191844858,
+      "signed_participation_preserved": {
+       "a": {
+        "1": -0.0009336025799
+       },
+       "b": {
+        "1": 0.0009112763978
+       }
+      },
+      "surrogate_relative_bound": {
+       "a": {
+        "1": 1.8946182423415144e-05
+       },
+       "b": {
+        "1": 0.00034728169564227524
+       }
+      }
+     }
+    ],
+    "reason": "the frequency and |p| orderings agree and every pair is inside the separation guard",
+    "rule": {
+     "adjacent_gap_is_over_admitted_modes_only": "a rejected row lying between two admitted ones does not narrow the guard; on this record every rejected row sits above both admitted in-window modes, so it does not bite",
+     "id": "qmhp-cem.mode-matching/0.1.1",
+     "pairing": "two one-to-one pairings over the admitted in-window modes \u2014 by ascending frequency, and by descending |p| \u2014 which must induce the SAME pairing",
+     "refuses_when": "the two runs admit different numbers of in-window modes, the two pairings disagree, or the separation guard fails \u2014 in each case no comparison is reported",
+     "separation_guard": "each pair's frequency shift between runs must be below half the smallest adjacent-mode spacing in either run, so no swap is possible",
+     "separation_guard_is_vacuous_when": "either run admits a single in-window mode: the adjacent-mode spacing is then infinite, so the guard cannot fail and the ordering check cannot fail either. Such a match is reported with guard='VACUOUS' rather than silently as if it had been guarded.",
+     "status": "retrospective for COUPLED-PILOT-20260916T035733Z; prospective for the next confirmatory run",
+     "what_the_ordering_check_can_and_cannot_do": "Each pairing is formed by sorting the two runs SEPARATELY and zipping, so whenever |p| is co-monotone with frequency inside each run the two pairings agree BY CONSTRUCTION, whatever the true correspondence is. The check therefore detects a run whose |p| order inverts against its frequency order; it is NOT independent evidence that the correspondence between the runs is right. On COUPLED-PILOT-20260916T035733Z all three runs are co-monotone, so the check could not have contradicted the frequency pairing there. The separation guard is what carries the correspondence."
+    },
+    "status": "MATCHED"
+   },
+   "L2->L3": {
+    "admitted_in_window_GHz": {
+     "a": [
+      1.461886595,
+      3.885511214
+     ],
+     "b": [
+      1.709561611,
+      4.087683186
+     ]
+    },
+    "comparable": true,
+    "comparison": "L2 vs L3",
+    "convention": {
+     "delta_f": "|f_a - f_b| / f_a, run A the reference (unchanged)",
+     "delta_p": "abs(|p_a| - |p_b|) / max(|p_a|, |p_b|) \u2014 MAGNITUDES. Corrective change from the signed numerator |p_a - p_b|, which is not invariant under the eigenvector phase. The denominator and the 1e-2 tolerance are unchanged.",
+     "signs_preserved": "the signed participation and the complex port current are carried through unchanged in every record; only the comparison uses magnitudes"
+    },
+    "pairs": [
+     {
+      "a": {
+       "frequency_GHz": 1.461886595,
+       "mode": 1
+      },
+      "abs_participation": {
+       "a": {
+        "1": 0.9985647137
+       },
+       "b": {
+        "1": 0.9983175827
+       }
+      },
+      "b": {
+       "frequency_GHz": 1.709561611,
+       "mode": 1
+      },
+      "delta_abs_participation_relative": {
+       "1": 0.0002474862135717344
+      },
+      "delta_f_relative": 0.1694214974315433,
+      "frequency_shift_GHz": 0.24767501600000008,
+      "guard": "APPLIED",
+      "separation_limit_GHz": 1.1890607874999999,
+      "separation_margin": 4.800891130254331,
+      "signed_participation_preserved": {
+       "a": {
+        "1": -0.9985647137
+       },
+       "b": {
+        "1": 0.9983175827
+       }
+      },
+      "surrogate_relative_bound": {
+       "a": {
+        "1": 3.355670369719604e-05
+       },
+       "b": {
+        "1": 1.7711902745642085e-05
+       }
+      }
+     },
+     {
+      "a": {
+       "frequency_GHz": 3.885511214,
+       "mode": 2
+      },
+      "abs_participation": {
+       "a": {
+        "1": 0.0007781308392
+       },
+       "b": {
+        "1": 0.0009112763978
+       }
+      },
+      "b": {
+       "frequency_GHz": 4.087683186,
+       "mode": 2
+      },
+      "delta_abs_participation_relative": {
+       "1": 0.14610886326194722
+      },
+      "delta_f_relative": 0.05203227088151172,
+      "frequency_shift_GHz": 0.20217197199999948,
+      "guard": "APPLIED",
+      "separation_limit_GHz": 1.1890607874999999,
+      "separation_margin": 5.8814324049824425,
+      "signed_participation_preserved": {
+       "a": {
+        "1": 0.0007781308392
+       },
+       "b": {
+        "1": 0.0009112763978
+       }
+      },
+      "surrogate_relative_bound": {
+       "a": {
+        "1": 0.002861576085860234
+       },
+       "b": {
+        "1": 0.00034728169564227524
+       }
+      }
+     }
+    ],
+    "reason": "the frequency and |p| orderings agree and every pair is inside the separation guard",
+    "rule": {
+     "adjacent_gap_is_over_admitted_modes_only": "a rejected row lying between two admitted ones does not narrow the guard; on this record every rejected row sits above both admitted in-window modes, so it does not bite",
+     "id": "qmhp-cem.mode-matching/0.1.1",
+     "pairing": "two one-to-one pairings over the admitted in-window modes \u2014 by ascending frequency, and by descending |p| \u2014 which must induce the SAME pairing",
+     "refuses_when": "the two runs admit different numbers of in-window modes, the two pairings disagree, or the separation guard fails \u2014 in each case no comparison is reported",
+     "separation_guard": "each pair's frequency shift between runs must be below half the smallest adjacent-mode spacing in either run, so no swap is possible",
+     "separation_guard_is_vacuous_when": "either run admits a single in-window mode: the adjacent-mode spacing is then infinite, so the guard cannot fail and the ordering check cannot fail either. Such a match is reported with guard='VACUOUS' rather than silently as if it had been guarded.",
+     "status": "retrospective for COUPLED-PILOT-20260916T035733Z; prospective for the next confirmatory run",
+     "what_the_ordering_check_can_and_cannot_do": "Each pairing is formed by sorting the two runs SEPARATELY and zipping, so whenever |p| is co-monotone with frequency inside each run the two pairings agree BY CONSTRUCTION, whatever the true correspondence is. The check therefore detects a run whose |p| order inverts against its frequency order; it is NOT independent evidence that the correspondence between the runs is right. On COUPLED-PILOT-20260916T035733Z all three runs are co-monotone, so the check could not have contradicted the frequency pairing there. The separation guard is what carries the correspondence."
+    },
+    "status": "MATCHED"
+   }
+  },
+  "series": {
+   "L1m1": {
+    "points": [
+     {
+      "abs_participation": 0.9985099177,
+      "dof": 39832,
+      "frequency_GHz": 1.158332505,
+      "h_gap_mm": 0.01,
+      "level": 1,
+      "mode": 1
+     },
+     {
+      "abs_participation": 0.9985647137,
+      "dof": 79944,
+      "frequency_GHz": 1.461886595,
+      "h_gap_mm": 0.006666666666666666,
+      "level": 2,
+      "mode": 1
+     },
+     {
+      "abs_participation": 0.9983175827,
+      "dof": 147372,
+      "frequency_GHz": 1.709561611,
+      "h_gap_mm": 0.005,
+      "level": 3,
+      "mode": 1
+     }
+    ],
+    "role": "LUMPED_DOMINATED"
+   },
+   "L1m2": {
+    "points": [
+     {
+      "abs_participation": 0.0009336025799,
+      "dof": 39832,
+      "frequency_GHz": 3.693188998,
+      "h_gap_mm": 0.01,
+      "level": 1,
+      "mode": 2
+     },
+     {
+      "abs_participation": 0.0007781308392,
+      "dof": 79944,
+      "frequency_GHz": 3.885511214,
+      "h_gap_mm": 0.006666666666666666,
+      "level": 2,
+      "mode": 2
+     },
+     {
+      "abs_participation": 0.0009112763978,
+      "dof": 147372,
+      "frequency_GHz": 4.087683186,
+      "h_gap_mm": 0.005,
+      "level": 3,
+      "mode": 2
+     }
+    ],
+    "role": "FIELD_DOMINATED"
+   }
+  },
+  "transitivity_note": "the composed L1->L2->L3 correspondence agrees with the direct L1->L3 match"
+ },
+ "trend": {
+  "available": false,
+  "reason": "this is a port-refined run, not a rung. Its movement against level 1 confounds the global level with the port box; see baseline_comparison and port_resolution_sensitivity, which isolate the port box."
+ },
+ "wall_clock_cap_s": 2700
+}
