@@ -1,5 +1,33 @@
 # Definition decision: R1 as the readout normal mode of the linear environment
 
+> **Corrections forced by the transfer-function compatibility check
+> (2026-09-20; [`fem-spectral-mapping.md`](fem-spectral-mapping.md)).** The
+> draft below stands as drafted and remains unapproved; these four points
+> correct it and take precedence.
+>
+> 1. **§5 item 2 is withdrawn.** The 10.0 of `solvers/palace/verification.py`
+>    is a cavity-height shift-to-uncertainty rule. Reusing it as a
+>    modal-ownership guard presented a **new** criterion as an existing
+>    approved one. The residue-term dominance ratio is a diagnostic only; any
+>    ownership criterion needs its own justification and pre-declaration.
+> 2. **§5 item 1 and §9 are qualified.** The declared probe classification
+>    cannot be executed on N1R or N2R: the solved configurations carry no
+>    `Domains.Postprocessing.Probe` and the records carry no `probe-E.csv`.
+>    Physical readout identification is therefore **not established** by these
+>    records, and no substitute may be assumed.
+> 3. **§7 "Completeness" is corrected.** `Σ_m p_mF + δ_far = 1` is not the
+>    right statement for this FEM model. The complete-mode sum of Palace's
+>    reported EPR is `Σ_all |p_mF| = fᵀK⁻¹f/L`, which is **strictly below 1**;
+>    `δ_saved := 1 − Σ_saved |p_mF|` is an **upper bound** on omitted spectral
+>    weight, not equal to it, and must not be renamed `δ_far`.
+> 4. **§3 and §7 are qualified.** The zeros of `G_F` correspond to removing
+>    the rank-one surrogate `f fᵀ/L`, not the assembled port operator
+>    `K_port = ∫_Γ (1/L_s)|E_t|²`. The committed records show the two differ
+>    (four of N1R's six and five of N2R's nine saved modes are
+>    port-operator-localised). The resulting error on the readout zero is
+>    bounded at `≲2.3e-7` by committed data; on `a`, and hence on
+>    `E_C,F1F1`, it is not bounded.
+
 **Status:** assessment and draft only. The registered target is **not changed
 by this document**; a draft amendment is given in §7 for approval, labelled
 as a conceptual clarification forced by the multimode identifiability analysis
