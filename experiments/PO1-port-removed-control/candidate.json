@@ -256,5 +256,31 @@
   "how_it_is_given": "add \"port_control\": \"PO1-port-removed\" to .github/ladder-approval.json, set palace_refinement.id to \"PO1\" with N2R's boxes ([{Levels: 2, BoundingBoxMin: [-0.62, -0.125, -0.01], BoundingBoxMax: [-0.58, -0.065, 0.01]}]) and solver_linear_overrides {MGMaxLevels: 1}, set baseline_record to COUPLED-LADDER-O1-L2-N2R-20260918T061455Z, keep baseline_mesh_sha256 d8dc1a92...c14428, and commit it on the palace/** branch. Nothing else changes.",
   "what_it_authorises": "one solve, at the unchanged 250 000-DOF rule and 2 700 s cap, with no retry.",
   "what_it_does_not_authorise": "no second attempt, no other level, no extraction, no Route A or Route B result, no coupling value, no registered-definition amendment, no budget or cap change, and no merge of PR 7."
+ },
+ "refinement_region": {
+  "BoundingBoxMin": [
+   -0.62,
+   -0.125,
+   -0.01
+  ],
+  "BoundingBoxMax": [
+   -0.58,
+   -0.065,
+   0.01
+  ],
+  "Levels": 2,
+  "identical_to_N2R": "read out of N2R's SOLVED config, not restated from memory. PO1 is not a refinement step and does NOT deepen the box: the discretisation must be N2R's exactly, because any difference in it would destroy the comparison rather than enable it.",
+  "total_not_additional": "TWO TOTAL levels from the loaded mesh, the same as N2R."
+ },
+ "approval_must_carry": {
+  "port_control": "PO1-port-removed",
+  "baseline_record": "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z",
+  "sequence_records": [],
+  "baseline_mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+  "palace_refinement.solver_linear_overrides": {
+   "MGMaxLevels": 1
+  },
+  "why_sequence_records_is_empty": "PO1 is at the SAME depth as its baseline, so it is not a point on a sequence in h. Naming records here would present it as a refinement step, which it is not.",
+  "why_the_baseline_is_N2R_at_the_same_depth": "every other approval needs a strictly SHALLOWER baseline, and the driver refuses a refined one for exactly that reason. This control needs an IDENTICAL one. approved_palace_refinement admits that only under the pinned port_control identifier and only on exact equality in every box (is_identical_refinement)."
  }
 }

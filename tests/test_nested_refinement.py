@@ -684,6 +684,7 @@ CANDIDATE_FOR_ID = {
     "N2": REPO_ROOT / "experiments" / "N2-nested-port-refinement",
     "N2R": REPO_ROOT / "experiments" / "N2R-rescue-preconditioner",
     "N1R": REPO_ROOT / "experiments" / "N1R-controlled-preconditioner",
+    "PO1": REPO_ROOT / "experiments" / "PO1-port-removed-control",
 }
 
 

@@ -513,17 +513,137 @@ def test_the_rendered_report_says_it_is_not_a_refinement_check(ladder):
 # --- nothing is armed ----------------------------------------------------------------
 
 
-def test_the_approval_trigger_is_untouched_and_carries_no_control(ladder):
+def test_the_approval_trigger_is_either_unarmed_or_exactly_the_reviewed_PO1(ladder):
+    """Two states, both checked. Being armed is not a failure; being armed WRONG is.
+
+    The earlier version of this guard asserted the approval was still N1R and
+    carried no port_control. That made it a statement about a moment rather
+    than about a property: the approving commit would have had to edit the
+    guard, which is exactly the coupling that makes a guard worthless. So it
+    branches instead.
+
+    Unarmed, it checks that nothing resolves a control. Armed, it checks that
+    what is approved IS the reviewed candidate - every field read out of the
+    candidate's ``approval_must_carry`` block and out of the config N2R
+    actually solved, never restated here.
+    """
     approval = json.loads(APPROVAL.read_text())
-    assert "port_control" not in approval
-    assert approval["palace_refinement"]["id"] == "N1R"
-    assert ladder.approved_port_control(APPROVAL) is None
-    changed = subprocess.run(["git", "diff", "--name-only", "HEAD"], capture_output=True, text=True,
-                             cwd=REPO_ROOT).stdout.split()
-    assert ".github/ladder-approval.json" not in changed
     workflow = (REPO_ROOT / ".github" / "workflows" / "palace-order1-ladder.yml").read_text()
-    assert ".github/ladder-approval.json" in workflow
-    assert ".github/workflows/palace-order1-ladder.yml" not in changed
+    assert ".github/ladder-approval.json" in workflow, "the trigger path is unchanged"
+
+    if "port_control" not in approval:
+        assert ladder.approved_port_control(APPROVAL) is None
+        assert approval["palace_refinement"]["id"] != "PO1", (
+            "an approval naming PO1 without port_control would re-solve N2R and be recorded "
+            "as the control it is not"
+        )
+        return
+
+    cand = json.loads((REC / "candidate.json").read_text())
+    must = cand["approval_must_carry"]
+    solved = json.loads(N2R_SOLVED.read_text())
+
+    assert approval["port_control"] == must["port_control"] == "PO1-port-removed"
+    assert ladder.approved_port_control(APPROVAL) == must["port_control"]
+    assert "port_refinement" not in approval, "the gmsh path builds a different mesh"
+
+    block = approval["palace_refinement"]
+    assert block["id"] == "PO1", "the record suffix, which keeps PO1 out of N2R's directory"
+    assert block["boxes"] == solved["Model"]["Refinement"]["Boxes"], (
+        "the discretisation must be N2R's own, read from the config N2R solved"
+    )
+    region = cand["refinement_region"]
+    assert block["boxes"][0]["Levels"] == region["Levels"]
+    assert block["boxes"][0]["BoundingBoxMin"] == region["BoundingBoxMin"]
+    assert block["boxes"][0]["BoundingBoxMax"] == region["BoundingBoxMax"]
+    assert block.get("solver_linear_overrides", {}) == must[
+        "palace_refinement.solver_linear_overrides"]
+    assert approval["baseline_record"] == must["baseline_record"]
+    assert approval["sequence_records"] == must["sequence_records"] == []
+    assert approval["baseline_mesh_sha256"] == must["baseline_mesh_sha256"]
+
+    # The limits this approval may not move.
+    assert approval["level"] == 2
+    assert approval["constraints"]["finite_element_order"] == 1
+    assert approval["constraints"]["dof_budget"] == 250_000
+    assert approval["constraints"]["per_solve_wall_clock_cap_s"] == 2700
+
+    # And the driver resolves it to those same numbers, not to something nearby.
+    assert ladder.approved_palace_refinement(APPROVAL) == (
+        "PO1",
+        solved["Model"]["Refinement"]["Boxes"],
+        must["baseline_mesh_sha256"],
+        must["palace_refinement.solver_linear_overrides"],
+    )
+
+
+def _armed_approval() -> dict:
+    """The approval that WOULD arm PO1, built from the reviewed candidate alone.
+
+    Every value comes from ``approval_must_carry`` or from the config N2R
+    solved. Nothing is restated, so this helper cannot certify an approval the
+    candidate does not describe.
+    """
+    cand = json.loads((REC / "candidate.json").read_text())
+    must = cand["approval_must_carry"]
+    body = copy.deepcopy(json.loads(APPROVAL.read_text()))
+    body.pop("port_refinement", None)
+    body["port_control"] = must["port_control"]
+    body["baseline_record"] = must["baseline_record"]
+    body["sequence_records"] = must["sequence_records"]
+    body["baseline_mesh_sha256"] = must["baseline_mesh_sha256"]
+    body["palace_refinement"] = {
+        "id": "PO1",
+        "boxes": json.loads(N2R_SOLVED.read_text())["Model"]["Refinement"]["Boxes"],
+        "solver_linear_overrides": must["palace_refinement.solver_linear_overrides"],
+    }
+    return body
+
+
+def test_the_armed_branch_of_that_guard_is_not_vacuous(ladder, tmp_path, monkeypatch):
+    """The armed branch must pass on the prepared PO1 and fail on any drift.
+
+    A two-state guard is only worth having if the state it is not currently in
+    is also exercised. This drives the armed branch on a temporary file - the
+    live approval is never written - and then moves one field at a time.
+    """
+    mod = sys.modules[__name__]
+
+    def run(body):
+        path = tmp_path / "armed.json"
+        path.write_text(json.dumps(body, indent=1))
+        monkeypatch.setattr(mod, "APPROVAL", path)
+        mod.test_the_approval_trigger_is_either_unarmed_or_exactly_the_reviewed_PO1(ladder)
+
+    run(_armed_approval())          # the prepared approval passes the armed branch
+
+    drifts = {
+        "a deeper box": lambda b: b["palace_refinement"].__setitem__(
+            "boxes", [dict(b["palace_refinement"]["boxes"][0], Levels=3)]),
+        "a moved box": lambda b: b["palace_refinement"].__setitem__(
+            "boxes", [dict(b["palace_refinement"]["boxes"][0], BoundingBoxMax=[-0.57, -0.065, 0.01])]),
+        "another override": lambda b: b["palace_refinement"]["solver_linear_overrides"].__setitem__(
+            "MGMaxLevels", 2),
+        "a different baseline": lambda b: b.__setitem__(
+            "baseline_record", "COUPLED-LADDER-O1-L2-20260916T080802Z"),
+        "a non-empty sequence": lambda b: b.__setitem__(
+            "sequence_records", ["COUPLED-LADDER-O1-L2-N2R-20260918T061455Z"]),
+        "a different mesh hash": lambda b: b.__setitem__("baseline_mesh_sha256", "0" * 64),
+        "a different id": lambda b: b["palace_refinement"].__setitem__("id", "PO2"),
+        "a raised budget": lambda b: b["constraints"].__setitem__("dof_budget", 500_000),
+        "a raised cap": lambda b: b["constraints"].__setitem__("per_solve_wall_clock_cap_s", 5400),
+        "a different level": lambda b: b.__setitem__("level", 3),
+        "order 2": lambda b: b["constraints"].__setitem__("finite_element_order", 2),
+        "a re-added port_refinement": lambda b: b.__setitem__(
+            "port_refinement", {"id": "R1", "h_port_mm": 0.0033, "pad_mm": 0.02,
+                                "transition_mm": 0.02}),
+    }
+    for label, mutate in drifts.items():
+        body = _armed_approval()
+        mutate(body)
+        with pytest.raises((AssertionError, ladder.LadderError, KeyError)):
+            run(body)
+            pytest.fail(f"the guard accepted {label}")
 
 
 def test_nothing_in_this_preparation_can_launch_palace():
@@ -532,18 +652,22 @@ def test_nothing_in_this_preparation_can_launch_palace():
     text = (REC / "prepare.py").read_text()
     for token in forbidden:
         assert token not in text.replace("def main()", "").replace("sys.exit(main())", ""), token
-    # this test file itself runs only the offline candidate builder and git
+    # this test file itself runs exactly ONE subprocess, the offline candidate builder
     import ast
 
     tree = ast.parse(Path(__file__).read_text())
     runs = [n for n in ast.walk(tree)
             if isinstance(n, ast.Call) and ast.unparse(n.func) == "subprocess.run"]
     argv = [ast.unparse(n.args[0]) for n in runs]
-    assert len(argv) == 2, argv
-    assert any("prepare.py" in a for a in argv) and any("'git'" in a for a in argv)
-    # the candidate is never written under results/, and no PO1 record exists
+    assert len(argv) == 1, argv
+    assert "prepare.py" in argv[0]
+    # No PO1 CANDIDATE may ever be written under results/. A PO1 RECORD may
+    # exist once the approved run has committed one - that is evidence, not a
+    # candidate - so it is checked for shape rather than forbidden outright.
     assert "refusing to write a candidate under results/" in text
-    assert not list((REPO_ROOT / "results").glob("*PO1*"))
+    assert not list((REPO_ROOT / "results").rglob("config.candidate.json"))
+    for record in (REPO_ROOT / "results").glob("COUPLED-LADDER-O1-L*-PO1-*"):
+        assert (record / "summary.json").is_file(), f"{record.name} is not a solver record"
 
 
 def test_the_single_approval_is_stated(candidate):
