@@ -656,7 +656,8 @@ def test_nothing_in_this_preparation_can_launch_palace():
     # every subprocess this test file runs is one of the declared OFFLINE builders
     import ast
 
-    offline = {"prepare.py", "correspondence.py", "verify_external.py", "normalisation.py"}
+    offline = {"prepare.py", "correspondence.py", "verify_external.py", "normalisation.py",
+               "moment_identities.py", "n2r_moments.py"}
     tree = ast.parse(Path(__file__).read_text())
     runs = [n for n in ast.walk(tree)
             if isinstance(n, ast.Call) and ast.unparse(n.func) == "subprocess.run"]
@@ -668,7 +669,10 @@ def test_nothing_in_this_preparation_can_launch_palace():
             assert any(q in a for q in ("'diff'", "'log'", "'status'", "'rev-parse'")), a
             continue
         assert "sys.executable" in a, a
-        assert any(name in a for name in offline), a
+        # either the builder is named literally, or the call is parameterised over a
+        # directory constant whose builders are all in the offline set above
+        dirs = ("REC /", "CORR /", "EXT /", "NORM /", "MOM /")
+        assert any(n in a for n in offline) or any(d in a for d in dirs), a
     assert any("sys.executable" in a for a in argv), "at least one offline builder must run"
     # No PO1 CANDIDATE may ever be written under results/. A PO1 RECORD may
     # exist once the approved run has committed one - that is evidence, not a
@@ -976,3 +980,139 @@ def test_the_normalisation_script_reproduces_its_json_and_touches_no_network():
                           capture_output=True, text=True, cwd=REPO_ROOT)
     assert proc.returncode == 0, proc.stderr
     assert (NORM / "normalisation.json").read_text() == before
+
+
+# --- the two spectral moments: identities, corrections, feasibility --------------------
+
+MOM = REPO_ROOT / "experiments" / "first-moment"
+MOM_DOC = REPO_ROOT / "docs" / "coupled-candidate" / "first-moment.md"
+
+
+@pytest.fixture(scope="module")
+def identities():
+    return json.loads((MOM / "moment_identities.json").read_text())
+
+
+@pytest.fixture(scope="module")
+def moments():
+    return json.loads((MOM / "n2r_moments.json").read_text())
+
+
+def test_both_moment_identities_are_verified_synthetically(identities):
+    i = identities["identities"]
+    assert i["zeroth_moment"] == "N = sum_m p_m = q^H K^+ q"
+    assert i["first_moment"] == "A = sum_m lambda_m p_m = q^H M^-1 q"
+    assert i["both_verified"] is True
+    assert i["max_relative_error_N"] < 1e-8 and i["max_relative_error_A"] < 1e-8
+    assert "Parseval" in i["why_A_is_the_easy_one"]
+    assert identities["trials"] >= 100 and identities["nullity"] > 0
+    assert "did NOT reach this environment" in identities["supplied_package_status"]
+    assert "not treated as authority" in identities["supplied_package_status"]
+
+
+def test_the_four_assumptions_are_stated(identities):
+    a = identities["assumptions"]
+    assert set(a) == {"completeness", "null_space", "normalisation", "projection", "units"}
+    assert "not a filtered subset" in a["completeness"]
+    assert "q^H E_0 = 0" in a["null_space"] and "ASSUMPTION" in a["null_space"]
+    assert "E_m^H M E_m = 1" in a["normalisation"]
+    assert "silently" in a["projection"]
+    assert "(2*pi*1e9)^2" in a["units"]
+
+
+def test_filtering_damages_the_first_moment_far_more_than_the_zeroth(identities):
+    f = identities["how_the_identities_fail"]["filtered_subset_keeps_a_third_of_the_modes"]
+    assert f["fraction_of_A_recovered"]["median"] < f["fraction_of_N_recovered"]["median"]
+    assert f["fraction_of_N_recovered"]["median"] > 0.8
+    assert f["fraction_of_A_recovered"]["median"] < 0.8
+    assert "little weight but much moment" in f["reading"]
+
+
+def test_the_recorded_a_is_this_first_moment(moments):
+    for key, v in moments["variants"].items():
+        assert v["reproduces_the_record"] is True, key
+    A = moments["variants"]["A_all_saved_modes"]
+    assert A["modes"] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert A["N_partial"] == pytest.approx(0.999254583556, abs=1e-12)
+    assert A["A_partial_GHz2"] == pytest.approx(2.351511939, abs=1e-8)
+    assert moments["variants"]["B_field_resonant_only"]["modes"] == [1, 2, 5, 8]
+
+
+def test_the_tail_of_A_is_declared_uncontrolled(moments):
+    t = moments["the_tail_of_A_is_not_controlled_by_the_tail_of_N"]
+    assert "unbounded in F" in t["statement"]
+    assert "constrains NOTHING about A" in t["statement"]
+    # the scenario table must run past the old 12-50 GHz window and show it grow
+    fs = [s["F_GHz"] for s in t["scenarios"]]
+    assert max(fs) >= 100
+    biggest = max(t["scenarios"], key=lambda s: s["F_GHz"])
+    assert biggest["as_a_fraction_of_A_partial"] > 1.0
+    assert "not an uncertainty interval" in t["these_are_scenarios_not_bounds"]
+    assert "cannot be asserted from the denominator alone" in t["no_universal_tail_rate_is_claimed"]
+
+
+def test_the_bookkeeping_is_unmixed(moments):
+    b = moments["bookkeeping_correction"]
+    assert "ALL NINE" in b["the_inconsistency"] and "variant B" in b["the_inconsistency"]
+    assert b["N_all_nine"] > b["N_variant_B"]
+    assert b["difference_in_N"] > 0 and b["difference_in_A_GHz2"] > 0
+    assert "not by arguing it does not matter" in b["size"]
+
+
+def test_the_six_corrections_are_in_the_record():
+    norm = _norm(MOM_DOC.read_text())
+    for phrase in (
+        "holds for *exactly* zero, not approximately zero",      # 1
+        "does not exclude dark modes",                            # 2
+        "scenarios, not bounds",                                  # 3
+        "Bookkeeping, unmixed",                                   # 4
+        "No universal `1/ω²` tail rate",                          # 5
+        "adds a trend point, not convergence",                    # 6
+    ):
+        assert phrase in norm, phrase
+    assert norm.count("**withdrawn**") >= 2
+
+
+def test_the_feasibility_findings_match_the_pinned_source():
+    norm = _norm(MOM_DOC.read_text())
+    # f already exists as a vector; both matrices are exposed
+    assert "`LumpedPortData::v`" in norm
+    assert "GetMassMatrix" in norm
+    assert "two existing accessors and one SPD solve" in norm
+    # the driven route is blocked by the R > 0 assertion
+    assert 'MFEM_VERIFY(std::abs(data.R) > 0.0,' in MOM_DOC.read_text()
+    assert "The F1 port has `R = 0`" in norm
+    assert "cannot even be tested" in norm
+    # and the honest caveat that neither route is config-only
+    assert "Neither is a configuration change" in norm
+    # the port really does carry R = 0 in the solved config
+    cfg = json.loads((REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z"
+                      / "L2" / "solver" / "config.json").read_text())
+    assert "R" not in cfg["Boundaries"]["LumpedPort"][0], "R is unset, i.e. zero"
+
+
+def test_the_scope_and_the_recommended_task_do_not_overclaim():
+    norm = _norm(MOM_DOC.read_text())
+    assert "not** the registered physical `E_C`" in norm
+    for mapping in ("Coordinate mapping", "Operator mapping", "Discretisation",
+                    "Circuit identification"):
+        assert mapping in norm, mapping
+    assert "Not prepared, not configured, not approved" in norm
+    assert "the approval file is untouched" in norm
+    # the recommendation is A, not N, and says why
+    assert "Not `N`" in norm
+    assert "the omitted first moment" in norm
+
+
+def test_the_moment_scripts_reproduce_their_json_and_touch_no_network():
+    for name in ("moment_identities.py", "n2r_moments.py"):
+        src = (MOM / name).read_text()
+        for forbidden in ("requests", "urllib", "socket", "http://", "https://",
+                          "subprocess", "docker", "podman"):
+            assert forbidden not in src, (name, forbidden)
+        out = MOM / name.replace(".py", ".json")
+        before = out.read_text()
+        proc = subprocess.run([sys.executable, str(MOM / name)], capture_output=True,
+                              text=True, cwd=REPO_ROOT)
+        assert proc.returncode == 0, proc.stderr
+        assert out.read_text() == before, f"{name} is not deterministic"
