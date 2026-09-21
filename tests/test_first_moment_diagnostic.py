@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import contextlib
 import copy
 import csv
 from fractions import Fraction
@@ -12,8 +13,12 @@ import inspect
 import json
 import math
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
+import threading
+import time
 from pathlib import Path
 
 import numpy as np
@@ -1575,6 +1580,84 @@ def test_the_synthetic_fixture_is_not_the_qmhp_cell(synthetic):
 
 # --- 6b. preparation only, offline and inert -----------------------------------------
 
+# --- regeneration isolation ----------------------------------------------------------
+#
+# The regeneration checks used to run the offline scripts over the TRACKED reference
+# files and restore them in a `finally`. That is unsafe in two ways this module now
+# proves rather than asserts: two runs racing each other interleave their writes, and a
+# process killed between the write and the restore leaves a tracked reference corrupted
+# on disk, where it can be committed as though it were real. Both were observed: a
+# concurrent suite run left reference_model.json with 16 changed floats in the working
+# tree.
+#
+# The scripts take HERE = Path(__file__).resolve().parent and REPO = HERE.parents[1],
+# and every one of their five write targets derives from HERE. So a disposable root
+# that SYMLINKS each top-level repository entry except `experiments`, and under it each
+# entry except this diagnostic's directory - which is a real 432 KiB copy - gives them
+# the whole repository to READ while every write lands inside the copy. The tracked
+# references are never opened for writing at all, so neither a race nor a kill -9 can
+# reach them.
+
+#: The offline scripts, in the order a regeneration runs them.
+REGENERATION_SCRIPTS = (("reference_model.py", ()), ("prepare.py", ()),
+                        ("evaluate_record.py", ("--fixture",)))
+
+
+@contextlib.contextmanager
+def isolated_repo_view():
+    """Yield (root, fmd): a repository view whose only writable part is a copy of this
+    diagnostic's directory. Everything else is a symlink to the real tree, read-only in
+    practice because nothing the scripts run writes outside HERE."""
+    with tempfile.TemporaryDirectory(prefix="qmhp-regen-") as tmp:
+        root = Path(tmp) / "repo"
+        root.mkdir()
+        for entry in REPO_ROOT.iterdir():
+            if entry.name != "experiments":
+                (root / entry.name).symlink_to(entry)
+        experiments = root / "experiments"
+        experiments.mkdir()
+        for entry in (REPO_ROOT / "experiments").iterdir():
+            if entry.name != FMD.name:
+                (experiments / entry.name).symlink_to(entry)
+        fmd = experiments / FMD.name
+        shutil.copytree(FMD, fmd, symlinks=True)
+        yield root, fmd
+
+
+def regenerate(root: Path, fmd: Path) -> None:
+    """Run the three offline scripts inside an isolated view.
+
+    The artefacts are EMPTIED in the copy first. Without that, a script that exits 0
+    without writing would leave the copied committed content in place and every
+    comparison against it would pass vacuously - the isolation would have removed the
+    check rather than made it safe.
+    """
+    for name in REGENERATED:
+        (fmd / name).write_text("")
+    for name, extra in REGENERATION_SCRIPTS:
+        proc = subprocess.run([sys.executable, str(fmd / name), *extra],
+                              capture_output=True, text=True, cwd=root)
+        assert proc.returncode == 0, (name, proc.stderr[-2000:])
+    for name in REGENERATED:
+        assert (fmd / name).read_text().strip(), f"{name} was not regenerated"
+
+
+def tracked_reference_digests() -> dict[str, str]:
+    """sha256 of every tracked artefact a regeneration would otherwise have written."""
+    return {name: _sha256(FMD / name) for name in REGENERATED}
+
+
+#: The git subcommands this module may run. Every one reports state; none checks out,
+#: resets, cleans, stashes or writes. The launch-safety test pins this list.
+GIT_READ_ONLY = ("status", "diff", "ls-files", "rev-parse")
+
+
+def _git(*argv: str) -> str:
+    assert argv and argv[0] in GIT_READ_ONLY, f"{argv[0]} is not a read-only git command"
+    return subprocess.run(["git", *argv], cwd=REPO_ROOT, capture_output=True,
+                          text=True, check=True).stdout
+
+
 def test_the_offline_scripts_are_deterministic_and_cannot_launch_anything(rm):
     offline = ("reference_model.py", "prepare.py", "evaluate_record.py")
     for name in offline:
@@ -1589,21 +1672,134 @@ def test_the_offline_scripts_are_deterministic_and_cannot_launch_anything(rm):
     qualifier = (FMD / "compiled_qualification.py").read_text()
     assert "assert_synthetic(config_path)" in qualifier
 
-    # EVERY generated document, each through the guard that knows what its numbers mean
-    outputs = {FMD / name: (FMD / name).read_text() for name in REGENERATED}
-    try:
-        for name, extra in (("reference_model.py", []), ("prepare.py", []),
-                            ("evaluate_record.py", ["--fixture"])):
-            proc = subprocess.run([sys.executable, str(FMD / name), *extra],
-                                  capture_output=True, text=True, cwd=REPO_ROOT)
-            assert proc.returncode == 0, proc.stderr
-        for p, before in outputs.items():
-            mismatches = regeneration_mismatches(p.name, p.read_text(), before, rm)
+    # EVERY generated document, regenerated in a disposable view and compared there.
+    # The tracked references are READ for the comparison and never written.
+    committed = {name: (FMD / name).read_text() for name in REGENERATED}
+    before = tracked_reference_digests()
+    with isolated_repo_view() as (root, fmd):
+        regenerate(root, fmd)
+        for name in REGENERATED:
+            mismatches = regeneration_mismatches(name, (fmd / name).read_text(),
+                                                 committed[name], rm)
             assert mismatches == [], mismatches
-    finally:
-        for p, before in outputs.items():
-            p.write_text(before)
+    assert tracked_reference_digests() == before, "a regeneration wrote a tracked file"
     assert not list((REPO_ROOT / "results").rglob("first-moment*.json"))
+
+
+def test_two_concurrent_regenerations_do_not_interfere(rm):
+    """The race that was observed: a suite run and a driver sweep regenerating at once
+    left reference_model.json with 16 changed floats in the working tree. Two isolated
+    views cannot see each other, so each produces a complete, valid regeneration."""
+    committed = {name: (FMD / name).read_text() for name in REGENERATED}
+    before = tracked_reference_digests()
+    produced: dict[int, dict[str, str]] = {}
+    roots: dict[int, str] = {}
+    failures: dict[int, BaseException] = {}
+    barrier = threading.Barrier(2, timeout=300)
+
+    def one(tag: int) -> None:
+        try:
+            with isolated_repo_view() as (root, fmd):
+                roots[tag] = str(root)
+                barrier.wait()          # both inside their own view before either writes
+                regenerate(root, fmd)
+                produced[tag] = {n: (fmd / n).read_text() for n in REGENERATED}
+        except BaseException as exc:    # noqa: BLE001 - reported, not swallowed
+            failures[tag] = exc
+            with contextlib.suppress(threading.BrokenBarrierError):
+                barrier.abort()
+
+    threads = [threading.Thread(target=one, args=(t,)) for t in (0, 1)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=900)
+    assert not failures, failures
+    assert set(produced) == {0, 1} and roots[0] != roots[1]
+    # each run is independently a valid regeneration, so neither read the other's
+    # half-written file
+    for tag, docs in produced.items():
+        for name, text in docs.items():
+            assert regeneration_mismatches(name, text, committed[name], rm) == [], (tag, name)
+    # the byte-compared documents are deterministic, so the two runs agree exactly
+    for name in REGENERATED:
+        if REGENERATED[name][0] == "bytes":
+            assert produced[0][name] == produced[1][name], name
+    assert tracked_reference_digests() == before
+
+
+def test_a_killed_regeneration_leaves_the_tracked_references_untouched(tmp_path):
+    """Forced interruption. The first case is deterministic and is exactly the old
+    failure mode: a writer that has ALREADY replaced the artefacts and is killed before
+    it could restore them. Inside the isolated view that leaves real corruption - which
+    is the point, the corruption exists and is nowhere near the repository."""
+    before = tracked_reference_digests()
+    stub = tmp_path / "corrupt_then_hang.py"
+    stub.write_text("import sys, time\n"
+                    "from pathlib import Path\n"
+                    "fmd = Path(sys.argv[1])\n"
+                    "for name in sys.argv[2:]:\n"
+                    "    (fmd / name).write_text('CORRUPTED BY A KILLED WRITER\\n')\n"
+                    "time.sleep(600)\n")
+    with isolated_repo_view() as (root, fmd):
+        proc = subprocess.Popen([sys.executable, str(stub), str(fmd), *REGENERATED],
+                                cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            deadline = time.monotonic() + 120
+            while time.monotonic() < deadline:
+                with contextlib.suppress(OSError):
+                    if all((fmd / n).read_text().startswith("CORRUPTED")
+                           for n in REGENERATED):
+                        break
+                time.sleep(0.02)
+            else:
+                pytest.fail("the stub never wrote; the interruption proof would be vacuous")
+            assert proc.poll() is None, "the stub exited instead of hanging mid-restore"
+        finally:
+            proc.kill()
+            proc.wait(timeout=120)
+        assert proc.returncode != 0
+        for name in REGENERATED:                      # the corruption is real ...
+            assert (fmd / name).read_text().startswith("CORRUPTED"), name
+    assert tracked_reference_digests() == before      # ... and it never reached the repo
+
+    # and the real script, killed while it works
+    with isolated_repo_view() as (root, fmd):
+        proc = subprocess.Popen([sys.executable, str(fmd / "reference_model.py")],
+                                cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            time.sleep(0.05)
+            was_running = proc.poll() is None
+        finally:
+            proc.kill()
+            proc.wait(timeout=120)
+        assert was_running, "the script finished before the kill; nothing was interrupted"
+    assert tracked_reference_digests() == before
+    assert _git("status", "--porcelain", "--", "experiments/first-moment-diagnostic") == ""
+
+
+def test_the_isolated_view_can_never_target_a_tracked_reference():
+    """Structural, so the guarantee does not rest on the scripts behaving. Every
+    artefact a regeneration writes resolves OUTSIDE the repository, the scripts run are
+    the WORKING-TREE ones (not a checkout of HEAD, which would stop this test seeing an
+    uncommitted change to them), and the rest of the repository is a symlinked read."""
+    assert _git("status", "--porcelain", "--", "experiments/first-moment-diagnostic") == ""
+    with isolated_repo_view() as (root, fmd):
+        assert fmd.resolve() != FMD and REPO_ROOT not in fmd.resolve().parents
+        for name in REGENERATED:
+            target = (fmd / name).resolve()
+            assert REPO_ROOT not in target.parents, (name, target)
+            assert target.read_text() == (FMD / name).read_text(), name
+        for name, _ in REGENERATION_SCRIPTS:
+            assert not (fmd / name).is_symlink()
+            assert (fmd / name).read_bytes() == (FMD / name).read_bytes(), name
+        for shared in ("results", "docker", ".github"):
+            assert (root / shared).is_symlink()
+            assert (root / shared).resolve() == (REPO_ROOT / shared).resolve()
+        assert (root / "experiments" / "fem-spectral-mapping").is_symlink()
+        assert not (root / "experiments").is_symlink()
+    # the disposable root is gone with its copy
+    assert not Path(root).exists()
 
 
 def test_the_proposal_states_the_blocker_the_launcher_and_one_execution(proposal):
@@ -1668,20 +1864,36 @@ def test_the_doc_is_indexed_and_states_the_corrections():
 
 
 def test_launch_safety_of_this_test_file():
+    """No test here can start a container, an MPI launcher or an arbitrary binary.
+
+    Covers subprocess.Popen as well as subprocess.run: the isolation helpers added two
+    Popen call sites and a git reader, and a guard that inspected only `run` would have
+    stopped covering the file the moment it grew.
+    """
     tree = ast.parse(Path(__file__).read_text())
-    runs = [n for n in ast.walk(tree)
-            if isinstance(n, ast.Call) and ast.unparse(n.func) == "subprocess.run"]
-    argv = [ast.unparse(n.args[0]) for n in runs]
-    assert argv
+    calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
+             and ast.unparse(n.func) in ("subprocess.run", "subprocess.Popen")]
+    argv = [ast.unparse(n.args[0]) for n in calls]
+    assert len(argv) >= 6, argv
     for a in argv:
         if a.startswith("['git'"):
-            assert "'diff'" in a
+            # the one variadic git call is _git, which refuses anything but a read-only
+            # subcommand at runtime; the literal call sites are pinned here
+            assert a in ("['git', *argv]", "['git', 'diff', '--name-only', 'HEAD']"), a
             continue
-        assert "sys.executable" in a and ("FMD /" in a or "launcher" in a), a
+        # a python interpreter running a script in this diagnostic's directory: the
+        # tracked one, its disposable copy, the pinned inert launcher, or a test stub
+        assert "sys.executable" in a, a
+        assert any(t in a for t in ("FMD /", "fmd /", "str(fmd)", "launcher", "stub")), a
     # no test here shells out to a container runtime or an MPI launcher
     for a in argv:
         for token in ("docker", "podman", "mpirun", "palace"):
             assert token not in a, (token, a)
+    # and the read-only git allowlist is exactly that: no writing verb may join it
+    assert set(GIT_READ_ONLY) == {"status", "diff", "ls-files", "rev-parse"}
+    for writer in ("checkout", "reset", "clean", "stash", "restore", "commit", "add"):
+        assert writer not in GIT_READ_ONLY, writer
+    assert "assert argv and argv[0] in GIT_READ_ONLY" in Path(__file__).read_text()
 
 
 #: The paths in fixture_evaluation.json that carry the first moment's units. A COMMON
