@@ -3,6 +3,13 @@
 These rules govern Claude Code work in this repository.
 Scientific evidence integrity takes priority over producing a successful-looking result.
 
+`AGENTS.md`, the Shared AI Agent Operating Contract, was adopted as repository policy on
+21 September 2026 and applies IN ADDITION to these rules. It is additive: nothing below
+is replaced, relaxed or superseded by it, and where both speak to the same subject the
+stricter reading governs. The clause-by-clause mapping, and an honest record of which
+contract clauses are enforced by a mechanism and which are behavioural only, is in
+`docs/agent-contract-implementation.md`. Adopting a policy file installs no control.
+
 ## 1. Scientific Evidence Is Append-Only
 
 Historical evidence is immutable.
