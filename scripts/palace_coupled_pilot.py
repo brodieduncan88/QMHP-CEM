@@ -132,8 +132,8 @@ STATEMENT = (
 # unaffected: it meshes and writes configs and cannot launch Palace, so it does
 # not consult this gate at all.
 #
-# The block binds an execution to all six things at once. Any one of them being
-# absent, wrong or merely stale is a refusal BEFORE a runtime is invoked:
+# The block binds an execution to all seven things below at once. Any one of them
+# being absent, wrong or merely stale is a refusal BEFORE a runtime is invoked:
 #
 #   reviewed code           driver_sha256 -- this file's own bytes, so an approval
 #                           cannot survive an edit to the driver it approved
@@ -142,13 +142,19 @@ STATEMENT = (
 #   resource caps           dof_budget 250000 and per_solve_wall_clock_cap_s 2700
 #   execution mechanism     runtime, image and mpi_processes, checked again at the
 #                           launch primitive, not only at the top
-#   a narrow attempt        a strictly new attempt number, inside a short explicit UTC
-#                           window. NOT single-use: nothing consumes the attempt, since
-#                           that would mean writing to an approval record. Within a live
-#                           window the same block admits a further invocation, and note
-#                           that the workflow re-triggers on any later push touching
-#                           .github/pilot-approval.json. The window and the ledger bound
-#                           that exposure; they do not close it.
+#   the prior executions    supersedes -- every execution this repository can account
+#                           for, derived from the reruns ledger AND from the committed
+#                           records this driver wrote. The ledger alone is incomplete:
+#                           it lists attempt 1, while the re-run that produced
+#                           results/COUPLED-PILOT-20260916T035733Z has no entry, so a
+#                           ledger-only floor admitted "attempt 2", already used.
+#   a narrow attempt        numbered past every one of those, inside a short explicit
+#                           UTC window. NOT single-use: nothing consumes the attempt,
+#                           since that would mean writing to an approval record. Within
+#                           a live window the same block admits a further invocation,
+#                           and the workflow re-triggers on any later push touching
+#                           .github/pilot-approval.json. The window, the enumeration and
+#                           the floor bound that exposure; they do not close it.
 
 #: The historical approval record, which is also the workflow trigger. Read here
 #: ONLY for the `execution_authority` block; nothing else in it grants authority.
@@ -391,8 +397,9 @@ def require_execution_authority(
             f"execution_authority.authorises is {authority['authorises']!r}; this gate accepts "
             "the literal 'one execution' only. NOTE what that does and does not mean: nothing "
             "here CONSUMES the attempt, because doing so would write to an approval record. "
-            "Reuse is bounded by the window and by the spent-attempt ledger, not prevented "
-            "within a live window.")
+            "Reuse is bounded by the window, by the requirement that the block enumerate every "
+            "prior execution in `supersedes`, and by a floor derived from the reruns ledger AND "
+            "the committed records this driver wrote - not prevented within a live window.")
     if not isinstance(authority["approved_by"], str) or not authority["approved_by"].strip():
         raise PilotRefusal("execution_authority.approved_by must name who approved this attempt")
 

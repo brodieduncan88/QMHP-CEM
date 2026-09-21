@@ -27,11 +27,14 @@ would be unfalsifiable, since that function cannot reach a runtime whatever it d
 the claim proved here is the whole one: it refused, no record directory was created, and
 nothing ran.
 
-That interception is complete rather than merely broad because
+That interception is broad rather than merely convenient because
 `test_the_pilot_executes_nothing_at_import_time` and
-`test_every_launch_site_in_the_pilot_is_gated_and_the_set_is_pinned` pin, by AST, that the
-module global `subprocess` is the ONLY way this module can execute anything - so shadowing
-it leaves no second channel (`os.system`, an aliased import, an import-time call) open.
+`test_every_launch_site_in_the_pilot_is_gated_and_the_set_is_pinned` pin, by AST, that no
+function OTHER than the three gated ones reaches an enumerated exec primitive, and that
+none runs at import - resolving import aliases, so `os.system`, `sp.run`, a bare `run` and
+a rebound `_R` are all covered. Stated exactly: that pins the primitives it enumerates, not
+the absence of every conceivable way to start a process (`ctypes`, `pty`,
+`asyncio.create_subprocess_exec` are not enumerated).
 
 This module deliberately calls no subprocess of its own.
 """
@@ -662,10 +665,11 @@ def test_the_three_ways_of_manufacturing_an_authority_object_are_all_refused(pil
                                                                              tmp_path):
     """Being an instance is deliberately NOT sufficient, and this is why.
 
-    All three of these produced a genuine `ExecutionAuthority` and reached a real
-    `docker ...` argv while the gate checked only `isinstance`. They are the reason the
-    gate now demands membership of the set the granting function populates. Each is
-    applied against the committed approval record, which authorises nothing."""
+    All three produce a genuine `ExecutionAuthority` without the gate ever running, and the
+    increment 3 review found that they defeated the `isinstance` check this gate originally
+    used. They are the reason it now demands membership of the set the granting function
+    populates. What is preserved here is the REFUSAL: the pre-fix reachability was
+    demonstrated in the session that found it and is not committed evidence."""
     # (1) __new__ bypasses __init__ entirely, so the token is never seen
     bypassed = object.__new__(pilot.ExecutionAuthority)
     for key, value in FORGED_FIELDS.items():
