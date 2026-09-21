@@ -55,6 +55,11 @@ def _norm(text: str) -> str:
     return " ".join(" ".join(lines).split())
 
 
+#: A float below this fraction of its object's scale is solver-noise residue,
+#: not signal. Justified by measurement in _json_mismatch's docstring.
+NOISE_FLOOR = 1e-6
+
+
 def _local_scale(obj) -> float:
     """The largest float magnitude inside ONE object's subtree.
 
@@ -83,11 +88,23 @@ def _json_mismatch(a, b, path: str = "", scale: float | None = None) -> str | No
 
       * structure, strings, booleans and integers  -> identical
       * floats at their own object's scale         -> 1e-9 relative
-      * floats at or below 1e-9 of that scale      -> round-off, not compared, because
-        they are cancellation residues whose RELATIVE value carries no information.
-        Measured: /evaluator/error_vs_truth_nd is the difference of two numbers near
-        1.75e-07 and lands near 6e-20; swapping the LAPACK eigen driver moves it by 7
-        percent while the quantities it qualifies move by 7e-13.
+      * floats at or below NOISE_FLOOR of it       -> not compared
+
+    The exempt class is solver-noise residue, whose RELATIVE value carries no
+    information. Two cross-machine measurements set the constant:
+
+      /evaluator/error_vs_truth_nd          3.3e-13 of its object's scale; swapping the
+                                            LAPACK eigen driver moved it by 7 percent
+      /negative_discrepancy/threshold_GHz2  2.0e-07 of its object's scale; CI run
+                                            35554886550 moved it by 4.1e-07
+
+    while the physical quantities in the same documents moved by 7e-13. The floor sits
+    five times above the tightest measured ratio. Every field it exempts is asserted by
+    a dedicated test that compares it against a KNOWN answer rather than against a
+    previous run: the saved-moment interval by
+    test_the_saved_moment_interval_comes_from_the_printed_precision, the counterexample
+    constants by test_the_old_quantity_is_not_a_bound_even_at_a_tiny_residual, and the
+    error bound by test_the_residual_error_identity_is_exact.
 
     The scale is taken from the enclosing object, not the document. Returns None when
     equivalent, else the path and both values, so a CI failure names the field.
@@ -115,7 +132,7 @@ def _json_mismatch(a, b, path: str = "", scale: float | None = None) -> str | No
     if isinstance(a, (int, float)) and isinstance(b, (int, float)):
         if a == b:
             return None
-        floor = 1e-9 * (scale if scale is not None else max(abs(a), abs(b)))
+        floor = NOISE_FLOOR * (scale if scale is not None else max(abs(a), abs(b)))
         if abs(a) <= floor and abs(b) <= floor:
             return None                      # round-off residue, not signal
         if abs(a - b) <= 1e-9 * max(abs(a), abs(b)):
@@ -959,3 +976,56 @@ def test_launch_safety_of_this_test_file():
     for a in argv:
         for token in ("docker", "podman", "mpirun", "palace"):
             assert token not in a, (token, a)
+
+
+def test_the_artefact_comparison_accepts_round_off_and_rejects_real_change():
+    """The classifier itself, tested against both measured variations and real edits.
+
+    A comparison that only ever passes is worthless, so the exempt class is pinned by the
+    two cross-machine variations actually observed, and the non-exempt class by six
+    deliberate edits that must all be caught AND named.
+    """
+    import copy
+
+    committed = json.loads((FMD / "fixture_evaluation.json").read_text())
+    assert _json_mismatch(committed, committed) is None
+
+    # the two measured cross-machine variations must be accepted
+    for path, value in ((("evaluator", "error_vs_truth_nd"), 5.381306e-20),
+                        (("negative_discrepancy", "threshold_GHz2"), -1.6511520418429716e-13)):
+        alt = copy.deepcopy(committed)
+        alt[path[0]][path[1]] = value
+        assert _json_mismatch(alt, committed) is None, path
+
+    # and real changes must be rejected, each naming its own path
+    def bump(d, *path, factor):
+        node = d
+        for k in path[:-1]:
+            node = node[k]
+        node[path[-1]] = node[path[-1]] * factor
+
+    cases = {
+        "headline float 1e-8": lambda d: bump(d, "evaluator", "A_direct_minus_A_saved_nd",
+                                              factor=1 + 1e-8),
+        "nested float 1e-8": lambda d: bump(d, "full_evaluation_of_the_good_record",
+                                            "difference", "A_direct_minus_A_saved_GHz2",
+                                            factor=1 + 1e-8),
+        "verdict string": lambda d: d["evaluator"].__setitem__("verdict", "NOT_RESOLVED"),
+        "boolean": lambda d: d["evaluator"].__setitem__(
+            "certified_lower_bound_is_below_the_truth", False),
+        "missing key": lambda d: d["evaluator"].pop("verdict"),
+        "shortened list": lambda d: d["full_evaluation_of_the_good_record"].__setitem__(
+            "checks", d["full_evaluation_of_the_good_record"]["checks"][:-1]),
+    }
+    for label, mutate in cases.items():
+        bad = copy.deepcopy(committed)
+        mutate(bad)
+        mismatch = _json_mismatch(bad, committed)
+        assert mismatch is not None, label
+        assert mismatch.startswith("/"), (label, mismatch)
+
+    # the exemption must not swallow a field that sits AT its object's scale
+    assert NOISE_FLOOR == 1e-6
+    nd = committed["negative_discrepancy"]
+    assert abs(nd["threshold_GHz2"]) / _local_scale(nd) < NOISE_FLOOR
+    assert abs(nd["difference_GHz2"]) / _local_scale(nd) == 1.0
