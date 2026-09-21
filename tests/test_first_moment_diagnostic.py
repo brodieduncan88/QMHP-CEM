@@ -29,7 +29,7 @@ N2R_SOLVED = (REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z
 # preparation, and the patch is the reviewed one.
 PROD_DOCKERFILE_SHA256 = "ae61175a4237cfed043d0df47126080215fa06c42acd897a53107b2c99fc88a9"
 APPROVAL_SHA256 = "be5cbe1a03882fd508fd2837751a95f111a48fc66a8f6d6485170448142f01bc"
-PATCH_SHA256 = "31b5bd29de05c81747841287e33f7b943a9669bea55ea01074e9e9326de872db"
+PATCH_SHA256 = "e8a1ad51d4e355b0426e84c70cb9c796a4915b1216bb035d5fe60913de512fee"
 N2R_CONFIG_SHA256 = "79304b5f8bd7c67741e995ec7ae7880b41dfcee23d6c3c12984f5baba8c1f33f"
 PALACE_COMMIT = "a61c8cbe0cacf496cde3c62e93085fae0d6299ac"
 
@@ -98,6 +98,16 @@ def proposal() -> dict:
 @pytest.fixture(scope="module")
 def fixture_eval() -> dict:
     return json.loads((FMD / "fixture_evaluation.json").read_text())
+
+
+@pytest.fixture(scope="module")
+def compiled() -> dict:
+    return json.loads((FMD / "compiled_qualification.json").read_text())
+
+
+@pytest.fixture(scope="module")
+def synthetic() -> dict:
+    return json.loads((FMD / "synthetic_fixture.json").read_text())
 
 
 # --- 1. the constrained mass operator ------------------------------------------------
@@ -216,7 +226,8 @@ def test_the_driver_checks_the_functional_against_get_voltage_on_a_complex_field
     assert "linalg::SetRandom(comm, Et, opts.seed);" in drv
     assert "linalg::SetSubVector(Et, dbc_tdof_list, 0.0);" in drv
     assert "port->GetVoltage(E)" in drv
-    assert "MFEM_VERIFY(rel < check_functional_tol" in drv
+    assert "WriteFailure(\"the true-dof voltage functional does not reproduce GetVoltage\"" in drv
+    assert "MFEM_ABORT(\"The true-dof voltage functional does not reproduce GetVoltage!\")" in drv
     assert "port->GetVoltageFunctional(nd_fespace.Get(), f);" in drv
 
 
@@ -272,7 +283,8 @@ def test_the_driver_keeps_internal_units_internal(patch_text):
     assert "const double L_nd = port->L;" in drv
     assert "const double A_nd = fx / L_nd;" in drv
     assert "iodata.DimensionalizeValue(IoData::ValueType::FREQUENCY, 1.0)" in drv
-    assert "const double A_GHz2 = A_nd * freq_scale * freq_scale;" in drv
+    assert "const double ghz2_per_nd = freq_scale * freq_scale;" in drv
+    assert "const double A_GHz2 = A_nd * ghz2_per_nd;" in drv
     # henries appear only as an output conversion of L_nd, never inside the computation
     assert drv.count("ValueType::INDUCTANCE") == 2
     assert "mu0" not in drv and "1e-7" not in drv
@@ -348,80 +360,13 @@ def test_the_driver_checks_k_ge_qq_without_any_eigenbasis(patch_text):
     drv = patch_text.split("palace/drivers/firstmomentsolver.cpp", 1)[1]
     assert "GetStiffnessMatrix<Operator>(Operator::DIAG_ONE)" in drv
     assert "K->Mult(u, Ku);" in drv and "const double qu2 = fu * fu / L_nd;" in drv
-    assert "MFEM_VERIFY(min_gap >= -1.0e-10" in drv
+    assert "WriteFailure(\"K >= q q^H violated on the constrained assembly\", check_k);" in drv
+    assert "MFEM_ABORT(\"K \u2265 q q\u1d34 violated on the constrained assembly!\");" in drv
     for forbidden in ("EigenvalueSolver", "slepc", "arpack", "DivFreeSolver", "Driven", "omega"):
         assert forbidden not in drv, forbidden
 
 
 # --- 5. outputs and numerical checks -------------------------------------------------
-
-def test_every_record_key_is_written_by_the_driver(rm, patch_text):
-    drv = patch_text.split("palace/drivers/firstmomentsolver.cpp", 1)[1]
-    for k, subs in rm.RECORD_KEYS.items():
-        assert f'"{k}"' in drv, k
-        for s in subs:
-            assert f'"{s}"' in drv, f"{k}.{s}"
-    for extra in ("WallTime_s", "MaxRSS_MB", "RelativeResidual", "Converged", "Free",
-                  "Essential", "Lc_m", "tc_ns", "A_nd", "A_GHz2", "ResidualBound_GHz2"):
-        assert f'"{extra}"' in drv
-
-
-def test_the_evaluator_recovers_a_known_omitted_moment_within_its_bound(fixture_eval):
-    ev, truth = fixture_eval["evaluator"], fixture_eval["truth"]
-    assert ev["all_checks_passed"] is True
-    assert ev["error_within_bound"] is True
-    assert abs(ev["error_vs_truth_nd"]) <= ev["residual_bound_nd"]
-    assert truth["omitted_first_moment_exact_nd"] > 0
-    assert "qualified by the residual bound" in ev["interpretation"]
-    good = fixture_eval["full_evaluation_of_the_good_record"]
-    assert good["E_C"] == "UNAVAILABLE" and good["g"] == "UNAVAILABLE"
-    assert good["N"] == "not measured by this diagnostic"
-
-
-def test_broken_records_are_unqualified_and_a_sloppy_solve_fails_the_residual_check(fixture_eval):
-    for what, r in fixture_eval["broken_records_are_unqualified"].items():
-        assert r["all_checks_passed"] is False, what
-        assert r["interpretation"].startswith("UNQUALIFIED"), what
-        assert len(r["failed"]) == 1, what
-    s = fixture_eval["sloppy_solve"]
-    assert s["all_checks_passed"] is False
-    assert s["failed"] == ["independent relative residual <= 1e-12"]
-
-
-def test_a_difference_inside_the_bound_is_not_called_a_small_tail(rm):
-    rng = np.random.default_rng(11)
-    fx = rm.Fixture(rng)
-    rec = rm.synthetic_record(fx, 4.0e-3, residual_scale=1e-13, seed=11)
-    # a saved moment equal to the direct one up to far less than the bound
-    res = rm.evaluate(rec, rec["A"]["A_GHz2"] * (1 - 1e-18), expected_dofs=fx.n_true)
-    assert res["all_checks_passed"]
-    nq = res["numerical_qualification"]
-    assert nq["difference_exceeds_residual_bound"] is False
-    assert any("not resolved" in s for s in res["not_established_here"])
-    assert "calculation error" in nq["bound_statement"] or "calculation-error" in " ".join(res["not_established_here"])
-
-
-def test_the_evaluator_enforces_the_hard_caps_and_the_space_identity(rm):
-    rng = np.random.default_rng(12)
-    fx = rm.Fixture(rng)
-    base = rm.synthetic_record(fx, 4.0e-3, seed=12)
-    saved = base["A"]["A_GHz2"] * 0.9
-    assert rm.evaluate(base, saved, expected_dofs=fx.n_true)["all_checks_passed"]
-    slow = json.loads(json.dumps(base))
-    slow["Resources"]["WallTime_s"] = 2700.5
-    assert not rm.evaluate(slow, saved)["all_checks_passed"]
-    big = json.loads(json.dumps(base))
-    big["Dofs"]["True"] = 250001
-    big["Dofs"]["Free"] = 250001 - big["Dofs"]["Essential"]
-    assert not rm.evaluate(big, saved)["all_checks_passed"]
-    other = rm.evaluate(base, saved, expected_dofs=fx.n_true + 1)
-    assert not other["all_checks_passed"]
-    assert any("same true-dof count" in c["check"] and not c["passed"] for c in other["checks"])
-    incomplete = json.loads(json.dumps(base))
-    del incomplete["A"]["ResidualBound_GHz2"]
-    assert rm.validate_record(incomplete) == ["A.ResidualBound_GHz2"]
-    assert rm.evaluate(incomplete, saved)["interpretation"].startswith("UNQUALIFIED")
-
 
 # --- 6. preparation only -------------------------------------------------------------
 
@@ -444,70 +389,6 @@ def test_prepare_writes_exactly_the_declared_delta(prep):
     plus = [ln for ln in delta.splitlines() if ln.startswith("+") and not ln.startswith("+++")]
     assert len(minus) == 7 and len(plus) == 9, (minus, plus)
     assert "Mesh" not in delta and "Boxes" not in delta and "PEC" not in delta
-
-
-def test_the_scripts_are_offline_deterministic_and_cannot_launch_anything():
-    names = ("reference_model.py", "prepare.py", "evaluate_record.py")
-    for name in names:
-        src = (FMD / name).read_text()
-        for forbidden in ("requests", "urllib", "socket", "http://", "https://",
-                          "subprocess", "os.system", "Popen", "podman"):
-            assert forbidden not in src, (name, forbidden)
-        tree = ast.parse(src)
-        calls = [ast.unparse(n.func) for n in ast.walk(tree) if isinstance(n, ast.Call)]
-        assert not [c for c in calls if c.startswith(("subprocess", "os.", "shutil"))], name
-    outputs = {p: p.read_text() for p in (
-        FMD / "reference_model.json", FMD / "config.candidate.json", FMD / "config.delta.txt",
-        FMD / "proposal.json", FMD / "fixture_evaluation.json")}
-    try:
-        for name, extra in (("reference_model.py", []), ("prepare.py", []),
-                            ("evaluate_record.py", ["--fixture"])):
-            proc = subprocess.run([sys.executable, str(FMD / name), *extra], capture_output=True,
-                                  text=True, cwd=REPO_ROOT)
-            assert proc.returncode == 0, proc.stderr
-        for p, before in outputs.items():
-            after = p.read_text()
-            if p.suffix == ".json":
-                # byte-identical on this machine; across BLAS kernels the round-off-level
-                # entries (1e-16 worst cases) may differ in their last digits, so the
-                # comparison is structural with floats at 1e-9 relative or both below 1e-11
-                assert _same_json(json.loads(after), json.loads(before)), f"{p.name} is not deterministic"
-            else:
-                assert after == before, f"{p.name} is not deterministic"
-    finally:
-        for p, before in outputs.items():
-            p.write_text(before)
-    assert not list((REPO_ROOT / "results").rglob("first-moment*.json"))
-
-
-def test_the_proposal_states_caps_one_execution_and_no_mechanism(proposal):
-    st = proposal["status"]
-    assert st == {"prepared": True, "compiled": False, "approved": False, "executed": False,
-                  "why_not_compiled": st["why_not_compiled"]}
-    one = proposal["the_one_execution"]
-    assert one["hard_caps"]["dof"] == 250000 and one["hard_caps"]["wall_s"] == 2700
-    assert "not runtime promises" in one["hard_caps"]["meaning"]
-    assert one["what_it_authorises"] == "one execution of this config with this image, once; no retry"
-    assert one["mechanism"].startswith("NO workflow runs this and none is added")
-    assert "spent PO1 approval" in one["mechanism"]
-    assert one["mpi_processes"] == 1 and one["command"][-3:] == ["-np", "1", "config.json"]
-    assert "--network" in one["command"] and "none" in one["command"]
-    img = one["image"]
-    assert img["patch_sha256"] == _sha256(PATCH) == PATCH_SHA256
-    assert img["dockerfile_sha256"] == _sha256(DOCKERFILE)
-    assert img["production_dockerfile_sha256_untouched"] == PROD_DOCKERFILE_SHA256
-    assert img["palace_commit"] == PALACE_COMMIT
-    assert one["inputs"]["config_sha256"] == _sha256(FMD / "config.candidate.json")
-    assert one["inputs"]["mesh_sha256"] == "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428"
-    saved = proposal["A_saved_from_committed_columns"]
-    assert saved["A_all_saved_modes"]["modes"] == list(range(1, 10))
-    assert abs(saved["A_all_saved_modes"]["A_partial_GHz2"] - 2.351511939494728) < 1e-12
-    assert abs(saved["A_all_saved_modes"]["N_partial"] - 0.999254583555896) < 1e-12
-    assert abs(saved["B_field_resonant_only"]["A_partial_GHz2"] - 2.3508870351819766) < 1e-12
-    assert abs(proposal["expected_scales"]["L_nd_expected"] - 20.582047285188583) < 1e-9
-    for s in ("no eigensolve", "no Route A or Route B", "no registered-definition change",
-              "no budget or cap increase, no merge of PR #7"):
-        assert any(s in x for x in one["what_it_does_not_authorise"]), s
 
 
 def test_the_patch_is_the_reviewed_one_and_touches_only_the_listed_files(patch_text):
@@ -575,29 +456,430 @@ def test_no_trigger_path_is_touched_and_the_spent_approval_is_untouched(proposal
     assert not any(any(c.startswith(t) for t in triggers) for c in changed), changed
 
 
-def test_the_doc_is_indexed_and_states_the_scope():
+
+
+# --- 5. outputs, error qualification and numerical checks ----------------------------
+
+def test_every_record_key_is_written_by_the_driver(rm, patch_text):
+    drv = patch_text.split("palace/drivers/firstmomentsolver.cpp", 1)[1]
+    for k, subs in rm.RECORD_KEYS.items():
+        assert f'"{k}"' in drv, k
+        for s in subs:
+            assert f'"{s}"' in drv, f"{k}.{s}"
+    for extra in ("WallTime_s", "MaxRSS_MB", "RelativeResidual", "Converged", "Free",
+                  "Essential", "Lc_m", "tc_ns", "A_nd", "A_GHz2", "ImageInfoDirIsDefault"):
+        assert f'"{extra}"' in drv
+
+
+def test_the_driver_no_longer_reports_the_old_quantity_as_a_bound(patch_text):
+    drv = patch_text.split("palace/drivers/firstmomentsolver.cpp", 1)[1]
+    assert '"ResidualBound_nd"' not in drv and '"ResidualBound_GHz2"' not in drv
+    assert '"UncertifiedErrorEstimate_nd"' in drv
+    assert '"CertifiedErrorUpperBound_nd"' in drv
+    assert '"CertifiedUpperBound"' in drv and '"UNAVAILABLE"' in drv
+    assert "ESTIMATE, not a bound" in drv
+
+
+def test_the_residual_error_identity_is_exact(rm):
+    """A_computed - A_exact = (Re(x^H r) - r^H M^-1 r)/L, term by term."""
+    rng = np.random.default_rng(31)
+    for _ in range(8):
+        fx = rm.Fixture(rng)
+        f = rm.restrict_to_free(fx.f_true, fx.dbc)
+        Mp = rm.padded_mass(fx.M, fx.dbc, "DIAG_ONE")
+        x_star = np.linalg.solve(Mp, f)
+        for scale in (1e-2, 1e-6, 1e-11):
+            pert = rng.normal(size=x_star.size)
+            pert[fx.dbc] = 0.0
+            x = x_star + scale * np.linalg.norm(x_star) * pert / np.linalg.norm(pert)
+            idn = rm.residual_error_identity(Mp, f, x, fx.L)
+            assert abs(idn["lhs"] - idn["rhs"]) <= 1e-12 * abs(idn["A_exact"])
+            # the certified statement, from r^H M^-1 r >= 0 alone
+            assert idn["r_Minv_r"] >= 0.0
+            assert idn["lhs"] <= idn["certified_error_upper_bound"] + 1e-12 * abs(idn["A_exact"])
+            assert idn["certified_lower_bound_A"] <= idn["A_exact"] * (1 + 1e-12)
+            # the variational form gives the same number
+            assert abs(idn["variational_lower_bound_A"] - idn["certified_lower_bound_A"]) \
+                <= 1e-9 * abs(idn["certified_lower_bound_A"])
+
+
+def test_the_old_quantity_is_not_a_bound_even_at_a_tiny_residual(rm):
+    """The counterexample family, including one that would pass the residual check."""
+    loose = rm.bound_counterexample(1e-12, 1e-4)
+    assert loose["estimate_is_a_bound"] is False
+    assert loose["violation_factor"] > 1e6
+    tight = rm.bound_counterexample(1e-16, 1e-13)
+    assert tight["relative_residual"] <= 1e-12, "this one passes the residual check"
+    assert tight["estimate_is_a_bound"] is False
+    assert tight["violation_factor"] > 100
+    for c in (loose, tight):
+        assert c["certified_bound_holds"] is True
+    # and the sufficient condition that would make the estimate a bound is reported
+    assert loose["sufficient_lambda_min_for_estimate_to_bound"] > loose["lambda_min_M"]
+
+
+def test_the_error_trials_and_counterexamples_are_recorded(rm):
+    e = json.loads((FMD / "reference_model.json").read_text())["error_qualification"]
+    t = e["trials"]
+    assert t["identity_max_error_relative_to_A"] < 1e-12
+    assert t["certified_bound_violations"] == 0
+    assert t["variational_equals_certified_max_rel"] < 1e-12
+    assert t["cg_like_solution_A_hat_never_exceeds_A_exact"] is True
+    assert t["max_shortfall_of_A_hat_below_A_exact_relative"] > 0
+    assert len(e["counterexamples_to_the_old_quantity"]) >= 3
+    assert all(c["estimate_is_a_bound"] is False and c["certified_bound_holds"] is True
+               for c in e["counterexamples_to_the_old_quantity"])
+
+
+def test_the_saved_moment_interval_comes_from_the_printed_precision(rm, prep):
+    saved = prep.saved_moments(rm.unit_scales(4.0e-3)["tc_ns"])["A_all_saved_modes"]
+    assert abs(saved["central_GHz2"] - 2.351511939494728) < 1e-12
+    assert saved["lo_GHz2"] < saved["central_GHz2"] < saved["hi_GHz2"]
+    # "%+.9e" is 10 significant digits, so the half width is ~1e-9 of A, not more
+    assert 0 < saved["halfwidth_GHz2"] < 1e-8 * saved["central_GHz2"]
+    assert abs(rm.printed_halfwidth(3.885827871) - 0.5e-9) < 1e-20
+    assert rm.printed_halfwidth(0.0) == 0.0
+    ec = saved["eigensolver_convergence"]
+    assert ec["propagated_into_A"] == "UNQUANTIFIED"
+    assert ec["max_backward_error"] > 0 and ec["max_absolute_error"] > 0
+    assert "spectral gap" in ec["why"]
+
+
+def test_the_two_uncertainties_are_reported_separately(fixture_eval):
+    good = fixture_eval["full_evaluation_of_the_good_record"]
+    ms, sv = good["mass_solve_uncertainty"], good["A_saved_uncertainty"]
+    assert set(ms) >= {"identity", "certified_error_upper_bound_GHz2",
+                       "certified_lower_bound_A_GHz2", "certified_upper_bound_A_GHz2",
+                       "uncertified_error_estimate_GHz2",
+                       "sufficient_condition_for_the_estimate_to_be_a_bound"}
+    assert ms["certified_upper_bound_A_GHz2"] == "UNAVAILABLE"
+    cond = ms["sufficient_condition_for_the_estimate_to_be_a_bound"]
+    assert cond["condition"] == "lambda_min(M_free) >= ||r|| / ||x||"
+    assert cond["lambda_min_measured"] is False and cond["threshold"] > 0
+    assert sv["kept_separate_from_mass_solve_uncertainty"] is True
+    assert sv["eigensolver_convergence"]["propagated_into_A"] == "UNQUANTIFIED"
+    assert good["tail_upper_bound"] == "UNAVAILABLE"
+
+
+def test_the_evaluator_recovers_a_known_omitted_moment_and_never_overstates_it(fixture_eval):
+    ev, truth = fixture_eval["evaluator"], fixture_eval["truth"]
+    assert ev["verdict"] == "OMITTED_MOMENT_CERTIFIED_LOWER_BOUND"
+    assert ev["all_checks_passed"] is True
+    assert truth["omitted_first_moment_exact_nd"] > 0
+    assert abs(ev["error_vs_truth_nd"]) <= 1e-9 * truth["omitted_first_moment_exact_nd"]
+    assert ev["certified_lower_bound_is_below_the_truth"] is True
+    assert ev["certified_omitted_moment_lower_bound_nd"] <= \
+        truth["omitted_first_moment_exact_nd"]
+    good = fixture_eval["full_evaluation_of_the_good_record"]
+    assert good["E_C"] == "UNAVAILABLE" and good["g"] == "UNAVAILABLE"
+    assert good["N"] == "not measured by this diagnostic"
+
+
+def test_a_materially_negative_difference_is_inconsistent_not_an_omitted_moment(fixture_eval):
+    neg = fixture_eval["negative_discrepancy"]
+    assert neg["verdict"] == "INCONSISTENT"
+    assert neg["difference_GHz2"] < neg["threshold_GHz2"]
+    assert neg["interpretation"].startswith("INCONSISTENT")
+    assert "NOT an omitted moment" in neg["interpretation"]
+    assert "under-converged" in neg["interpretation"]
+
+
+def test_a_difference_inside_the_combined_uncertainty_is_not_a_small_tail(fixture_eval):
+    u = fixture_eval["difference_inside_the_combined_uncertainty"]
+    assert u["verdict"] == "NOT_RESOLVED"
+    assert "not evidence of a small tail" in u["interpretation"]
+    assert u["tail_upper_bound"] == "UNAVAILABLE"
+
+
+def test_the_hard_caps_and_the_space_identity_are_enforced(rm):
+    rng = np.random.default_rng(12)
+    fx = rm.Fixture(rng)
+    base = rm.synthetic_record(fx, 4.0e-3, seed=12)
+    saved = {"central_GHz2": base["A"]["A_GHz2"] * 0.9, "lo_GHz2": base["A"]["A_GHz2"] * 0.9,
+             "hi_GHz2": base["A"]["A_GHz2"] * 0.9, "halfwidth_GHz2": 0.0}
+    req = {"PALACE_VERSION": "0.13.0",
+           "PALACE_COMMIT": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+           "PALACE_PATCH": "first-moment-diagnostic", "PALACE_PATCH_SHA256": "0" * 64,
+           "config_sha256": "c", "mesh_sha256": "d", "patch_sha256": "e",
+           "dockerfile_sha256": "f", "image_id": "i"}
+    act = {k: req[k] for k in ("config_sha256", "mesh_sha256", "patch_sha256",
+                               "dockerfile_sha256", "image_id")}
+
+    def ev(rec, **kw):
+        return rm.evaluate(rec, saved, required_provenance=req, actual=act, **kw)
+
+    assert ev(base, expected_dofs=fx.n_true)["all_checks_passed"]
+    slow = json.loads(json.dumps(base))
+    slow["Resources"]["WallTime_s"] = 2700.5
+    assert not ev(slow)["all_checks_passed"]
+    big = json.loads(json.dumps(base))
+    big["Dofs"]["True"] = 250001
+    big["Dofs"]["Free"] = 250001 - big["Dofs"]["Essential"]
+    assert not ev(big)["all_checks_passed"]
+    other = ev(base, expected_dofs=fx.n_true + 1)
+    assert any("same true-dof count" in c["check"] and not c["passed"]
+               for c in other["checks"])
+    incomplete = json.loads(json.dumps(base))
+    del incomplete["A"]["CertifiedLowerBound_A_nd"]
+    assert rm.validate_record(incomplete) == ["A.CertifiedLowerBound_A_nd"]
+    assert ev(incomplete)["verdict"] == "UNQUALIFIED"
+
+
+# --- 5b. provenance fails closed ------------------------------------------------------
+
+def test_every_spoiled_provenance_prevents_qualification(fixture_eval):
+    spoiled = fixture_eval["spoiled_records_are_unqualified"]
+    expected = {
+        "provenance_missing": "provenance carries no unavailable field",
+        "provenance_mismatch": "embedded PALACE_COMMIT matches the required value",
+        "developer_build": "run came from the image identity directory",
+        "required_image_id_not_supplied": "image_id measured and matches the required value",
+        "measured_mesh_digest_mismatch": "mesh_sha256 measured and matches the required value",
+        "status": "record status is COMPLETED",
+        "functional": "functional reproduces GetVoltage",
+        "null_space": "sampled K >= q q^H",
+        "convergence": "linear solve converged",
+    }
+    for key, needle in expected.items():
+        assert spoiled[key]["verdict"] == "UNQUALIFIED", key
+        assert any(needle in c for c in spoiled[key]["failed"]), (key, spoiled[key])
+    assert fixture_eval["sloppy_solve"]["verdict"] == "UNQUALIFIED"
+
+
+def test_required_provenance_is_required_not_merely_reported(rm, prep):
+    req = prep.required_provenance("cfg")
+    assert set(req) >= set(rm.REQUIRED_PROVENANCE_FIELDS) | set(rm.REQUIRED_DIGEST_FIELDS)
+    assert req["PALACE_COMMIT"] == PALACE_COMMIT
+    assert req["PALACE_PATCH_SHA256"] == PATCH_SHA256 == _sha256(PATCH)
+    assert req["dockerfile_sha256"] == _sha256(DOCKERFILE)
+    assert req["mesh_sha256"] == "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428"
+    assert "SUPPLIED BY THE EXECUTION" in req["image_id"]
+    # the driver reads the identity from the image rather than being told it
+    drv = PATCH.read_text().split("palace/drivers/firstmomentsolver.cpp", 1)[1]
+    assert "ReadImageInfoFile" in drv and "/opt/palace" in drv
+    assert "PALACE_PATCH_SHA256" in drv and '"unavailable"' in drv
+
+
+def test_the_launcher_is_prepared_but_inert():
+    launcher = FMD / "run_diagnostic.py"
+    assert launcher.is_file()
+    assert not (FMD / "EXECUTION-APPROVAL.json").exists(), "the diagnostic must not be armed"
+    proc = subprocess.run([sys.executable, str(launcher), "--record-dir", "/tmp/nope",
+                           "--mesh", "/tmp/nope"], capture_output=True, text=True,
+                          cwd=REPO_ROOT)
+    assert proc.returncode == 2
+    assert "REFUSED" in proc.stderr and "PREPARED, NOT ACTIVATED" in proc.stderr
+    assert "spent PO1 approval" in proc.stderr
+    src = launcher.read_text()
+    for token in ("DOF_HARD_CAP", "WALL_HARD_CAP_S", "docker", "kill"):
+        assert token in src
+    assert "no_retry" in src
+
+
+def test_the_launcher_argv_and_caps_are_pinned():
+    mod = _load("run_diagnostic")
+    argv = mod.build_command(workdir=Path("/w"), name="n", user=False)
+    assert argv[:6] == ["docker", "run", "--rm", "--network", "none", "--hostname"]
+    assert argv[-4:] == ["palace", "-np", "1", "config.json"]
+    assert "--entrypoint" in argv and "stdbuf" in argv
+    assert "-v" in argv and "/w:/work" in argv
+    assert mod.DOF_HARD_CAP == 250_000 and mod.WALL_HARD_CAP_S == 2_700
+    with pytest.raises(mod.Refusal):
+        mod.load_approval()
+    # the DOF pattern matches the finest-space line and not the multigrid lines, checked
+    # against the committed N2R log
+    pat = mod.dof_probe_pattern(1)
+    log = (REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z" / "L2"
+           / "solver" / "palace_log.txt").read_text()
+    hits = [int(m) for m in pat.findall(log)]
+    assert hits == [103411]
+    assert not pat.search(" Level 0 (p = 1): 79944 unknowns")
+
+
+# --- 5c. the compiled diagnostic ------------------------------------------------------
+
+def test_the_compiled_diagnostic_matches_an_independent_assembly(compiled, synthetic):
+    for name in ("A-nominal", "B-scaled-L"):
+        r = compiled["runs"][name]
+        assert r["converged"] is True
+        assert r["relative_error_vs_independent"] < 1e-12, name
+        assert r["dof_counts_agree"] is True
+        assert r["Lc_agrees"] and r["tc_agrees"] and r["A_GHz2_conversion_consistent"]
+        assert r["json_is_finite"] is True
+        assert r["functional_check_passed"] is True
+        assert r["functional_check_relative_error"] <= 1e-10
+        assert r["functional_norm2_essential"] > 0, "the PEC restriction must bite"
+        assert r["solution_essential_norm"] == 0.0
+        assert r["null_space_is_sampled_not_proof"] is True
+        assert r["null_space_min_gap"] > 0
+        assert r["certified_lower_bound_holds_vs_independent"] is True
+    assert compiled["L_scaling"]["relative_error"] < 1e-12
+    inv = synthetic["fixtures"]["A-nominal"]["independent"]
+    assert inv["constant_field_invariant_max_relative_error"] < 1e-12
+
+
+def test_the_compiled_diagnostic_handles_non_convergence_and_failed_checks(compiled):
+    c = compiled["runs"]["C-maxits-1"]
+    assert c["converged"] is False and c["relative_residual"] > 1e-3
+    assert c["log_preserved"] is True and c["json_is_finite"] is True
+    # an under-converged solve UNDERESTIMATES A, and the certified bound still holds
+    assert c["unconverged_solve_underestimates_A"] is True
+    assert c["shortfall_of_A_below_independent_nd"] > 0
+    assert c["certified_lower_bound_holds_vs_independent"] is True
+    # and there the old quantity's sufficient condition fails, on real compiled output
+    assert c["estimate_is_a_bound_here"] is False
+    d = compiled["runs"]["D-port-inactive"]
+    assert d["returncode"] != 0
+    assert d["wrote_first_moment_json"] is False, "a failed check must write no result"
+    assert d["failed_record"]["Status"] == "FAILED"
+    assert d["failed_record_has_provenance"] is True
+    assert d["log_preserved"] is True
+
+
+def test_the_functional_check_is_not_vacuous_and_its_limit_is_stated(compiled):
+    fi = compiled["fault_injection"]
+    assert fi["caught_at"] == ["np=4"]
+    assert fi["not_caught_at"] == ["np=1", "np=2", "np=3"]
+    assert "NOT vacuous" in fi["reading"]
+    assert "limit of the fixture, not a pass" in fi["reading"]
+    assert fi["good_binary_agrees_across_ranks"] is True
+    sweep = compiled["mpi_sweep"]
+    assert sweep["np=4"]["faulted"]["aborted"] is True
+    assert sweep["np=4"]["faulted"]["wrote_first_moment_json"] is False
+    assert "does not reproduce GetVoltage" in sweep["np=4"]["faulted"]["failed_reason"]
+    for row in sweep.values():
+        assert row["good"]["relative_error_vs_independent"] < 1e-12
+
+
+def test_the_compiled_run_is_recorded_as_a_developer_build_not_an_image_run(compiled, rm):
+    prov = compiled["runs"]["A-nominal"]["provenance"]
+    assert prov["PALACE_COMMIT"] == PALACE_COMMIT
+    assert prov["PALACE_PATCH_SHA256"] == PATCH_SHA256
+    assert prov["ImageInfoDirIsDefault"] is False, (
+        "a native build must not be able to masquerade as an image run")
+    rec = {"Diagnostic": "FirstMoment", "Status": "COMPLETED", "Provenance": prov}
+    assert "Port" in rm.validate_record(rec)
+
+
+def test_the_compiled_qualification_refuses_anything_but_the_synthetic_fixtures():
+    mod = _load("compiled_qualification")
+    with pytest.raises(mod.Refusal):
+        mod.assert_synthetic(REPO_ROOT / "results" /
+                             "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z" / "L2" / "solver"
+                             / "config.json")
+    with pytest.raises(mod.Refusal):
+        mod.assert_synthetic(FMD / "config.candidate.json")
+    cfg = mod.assert_synthetic(FMD / "fixtures" / "config-A-nominal.json")
+    assert cfg["Problem"]["Type"] == "FirstMoment"
+    assert cfg["Model"]["Mesh"] == "fm_synthetic.msh"
+    src = (FMD / "compiled_qualification.py").read_text()
+    assert "SYNTHETIC" in src and "refuses to execute anything" in src
+
+
+def test_the_synthetic_fixture_is_not_the_qmhp_cell(synthetic):
+    assert "NOT the QMHP-CEM coupled cell" in (FMD / "synthetic_fixture.py").read_text()
+    assert synthetic["mesh"]["n_tets"] < 2000, "small by construction"
+    src = (FMD / "synthetic_fixture.py").read_text()
+    for token in ("results/", "COUPLED-LADDER", "coupled_chip_cell", "11.45"):
+        assert token not in src, token
+    cfg = json.loads((FMD / "fixtures" / "config-A-nominal.json").read_text())
+    assert cfg["Domains"]["Materials"][1]["Permittivity"] == 4.0
+
+
+# --- 6b. preparation only, offline and inert -----------------------------------------
+
+def test_the_offline_scripts_are_deterministic_and_cannot_launch_anything():
+    offline = ("reference_model.py", "prepare.py", "evaluate_record.py")
+    for name in offline:
+        src = (FMD / name).read_text()
+        for forbidden in ("requests", "urllib", "socket", "http://", "https://",
+                          "subprocess", "os.system", "Popen", "podman"):
+            assert forbidden not in src, (name, forbidden)
+    # the two scripts that DO shell out are the inert launcher and the synthetic-only
+    # qualifier; neither can reach a QMHP config
+    launcher = (FMD / "run_diagnostic.py").read_text()
+    assert "raise Refusal" in launcher and "APPROVAL_PATH" in launcher
+    qualifier = (FMD / "compiled_qualification.py").read_text()
+    assert "assert_synthetic(config_path)" in qualifier
+
+    outputs = {p: p.read_text() for p in (
+        FMD / "reference_model.json", FMD / "config.candidate.json",
+        FMD / "config.delta.txt", FMD / "proposal.json", FMD / "fixture_evaluation.json")}
+    try:
+        for name, extra in (("reference_model.py", []), ("prepare.py", []),
+                            ("evaluate_record.py", ["--fixture"])):
+            proc = subprocess.run([sys.executable, str(FMD / name), *extra],
+                                  capture_output=True, text=True, cwd=REPO_ROOT)
+            assert proc.returncode == 0, proc.stderr
+        for p, before in outputs.items():
+            after = p.read_text()
+            if p.suffix == ".json":
+                assert _same_json(json.loads(after), json.loads(before)), p.name
+            else:
+                assert after == before, p.name
+    finally:
+        for p, before in outputs.items():
+            p.write_text(before)
+    assert not list((REPO_ROOT / "results").rglob("first-moment*.json"))
+
+
+def test_the_proposal_states_the_blocker_the_launcher_and_one_execution(proposal):
+    st = proposal["status"]
+    assert st["prepared"] is True and st["compiled"] is True
+    assert st["approved"] is False and st["executed_on_N2R"] is False
+    blocker = proposal["image_blocker"]
+    assert "production.cloudfront.docker.com:443" in blocker["exact_error"]
+    assert "403 to CONNECT" in blocker["exact_error"]
+    assert "not routed around" in " ".join(blocker).lower() or \
+        "no alternative registry" in blocker["not_routed_around"]
+    one = proposal["the_one_execution"]
+    assert one["launcher"]["state"] == "PREPARED, NOT ACTIVATED"
+    assert one["launcher"]["approval_absent"] is True
+    assert "not a timeout mechanism" in one["launcher"]["enforces"]["wall_clock"]
+    assert one["hard_caps"]["dof"] == 250000 and one["hard_caps"]["wall_s"] == 2700
+    assert "not runtime promises" in one["hard_caps"]["meaning"]
+    assert one["hard_caps"]["enforced_by"].endswith("run_diagnostic.py")
+    assert one["what_it_authorises"] == "one execution of this config with this image, once; no retry"
+    assert one["mechanism"].startswith("NO workflow runs this and none is added")
+    assert "spent PO1 approval" in one["mechanism"]
+    img = one["image"]
+    assert img["patch_sha256"] == _sha256(PATCH) == PATCH_SHA256
+    assert img["production_dockerfile_sha256_untouched"] == PROD_DOCKERFILE_SHA256
+    assert img["palace_commit"] == PALACE_COMMIT
+    assert one["inputs"]["config_sha256"] == _sha256(FMD / "config.candidate.json")
+    saved = proposal["A_saved_from_committed_columns"]["A_all_saved_modes"]
+    assert abs(saved["A_partial_GHz2"] - 2.351511939494728) < 1e-12
+    assert saved["halfwidth_GHz2"] > 0
+    assert saved["eigensolver_convergence"]["propagated_into_A"] == "UNQUANTIFIED"
+    for s in ("no eigensolve", "no Route A or Route B", "no registered-definition change",
+              "no budget or cap increase, no merge of PR #7"):
+        assert any(s in x for x in one["what_it_does_not_authorise"]), s
+    says = " ".join(proposal["what_the_comparison_will_and_will_not_say"])
+    assert "CERTIFIED LOWER BOUND" in says and "never a small tail" in says
+    assert "INCONSISTENT" in says
+
+
+def test_the_doc_is_indexed_and_states_the_corrections():
     readme = (REPO_ROOT / "docs" / "coupled-candidate" / "README.md").read_text()
     assert "](first-moment-diagnostic.md)" in readme
     norm = _norm(DOC.read_text())
     for phrase in (
-        "PREPARED, NOT APPROVED, NOT EXECUTED",
-        "not compiled",
-        "M_free x = f_free",
-        "no artificial boundary contribution",
-        "f = Pᵀ v",
-        "A_GHz² = A_nd / (2π t_c)²",
-        "|fᴴE_m|² / (L λ_m E_mᴴ M E_m)",
-        "K ≥ q qᴴ",
+        "PREPARED, NOT APPROVED, NOT EXECUTED ON N2R",
+        "A_computed − A_exact = (Re(xᴴr) − rᴴM⁻¹r) / L",
+        "is an ESTIMATE, not a bound",
+        "production.cloudfront.docker.com",
+        "403 to CONNECT",
+        "not routed around",
+        "8.9e-16",
+        "caught at four ranks",
+        "PREPARED, NOT ACTIVATED",
         "250 000",
         "2 700 s",
         "hard caps, not runtime promises",
-        "no N2R FEM assembly",
+        "INCONSISTENT",
         "E_C` stays UNAVAILABLE",
         "spent PO1 approval",
-        "is not called an omitted spectral moment until",
         PATCH_SHA256,
-        "20.582047285189",
-        "0.016526676",
     ):
         assert phrase in norm, phrase
 
@@ -612,4 +894,8 @@ def test_launch_safety_of_this_test_file():
         if a.startswith("['git'"):
             assert "'diff'" in a
             continue
-        assert "sys.executable" in a and "FMD /" in a, a
+        assert "sys.executable" in a and ("FMD /" in a or "launcher" in a), a
+    # no test here shells out to a container runtime or an MPI launcher
+    for a in argv:
+        for token in ("docker", "podman", "mpirun", "palace"):
+            assert token not in a, (token, a)

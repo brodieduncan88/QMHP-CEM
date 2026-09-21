@@ -12,20 +12,24 @@ index 6489d56..9d635cf 100644
  )
 diff --git a/palace/drivers/firstmomentsolver.cpp b/palace/drivers/firstmomentsolver.cpp
 new file mode 100644
-index 0000000..72e3ce7
+index 0000000..085aa73
 --- /dev/null
 +++ b/palace/drivers/firstmomentsolver.cpp
-@@ -0,0 +1,281 @@
-+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-+// SPDX-License-Identifier: Apache-2.0
+@@ -0,0 +1,413 @@
++// Copyright (c) 2026 Brodie Duncan. All rights reserved.
++// Proprietary. No licence is granted except by explicit written agreement.
 +//
-+// QMHP-CEM diagnostic patch against Palace v0.13.0 (a61c8cbe). Not part of upstream Palace.
++// QMHP-CEM first-moment diagnostic. This file is original QMHP-CEM source, not part of
++// upstream Palace. It is built against Palace v0.13.0 (a61c8cbe), which is licensed
++// Apache-2.0 by Amazon.com, Inc. or its affiliates; the files this patch MODIFIES keep
++// their upstream Apache-2.0 headers, which are not altered here.
 +
 +#include "firstmomentsolver.hpp"
 +
 +#include <algorithm>
 +#include <cmath>
 +#include <complex>
++#include <cstdlib>
 +#include <fstream>
 +#include <limits>
 +#include <string>
@@ -64,6 +68,25 @@ index 0000000..72e3ce7
 +  return mb;
 +}
 +
++// Read a one-line identity file written into the image by its Dockerfile. Returns an empty
++// string when the file is absent, which the record reports as "unavailable" so that
++// evaluation fails closed rather than silently accepting an unidentified binary.
++std::string ReadImageInfoFile(const std::string &dir, const std::string &name)
++{
++  std::ifstream fi(dir + "/" + name);
++  if (!fi.is_open())
++  {
++    return {};
++  }
++  std::string line;
++  std::getline(fi, line);
++  while (!line.empty() && (line.back() == '\n' || line.back() == '\r' || line.back() == ' '))
++  {
++    line.pop_back();
++  }
++  return line;
++}
++
 +}  // namespace
 +
 +std::pair<ErrorIndicator, long long int>
@@ -86,6 +109,50 @@ index 0000000..72e3ce7
 +  const auto &opts = iodata.solver.firstmoment;
 +  SaveMetadata(space_op.GetNDSpaces());
 +
++  // Provenance: what binary, built from what source and what patch, is producing this
++  // record. The identity files are written into the image by its Dockerfile; the directory
++  // is overridable only so that a non-image (developer) build can be run and, because the
++  // record states the directory it read, such a run is distinguishable from an image run.
++  const char *info_env = std::getenv("PALACE_IMAGE_INFO_DIR");
++  const std::string info_dir = info_env ? std::string(info_env) : std::string("/opt/palace");
++  json prov;
++  prov["ImageInfoDir"] = info_dir;
++  prov["ImageInfoDirIsDefault"] = (info_dir == "/opt/palace");
++  for (const char *name :
++       {"PALACE_VERSION", "PALACE_COMMIT", "PALACE_PATCH", "PALACE_PATCH_SHA256"})
++  {
++    const auto value = ReadImageInfoFile(info_dir, name);
++    prov[name] = value.empty() ? std::string("unavailable") : value;
++  }
++  prov["ConfigMesh"] = iodata.model.mesh;
++  prov["MpiSize"] = Mpi::Size(comm);
++  Mpi::Print("\nFirst-moment diagnostic provenance:\n source = {}, commit = {}, patch = {} "
++             "({})\n",
++             info_dir, prov["PALACE_COMMIT"].get<std::string>(),
++             prov["PALACE_PATCH"].get<std::string>(),
++             prov["PALACE_PATCH_SHA256"].get<std::string>());
++
++  // Structured failure evidence: a failed check writes first-moment-FAILED.json and aborts.
++  // It never writes first-moment.json, so a failed run cannot be mistaken for a result.
++  auto WriteFailure = [&](const std::string &reason, const json &details)
++  {
++    if (root && post_dir.length() > 0)
++    {
++      json out;
++      out["Diagnostic"] = "FirstMoment";
++      out["Status"] = "FAILED";
++      out["Reason"] = reason;
++      out["Details"] = details;
++      out["Provenance"] = prov;
++      std::ofstream fo(post_dir + "first-moment-FAILED.json");
++      if (fo.is_open())
++      {
++        fo << out.dump(2) << '\n';
++      }
++    }
++    Mpi::Barrier(comm);
++  };
++
 +  // Exactly one active lumped port with nonzero inductance defines the functional.
 +  const LumpedPortData *port = nullptr;
 +  int port_idx = -1;
@@ -93,14 +160,24 @@ index 0000000..72e3ce7
 +  {
 +    if (data.active && std::abs(data.L) > 0.0)
 +    {
-+      MFEM_VERIFY(!port, "The first-moment diagnostic requires exactly one active lumped "
-+                         "port with nonzero inductance!");
++      if (port)
++      {
++        WriteFailure("multiple active lumped ports with nonzero inductance",
++                     {{"first", port_idx}, {"second", idx}});
++        MFEM_ABORT("The first-moment diagnostic requires exactly one active lumped port "
++                   "with nonzero inductance!");
++      }
 +      port = &data;
 +      port_idx = idx;
 +    }
 +  }
-+  MFEM_VERIFY(port, "The first-moment diagnostic requires an active lumped port with "
-+                    "nonzero inductance!");
++  if (!port)
++  {
++    WriteFailure("no active lumped port with nonzero inductance",
++                 {{"num_ports", space_op.GetLumpedPortOp().Size()}});
++    MFEM_ABORT("The first-moment diagnostic requires an active lumped port with nonzero "
++               "inductance!");
++  }
 +  const double L_nd = port->L;
 +
 +  // Dof counts: total true dofs, essential (PEC) true dofs and free true dofs.
@@ -119,8 +196,12 @@ index 0000000..72e3ce7
 +  const double f_norm2_full = linalg::Dot(comm, f, f);
 +  linalg::SetSubVector(f, dbc_tdof_list, 0.0);
 +  const double f_norm2_free = linalg::Dot(comm, f, f);
-+  MFEM_VERIFY(f_norm2_free > 0.0,
-+              "The lumped port voltage functional vanishes on the free dofs!");
++  if (!(f_norm2_free > 0.0))
++  {
++    WriteFailure("the lumped port voltage functional vanishes on the free dofs",
++                 {{"norm2_full", f_norm2_full}, {"norm2_free", f_norm2_free}});
++    MFEM_ABORT("The lumped port voltage functional vanishes on the free dofs!");
++  }
 +
 +  // Check 1: the extracted true-dof functional reproduces GetVoltage on a random complex
 +  // field that satisfies the PEC constraint (both parts vanish on the essential dofs).
@@ -148,13 +229,21 @@ index 0000000..72e3ce7
 +    check_f["Tolerance"] = check_functional_tol;
 +    check_f["Passed"] = (rel < check_functional_tol);
 +    Mpi::Print(" Functional check: |V_f - V_GetVoltage| / |V_GetVoltage| = {:.3e}\n", rel);
-+    MFEM_VERIFY(rel < check_functional_tol,
-+                "The true-dof voltage functional does not reproduce GetVoltage!");
++    if (!(rel < check_functional_tol))
++    {
++      WriteFailure("the true-dof voltage functional does not reproduce GetVoltage",
++                   check_f);
++      MFEM_ABORT("The true-dof voltage functional does not reproduce GetVoltage!");
++    }
 +  }
 +
 +  // The SPD mass solve: Jacobi-preconditioned CG on M(DIAG_ONE) = [[M_free, 0], [0, I]].
 +  auto M = space_op.GetMassMatrix<Operator>(Operator::DIAG_ONE);
-+  MFEM_VERIFY(M, "The first-moment diagnostic requires a nonzero mass matrix!");
++  if (!M)
++  {
++    WriteFailure("the mass matrix is empty", {});
++    MFEM_ABORT("The first-moment diagnostic requires a nonzero mass matrix!");
++  }
 +  auto pcg = std::make_unique<CgSolver<Operator>>(comm, iodata.problem.verbose);
 +  pcg->SetInitialGuess(false);
 +  pcg->SetRelTol(opts.tol);
@@ -188,27 +277,46 @@ index 0000000..72e3ce7
 +
 +  // The moment, in nondimensional units and in GHz². With λ = ω² in units of 1/tc²,
 +  // f_GHz = ω_nd / (2π tc) (IoData::ValueType::FREQUENCY), so A_GHz² = A_nd / (2π tc)².
-+  // Exact A* = fᵀ x* with M x* = f satisfies A - A* = x*ᵀ r, so the first-order correction
-+  // is -xᵀr and |A - A*| ≤ ‖x*‖ ‖r‖.
++  //
++  // ERROR QUALIFICATION. With x* = M⁻¹f exact and r = M x - f, substituting f = M x - r
++  // into both quadratic forms gives the EXACT identity
++  //     fᵀx - fᵀM⁻¹f = (xᵀMx - rᵀx) - (xᵀMx - 2xᵀr + rᵀM⁻¹r) = xᵀr - rᵀM⁻¹r ,
++  // i.e.  A_computed - A_exact = (Re(xᴴr) - rᴴM⁻¹r) / L .
++  // M is SPD, so rᴴM⁻¹r ≥ 0 and therefore
++  //     A_computed - A_exact ≤ Re(xᴴr)/L    (a CERTIFIED one-sided bound, no conditioning
++  //                                          information required),
++  // equivalently A_exact ≥ A_computed - Re(xᴴr)/L. The same number is the variational
++  // lower bound 2fᵀx - xᵀMx over L. A certified UPPER bound on A_exact needs rᴴM⁻¹r, hence
++  // a lower bound on λ_min(M_free) or a second solve; neither is computed here, so none is
++  // reported. ‖x‖‖r‖/L is an ESTIMATE of the error, not a bound: the rᴴM⁻¹r term can
++  // exceed it when M is ill conditioned.
 +  const double freq_scale = iodata.DimensionalizeValue(IoData::ValueType::FREQUENCY, 1.0);
++  const double ghz2_per_nd = freq_scale * freq_scale;
 +  const double A_nd = fx / L_nd;
-+  const double A_GHz2 = A_nd * freq_scale * freq_scale;
-+  const double corr_nd = -xr / L_nd;
-+  const double bound_nd = x_norm * r_norm / L_nd;
++  const double A_GHz2 = A_nd * ghz2_per_nd;
++  const double err_ub_nd = xr / L_nd;
++  const double A_lower_nd = A_nd - err_ub_nd;
++  const double est_nd = x_norm * r_norm / L_nd;
 +  Mpi::Print(" A_nd = {:.12e}, A_GHz2 = {:.12e}\n ‖r‖/‖f‖ = {:.3e}, iterations = {:d}, "
-+             "converged = {}\n",
-+             A_nd, A_GHz2, r_norm / f_norm, cg->GetNumIterations(), cg->GetConverged());
++             "converged = {}\n certified lower bound on A_nd = {:.12e}\n",
++             A_nd, A_GHz2, r_norm / f_norm, cg->GetNumIterations(), cg->GetConverged(),
++             A_lower_nd);
 +
 +  // Check 2: the inequality uᵀ K u ≥ (fᵀu)² / L = (qᵀu)² on the actual constrained
-+  // assembly, for the solution x and random constrained fields. It is the discrete
-+  // Cauchy-Schwarz bound of the port stiffness term; it implies qᵀE₀ = 0 for every zero
-+  // mode of K, which is the condition under which A is the moment over the nonzero modes.
++  // assembly, for the solution x and random constrained fields. It is a RUNTIME SANITY
++  // CHECK on sampled vectors, not a proof for every vector: the proof that K ≥ q qᴴ is the
++  // quadrature-parity argument made against the source, kept separate from this sampling.
 +  json check_k;
 +  check_k["Enabled"] = opts.check_null_space;
++  check_k["IsSampledNotProof"] = true;
 +  if (opts.check_null_space)
 +  {
 +    auto K = space_op.GetStiffnessMatrix<Operator>(Operator::DIAG_ONE);
-+    MFEM_VERIFY(K, "The first-moment diagnostic requires a nonzero stiffness matrix!");
++    if (!K)
++    {
++      WriteFailure("the stiffness matrix is empty", {});
++      MFEM_ABORT("The first-moment diagnostic requires a nonzero stiffness matrix!");
++    }
 +    Vector u(f.Size()), Ku(f.Size());
 +    u.UseDevice(true);
 +    Ku.UseDevice(true);
@@ -237,11 +345,17 @@ index 0000000..72e3ce7
 +                         {"RelativeGap", gap}});
 +    }
 +    check_k["Samples"] = samples;
++    check_k["NumSamples"] = static_cast<int>(samples.size());
 +    check_k["MinRelativeGap"] = min_gap;
 +    check_k["Tolerance"] = -1.0e-10;
 +    check_k["Passed"] = (min_gap >= -1.0e-10);
-+    Mpi::Print(" Null-space check: min (uᵀKu - (qᵀu)²) / uᵀKu = {:.3e}\n", min_gap);
-+    MFEM_VERIFY(min_gap >= -1.0e-10, "K ≥ q qᴴ violated on the constrained assembly!");
++    Mpi::Print(" Null-space check (sampled): min (uᵀKu - (qᵀu)²) / uᵀKu = {:.3e}\n",
++               min_gap);
++    if (!(min_gap >= -1.0e-10))
++    {
++      WriteFailure("K >= q q^H violated on the constrained assembly", check_k);
++      MFEM_ABORT("K ≥ q qᴴ violated on the constrained assembly!");
++    }
 +  }
 +
 +  // Outputs.
@@ -253,6 +367,8 @@ index 0000000..72e3ce7
 +  {
 +    json out;
 +    out["Diagnostic"] = "FirstMoment";
++    out["Status"] = "COMPLETED";
++    out["Provenance"] = prov;
 +    out["Port"] = {{"Index", port_idx},
 +                   {"L_nd", L_nd},
 +                   {"L_H", iodata.DimensionalizeValue(IoData::ValueType::INDUCTANCE, L_nd)},
@@ -263,7 +379,7 @@ index 0000000..72e3ce7
 +        {"tc_ns", iodata.DimensionalizeValue(IoData::ValueType::TIME, 1.0)},
 +        {"FrequencyScale_GHz", freq_scale},
 +        {"InductanceScale_H", iodata.DimensionalizeValue(IoData::ValueType::INDUCTANCE, 1.0)},
-+        {"A_GHz2_per_nd", freq_scale * freq_scale}};
++        {"A_GHz2_per_nd", ghz2_per_nd}};
 +    out["Functional"] = {{"NormSquaredFull", f_norm2_full},
 +                         {"NormSquaredFree", f_norm2_free},
 +                         {"NormSquaredEssential", f_norm2_full - f_norm2_free},
@@ -279,12 +395,28 @@ index 0000000..72e3ce7
 +                          {"RelativeResidual", r_norm / f_norm},
 +                          {"SolutionNorm", x_norm},
 +                          {"SolutionEssentialNorm", x_dbc_norm}};
-+    out["A"] = {{"A_nd", A_nd},
-+                {"A_GHz2", A_GHz2},
-+                {"FirstOrderResidualCorrection_nd", corr_nd},
-+                {"FirstOrderResidualCorrection_GHz2", corr_nd * freq_scale * freq_scale},
-+                {"ResidualBound_nd", bound_nd},
-+                {"ResidualBound_GHz2", bound_nd * freq_scale * freq_scale}};
++    out["A"] = {
++        {"A_nd", A_nd},
++        {"A_GHz2", A_GHz2},
++        {"ErrorIdentity",
++         "A_computed - A_exact = (Re(x^H r) - r^H M^-1 r) / L, with r = M x - f"},
++        {"XDotR_nd", xr},
++        {"CertifiedErrorUpperBound_nd", err_ub_nd},
++        {"CertifiedErrorUpperBound_GHz2", err_ub_nd * ghz2_per_nd},
++        {"CertifiedLowerBound_A_nd", A_lower_nd},
++        {"CertifiedLowerBound_A_GHz2", A_lower_nd * ghz2_per_nd},
++        {"CertifiedLowerBoundJustification",
++         "r^H M^-1 r >= 0 because M is SPD, so A_computed - A_exact <= Re(x^H r)/L; the "
++         "same number is the variational lower bound (2 f^T x - x^T M x)/L"},
++        {"UncertifiedErrorEstimate_nd", est_nd},
++        {"UncertifiedErrorEstimate_GHz2", est_nd * ghz2_per_nd},
++        {"UncertifiedErrorEstimateNote",
++         "||x|| ||r|| / L is an ESTIMATE, not a bound: the r^H M^-1 r term of the identity "
++         "can exceed it when M is ill conditioned"},
++        {"CertifiedUpperBound", "UNAVAILABLE"},
++        {"CertifiedUpperBoundRequires",
++         "a lower bound on lambda_min(M_free), or a second solve for r^H M^-1 r; neither "
++         "is computed by this diagnostic"}};
 +    out["NullSpaceCheck"] = check_k;
 +    out["Resources"] = {{"WallTime_s", wall_s}, {"MaxRSS_MB", rss_mb}};
 +    const std::string path = post_dir + "first-moment.json";
@@ -299,14 +431,17 @@ index 0000000..72e3ce7
 +}  // namespace palace
 diff --git a/palace/drivers/firstmomentsolver.hpp b/palace/drivers/firstmomentsolver.hpp
 new file mode 100644
-index 0000000..1c219d5
+index 0000000..6ee67aa
 --- /dev/null
 +++ b/palace/drivers/firstmomentsolver.hpp
-@@ -0,0 +1,38 @@
-+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-+// SPDX-License-Identifier: Apache-2.0
+@@ -0,0 +1,41 @@
++// Copyright (c) 2026 Brodie Duncan. All rights reserved.
++// Proprietary. No licence is granted except by explicit written agreement.
 +//
-+// QMHP-CEM diagnostic patch against Palace v0.13.0 (a61c8cbe). Not part of upstream Palace.
++// QMHP-CEM first-moment diagnostic. This file is original QMHP-CEM source, not part of
++// upstream Palace. It is built against Palace v0.13.0 (a61c8cbe), which is licensed
++// Apache-2.0 by Amazon.com, Inc. or its affiliates; the files this patch MODIFIES keep
++// their upstream Apache-2.0 headers, which are not altered here.
 +
 +#ifndef PALACE_DRIVERS_FIRST_MOMENT_SOLVER_HPP
 +#define PALACE_DRIVERS_FIRST_MOMENT_SOLVER_HPP

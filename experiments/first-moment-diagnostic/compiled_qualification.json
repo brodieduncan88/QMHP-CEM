@@ -1,0 +1,338 @@
+{
+ "label": "COMPILED FIRST-MOMENT DIAGNOSTIC - SYNTHETIC QUALIFICATION",
+ "palace": "/tmp/claude-0/-home-user-QMHP-CEM/7e301b81-9cc3-5878-8c8a-f1390dcdb988/scratchpad/palace-good/bin/palace",
+ "image_info_dir": "/tmp/claude-0/-home-user-QMHP-CEM/7e301b81-9cc3-5878-8c8a-f1390dcdb988/scratchpad/palace-good",
+ "synthetic_only": "every config is a fixture in experiments/first-moment-diagnostic/fixtures naming fm_synthetic.msh",
+ "runs": {
+  "A-nominal": {
+   "purpose": "the full path: functional, PEC restriction, DIAG_ONE padding, mass solve, units",
+   "returncode": 0,
+   "wall_s": 0.46523462900040613,
+   "log_preserved": true,
+   "wrote_first_moment_json": true,
+   "A_nd": 64.16250164577238,
+   "A_GHz2": 36517.66213941119,
+   "certified_lower_bound_A_nd": 64.16250164577238,
+   "x_dot_r_nd": -3.480182745601994e-16,
+   "certified_upper_bound": "UNAVAILABLE",
+   "converged": true,
+   "iterations": 32,
+   "relative_residual": 1.2459756972030213e-12,
+   "solution_essential_norm": 0.0,
+   "functional_check_relative_error": 0.0,
+   "functional_check_passed": true,
+   "functional_norm2_essential": 0.022730652294334464,
+   "null_space_min_gap": 0.9433754934463132,
+   "null_space_is_sampled_not_proof": true,
+   "dofs": {
+    "Essential": 129,
+    "Free": 534,
+    "True": 663
+   },
+   "scales": {
+    "A_GHz2_per_nd": 569.1433657156557,
+    "FrequencyScale_GHz": 23.85672579621218,
+    "InductanceScale_H": 2.5132741228718347e-09,
+    "Lc_m": 0.002,
+    "tc_ns": 0.00667128190395536
+   },
+   "provenance": {
+    "ConfigMesh": "fm_synthetic.msh",
+    "ImageInfoDir": "/tmp/claude-0/-home-user-QMHP-CEM/7e301b81-9cc3-5878-8c8a-f1390dcdb988/scratchpad/palace-good",
+    "ImageInfoDirIsDefault": false,
+    "MpiSize": 1,
+    "PALACE_COMMIT": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+    "PALACE_PATCH": "first-moment-diagnostic",
+    "PALACE_PATCH_SHA256": "e8a1ad51d4e355b0426e84c70cb9c796a4915b1216bb035d5fe60913de512fee",
+    "PALACE_VERSION": "0.13.0"
+   },
+   "json_is_finite": true,
+   "independent_A_nd": 64.16250164577232,
+   "relative_error_vs_independent": 8.859289678982371e-16,
+   "independent_free_dofs": 534,
+   "dof_counts_agree": true,
+   "Lc_agrees": true,
+   "tc_agrees": true,
+   "A_GHz2_conversion_consistent": true,
+   "estimate_is_a_bound_here": true,
+   "certified_lower_bound_holds_vs_independent": true,
+   "shortfall_of_A_below_independent_nd": -5.684341886080802e-14,
+   "unconverged_solve_underestimates_A": true,
+   "lambda_min_M_free_independent": 0.005900925470086422,
+   "cond_M_free_independent": 144.09541160381724,
+   "log_tail": [
+    "Initialization                   0.006       0.006       0.006",
+    "Operator Construction            0.007       0.007       0.007",
+    "Postprocessing                   0.000       0.000       0.000",
+    "Disk IO                          0.002       0.002       0.002",
+    "--------------------------------------------------------------",
+    "Total                            0.383       0.383       0.383"
+   ]
+  },
+  "B-scaled-L": {
+   "purpose": "A must scale exactly as 1/L",
+   "returncode": 0,
+   "wall_s": 0.4585910400001012,
+   "log_preserved": true,
+   "wrote_first_moment_json": true,
+   "A_nd": 6.416250164577237,
+   "A_GHz2": 3651.7662139411186,
+   "certified_lower_bound_A_nd": 6.416250164577237,
+   "x_dot_r_nd": -3.480182745601994e-16,
+   "certified_upper_bound": "UNAVAILABLE",
+   "converged": true,
+   "iterations": 32,
+   "relative_residual": 1.2459756972030213e-12,
+   "solution_essential_norm": 0.0,
+   "functional_check_relative_error": 0.0,
+   "functional_check_passed": true,
+   "functional_norm2_essential": 0.022730652294334464,
+   "null_space_min_gap": 0.9939660838546912,
+   "null_space_is_sampled_not_proof": true,
+   "dofs": {
+    "Essential": 129,
+    "Free": 534,
+    "True": 663
+   },
+   "scales": {
+    "A_GHz2_per_nd": 569.1433657156557,
+    "FrequencyScale_GHz": 23.85672579621218,
+    "InductanceScale_H": 2.5132741228718347e-09,
+    "Lc_m": 0.002,
+    "tc_ns": 0.00667128190395536
+   },
+   "provenance": {
+    "ConfigMesh": "fm_synthetic.msh",
+    "ImageInfoDir": "/tmp/claude-0/-home-user-QMHP-CEM/7e301b81-9cc3-5878-8c8a-f1390dcdb988/scratchpad/palace-good",
+    "ImageInfoDirIsDefault": false,
+    "MpiSize": 1,
+    "PALACE_COMMIT": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+    "PALACE_PATCH": "first-moment-diagnostic",
+    "PALACE_PATCH_SHA256": "e8a1ad51d4e355b0426e84c70cb9c796a4915b1216bb035d5fe60913de512fee",
+    "PALACE_VERSION": "0.13.0"
+   },
+   "json_is_finite": true,
+   "independent_A_nd": 6.416250164577232,
+   "relative_error_vs_independent": 8.305584074045974e-16,
+   "independent_free_dofs": 534,
+   "dof_counts_agree": true,
+   "Lc_agrees": true,
+   "tc_agrees": true,
+   "A_GHz2_conversion_consistent": true,
+   "estimate_is_a_bound_here": true,
+   "certified_lower_bound_holds_vs_independent": true,
+   "shortfall_of_A_below_independent_nd": -5.329070518200751e-15,
+   "unconverged_solve_underestimates_A": true,
+   "lambda_min_M_free_independent": 0.005900925470086422,
+   "cond_M_free_independent": 144.09541160381724,
+   "log_tail": [
+    "Initialization                   0.006       0.006       0.006",
+    "Operator Construction            0.007       0.007       0.007",
+    "Postprocessing                   0.000       0.000       0.000",
+    "Disk IO                          0.002       0.002       0.002",
+    "--------------------------------------------------------------",
+    "Total                            0.384       0.384       0.384"
+   ]
+  },
+  "C-maxits-1": {
+   "purpose": "non-convergence handling: the record must say so",
+   "returncode": 0,
+   "wall_s": 0.45457298400015134,
+   "log_preserved": true,
+   "wrote_first_moment_json": true,
+   "A_nd": 54.2087085166793,
+   "A_GHz2": 30852.52681628179,
+   "certified_lower_bound_A_nd": 54.208708516679316,
+   "x_dot_r_nd": -6.3976601794024646e-15,
+   "certified_upper_bound": "UNAVAILABLE",
+   "converged": false,
+   "iterations": 1,
+   "relative_residual": 0.4129210005633967,
+   "solution_essential_norm": 0.0,
+   "functional_check_relative_error": 0.0,
+   "functional_check_passed": true,
+   "functional_norm2_essential": 0.022730652294334464,
+   "null_space_min_gap": 0.9069987035151496,
+   "null_space_is_sampled_not_proof": true,
+   "dofs": {
+    "Essential": 129,
+    "Free": 534,
+    "True": 663
+   },
+   "scales": {
+    "A_GHz2_per_nd": 569.1433657156557,
+    "FrequencyScale_GHz": 23.85672579621218,
+    "InductanceScale_H": 2.5132741228718347e-09,
+    "Lc_m": 0.002,
+    "tc_ns": 0.00667128190395536
+   },
+   "provenance": {
+    "ConfigMesh": "fm_synthetic.msh",
+    "ImageInfoDir": "/tmp/claude-0/-home-user-QMHP-CEM/7e301b81-9cc3-5878-8c8a-f1390dcdb988/scratchpad/palace-good",
+    "ImageInfoDirIsDefault": false,
+    "MpiSize": 1,
+    "PALACE_COMMIT": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+    "PALACE_PATCH": "first-moment-diagnostic",
+    "PALACE_PATCH_SHA256": "e8a1ad51d4e355b0426e84c70cb9c796a4915b1216bb035d5fe60913de512fee",
+    "PALACE_VERSION": "0.13.0"
+   },
+   "json_is_finite": true,
+   "independent_A_nd": 64.16250164577232,
+   "relative_error_vs_independent": 0.15513411843019806,
+   "independent_free_dofs": 534,
+   "dof_counts_agree": true,
+   "Lc_agrees": true,
+   "tc_agrees": true,
+   "A_GHz2_conversion_consistent": true,
+   "estimate_is_a_bound_here": false,
+   "certified_lower_bound_holds_vs_independent": true,
+   "shortfall_of_A_below_independent_nd": 9.953793129093022,
+   "unconverged_solve_underestimates_A": true,
+   "lambda_min_M_free_independent": 0.005900925470086422,
+   "cond_M_free_independent": 144.09541160381724,
+   "log_tail": [
+    "Initialization                   0.006       0.006       0.006",
+    "Operator Construction            0.004       0.004       0.004",
+    "Postprocessing                   0.000       0.000       0.000",
+    "Disk IO                          0.002       0.002       0.002",
+    "--------------------------------------------------------------",
+    "Total                            0.380       0.380       0.380"
+   ]
+  },
+  "D-port-inactive": {
+   "purpose": "failed-check handling: structured FAILED evidence, no first-moment.json",
+   "returncode": 1,
+   "wall_s": 0.40169447600010244,
+   "log_preserved": true,
+   "wrote_first_moment_json": false,
+   "failed_record": {
+    "Status": "FAILED",
+    "Reason": "no active lumped port with nonzero inductance"
+   },
+   "failed_record_has_provenance": true,
+   "log_tail": [
+    "with errorcode 1.",
+    "",
+    "NOTE: invoking MPI_ABORT causes Open MPI to kill all MPI processes.",
+    "You may or may not see output from other processes, depending on",
+    "exactly when Open MPI kills them.",
+    "--------------------------------------------------------------------------"
+   ]
+  }
+ },
+ "L_scaling": {
+  "ratio": 10.000000000000002,
+  "expected": 10.0,
+  "relative_error": 1.7763568394002506e-16
+ },
+ "mpi_sweep": {
+  "np=1": {
+   "good": {
+    "returncode": 0,
+    "aborted": false,
+    "wrote_first_moment_json": true,
+    "log_preserved": true,
+    "A_nd": 64.16250164577238,
+    "functional_check_relative_error": 0.0,
+    "mpi_size": 1,
+    "failed_reason": null,
+    "relative_error_vs_independent": 8.859289678982371e-16
+   },
+   "faulted": {
+    "returncode": 0,
+    "aborted": false,
+    "wrote_first_moment_json": true,
+    "log_preserved": true,
+    "A_nd": 64.16250164577238,
+    "functional_check_relative_error": 0.0,
+    "mpi_size": 1,
+    "failed_reason": null,
+    "relative_error_vs_independent": 8.859289678982371e-16
+   }
+  },
+  "np=2": {
+   "good": {
+    "returncode": 0,
+    "aborted": false,
+    "wrote_first_moment_json": true,
+    "log_preserved": true,
+    "A_nd": 64.16250164577238,
+    "functional_check_relative_error": 0.0,
+    "mpi_size": 2,
+    "failed_reason": null,
+    "relative_error_vs_independent": 8.859289678982371e-16
+   },
+   "faulted": {
+    "returncode": 0,
+    "aborted": false,
+    "wrote_first_moment_json": true,
+    "log_preserved": true,
+    "A_nd": 64.16250164577238,
+    "functional_check_relative_error": 0.0,
+    "mpi_size": 2,
+    "failed_reason": null,
+    "relative_error_vs_independent": 8.859289678982371e-16
+   }
+  },
+  "np=3": {
+   "good": {
+    "returncode": 0,
+    "aborted": false,
+    "wrote_first_moment_json": true,
+    "log_preserved": true,
+    "A_nd": 64.16250164577238,
+    "functional_check_relative_error": 0.0,
+    "mpi_size": 3,
+    "failed_reason": null,
+    "relative_error_vs_independent": 8.859289678982371e-16
+   },
+   "faulted": {
+    "returncode": 0,
+    "aborted": false,
+    "wrote_first_moment_json": true,
+    "log_preserved": true,
+    "A_nd": 64.16250164577238,
+    "functional_check_relative_error": 0.0,
+    "mpi_size": 3,
+    "failed_reason": null,
+    "relative_error_vs_independent": 8.859289678982371e-16
+   }
+  },
+  "np=4": {
+   "good": {
+    "returncode": 0,
+    "aborted": false,
+    "wrote_first_moment_json": true,
+    "log_preserved": true,
+    "A_nd": 64.16250164577238,
+    "functional_check_relative_error": 0.0,
+    "mpi_size": 4,
+    "failed_reason": null,
+    "relative_error_vs_independent": 8.859289678982371e-16
+   },
+   "faulted": {
+    "returncode": 1,
+    "aborted": true,
+    "wrote_first_moment_json": false,
+    "log_preserved": true,
+    "A_nd": null,
+    "functional_check_relative_error": null,
+    "mpi_size": null,
+    "failed_reason": "the true-dof voltage functional does not reproduce GetVoltage"
+   }
+  }
+ },
+ "fault_injection": {
+  "what": "a binary rebuilt with GetVoltageFunctional taking the leading GetTrueVSize entries of the LOCAL linear form instead of the dual assembly P^T v",
+  "caught_at": [
+   "np=4"
+  ],
+  "not_caught_at": [
+   "np=1",
+   "np=2",
+   "np=3"
+  ],
+  "reading": "the functional check is NOT vacuous: at np=4 the faulted binary aborts with structured FAILED evidence and writes no result. At np=1..3 on this fixture the two expressions coincide - the leading true-dof entries of the local form happen to equal P^T v for that partitioning - so the check is silent there. That is a limit of the fixture, not a pass: this fixture cannot falsify a dual-assembly error below four ranks.",
+  "good_binary_agrees_across_ranks": true
+ }
+}

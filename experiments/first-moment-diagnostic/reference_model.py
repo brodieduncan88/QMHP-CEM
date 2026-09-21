@@ -314,9 +314,111 @@ def null_space_gap(K: np.ndarray, f: np.ndarray, L: float, u: np.ndarray) -> flo
     return (uKu - float(f @ u) ** 2 / L) / uKu
 
 
+# --- the residual error qualification -----------------------------------------------
+#
+# With x* = M^-1 f exact, x the computed solution and r = M x - f, substituting f = M x - r
+# into both quadratic forms gives, for SPD M,
+#
+#     f^H x         = x^H M x - r^H x
+#     f^H M^-1 f    = x^H M x - 2 Re(x^H r) + r^H M^-1 r
+#     ==> A_computed - A_exact = [Re(x^H r) - r^H M^-1 r] / L        (EXACT identity)
+#
+# r^H M^-1 r >= 0, so Re(x^H r)/L is a CERTIFIED upper bound on the error and
+# A_computed - Re(x^H r)/L is a CERTIFIED lower bound on A_exact, with no conditioning
+# information. The same number is the variational lower bound (2 f^T x - x^T M x)/L.
+# A certified UPPER bound on A_exact needs r^H M^-1 r, hence a lower bound on
+# lambda_min(M_free) or a second solve. ||x|| ||r|| / L is an ESTIMATE, not a bound.
+
+
+def residual_error_identity(M: np.ndarray, f: np.ndarray, x: np.ndarray, L: float) -> dict:
+    """Every term of the identity, evaluated exactly for a small dense fixture."""
+    r = M @ x - f
+    A_hat = float(np.real(np.vdot(f, x))) / L
+    A_exact = float(np.real(np.vdot(f, np.linalg.solve(M, f)))) / L
+    xr = float(np.real(np.vdot(x, r)))
+    rMinvr = float(np.real(np.vdot(r, np.linalg.solve(M, r))))
+    return {
+        "A_hat": A_hat,
+        "A_exact": A_exact,
+        "lhs": A_hat - A_exact,
+        "rhs": (xr - rMinvr) / L,
+        "x_dot_r": xr,
+        "r_Minv_r": rMinvr,
+        "certified_error_upper_bound": xr / L,
+        "certified_lower_bound_A": A_hat - xr / L,
+        "variational_lower_bound_A": (2.0 * float(np.real(np.vdot(f, x)))
+                                      - float(np.real(np.vdot(x, M @ x)))) / L,
+        "uncertified_estimate": float(np.linalg.norm(x) * np.linalg.norm(r)) / L,
+        "lambda_min_M": float(np.linalg.eigvalsh(M).min()),
+        "sufficient_lambda_min_for_estimate_to_bound": float(
+            np.linalg.norm(r) / max(np.linalg.norm(x), np.finfo(float).tiny)),
+    }
+
+
+def bound_counterexample(eps: float, delta: float) -> dict:
+    """A 2x2 SPD system where ||x|| ||r|| / L is NOT a bound on the error.
+
+    M = diag(1, eps), x = (1, 0), r = (0, delta), f = M x - r = (1, -delta). Then
+    A_hat = 1, A_exact = 1 + delta^2/eps, so the error is -delta^2/eps while the claimed
+    bound is ||x|| ||r|| = delta. It is violated whenever delta > eps, i.e. whenever the
+    mass matrix is more ill conditioned than the residual is small.
+    """
+    M = np.diag([1.0, eps])
+    x = np.array([1.0, 0.0])
+    f = M @ x - np.array([0.0, delta])
+    out = residual_error_identity(M, f, x, 1.0)
+    out.update({
+        "eps": eps,
+        "delta": delta,
+        "relative_residual": float(delta / np.linalg.norm(f)),
+        "estimate_is_a_bound": abs(out["lhs"]) <= out["uncertified_estimate"],
+        "certified_bound_holds": out["lhs"] <= out["certified_error_upper_bound"] + 1e-30,
+        "violation_factor": abs(out["lhs"]) / out["uncertified_estimate"],
+    })
+    return out
+
+
+# --- the uncertainty of the SAVED moment, kept separate from the mass solve ------------
+#
+# Palace prints every postprocessing column with "%+.9e" (BaseSolver::Table(8, 9, 9)), so a
+# printed value v carries |v_true - v| <= 0.5 * 10^(exponent - 9). A_saved = sum |p_m| f_m^2
+# is increasing in each |p_m| and each f_m, so the printed-precision interval is exact at
+# the corners. The eigensolver's own convergence error is a SECOND, separate contribution
+# that the printed record does not quantify: eig.csv reports a backward and an absolute
+# error per mode, but converting either into an error on p_m needs a spectral gap that is
+# not measured here.
+
+PRINTED_DIGITS = 9  # "%+.9e": 10 significant digits
+
+
+def printed_halfwidth(v: float, digits: int = PRINTED_DIGITS) -> float:
+    """Half of the last printed decimal place of v."""
+    if v == 0.0:
+        return 0.0
+    return 0.5 * 10.0 ** (math.floor(math.log10(abs(v))) - digits)
+
+
+def saved_moment_interval(per_mode: list[dict]) -> dict:
+    """[lo, hi] for A_saved = sum |p| f^2 from the printed precision of p and f alone."""
+    lo = hi = central = 0.0
+    for m in per_mode:
+        p, f = abs(m["abs_p"]), m["f_GHz"]
+        dp, df = printed_halfwidth(p), printed_halfwidth(f)
+        central += p * f * f
+        lo += max(p - dp, 0.0) * (f - df) ** 2
+        hi += (p + dp) * (f + df) ** 2
+    return {"central_GHz2": central, "lo_GHz2": lo, "hi_GHz2": hi,
+            "halfwidth_GHz2": 0.5 * (hi - lo),
+            "source": "printed precision of the committed columns only"}
+
+
 # --- the record the patched driver writes, and its evaluation ----------------------
 RECORD_KEYS = {
     "Diagnostic": (),
+    "Status": (),
+    "Provenance": ("ImageInfoDir", "ImageInfoDirIsDefault", "PALACE_VERSION",
+                   "PALACE_COMMIT", "PALACE_PATCH", "PALACE_PATCH_SHA256", "ConfigMesh",
+                   "MpiSize"),
     "Port": ("Index", "L_nd", "L_H", "NumElements"),
     "Dofs": ("True", "Essential", "Free"),
     "Scales": ("Lc_m", "tc_ns", "FrequencyScale_GHz", "InductanceScale_H", "A_GHz2_per_nd"),
@@ -324,11 +426,21 @@ RECORD_KEYS = {
     "LinearSolve": ("Type", "RelTol", "MaxIts", "Iterations", "Converged", "SolverFinalRes",
                     "ResidualNorm", "RhsNorm", "RelativeResidual", "SolutionNorm",
                     "SolutionEssentialNorm"),
-    "A": ("A_nd", "A_GHz2", "FirstOrderResidualCorrection_nd",
-          "FirstOrderResidualCorrection_GHz2", "ResidualBound_nd", "ResidualBound_GHz2"),
-    "NullSpaceCheck": ("Enabled",),
+    "A": ("A_nd", "A_GHz2", "ErrorIdentity", "XDotR_nd", "CertifiedErrorUpperBound_nd",
+          "CertifiedErrorUpperBound_GHz2", "CertifiedLowerBound_A_nd",
+          "CertifiedLowerBound_A_GHz2", "UncertifiedErrorEstimate_nd",
+          "UncertifiedErrorEstimate_GHz2", "CertifiedUpperBound"),
+    "NullSpaceCheck": ("Enabled", "IsSampledNotProof"),
     "Resources": ("WallTime_s", "MaxRSS_MB"),
 }
+
+#: Provenance every qualifying record must carry, checked against the record and against
+#: the files on disk. Anything missing or mismatched prevents qualification.
+REQUIRED_PROVENANCE_FIELDS = (
+    "PALACE_VERSION", "PALACE_COMMIT", "PALACE_PATCH", "PALACE_PATCH_SHA256",
+)
+REQUIRED_DIGEST_FIELDS = ("config_sha256", "mesh_sha256", "patch_sha256",
+                          "dockerfile_sha256", "image_id")
 
 #: Frozen limits, carried as HARD CAPS on any execution; they are not runtime promises.
 DOF_HARD_CAP = 250_000
@@ -347,11 +459,12 @@ def validate_record(rec: dict) -> list[str]:
     return missing
 
 
-def synthetic_record(fx: Fixture, Lc_m: float, *, residual_scale: float = 1e-13,
-                     seed: int = 0, break_check: str | None = None) -> dict:
+def synthetic_record(fx, Lc_m: float, *, residual_scale: float = 1e-13,
+                     seed: int = 0, break_check: str | None = None,
+                     provenance: dict | None = None) -> dict:
     """What the patched driver would write for the fixture, computed with the reference
-    algebra, with a deliberately imperfect solve (relative residual ~ residual_scale) so
-    that the residual qualification is exercised. ``break_check`` names a check to fail."""
+    algebra, with a deliberately imperfect solve so the qualification is exercised.
+    ``break_check`` names one thing to spoil."""
     rng = np.random.default_rng(seed)
     sc = unit_scales(Lc_m)
     f_full = fx.f_true
@@ -365,7 +478,7 @@ def synthetic_record(fx: Fixture, Lc_m: float, *, residual_scale: float = 1e-13,
     L = fx.L
     A_nd = float(f @ x / L)
     xr = float(x @ r)
-    # the functional check on a random complex constrained field
+    est = float(np.linalg.norm(x) * np.linalg.norm(r)) / L
     Et = rng.normal(size=fx.n_true) + 1j * rng.normal(size=fx.n_true)
     Et[fx.dbc] = 0.0
     V_ref = voltage_palace(fx.v_loc, fx.P, Et)
@@ -374,15 +487,34 @@ def synthetic_record(fx: Fixture, Lc_m: float, *, residual_scale: float = 1e-13,
     if break_check == "functional":
         rel = 1e-3
     gaps = [null_space_gap(fx.K, f, L, x)]
-    for k in range(4):
+    for _k in range(4):
         u = rng.normal(size=fx.n_true)
         u[fx.dbc] = 0.0
         gaps.append(null_space_gap(fx.K, f, L, u))
     min_gap = min(gaps) if break_check != "null_space" else -1e-3
-    rel_res = float(np.linalg.norm(r) / np.linalg.norm(f))
-    converged = break_check != "convergence"
+    prov = {
+        "ImageInfoDir": "/opt/palace",
+        "ImageInfoDirIsDefault": True,
+        "PALACE_VERSION": "0.13.0",
+        "PALACE_COMMIT": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+        "PALACE_PATCH": "first-moment-diagnostic",
+        "PALACE_PATCH_SHA256": "0" * 64,
+        "ConfigMesh": "fixture.msh",
+        "MpiSize": 1,
+    }
+    if provenance:
+        prov.update(provenance)
+    if break_check == "provenance_missing":
+        prov["PALACE_PATCH_SHA256"] = "unavailable"
+    if break_check == "provenance_mismatch":
+        prov["PALACE_COMMIT"] = "deadbeef" * 5
+    if break_check == "developer_build":
+        prov["ImageInfoDir"] = "/tmp/dev-build"
+        prov["ImageInfoDirIsDefault"] = False
     return {
         "Diagnostic": "FirstMoment",
+        "Status": "FAILED" if break_check == "status" else "COMPLETED",
+        "Provenance": prov,
         "Port": {"Index": 1, "L_nd": L, "L_H": L * sc["InductanceScale_H"], "NumElements": 1},
         "Dofs": {"True": fx.n_true, "Essential": int(len(fx.dbc)),
                  "Free": fx.n_true - int(len(fx.dbc))},
@@ -397,35 +529,48 @@ def synthetic_record(fx: Fixture, Lc_m: float, *, residual_scale: float = 1e-13,
         },
         "LinearSolve": {
             "Type": "PCG+Jacobi on M(DIAG_ONE)", "RelTol": 1e-12, "MaxIts": 2000,
-            "Iterations": 17, "Converged": converged,
+            "Iterations": 17, "Converged": break_check != "convergence",
             "SolverFinalRes": float(np.linalg.norm(r)),
             "ResidualNorm": float(np.linalg.norm(r)), "RhsNorm": float(np.linalg.norm(f)),
-            "RelativeResidual": rel_res, "SolutionNorm": float(np.linalg.norm(x)),
+            "RelativeResidual": float(np.linalg.norm(r) / np.linalg.norm(f)),
+            "SolutionNorm": float(np.linalg.norm(x)),
             "SolutionEssentialNorm": float(np.linalg.norm(x[fx.dbc])),
         },
         "A": {
-            "A_nd": A_nd, "A_GHz2": A_nd * sc["A_GHz2_per_nd"],
-            "FirstOrderResidualCorrection_nd": -xr / L,
-            "FirstOrderResidualCorrection_GHz2": -xr / L * sc["A_GHz2_per_nd"],
-            "ResidualBound_nd": float(np.linalg.norm(x) * np.linalg.norm(r) / L),
-            "ResidualBound_GHz2": float(np.linalg.norm(x) * np.linalg.norm(r) / L
-                                        * sc["A_GHz2_per_nd"]),
+            "A_nd": A_nd,
+            "A_GHz2": A_nd * sc["A_GHz2_per_nd"],
+            "ErrorIdentity":
+                "A_computed - A_exact = (Re(x^H r) - r^H M^-1 r) / L, with r = M x - f",
+            "XDotR_nd": xr,
+            "CertifiedErrorUpperBound_nd": xr / L,
+            "CertifiedErrorUpperBound_GHz2": xr / L * sc["A_GHz2_per_nd"],
+            "CertifiedLowerBound_A_nd": A_nd - xr / L,
+            "CertifiedLowerBound_A_GHz2": (A_nd - xr / L) * sc["A_GHz2_per_nd"],
+            "UncertifiedErrorEstimate_nd": est,
+            "UncertifiedErrorEstimate_GHz2": est * sc["A_GHz2_per_nd"],
+            "CertifiedUpperBound": "UNAVAILABLE",
         },
-        "NullSpaceCheck": {"Enabled": True, "MinRelativeGap": min_gap, "Tolerance": -1e-10,
+        "NullSpaceCheck": {"Enabled": True, "IsSampledNotProof": True, "NumSamples": 5,
+                           "MinRelativeGap": min_gap, "Tolerance": -1e-10,
                            "Passed": min_gap >= -1e-10},
         "Resources": {"WallTime_s": 12.5, "MaxRSS_MB": 480.0},
     }
 
 
-def evaluate(rec: dict, A_saved_GHz2: float, *, expected_dofs: int | None = None,
+def evaluate(rec: dict, saved: dict, *, required_provenance: dict | None = None,
+             actual: dict | None = None, expected_dofs: int | None = None,
              expected_L_H: float | None = None, residual_tol: float = 1e-12,
-             dof_hard_cap: int = DOF_HARD_CAP, wall_hard_cap_s: float = WALL_HARD_CAP_S,
-             hashes: dict | None = None) -> dict:
+             dof_hard_cap: int = DOF_HARD_CAP,
+             wall_hard_cap_s: float = WALL_HARD_CAP_S) -> dict:
     """Evaluate a diagnostic record against a saved partial first moment.
 
-    Every check must pass before the difference ``A_direct - A_saved`` may be read as
-    the first moment omitted by the saved modes; until then it is an UNQUALIFIED
-    difference. Physical ``E_C`` and ``g`` are never produced here.
+    FAIL CLOSED. Every provenance and numerical check must pass before the difference
+    ``A_direct - A_saved`` may be read as an omitted first moment. Mass-solve uncertainty
+    and A_saved uncertainty are reported separately and never merged into one number.
+    Physical ``E_C`` and ``g`` are never produced here.
+
+    ``saved`` carries the saved moment and its own interval; ``required_provenance`` the
+    values a qualifying run must carry; ``actual`` the digests measured from the record.
     """
     checks = []
 
@@ -435,21 +580,51 @@ def evaluate(rec: dict, A_saved_GHz2: float, *, expected_dofs: int | None = None
     missing = validate_record(rec)
     check("record schema complete", not missing, {"missing": missing})
     if missing:
-        return {"checks": checks, "all_checks_passed": False,
-                "interpretation": "UNQUALIFIED: incomplete record", "E_C": "UNAVAILABLE",
-                "g": "UNAVAILABLE"}
+        return {"checks": checks, "all_checks_passed": False, "verdict": "UNQUALIFIED",
+                "interpretation": "UNQUALIFIED: incomplete record",
+                "E_C": "UNAVAILABLE", "g": "UNAVAILABLE"}
 
-    fc, ls, sc, A, d = rec["Functional"]["Check"], rec["LinearSolve"], rec["Scales"], rec["A"], rec["Dofs"]
+    # --- provenance, fail closed ---
+    prov = rec["Provenance"]
+    req = required_provenance or {}
+    check("record status is COMPLETED", rec.get("Status") == "COMPLETED",
+          {"status": rec.get("Status")})
+    check("provenance carries no unavailable field",
+          all(str(prov.get(k, "unavailable")) != "unavailable"
+              for k in REQUIRED_PROVENANCE_FIELDS),
+          {k: prov.get(k) for k in REQUIRED_PROVENANCE_FIELDS})
+    check("run came from the image identity directory (/opt/palace), not a developer build",
+          prov.get("ImageInfoDirIsDefault") is True,
+          {"dir": prov.get("ImageInfoDir")})
+    for key in REQUIRED_PROVENANCE_FIELDS:
+        if key in req:
+            check(f"embedded {key} matches the required value", prov.get(key) == req[key],
+                  {"record": prov.get(key), "required": req[key]})
+        else:
+            check(f"required value for {key} was supplied", False,
+                  {"record": prov.get(key), "required": None})
+    act = actual or {}
+    for key in REQUIRED_DIGEST_FIELDS:
+        have, want = act.get(key), req.get(key)
+        check(f"{key} measured and matches the required value",
+              have is not None and want is not None and have == want,
+              {"measured": have, "required": want})
+
+    # --- the checks the driver performed ---
+    fc, ls, sc, A, d = (rec["Functional"]["Check"], rec["LinearSolve"], rec["Scales"],
+                        rec["A"], rec["Dofs"])
     check("functional reproduces GetVoltage (complex, PEC-constrained field)",
           fc.get("Enabled") and fc.get("Passed"),
           {"relative_error": fc.get("RelativeError"), "tolerance": fc.get("Tolerance")})
     nc = rec["NullSpaceCheck"]
-    check("K >= q q^H on the constrained assembly (solution + random fields)",
+    check("sampled K >= q q^H check ran and passed on every sample",
           nc.get("Enabled") and nc.get("Passed"),
-          {"min_relative_gap": nc.get("MinRelativeGap"), "tolerance": nc.get("Tolerance")})
+          {"min_relative_gap": nc.get("MinRelativeGap"), "tolerance": nc.get("Tolerance"),
+           "note": "sampled runtime check, not a proof for every vector"})
     check("linear solve converged", ls["Converged"], {"iterations": ls["Iterations"]})
     check(f"independent relative residual <= {residual_tol:g}",
-          ls["RelativeResidual"] <= residual_tol, {"relative_residual": ls["RelativeResidual"]})
+          ls["RelativeResidual"] <= residual_tol,
+          {"relative_residual": ls["RelativeResidual"]})
     check("solution vanishes on the essential dofs",
           ls["SolutionEssentialNorm"] <= 1e-14 * max(ls["SolutionNorm"], 1e-300),
           {"essential_norm": ls["SolutionEssentialNorm"], "norm": ls["SolutionNorm"]})
@@ -473,12 +648,22 @@ def evaluate(rec: dict, A_saved_GHz2: float, *, expected_dofs: int | None = None
     check("FrequencyScale_GHz == 1/(2 pi tc)",
           close(sc["FrequencyScale_GHz"], ref["FrequencyScale_GHz"], 1e-9),
           {"scale": sc["FrequencyScale_GHz"], "expected": ref["FrequencyScale_GHz"]})
-    check("InductanceScale_H == mu0 Lc", close(sc["InductanceScale_H"], ref["InductanceScale_H"], 1e-9),
+    check("InductanceScale_H == mu0 Lc",
+          close(sc["InductanceScale_H"], ref["InductanceScale_H"], 1e-9),
           {"scale": sc["InductanceScale_H"], "expected": ref["InductanceScale_H"]})
     check("A_GHz2_per_nd == FrequencyScale^2",
           close(sc["A_GHz2_per_nd"], sc["FrequencyScale_GHz"] ** 2), {})
-    check("A_GHz2 == A_nd * A_GHz2_per_nd", close(A["A_GHz2"], A["A_nd"] * sc["A_GHz2_per_nd"]),
+    check("A_GHz2 == A_nd * A_GHz2_per_nd",
+          close(A["A_GHz2"], A["A_nd"] * sc["A_GHz2_per_nd"]),
           {"A_GHz2": A["A_GHz2"], "A_nd": A["A_nd"]})
+    check("certified lower bound == A_nd - Re(x^H r)/L, converted consistently",
+          close(A["CertifiedLowerBound_A_nd"], A["A_nd"] - A["CertifiedErrorUpperBound_nd"])
+          and close(A["CertifiedLowerBound_A_GHz2"],
+                    A["CertifiedLowerBound_A_nd"] * sc["A_GHz2_per_nd"]),
+          {"lower_nd": A["CertifiedLowerBound_A_nd"], "A_nd": A["A_nd"],
+           "err_ub_nd": A["CertifiedErrorUpperBound_nd"]})
+    check("no certified upper bound is claimed", A["CertifiedUpperBound"] == "UNAVAILABLE",
+          {"value": A["CertifiedUpperBound"]})
     check("L_H == L_nd * InductanceScale_H",
           close(rec["Port"]["L_H"], rec["Port"]["L_nd"] * sc["InductanceScale_H"]), {})
     check(f"wall time within the {wall_hard_cap_s} s hard cap",
@@ -486,52 +671,98 @@ def evaluate(rec: dict, A_saved_GHz2: float, *, expected_dofs: int | None = None
           {"wall_s": rec["Resources"]["WallTime_s"], "cap_s": wall_hard_cap_s})
 
     all_ok = all(c["passed"] for c in checks)
-    diff = A["A_GHz2"] - A_saved_GHz2
-    bound = A["ResidualBound_GHz2"]
-    corr = A["FirstOrderResidualCorrection_GHz2"]
-    tc = sc["tc_ns"]
-    result = {
-        "hashes": hashes or {},
+
+    # --- the two uncertainties, kept apart ---
+    A_direct = A["A_GHz2"]
+    A_lower = A["CertifiedLowerBound_A_GHz2"]
+    est = A["UncertifiedErrorEstimate_GHz2"]
+    sv_c, sv_lo, sv_hi = saved["central_GHz2"], saved["lo_GHz2"], saved["hi_GHz2"]
+    sv_half = saved.get("halfwidth_GHz2", 0.5 * (sv_hi - sv_lo))
+    lam_min_needed = (ls["ResidualNorm"] / ls["SolutionNorm"]) if ls["SolutionNorm"] else None
+    mass_solve_uncertainty = {
+        "identity": A["ErrorIdentity"],
+        "x_dot_r_nd": A["XDotR_nd"],
+        "certified_error_upper_bound_GHz2": A["CertifiedErrorUpperBound_GHz2"],
+        "certified_lower_bound_A_GHz2": A_lower,
+        "certified_upper_bound_A_GHz2": "UNAVAILABLE",
+        "uncertified_error_estimate_GHz2": est,
+        "why_the_estimate_is_not_a_bound": (
+            "the identity's r^H M^-1 r term is bounded by ||r||^2 / lambda_min(M_free), "
+            "which exceeds ||x|| ||r|| whenever lambda_min(M_free) < ||r||/||x||"),
+        "sufficient_condition_for_the_estimate_to_be_a_bound": {
+            "condition": "lambda_min(M_free) >= ||r|| / ||x||",
+            "threshold": lam_min_needed,
+            "lambda_min_measured": False,
+        },
+        "why_no_certified_upper_bound": (
+            "a certified upper bound on A_exact requires r^H M^-1 r, hence a lower bound "
+            "on lambda_min(M_free) or a second solve; neither is authorised or performed"),
+    }
+    A_saved_uncertainty = {
+        "central_GHz2": sv_c,
+        "printed_precision_interval_GHz2": [sv_lo, sv_hi],
+        "halfwidth_GHz2": sv_half,
+        "source": saved.get("source"),
+        "eigensolver_convergence": saved.get("eigensolver_convergence",
+                                             {"propagated_into_A": "UNQUANTIFIED"}),
+        "kept_separate_from_mass_solve_uncertainty": True,
+    }
+
+    # --- the discrepancy and its verdict ---
+    diff = A_direct - sv_c
+    certified_omitted_lower = A_lower - sv_hi
+    negative_margin = -(sv_half + est)
+    if not all_ok:
+        verdict = "UNQUALIFIED"
+    elif certified_omitted_lower > 0.0:
+        verdict = "OMITTED_MOMENT_CERTIFIED_LOWER_BOUND"
+    elif diff < negative_margin:
+        verdict = "INCONSISTENT"
+    else:
+        verdict = "NOT_RESOLVED"
+    interpretation = {
+        "UNQUALIFIED": ("UNQUALIFIED: a provenance or numerical check failed; the "
+                        "difference is not an omitted spectral moment"),
+        "OMITTED_MOMENT_CERTIFIED_LOWER_BOUND": (
+            "the modes absent from the saved set carry at least "
+            f"{certified_omitted_lower:.6e} GHz^2 of first moment"),
+        "INCONSISTENT": (
+            "INCONSISTENT: A_direct is materially below A_saved, which the non-negative "
+            "mode weights forbid. Either the mass solve is under-converged (A_computed "
+            "underestimates A_exact by r^H M^-1 r) or the functional, space or "
+            "normalisation does not match the saved record. NOT an omitted moment."),
+        "NOT_RESOLVED": ("NOT RESOLVED: the difference lies inside the combined "
+                         "uncertainty; this is not evidence of a small tail"),
+    }[verdict]
+    return {
         "checks": checks,
         "all_checks_passed": all_ok,
-        "A_direct": {"A_nd": A["A_nd"], "A_GHz2": A["A_GHz2"]},
-        "A_saved": {"A_GHz2": A_saved_GHz2, "A_nd": a_nd_from_ghz2(A_saved_GHz2, tc)},
+        "verdict": verdict,
+        "interpretation": interpretation,
+        "A_direct": {"A_nd": A["A_nd"], "A_GHz2": A_direct,
+                     "certified_lower_bound_GHz2": A_lower},
+        "A_saved": {"central_GHz2": sv_c, "modes": saved.get("modes")},
         "difference": {
             "A_direct_minus_A_saved_GHz2": diff,
-            "A_direct_minus_A_saved_nd": a_nd_from_ghz2(diff, tc),
-            "relative_to_A_saved": diff / A_saved_GHz2 if A_saved_GHz2 else None,
+            "relative_to_A_saved": diff / sv_c if sv_c else None,
+            "certified_omitted_moment_lower_bound_GHz2": certified_omitted_lower,
+            "materially_negative_threshold_GHz2": negative_margin,
         },
-        "numerical_qualification": {
-            "first_order_residual_correction_GHz2": corr,
-            "residual_bound_GHz2": bound,
-            "bound_statement": (
-                "|A_computed - A_exact| <= ||x*|| ||r|| / L with r = M x - f; ||x*|| is taken "
-                "as ||x|| up to the factor (1 + kappa(M_free) * relative_residual), which is "
-                "within 1e-6 of 1 whenever kappa(M_free) <= 1e6 at the required 1e-12 "
-                "relative residual. The bound is on the calculation error of A_direct only; "
-                "A_saved carries the eigensolver's own tolerance, not accounted for here."
-            ),
-            "difference_exceeds_residual_bound": abs(diff) > bound,
-            "difference_over_bound": (abs(diff) / bound) if bound > 0 else None,
-        },
-        "interpretation": (
-            "A_direct - A_saved is the first moment carried by modes absent from the saved "
-            "set, qualified by the residual bound above"
-            if all_ok else
-            "UNQUALIFIED difference: one or more checks failed; do not read it as an omitted "
-            "spectral moment"
-        ),
+        "mass_solve_uncertainty": mass_solve_uncertainty,
+        "A_saved_uncertainty": A_saved_uncertainty,
+        "tail_upper_bound": "UNAVAILABLE",
         "not_established_here": [
-            "a small raw difference does not prove a small tail unless it exceeds the "
-            "calculation-error bound; a difference within the bound is 'not resolved', "
-            "not 'zero'",
-            "the saved moment's own eigensolver error is not part of the bound",
+            "no upper bound on A_exact is certified, so a small difference NEVER "
+            "establishes a small omitted tail; it establishes only 'not resolved'",
+            "the eigensolver convergence error of A_saved is not propagated into A_saved's "
+            "interval and must be accounted for before any tail conclusion",
+            "the sampled K >= q q^H check is a runtime sanity check on finitely many "
+            "vectors, not a proof; the proof is the separate quadrature-parity argument",
         ],
         "N": "not measured by this diagnostic",
         "E_C": "UNAVAILABLE",
         "g": "UNAVAILABLE",
     }
-    return result
 
 
 # --- the synthetic verification ---------------------------------------------------------
@@ -655,6 +886,54 @@ def run_trials(trials: int = TRIALS, seed: int = RNG_SEED) -> dict:
     return worst
 
 
+def run_error_trials(trials: int = 40, seed: int = RNG_SEED + 1) -> dict:
+    """The residual error qualification, verified and falsified where it should be."""
+    rng = np.random.default_rng(seed)
+    worst = {
+        "identity_max_error_relative_to_A": 0.0,
+        "certified_bound_violations": 0,
+        "variational_equals_certified_max_rel": 0.0,
+        "cg_like_solution_A_hat_never_exceeds_A_exact": True,
+        "max_shortfall_of_A_hat_below_A_exact_relative": 0.0,
+    }
+    for _ in range(trials):
+        fx = Fixture(rng)
+        f = restrict_to_free(fx.f_true, fx.dbc)
+        Mp = padded_mass(fx.M, fx.dbc, "DIAG_ONE")
+        x_star = np.linalg.solve(Mp, f)
+        for scale in (1e-3, 1e-7, 1e-12):
+            pert = rng.normal(size=x_star.size)
+            pert[fx.dbc] = 0.0
+            x = x_star + scale * np.linalg.norm(x_star) * pert / np.linalg.norm(pert)
+            idn = residual_error_identity(Mp, f, x, fx.L)
+            # The identity is checked against |A| rather than against the difference: for a
+            # well-converged solve the two sides agree to round-off while their common
+            # value is many orders smaller than A, so a RELATIVE comparison of the
+            # difference would measure the cancellation in A_hat - A_exact, not the
+            # identity.
+            worst["identity_max_error_relative_to_A"] = max(
+                worst["identity_max_error_relative_to_A"],
+                abs(idn["lhs"] - idn["rhs"]) / max(abs(idn["A_exact"]), 1e-300))
+            if idn["lhs"] > idn["certified_error_upper_bound"] + 1e-12 * abs(idn["A_exact"]):
+                worst["certified_bound_violations"] += 1
+            worst["variational_equals_certified_max_rel"] = max(
+                worst["variational_equals_certified_max_rel"],
+                abs(idn["variational_lower_bound_A"] - idn["certified_lower_bound_A"])
+                / max(abs(idn["certified_lower_bound_A"]), 1e-300))
+        # a CG-like iterate: x in a Krylov space, residual M-orthogonal to it, so x.r = 0
+        K = np.column_stack([np.linalg.matrix_power(Mp, k) @ f for k in range(4)])
+        Q, _ = np.linalg.qr(K)
+        G = Q.T @ Mp @ Q
+        x_cg = Q @ np.linalg.solve(G, Q.T @ f)      # M-projection of x* onto span(Q)
+        idn = residual_error_identity(Mp, f, x_cg, fx.L)
+        if idn["A_hat"] > idn["A_exact"] * (1 + 1e-12):
+            worst["cg_like_solution_A_hat_never_exceeds_A_exact"] = False
+        worst["max_shortfall_of_A_hat_below_A_exact_relative"] = max(
+            worst["max_shortfall_of_A_hat_below_A_exact_relative"],
+            (idn["A_exact"] - idn["A_hat"]) / abs(idn["A_exact"]))
+    return worst
+
+
 def main() -> None:
     worst = run_trials()
     n2r = unit_scales(4.0e-3)
@@ -670,6 +949,23 @@ def main() -> None:
                      "reports the exact values and the evaluator uses those, not these."),
         },
         "expected_N2R_L_nd": inductance_nd(1.0345665367517793e-07, 4.0e-3),
+        "error_qualification": {
+            "identity": "A_computed - A_exact = (Re(x^H r) - r^H M^-1 r) / L, r = M x - f",
+            "trials": run_error_trials(),
+            "counterexamples_to_the_old_quantity": [
+                {k: v for k, v in bound_counterexample(eps, delta).items()
+                 if k in ("eps", "delta", "relative_residual", "lhs", "rhs",
+                          "uncertified_estimate", "certified_error_upper_bound",
+                          "estimate_is_a_bound", "certified_bound_holds",
+                          "violation_factor")}
+                for eps, delta in ((1e-12, 1e-4), (1e-16, 1e-13), (1e-8, 1e-6))
+            ],
+            "reading": (
+                "||x|| ||r|| / L is an ESTIMATE. It fails as a bound exactly when "
+                "lambda_min(M_free) < ||r||/||x||, and the third counterexample has a "
+                "relative residual of 1e-13, i.e. it would pass the residual check. The "
+                "certified statement is one-sided: A_exact >= A_computed - Re(x^H r)/L."),
+        },
         "hard_caps": {"dof": DOF_HARD_CAP, "wall_s": WALL_HARD_CAP_S,
                       "meaning": "hard caps on any execution, not runtime promises"},
         "what_is_and_is_not_verified": {

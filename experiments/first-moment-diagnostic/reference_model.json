@@ -33,6 +33,55 @@
   "note": "Lc = 4.000e-03 m is the mesh bounding-box extent Palace printed for N2R (palace_log.txt:18-19, 't0 = 1.334e-02 ns'); the diagnostic record reports the exact values and the evaluator uses those, not these."
  },
  "expected_N2R_L_nd": 20.582047285188583,
+ "error_qualification": {
+  "identity": "A_computed - A_exact = (Re(x^H r) - r^H M^-1 r) / L, r = M x - f",
+  "trials": {
+   "identity_max_error_relative_to_A": 7.3152571425946635e-16,
+   "certified_bound_violations": 0,
+   "variational_equals_certified_max_rel": 4.3982912251202505e-16,
+   "cg_like_solution_A_hat_never_exceeds_A_exact": true,
+   "max_shortfall_of_A_hat_below_A_exact_relative": 0.0017461539172597843
+  },
+  "counterexamples_to_the_old_quantity": [
+   {
+    "lhs": -10000.0,
+    "rhs": -10000.0,
+    "certified_error_upper_bound": 0.0,
+    "uncertified_estimate": 0.0001,
+    "eps": 1e-12,
+    "delta": 0.0001,
+    "relative_residual": 9.999999950000001e-05,
+    "estimate_is_a_bound": false,
+    "certified_bound_holds": true,
+    "violation_factor": 100000000.0
+   },
+   {
+    "lhs": -1.000000082740371e-10,
+    "rhs": -1e-10,
+    "certified_error_upper_bound": 0.0,
+    "uncertified_estimate": 1e-13,
+    "eps": 1e-16,
+    "delta": 1e-13,
+    "relative_residual": 1e-13,
+    "estimate_is_a_bound": false,
+    "certified_bound_holds": true,
+    "violation_factor": 1000.000082740371
+   },
+   {
+    "lhs": -9.999999999998899e-05,
+    "rhs": -9.999999999999999e-05,
+    "certified_error_upper_bound": 0.0,
+    "uncertified_estimate": 1e-06,
+    "eps": 1e-08,
+    "delta": 1e-06,
+    "relative_residual": 9.999999999995e-07,
+    "estimate_is_a_bound": false,
+    "certified_bound_holds": true,
+    "violation_factor": 99.99999999998899
+   }
+  ],
+  "reading": "||x|| ||r|| / L is an ESTIMATE. It fails as a bound exactly when lambda_min(M_free) < ||r||/||x||, and the third counterexample has a relative residual of 1e-13, i.e. it would pass the residual check. The certified statement is one-sided: A_exact >= A_computed - Re(x^H r)/L."
+ },
  "hard_caps": {
   "dof": 250000,
   "wall_s": 2700,

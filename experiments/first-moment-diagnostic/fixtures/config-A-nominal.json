@@ -1,0 +1,66 @@
+{
+  "Problem": {
+    "Type": "FirstMoment",
+    "Verbose": 2,
+    "Output": "postpro"
+  },
+  "Model": {
+    "Mesh": "fm_synthetic.msh",
+    "L0": 0.001
+  },
+  "Domains": {
+    "Materials": [
+      {
+        "Attributes": [
+          1
+        ],
+        "Permittivity": 1.0,
+        "Permeability": 1.0
+      },
+      {
+        "Attributes": [
+          2
+        ],
+        "Permittivity": 4.0,
+        "Permeability": 1.0
+      }
+    ]
+  },
+  "Boundaries": {
+    "PEC": {
+      "Attributes": [
+        2,
+        4
+      ]
+    },
+    "LumpedPort": [
+      {
+        "Index": 1,
+        "Attributes": [
+          10
+        ],
+        "Direction": "+Y",
+        "L": 1e-09
+      }
+    ]
+  },
+  "Solver": {
+    "Order": 1,
+    "Device": "CPU",
+    "Linear": {
+      "Type": "Default",
+      "KSPType": "CG",
+      "Tol": 1e-08,
+      "MaxIts": 100,
+      "MGMaxLevels": 1
+    },
+    "FirstMoment": {
+      "Tol": 1e-12,
+      "MaxIts": 2000,
+      "CheckFunctional": true,
+      "CheckNullSpace": true,
+      "NullSpaceSamples": 4,
+      "Seed": 20260920
+    }
+  }
+}

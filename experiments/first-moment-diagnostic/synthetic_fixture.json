@@ -1,0 +1,99 @@
+{
+ "label": "SYNTHETIC NON-QMHP FIXTURES FOR THE COMPILED DIAGNOSTIC",
+ "not_qmhp": "a plain two-material brick; no QMHP geometry, mesh, material or port is used, and no committed QMHP result is read",
+ "mesh": {
+  "file": "fm_synthetic.msh",
+  "n_nodes": 144,
+  "n_tets": 390,
+  "n_tris": 104
+ },
+ "fixtures": {
+  "A-nominal": {
+   "purpose": "the full path: functional, PEC restriction, DIAG_ONE padding, mass solve, units",
+   "config": "config-A-nominal.json",
+   "L_H": 1e-09,
+   "independent": {
+    "A_nd": 64.16250164577232,
+    "constant_field_invariant_max_relative_error": 5.329070518200749e-16,
+    "solution_norm": 42.14286916348303,
+    "A_GHz2": 36517.662139411164,
+    "n_edges_total": 663,
+    "n_edges_pec": 129,
+    "n_edges_free": 534,
+    "Lc_m": 0.002,
+    "tc_ns": 0.00667128190395536,
+    "L_nd": 0.3978873577297383,
+    "port_w_nd": 0.5,
+    "port_l_nd": 0.5,
+    "f_norm2_full": 0.5601841337765997,
+    "f_norm2_free": 0.5374534814822652,
+    "f_norm2_essential": 0.022730652294334464,
+    "cond_M_free": 144.09541160381724,
+    "lambda_min_M_free": 0.005900925470086422,
+    "n_tets": 390,
+    "n_port_tris": 26
+   }
+  },
+  "B-scaled-L": {
+   "purpose": "A must scale exactly as 1/L",
+   "config": "config-B-scaled-L.json",
+   "L_H": 1e-08,
+   "independent": {
+    "A_nd": 6.416250164577232,
+    "constant_field_invariant_max_relative_error": 5.329070518200749e-16,
+    "solution_norm": 42.14286916348303,
+    "A_GHz2": 3651.7662139411163,
+    "n_edges_total": 663,
+    "n_edges_pec": 129,
+    "n_edges_free": 534,
+    "Lc_m": 0.002,
+    "tc_ns": 0.00667128190395536,
+    "L_nd": 3.9788735772973833,
+    "port_w_nd": 0.5,
+    "port_l_nd": 0.5,
+    "f_norm2_full": 0.5601841337765997,
+    "f_norm2_free": 0.5374534814822652,
+    "f_norm2_essential": 0.022730652294334464,
+    "cond_M_free": 144.09541160381724,
+    "lambda_min_M_free": 0.005900925470086422,
+    "n_tets": 390,
+    "n_port_tris": 26
+   }
+  },
+  "C-maxits-1": {
+   "purpose": "non-convergence handling: the record must say so",
+   "config": "config-C-maxits-1.json",
+   "L_H": 1e-09,
+   "independent": {
+    "A_nd": 64.16250164577232,
+    "constant_field_invariant_max_relative_error": 5.329070518200749e-16,
+    "solution_norm": 42.14286916348303,
+    "A_GHz2": 36517.662139411164,
+    "n_edges_total": 663,
+    "n_edges_pec": 129,
+    "n_edges_free": 534,
+    "Lc_m": 0.002,
+    "tc_ns": 0.00667128190395536,
+    "L_nd": 0.3978873577297383,
+    "port_w_nd": 0.5,
+    "port_l_nd": 0.5,
+    "f_norm2_full": 0.5601841337765997,
+    "f_norm2_free": 0.5374534814822652,
+    "f_norm2_essential": 0.022730652294334464,
+    "cond_M_free": 144.09541160381724,
+    "lambda_min_M_free": 0.005900925470086422,
+    "n_tets": 390,
+    "n_port_tris": 26
+   }
+  },
+  "D-port-inactive": {
+   "purpose": "failed-check handling: structured FAILED evidence, no first-moment.json",
+   "config": "config-D-port-inactive.json",
+   "L_H": 1e-09
+  }
+ },
+ "scaling_check": {
+  "A_nominal_times_L_ratio": 10.000000000000002,
+  "expected": 10.0
+ }
+}

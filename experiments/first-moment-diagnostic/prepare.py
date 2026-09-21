@@ -30,7 +30,8 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 from reference_model import (  # noqa: E402
-    DOF_HARD_CAP, WALL_HARD_CAP_S, a_nd_from_ghz2, inductance_nd, unit_scales,
+    DOF_HARD_CAP, WALL_HARD_CAP_S, a_nd_from_ghz2, inductance_nd, saved_moment_interval,
+    unit_scales,
 )
 
 #: N2R's record and the config it actually SOLVED - not a candidate file.
@@ -106,24 +107,42 @@ def _rows(name: str) -> list[list[float]]:
 
 def saved_moments(tc_ns: float) -> dict:
     """The saved partial moments from the committed N2R scalar columns, both variants,
-    exactly as experiments/first-moment/n2r_moments.py sums them, plus their
-    nondimensional equivalents for the direct comparison."""
+    summed exactly as experiments/first-moment/n2r_moments.py sums them, together with
+    the interval that the PRINTED PRECISION of those columns alone implies and the
+    eigensolver's own reported errors, which are NOT propagated into that interval."""
     eig, epr = _rows("eig.csv"), _rows("port-EPR.csv")
     f = [r[1] for r in eig]
     p = [abs(r[1]) for r in epr]
+    bkwd = [abs(r[4]) for r in eig]
+    absr = [abs(r[5]) for r in eig]
     variants = json.loads(SPECTRAL.read_text())["records"]["N2R"]["spectral_variants"]
     out = {}
     for key, v in variants.items():
         idx = v["included_modes"]
+        per_mode = [{"mode": i, "f_GHz": f[i - 1], "abs_p": p[i - 1],
+                     "abs_p_f2_GHz2": p[i - 1] * f[i - 1] ** 2,
+                     "error_bkwd": bkwd[i - 1], "error_abs": absr[i - 1]} for i in idx]
+        interval = saved_moment_interval(per_mode)
         n = sum(p[i - 1] for i in idx)
         a = sum(p[i - 1] * f[i - 1] ** 2 for i in idx)
+        assert abs(interval["central_GHz2"] - a) <= 1e-12 * a
         out[key] = {
             "modes": idx,
             "N_partial": n,
             "A_partial_GHz2": a,
             "A_partial_nd_at_expected_tc": a_nd_from_ghz2(a, tc_ns),
-            "per_mode": [{"mode": i, "f_GHz": f[i - 1], "abs_p": p[i - 1],
-                          "abs_p_f2_GHz2": p[i - 1] * f[i - 1] ** 2} for i in idx],
+            "per_mode": per_mode,
+            **interval,
+            "eigensolver_convergence": {
+                "max_backward_error": max(bkwd[i - 1] for i in idx),
+                "max_absolute_error": max(absr[i - 1] for i in idx),
+                "propagated_into_A": "UNQUANTIFIED",
+                "why": ("eig.csv reports a backward and an absolute error per eigenpair; "
+                        "turning either into an error on p_m = (q^H E_m)^2 / lambda_m "
+                        "needs a spectral gap, which the committed record does not "
+                        "measure. It is therefore kept out of the interval and stated "
+                        "separately, and any tail conclusion must account for it."),
+            },
         }
     return out
 
@@ -141,6 +160,22 @@ def scales_from_log() -> dict:
             "L_nd_expected": inductance_nd(N2R_PORT_L_H, N2R_LC_M),
             "note": ("expected values only: the diagnostic record reports Lc, tc and the "
                      "scales it actually used, and the evaluator compares against those")}
+
+
+def required_provenance(config_sha256: str) -> dict:
+    """What a qualifying execution record must carry. Anything missing or mismatched
+    prevents qualification; these are REQUIRED values, never reported as verified ones."""
+    return {
+        "PALACE_VERSION": PALACE_VERSION,
+        "PALACE_COMMIT": PALACE_COMMIT,
+        "PALACE_PATCH": "first-moment-diagnostic",
+        "PALACE_PATCH_SHA256": sha256(PATCH),
+        "config_sha256": config_sha256,
+        "mesh_sha256": N2R_MESH_SHA256,
+        "patch_sha256": sha256(PATCH),
+        "dockerfile_sha256": sha256(DOCKERFILE),
+        "image_id": "SUPPLIED BY THE EXECUTION: the image ID the launcher records",
+    }
 
 
 def _refuse_results(path: Path) -> None:
@@ -166,15 +201,30 @@ def main() -> None:
     tc = scales["expected_exact_from_Lc_4mm"]["tc_ns"]
     saved = saved_moments(tc)
     code_hashes = {name: sha256(HERE / name)
-                   for name in ("reference_model.py", "prepare.py", "evaluate_record.py")}
+                   for name in ("reference_model.py", "prepare.py", "evaluate_record.py",
+                                "run_diagnostic.py", "synthetic_fixture.py")}
 
     proposal = {
-        "label": "FIRST-MOMENT DIAGNOSTIC ON N2R - PREPARED, NOT APPROVED, NOT EXECUTED",
+        "label": "FIRST-MOMENT DIAGNOSTIC ON N2R - PREPARED, QUALIFIED ON SYNTHETIC "
+                 "FIXTURES, NOT APPROVED, NOT EXECUTED ON N2R",
         "status": {
-            "prepared": True, "compiled": False, "approved": False, "executed": False,
-            "why_not_compiled": ("no Palace toolchain in the preparation environment; the "
-                                 "patch was verified to apply cleanly to the pinned commit "
-                                 "with `git apply --check` and is built only by the image"),
+            "prepared": True, "compiled": True, "approved": False, "executed_on_N2R": False,
+            "compiled_where": ("natively from the pinned tag with the patch applied; see "
+                               "compiled_qualification.json. The reviewed IMAGE could not "
+                               "be built in the preparation session - see image_blocker."),
+        },
+        "image_blocker": {
+            "what": "docker build of docker/palace-first-moment.Dockerfile",
+            "blocked_by": "the session egress policy",
+            "exact_error": ("gateway answered 403 to CONNECT for "
+                            "production.cloudfront.docker.com:443 (Docker Hub blob CDN) "
+                            "while pulling the digest-pinned ubuntu:24.04 base"),
+            "not_routed_around": ("no alternative registry or mirror was used: an "
+                                  "organization egress denial is reported, not worked "
+                                  "around"),
+            "consequence": ("the image ID, repo digest and PALACE_PATCH_SHA256 that a "
+                            "qualifying run must carry can only be produced by a build "
+                            "in an environment where that host is allowed"),
         },
         "what_would_be_computed": {
             "space": ("N2R's Nedelec space: same mesh file, same two-level box refinement, "
@@ -185,14 +235,44 @@ def main() -> None:
             "solve": "M x = f by PCG + Jacobi, RelTol 1e-12, MaxIts 2000; independent residual r = M x - f",
             "A_nd": "Re(f^T x) / L_nd  with  L_nd = L_H / (mu0 Lc)",
             "A_GHz2": "A_nd * (1 / (2 pi tc_ns))^2",
+            "error_qualification": {
+                "identity": "A_computed - A_exact = (Re(x^H r) - r^H M^-1 r) / L",
+                "certified": ("one-sided only: A_exact >= A_computed - Re(x^H r)/L, "
+                              "because r^H M^-1 r >= 0 for SPD M"),
+                "not_certified": ("no upper bound on A_exact; ||x|| ||r|| / L is reported "
+                                  "as an ESTIMATE and is not a bound"),
+            },
             "checks_built_in": [
-                "f . Re(E) + i f . Im(E) == GetVoltage(E) on a random complex field zeroed on the PEC dofs (abort on failure)",
-                "u^T K u >= (f . u)^2 / L_nd for x and four random constrained fields (abort on failure)",
+                "f . Re(E) + i f . Im(E) == GetVoltage(E) on a random complex field zeroed on the PEC dofs (structured FAILED record, then abort)",
+                "u^T K u >= (f . u)^2 / L_nd for x and four random constrained fields - a SAMPLED runtime check, not a proof",
                 "x vanishes on the PEC dofs; ||r|| / ||f|| reported",
             ],
             "written": "postpro/first-moment.json (see reference_model.RECORD_KEYS); no fields",
         },
         "the_one_execution": {
+            "launcher": {
+                "script": "experiments/first-moment-diagnostic/run_diagnostic.py",
+                "state": "PREPARED, NOT ACTIVATED",
+                "refuses_without": "experiments/first-moment-diagnostic/EXECUTION-APPROVAL.json",
+                "approval_absent": not (HERE / "EXECUTION-APPROVAL.json").exists(),
+                "enforces": {
+                    "wall_clock": ("the container is read line by line under a deadline and "
+                                   "KILLED on expiry; the bare docker command in the earlier "
+                                   "proposal was not a timeout mechanism"),
+                    "dof": ("the streamed log is probed for the finest-space ND count and "
+                            "the container is KILLED the moment it exceeds the budget"),
+                    "provenance": ("image ID, repo digests, labels, the four PALACE_* files "
+                                   "read from inside the image, and the sha256 of config, "
+                                   "mesh, patch, Dockerfile and diagnostic code are written "
+                                   "to provenance.json"),
+                },
+                "argv": ["docker", "run", "--rm", "--network", "none", "--hostname",
+                         "localhost", "--name", "<name>", "--entrypoint", "stdbuf",
+                         "-e", "HOME=/tmp", "-e", "OMP_NUM_THREADS=1",
+                         "-e", "OPENBLAS_NUM_THREADS=1", "-v", "<workdir>:/work",
+                         "-w", "/work", IMAGE, "-oL", "-eL", "palace", "-np", "1",
+                         "config.json"],
+            },
             "image": {
                 "dockerfile": "docker/palace-first-moment.Dockerfile",
                 "dockerfile_sha256": sha256(DOCKERFILE),
@@ -203,6 +283,8 @@ def main() -> None:
                 "palace_version": PALACE_VERSION,
                 "palace_commit": PALACE_COMMIT,
                 "build": f"docker build -f docker/palace-first-moment.Dockerfile -t {IMAGE} .",
+                "must_be_built_where": ("an environment whose egress policy allows the "
+                                        "Docker Hub blob CDN; see image_blocker"),
             },
             "inputs": {
                 "config": "experiments/first-moment-diagnostic/config.candidate.json",
@@ -212,34 +294,19 @@ def main() -> None:
                 "mesh": f"results/{N2R_RECORD}/L2/solver/coupled_chip_cell_L2.msh",
                 "mesh_sha256": N2R_MESH_SHA256,
             },
-            "command": [
-                "docker", "run", "--rm", "--network", "none", "--hostname", "localhost",
-                "-e", "HOME=/tmp", "-e", "OMP_NUM_THREADS=1", "-e", "OPENBLAS_NUM_THREADS=1",
-                "-v", "<workdir>:/work", "-w", "/work", IMAGE, "-np", "1", "config.json",
-            ],
-            "workdir_contents": ["config.json (= config.candidate.json)", "coupled_chip_cell_L2.msh"],
+            "required_provenance": required_provenance(sha256(out_cfg)),
             "mpi_processes": 1,
             "hard_caps": {
                 "dof": DOF_HARD_CAP,
                 "wall_s": WALL_HARD_CAP_S,
                 "meaning": ("hard caps on the execution, not runtime promises. The space is "
                             f"N2R's, {N2R_TRUE_DOFS} true dofs, so the DOF cap is known to hold; "
-                            "the wall cap is enforced by the launcher's timeout, as the ladder "
-                            "driver enforces its own, and a run that hits it is FAILED, not retried"),
+                            "the wall cap is enforced by the launcher, and a run that hits "
+                            "either cap is FAILED, never retried"),
+                "enforced_by": "experiments/first-moment-diagnostic/run_diagnostic.py",
             },
-            "expected_outputs": ["postpro/first-moment.json", "postpro/palace.json", "palace_log.txt"],
-            "record_must_carry": [
-                "config sha256, mesh sha256, patch sha256, Dockerfile sha256",
-                "image ID and RepoDigests; PALACE_COMMIT and PALACE_PATCH_SHA256 read from the image",
-                "sha256 of reference_model.py, evaluate_record.py and prepare.py",
-                "total, essential and free true-dof counts",
-                "Lc, tc, frequency and inductance scales as the solver used them",
-                "linear-solve residual, iterations and convergence status",
-                "A_nd and A_GHz2",
-                "all-nine A_saved recomputed from the committed columns (and variant B)",
-                "A_direct - A_saved with the residual bound and the first-order correction",
-                "wall time and max RSS",
-            ],
+            "expected_outputs": ["postpro/first-moment.json", "postpro/palace.json",
+                                 "palace_log.txt", "provenance.json"],
             "evaluation": "uv run python experiments/first-moment-diagnostic/evaluate_record.py --record <record dir>",
             "mechanism": (
                 "NO workflow runs this and none is added by this preparation. The approval "
@@ -259,14 +326,19 @@ def main() -> None:
         "expected_scales": scales,
         "A_saved_from_committed_columns": saved,
         "what_the_comparison_will_and_will_not_say": [
-            "A_direct - A_saved is called the omitted first moment only after the functional, "
-            "null-space, unit and numerical checks in evaluate_record.py pass",
-            "a raw difference smaller than the residual bound is 'not resolved', not 'small tail'",
+            "A_direct - A_saved is called an omitted first moment only after every "
+            "provenance and numerical check in evaluate_record.py passes",
+            "only a CERTIFIED LOWER BOUND on the omitted moment can be stated, from "
+            "A_certified_lower - A_saved_hi; there is no certified upper bound, so a small "
+            "difference is NOT RESOLVED and never a small tail",
+            "a materially negative difference is flagged INCONSISTENT - the non-negative "
+            "mode weights forbid it - and is never labelled an omitted moment",
+            "mass-solve uncertainty and A_saved uncertainty are reported separately",
             "E_C and g stay UNAVAILABLE whatever the number",
         ],
         "not_done_in_preparation": [
             "no N2R FEM assembly, functional, matrix or solve",
-            "no compilation of the C++ patch (verified to apply; built only by the image)",
+            "no build of the reviewed image (blocked; see image_blocker)",
             "no golden run, no reuse of the spent PO1 approval, no workflow added",
             "no registered-definition change, no historical-record rewrite, no Route A/B, no N3, no budget increase, no PR #7 merge",
         ],
