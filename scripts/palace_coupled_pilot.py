@@ -52,6 +52,7 @@ import shutil
 import subprocess
 import sys
 import time
+import weakref
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -117,10 +118,433 @@ STATEMENT = (
 )
 
 
+# --- execution authority ------------------------------------------------------
+#
+# .github/pilot-approval.json ALREADY EXISTS. It is the HISTORICAL record of the
+# 16 September 2026 approval and the record of attempt 1, which ran. Its mere
+# presence is not permission to solve again, and this module must not read it as
+# though it were: a file that has been on disk since September cannot authorise a
+# launch today.
+#
+# So the authority this module requires is a SEPARATE, EXPLICIT block --
+# `execution_authority` -- which that file does not currently carry. Until a human
+# adds one, every solver-capable subprocess here refuses. `--prepare-only` is
+# unaffected: it meshes and writes configs and cannot launch Palace, so it does
+# not consult this gate at all.
+#
+# The block binds an execution to all six things at once. Any one of them being
+# absent, wrong or merely stale is a refusal BEFORE a runtime is invoked:
+#
+#   reviewed code           driver_sha256 -- this file's own bytes, so an approval
+#                           cannot survive an edit to the driver it approved
+#   reviewed configuration  declaration_sha256 -- the declaration actually passed
+#   frozen run set          runs -- exactly P1/P2/P3, order, halo and level
+#   resource caps           dof_budget 250000 and per_solve_wall_clock_cap_s 2700
+#   execution mechanism     runtime, image and mpi_processes, checked again at the
+#                           launch primitive, not only at the top
+#   a narrow attempt        a strictly new attempt number, inside a short explicit UTC
+#                           window. NOT single-use: nothing consumes the attempt, since
+#                           that would mean writing to an approval record. Within a live
+#                           window the same block admits a further invocation, and note
+#                           that the workflow re-triggers on any later push touching
+#                           .github/pilot-approval.json. The window and the ledger bound
+#                           that exposure; they do not close it.
+
+#: The historical approval record, which is also the workflow trigger. Read here
+#: ONLY for the `execution_authority` block; nothing else in it grants authority.
+PILOT_APPROVAL = REPO_ROOT / ".github" / "pilot-approval.json"
+
+#: Where this repository's committed evidence lives. Deliberately NOT ``--results-root``:
+#: what has already executed is a property of the repository, not of where this
+#: invocation happens to be told to write, and reading the CLI value here would let an
+#: invocation shrink its own history by pointing at an empty directory.
+RESULTS_ROOT = REPO_ROOT / "results"
+
+#: This file. Its digest is what an authority must name, so approving the pilot
+#: approves the code that was reviewed rather than the name of a script.
+DRIVER_PATH = Path(__file__).resolve()
+
+#: Keys an `execution_authority` block must carry. Unknown keys are refused
+#: rather than ignored: a typo must not silently become "no constraint".
+AUTHORITY_REQUIRED_KEYS = frozenset({
+    "schema", "authorises", "attempt", "approved_by", "not_before_utc", "expires_utc",
+    "driver_sha256", "declaration_sha256", "runs", "dof_budget",
+    "per_solve_wall_clock_cap_s", "execution_mechanism", "out_of_scope", "supersedes",
+})
+AUTHORITY_SCHEMA = "qmhp-cem.pilot-execution-authority/0.1.0"
+MECHANISM_REQUIRED_KEYS = frozenset({"runtime", "image", "mpi_processes"})
+
+#: An authority window wider than this is not a narrowly defined attempt. Without
+#: a ceiling, "expires" could be set decades out and the block would become the
+#: same standing permission the historical record must not be.
+MAX_AUTHORITY_WINDOW_S = 7 * 24 * 3600
+
+#: The scope the pilot was approved under. An authority must restate it exactly,
+#: AND the approval record must still carry it: dropping "the Route A inversion"
+#: from either is an altered scope, not a formatting change.
+OUT_OF_SCOPE: tuple[str, ...] = (
+    "the coupling extraction itself",
+    "the Route A inversion",
+    "Route B",
+    "pulse optimisation",
+    "AMD-E",
+    "decoder work",
+    "mediator work",
+    "any broader redesign",
+)
+
+
+class PilotRefusal(RuntimeError):
+    """Raised instead of launching anything."""
+
+
+_AUTHORITY_TOKEN = object()
+
+#: The authorities this process actually granted. Identity-based and weak, so an
+#: authority cannot be forged by producing an object of the right type and cannot
+#: be resurrected by id reuse after it is dropped.
+_GRANTED: "weakref.WeakSet[ExecutionAuthority]" = weakref.WeakSet()
+
+
+class ExecutionAuthority:
+    """Proof that a live `execution_authority` block was read and accepted.
+
+    Being an INSTANCE of this class is deliberately not sufficient. Three routes
+    produce one without the gate ever running -- ``object.__new__`` followed by
+    setting the slots, a subclass whose ``__init__`` never calls ``super()``, and
+    reading the module-private token and calling the constructor -- and all three
+    were demonstrated reaching a real ``docker`` argv before this was tightened.
+
+    So the authority is a MEMBERSHIP, not a type. Only
+    :func:`require_execution_authority` registers an instance in ``_GRANTED``, and
+    :func:`_require_authority` demands membership as well as the exact type.
+    ``object.__new__`` and the subclass never enter the set, subclassing is
+    refused outright, and the token alone no longer buys anything.
+
+    The honest residual: code that can edit this module, or reach ``_GRANTED``
+    itself, can still forge. This is a guard against a careless or mistaken launch
+    path, not a security boundary against code running inside the process.
+    """
+
+    _FIELDS = ("attempt", "runtime", "image", "mpi_processes",
+               "approval_sha256", "driver_sha256", "declaration_sha256", "granted_utc")
+    __slots__ = (*_FIELDS, "__weakref__")
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        raise PilotRefusal(
+            "ExecutionAuthority may not be subclassed: a subclass would satisfy an "
+            "isinstance check without ever passing the gate")
+
+    def __init__(self, token: Any, **fields: Any) -> None:
+        if token is not _AUTHORITY_TOKEN:
+            raise PilotRefusal(
+                "an ExecutionAuthority can only be produced by require_execution_authority(); "
+                "constructing one directly would forge the approval it stands for"
+            )
+        for key in self._FIELDS:
+            setattr(self, key, fields[key])
+
+    def as_dict(self) -> dict[str, Any]:
+        return {key: getattr(self, key) for key in self._FIELDS}
+
+
+def _same(a: Any, b: Any) -> bool:
+    """Equality that does not let ``1``, ``1.0`` and ``true`` stand in for one another.
+
+    JSON is written by hand here, and Python's ``==`` would accept
+    ``"dof_budget": 250000.0`` and ``"level": true`` as the declared integers. A bound
+    field must match in TYPE as well as value, or the binding is weaker than it reads.
+    """
+    if isinstance(a, bool) != isinstance(b, bool):
+        return False
+    if isinstance(a, dict) and isinstance(b, dict):
+        return set(a) == set(b) and all(_same(a[k], b[k]) for k in a)
+    if isinstance(a, list) and isinstance(b, list):
+        return len(a) == len(b) and all(_same(x, y) for x, y in zip(a, b))
+    return type(a) is type(b) and a == b
+
+
+def executed_pilots(results_root: Path | None = None) -> list[str]:
+    """Every committed record THIS driver produced, identified by its own schema.
+
+    The approval record's ``reruns`` ledger is not a complete history and must not be
+    read as one. It lists attempt 1 and explains that a re-run followed; that re-run is
+    the execution which produced ``results/COUPLED-PILOT-20260916T035733Z`` (workflow run
+    35053649226), and it has no ledger entry of its own. Counting the ledger alone
+    therefore makes the pilot look like it ran once when it ran twice, and would admit
+    "attempt 2" as new.
+
+    So prior executions are derived from the evidence as well. A record counts only if
+    its ``summary.json`` carries this module's SUMMARY_SCHEMA, which excludes the
+    corrective-analysis record ``COUPLED-PILOT-CORR-*`` - that one launched nothing.
+    """
+    root = RESULTS_ROOT if results_root is None else Path(results_root)
+    if not root.is_dir():
+        return []
+    found = []
+    for record in sorted(root.iterdir()):
+        if not record.is_dir():
+            continue
+        summary = record / "summary.json"
+        if not summary.is_file():
+            continue
+        try:
+            body = json.loads(summary.read_text())
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
+            # FAIL CLOSED. A record this gate cannot read might be an execution, and
+            # skipping it would quietly lower the floor the next attempt must clear.
+            raise PilotRefusal(
+                f"{summary} cannot be read ({type(exc).__name__}: {exc}), so the number of "
+                "executions this repository accounts for cannot be established. Resolve that "
+                "before an execution is authorised.")
+        if isinstance(body, dict) and body.get("schema") == SUMMARY_SCHEMA:
+            found.append(record.name)
+    return found
+
+
+def prior_executions(approval: dict[str, Any], results_root: Path | None = None) -> list[str]:
+    """Everything the repository can account for as an execution of this pilot."""
+    reruns = approval.get("reruns") or []
+    if not isinstance(reruns, list):
+        raise PilotRefusal(
+            f"the approval record's reruns ledger is a {type(reruns).__name__}, not a list; "
+            "this gate cannot establish what has already executed")
+    ledger = []
+    for entry in reruns:
+        attempt = entry.get("attempt") if isinstance(entry, dict) else None
+        if not isinstance(attempt, int) or isinstance(attempt, bool):
+            # FAIL CLOSED rather than filtering. Dropping an entry the gate cannot parse
+            # would read as "nothing has been spent", which is the opposite of what an
+            # unreadable ledger means.
+            raise PilotRefusal(
+                f"the approval record's reruns ledger has an entry this gate cannot read "
+                f"({entry!r}); an unreadable ledger is not an empty one")
+        ledger.append(attempt)
+    return [f"attempt {n}" for n in sorted(ledger)] + [
+        f"record {name}" for name in executed_pilots(results_root)]
+
+
+def _authority_instant(value: Any, field: str) -> datetime:
+    if not isinstance(value, str):
+        raise PilotRefusal(f"execution_authority.{field} must be an RFC 3339 UTC string")
+    try:
+        moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise PilotRefusal(f"execution_authority.{field} is not a timestamp: {value!r} ({exc})")
+    if moment.tzinfo is None:
+        raise PilotRefusal(f"execution_authority.{field} must carry a UTC offset, got {value!r}")
+    return moment.astimezone(timezone.utc)
+
+
+def require_execution_authority(
+    *,
+    runtime: str,
+    image: str,
+    mpi_processes: int,
+    declaration_path: Path,
+    path: Path | None = None,
+    now: datetime | None = None,
+    results_root: Path | None = None,
+) -> ExecutionAuthority:
+    """Refuse unless a live, matching `execution_authority` block authorises THIS run.
+
+    Every refusal happens before any runtime is invoked. The checks are ordered
+    from the cheapest and most structural to the most specific so that a missing
+    block -- the current state of the repository -- is named as such rather than
+    as one of the mismatches below it.
+    """
+    path = PILOT_APPROVAL if path is None else Path(path)
+    if not path.is_file():
+        raise PilotRefusal(
+            f"no approval record at {path}: the coupled pilot launches nothing without one")
+    try:
+        approval = json.loads(path.read_text())
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError) as exc:
+        raise PilotRefusal(f"{path} could not be read as JSON ({type(exc).__name__}): {exc}")
+    if not isinstance(approval, dict):
+        raise PilotRefusal(f"{path} must be a JSON object, got {type(approval).__name__}")
+
+    if "execution_authority" not in approval:
+        raise PilotRefusal(
+            f"{path} carries no execution_authority block. It is the HISTORICAL record of the "
+            "2026-09-16 approval and of attempt 1, which already ran; its presence is not "
+            "permission to solve again. A new execution needs a separate, explicit "
+            "execution_authority naming the reviewed driver and declaration digests, the frozen "
+            "P1/P2/P3 run set, the 250000 DOF and 2700 s caps, the image and runtime, and one "
+            "narrowly bounded attempt. Use --prepare-only to mesh and write configs instead.")
+    authority = approval["execution_authority"]
+    if not isinstance(authority, dict):
+        raise PilotRefusal("execution_authority must be a JSON object")
+
+    unknown = sorted(set(authority) - AUTHORITY_REQUIRED_KEYS)
+    if unknown:
+        raise PilotRefusal(f"unknown execution_authority key(s): {unknown}")
+    missing = sorted(AUTHORITY_REQUIRED_KEYS - set(authority))
+    if missing:
+        raise PilotRefusal(f"execution_authority is missing {missing}")
+
+    if authority["schema"] != AUTHORITY_SCHEMA:
+        raise PilotRefusal(
+            f"execution_authority.schema is {authority['schema']!r}, not {AUTHORITY_SCHEMA!r}")
+    if authority["authorises"] != "one execution":
+        raise PilotRefusal(
+            f"execution_authority.authorises is {authority['authorises']!r}; this gate accepts "
+            "the literal 'one execution' only. NOTE what that does and does not mean: nothing "
+            "here CONSUMES the attempt, because doing so would write to an approval record. "
+            "Reuse is bounded by the window and by the spent-attempt ledger, not prevented "
+            "within a live window.")
+    if not isinstance(authority["approved_by"], str) or not authority["approved_by"].strip():
+        raise PilotRefusal("execution_authority.approved_by must name who approved this attempt")
+
+    # --- the attempt is new, and every prior one is acknowledged ---------------
+    attempt = authority["attempt"]
+    if isinstance(attempt, bool) or not isinstance(attempt, int) or attempt < 1:
+        raise PilotRefusal(f"execution_authority.attempt must be a positive integer, got {attempt!r}")
+    prior = prior_executions(approval, results_root)
+    if not _same(authority["supersedes"], prior):
+        raise PilotRefusal(
+            f"execution_authority.supersedes is {authority['supersedes']!r}, but this repository "
+            f"accounts for {prior!r}. An approval must name every execution it follows, and the "
+            "list is derived from the ledger AND from the committed records this driver wrote - "
+            "the ledger alone is incomplete, because the re-run that produced "
+            "results/COUPLED-PILOT-20260916T035733Z has no ledger entry.")
+    if attempt <= len(prior):
+        raise PilotRefusal(
+            f"execution_authority.attempt {attempt} is not new: {len(prior)} execution(s) are "
+            f"already accounted for ({prior}). A spent attempt is evidence, not authority.")
+
+    # --- the window is live and narrow -----------------------------------------
+    not_before = _authority_instant(authority["not_before_utc"], "not_before_utc")
+    expires = _authority_instant(authority["expires_utc"], "expires_utc")
+    if expires <= not_before:
+        raise PilotRefusal(
+            f"execution_authority expires_utc {expires.isoformat()} is not after not_before_utc "
+            f"{not_before.isoformat()}")
+    window = (expires - not_before).total_seconds()
+    if window > MAX_AUTHORITY_WINDOW_S:
+        raise PilotRefusal(
+            f"execution_authority covers {window / 86400:.1f} days; a narrowly defined attempt is "
+            f"at most {MAX_AUTHORITY_WINDOW_S / 86400:.0f} days, otherwise the block becomes the "
+            "standing permission the historical record must not be")
+    moment = datetime.now(timezone.utc) if now is None else now.astimezone(timezone.utc)
+    if moment < not_before:
+        raise PilotRefusal(
+            f"execution_authority is not yet live: it begins {not_before.isoformat()}, now is "
+            f"{moment.isoformat()}")
+    if moment >= expires:
+        raise PilotRefusal(
+            f"execution_authority expired {expires.isoformat()}; now is {moment.isoformat()}. A "
+            "historical authority is not a current one.")
+
+    # --- bound to the reviewed code and configuration ---------------------------
+    driver_sha = manifest.file_digest(DRIVER_PATH)
+    if authority["driver_sha256"] != driver_sha:
+        raise PilotRefusal(
+            f"execution_authority.driver_sha256 is {authority['driver_sha256']!r} but "
+            f"{DRIVER_PATH.name} hashes to {driver_sha!r}: this approval was given for different "
+            "driver code and does not carry over to an edited one")
+    declaration_path = Path(declaration_path)
+    if not declaration_path.is_file():
+        raise PilotRefusal(f"the declaration {declaration_path} does not exist")
+    declaration_sha = manifest.file_digest(declaration_path)
+    if authority["declaration_sha256"] != declaration_sha:
+        raise PilotRefusal(
+            f"execution_authority.declaration_sha256 is {authority['declaration_sha256']!r} but "
+            f"{declaration_path} hashes to {declaration_sha!r}")
+
+    # --- bound to the frozen run set and the caps -------------------------------
+    approved_runs = [
+        {"name": r.name, "finite_element_order": r.finite_element_order,
+         "halo_mm": r.halo_mm, "level": r.level}
+        for r in RUNS
+    ]
+    if not _same(authority["runs"], approved_runs):
+        raise PilotRefusal(
+            f"execution_authority.runs is {authority['runs']!r}, which is not the frozen pilot "
+            f"{approved_runs!r}. Changing the run set is a new approval, not an edit.")
+    if not _same(authority["dof_budget"], DOF_BUDGET):
+        raise PilotRefusal(
+            f"execution_authority.dof_budget is {authority['dof_budget']!r}, not the declared "
+            f"{DOF_BUDGET}")
+    if not _same(authority["per_solve_wall_clock_cap_s"], SOLVE_TIMEOUT_S):
+        raise PilotRefusal(
+            f"execution_authority.per_solve_wall_clock_cap_s is "
+            f"{authority['per_solve_wall_clock_cap_s']!r}, not the approved {SOLVE_TIMEOUT_S}")
+
+    # --- bound to the execution mechanism ---------------------------------------
+    mechanism = authority["execution_mechanism"]
+    if not isinstance(mechanism, dict):
+        raise PilotRefusal("execution_authority.execution_mechanism must be a JSON object")
+    unknown = sorted(set(mechanism) - MECHANISM_REQUIRED_KEYS)
+    if unknown:
+        raise PilotRefusal(f"unknown execution_mechanism key(s): {unknown}")
+    missing = sorted(MECHANISM_REQUIRED_KEYS - set(mechanism))
+    if missing:
+        raise PilotRefusal(f"execution_mechanism is missing {missing}")
+    for key, got in (("runtime", runtime), ("image", image), ("mpi_processes", mpi_processes)):
+        if not _same(mechanism[key], got):
+            raise PilotRefusal(
+                f"execution_mechanism.{key} is {mechanism[key]!r} but this invocation would use "
+                f"{got!r}: the approval does not cover this execution mechanism")
+
+    # --- bound to the approved scope, in both places ----------------------------
+    if not _same(authority["out_of_scope"], list(OUT_OF_SCOPE)):
+        raise PilotRefusal(
+            "execution_authority.out_of_scope does not restate the approved scope exactly; "
+            f"expected {list(OUT_OF_SCOPE)!r}")
+    if not _same(approval.get("explicitly_out_of_scope"), list(OUT_OF_SCOPE)):
+        raise PilotRefusal(
+            "the approval record's explicitly_out_of_scope no longer matches the approved scope. "
+            f"Expected {list(OUT_OF_SCOPE)!r}, found {approval.get('explicitly_out_of_scope')!r}. "
+            "An altered scope is a new approval, not an execution of this one.")
+
+    granted = ExecutionAuthority(
+        _AUTHORITY_TOKEN,
+        attempt=attempt,
+        runtime=runtime,
+        image=image,
+        mpi_processes=mpi_processes,
+        approval_sha256=manifest.file_digest(path),
+        driver_sha256=driver_sha,
+        declaration_sha256=declaration_sha,
+        granted_utc=moment.isoformat(),
+    )
+    _GRANTED.add(granted)
+    return granted
+
+
+def _require_authority(authority: Any, what: str, *,
+                       runtime: str | None = None,
+                       image: str | None = None) -> ExecutionAuthority:
+    """The precondition of every solver-capable subprocess in this module.
+
+    Re-checking the runtime and image HERE, and not only in
+    :func:`require_execution_authority`, is deliberate: an authority granted for
+    ``docker``/``qmhp-cem/palace:0.13.0`` cannot be carried into a call that
+    would launch something else.
+    """
+    if type(authority) is not ExecutionAuthority or authority not in _GRANTED:
+        raise PilotRefusal(
+            f"{what} requires a validated execution authority; got "
+            f"{type(authority).__name__}. Being one of these objects is not enough: it must be "
+            "one require_execution_authority() granted in this process. Nothing in this module "
+            "launches a runtime without that.")
+    if runtime is not None and authority.runtime != runtime:
+        raise PilotRefusal(
+            f"{what} would use runtime {runtime!r}, but the authority covers "
+            f"{authority.runtime!r}")
+    if image is not None and authority.image != image:
+        raise PilotRefusal(
+            f"{what} would use image {image!r}, but the authority covers {authority.image!r}")
+    return authority
+
 # --- solver invocation --------------------------------------------------------
 
 
-def _image_identity(runtime: str, image: str) -> dict[str, Any]:
+def _image_identity(authority: Any, runtime: str, image: str) -> dict[str, Any]:
+    """Inspect the image. Docker inspection is a container-runtime execution, so it
+    sits behind the same gate as the solve it would identify."""
+    _require_authority(authority, "image inspection", runtime=runtime, image=image)
     out: dict[str, Any] = {"image": image, "runtime": runtime}
     try:
         got = subprocess.run(
@@ -144,7 +568,7 @@ def _image_identity(runtime: str, image: str) -> dict[str, Any]:
     return out
 
 
-def _user_flag(runtime: str) -> list[str]:
+def _user_flag(authority: Any, runtime: str) -> list[str]:
     """Run the container as the invoking user, as the main adapter does.
 
     Without this Palace writes ``postpro/`` as root, and the evidence is then
@@ -153,6 +577,7 @@ def _user_flag(runtime: str) -> list[str]:
     root-owned files. The solver output is evidence, so it must be writable by
     whoever records it.
     """
+    _require_authority(authority, "runtime capability probe", runtime=runtime)
     if not hasattr(os, "getuid"):
         return []
     try:
@@ -167,11 +592,19 @@ def _user_flag(runtime: str) -> list[str]:
     return ["--user", f"{os.getuid()}:{os.getgid()}"]
 
 
-def _run_palace(runtime: str, image: str, work_dir: Path, name: str, np_: int) -> dict[str, Any]:
-    """One container run. Never raises: a failure is a recorded outcome."""
+def _run_palace(authority: Any, runtime: str, image: str, work_dir: Path, name: str,
+                np_: int) -> dict[str, Any]:
+    """One container run. Refuses without a validated authority; otherwise never raises,
+    because from that point on a failure is a recorded outcome rather than an error."""
+    _require_authority(authority, "a Palace container run", runtime=runtime, image=image)
+    if not _same(np_, authority.mpi_processes):
+        raise PilotRefusal(
+            f"a Palace container run would use {np_} MPI process(es), but the authority covers "
+            f"{authority.mpi_processes}")
     command = [
         runtime, "run", "--rm", "--network", "none", "--hostname", "localhost",
-        "--name", name, *_user_flag(runtime), "-e", "HOME=/tmp", "-e", "OMP_NUM_THREADS=1",
+        "--name", name, *_user_flag(authority, runtime), "-e", "HOME=/tmp",
+        "-e", "OMP_NUM_THREADS=1",
         "-e", "OPENBLAS_NUM_THREADS=1",
         "-v", f"{work_dir.resolve()}:{CONTAINER_WORKDIR}", "-w", CONTAINER_WORKDIR,
         image, "-np", str(np_), CONFIG_FILENAME,
@@ -226,9 +659,25 @@ def _memory_lines_from_log(log: str) -> list[str]:
 
 def execute_run(
     spec: CoupledRun, declaration: dict[str, Any], run_dir: Path, *,
-    runtime: str, image: str, np_: int, prepare_only: bool,
+    runtime: str, image: str, np_: int, prepare_only: bool, authority: Any = None,
 ) -> dict[str, Any]:
-    """Mesh, configure and solve. Never raises; every outcome is recorded."""
+    """Mesh, configure and solve.
+
+    Raises ONLY :class:`PilotRefusal`, and only when no valid authority was granted.
+    Every other outcome - a timeout, a nonzero exit, a mesh failure, a DOF overrun - is
+    recorded as evidence and returned, which is the property ``main`` relies on to write
+    ``summary.json``, ``report.md`` and the manifest for a failed run. A refusal is not
+    one of those outcomes: it is the pilot not happening, so filing it as an ERROR entry
+    would put the absence of authority in the record where something that ran belongs.
+    ``main`` cannot meet that raise in practice, because it validates before the loop.
+
+    ``prepare_only`` meshes and writes the config and returns before any runtime is
+    touched, so it needs no authority. Anything else does, and it is demanded here
+    BEFORE the mesh is built rather than at the container call: refusing after twenty
+    minutes of meshing would be a refusal in name only.
+    """
+    if not prepare_only:
+        _require_authority(authority, "a pilot solve", runtime=runtime, image=image)
     entry: dict[str, Any] = {"spec": spec.as_dict(), "status": "PREPARED"}
     solver_dir = run_dir / "solver"
     solver_dir.mkdir(parents=True, exist_ok=True)
@@ -268,7 +717,7 @@ def execute_run(
             return entry
 
         name = f"qmhp-coupled-pilot-{spec.name}".lower()
-        run_info = _run_palace(runtime, image, solver_dir, name, np_)
+        run_info = _run_palace(authority, runtime, image, solver_dir, name, np_)
         entry["run"] = run_info
         (solver_dir / "palace_run.json").write_text(json.dumps(run_info, indent=1) + "\n")
         log = (solver_dir / "palace_log.txt").read_text()
@@ -341,6 +790,11 @@ def execute_run(
         ]
         entry["max_backward_error"] = table.max_backward_error
         entry["status"] = "COMPLETED"
+    except PilotRefusal:
+        # A refusal is not an outcome of the pilot; it is the pilot not happening.
+        # Recording it as an ERROR entry would file the absence of authority
+        # alongside solver failures, where it would read as something that ran.
+        raise
     except Exception as exc:  # noqa: BLE001 - a failure is evidence
         entry["status"] = entry.get("status", "ERROR") if entry.get("status") in {
             "TIMEOUT", "RUN_FAILED", "BLOCKED"
@@ -685,6 +1139,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--record-pointer", default=None)
     args = parser.parse_args(argv)
 
+    # The gate comes first: before the record directory exists, before the
+    # declaration is parsed for meshing, and before any runtime is named to a
+    # subprocess. A refused invocation must leave nothing behind, so there is no
+    # empty record to mistake for an attempt.
+    authority: ExecutionAuthority | None = None
+    if not args.prepare_only:
+        try:
+            authority = require_execution_authority(
+                runtime=args.runtime, image=args.image, mpi_processes=args.np,
+                declaration_path=Path(args.declaration),
+            )
+        except PilotRefusal as exc:
+            print(f"REFUSED: {exc}", file=sys.stderr)
+            return 2
+
     started = datetime.now(timezone.utc)
     batch = args.record_name or f"COUPLED-PILOT-{started.strftime('%Y%m%dT%H%M%SZ')}"
     root = Path(args.results_root) / batch
@@ -715,7 +1184,10 @@ def main(argv: list[str] | None = None) -> int:
             "mpi_processes": args.np,
             "docker_available": shutil.which(args.runtime) is not None,
         },
-        "image": _image_identity(args.runtime, args.image) if not args.prepare_only else {"image": args.image},
+        "image": (_image_identity(authority, args.runtime, args.image)
+                  if not args.prepare_only else {"image": args.image}),
+        "execution_authority": (authority.as_dict() if authority is not None
+                                else {"granted": False, "reason": "--prepare-only launches nothing"}),
         "runs": {},
     }
 
@@ -724,6 +1196,7 @@ def main(argv: list[str] | None = None) -> int:
         entry = execute_run(
             spec, declaration, root / spec.name,
             runtime=args.runtime, image=args.image, np_=args.np, prepare_only=args.prepare_only,
+            authority=authority,
         )
         summary["runs"][spec.name] = entry
         wall = entry.get("run", {}).get("wall_clock_s")

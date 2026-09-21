@@ -12,6 +12,11 @@ prose:
                             runtime or an MPI launcher is pinned, so a new one fails
                             here, and each of them is required to name its own gate.
 
+Increment 3 closed the gap this file recorded against scripts/palace_coupled_pilot.py,
+which now refuses in-module; tests/test_pilot_execution_authority.py holds that gate's own
+positive and negative controls. solvers/palace/adapter.py remains here as the one named
+exception, and as an open architecture question rather than an oversight.
+
 Both checks are FUNCTIONS over a directory, so the negative controls run them against
 synthetic material and show they reject it. A test that only asserted the present state
 would pass just as happily if the check had quietly stopped working - which is exactly
@@ -23,6 +28,7 @@ This module deliberately calls no subprocess. It must not itself become launch-c
 from __future__ import annotations
 
 import ast
+import json
 import re
 import shutil
 import warnings
@@ -241,23 +247,27 @@ REFUSES_IN_MODULE = {
     "scripts/palace_order1_ladder.py": "LADDER_APPROVAL",
     # refuses any config that is not one of this directory's synthetic fixtures
     "experiments/first-moment-diagnostic/compiled_qualification.py": "assert_synthetic",
+    # phase C increment 3. Refuses unless .github/pilot-approval.json carries an
+    # execution_authority block binding THIS run: the reviewed driver and declaration
+    # digests, the frozen P1/P2/P3 set, the 250 000 DOF and 2 700 s caps, the
+    # runtime/image/rank mechanism, and one new attempt inside a short UTC window. The
+    # committed record carries no such block, so the pilot is inert by default -
+    # presence of the historical approval is deliberately NOT permission.
+    "scripts/palace_coupled_pilot.py": "require_execution_authority",
 }
 
-#: KNOWN GAP, pinned so it cannot grow unnoticed. These two can form a container argv
-#: and contain NO in-module refusal; their authority rests elsewhere:
+#: KNOWN GAP, pinned so it cannot grow unnoticed - and now one module, not two.
 #:
-#:   scripts/palace_coupled_pilot.py  the three approved runs are frozen CONSTANTS in
-#:       the source ("The approved pilot. Changing any of it is a new approval, not an
-#:       edit"), and the launch authority is the workflow trigger - a push touching
-#:       .github/pilot-approval.json. Nothing refuses if the script is simply run. This
-#:       is materially weaker than the ladder, which reads its approval and raises.
-#:   solvers/palace/adapter.py        the single exec funnel. It launches what a caller
-#:       hands it and gates nothing itself; every production caller is listed above.
+#:   solvers/palace/adapter.py   the single exec funnel. It launches what a caller hands
+#:       it and gates nothing itself; every production caller is listed above. Whether it
+#:       should refuse, or whether its authority boundary is intentionally inherited from
+#:       its callers, is an open ARCHITECTURE QUESTION rather than an oversight: a gate
+#:       inside the funnel would have to be satisfied by the golden run, the verification
+#:       campaign and the openEMS path as well, each of which has a different approval
+#:       shape. It is deliberately left here, named, until that question is decided.
 #:
-#: Closing this means editing a solver driver, which is outside a test-only increment
-#: and needs its own approval. Recorded in docs/agent-contract-implementation.md.
+#: Recorded in docs/agent-contract-implementation.md.
 NO_IN_MODULE_REFUSAL = {
-    "scripts/palace_coupled_pilot.py",
     "solvers/palace/adapter.py",
 }
 
@@ -320,16 +330,35 @@ def test_the_modules_that_claim_to_refuse_actually_raise():
 
 
 def test_the_known_gap_does_not_grow():
-    """The two ungated launch-capable modules are pinned. A third would fail here rather
-    than arrive unnoticed."""
-    assert NO_IN_MODULE_REFUSAL == {"scripts/palace_coupled_pilot.py",
-                                    "solvers/palace/adapter.py"}
-    # and the claim about the pilot is true: it really has no approval-file read
-    pilot = (REPO_ROOT / "scripts" / "palace_coupled_pilot.py").read_text()
-    assert "pilot-approval.json" not in pilot
+    """One ungated launch-capable module remains. A second would fail here rather than
+    arrive unnoticed."""
+    assert NO_IN_MODULE_REFUSAL == {"solvers/palace/adapter.py"}
+    # and the claim about the adapter is true: it really has no approval-file read
+    adapter = (REPO_ROOT / "solvers" / "palace" / "adapter.py").read_text()
+    assert "approval" not in adapter.lower()
     # while the ladder, which is pinned as refusing, really does read and raise
     ladder = (REPO_ROOT / "scripts" / "palace_order1_ladder.py").read_text()
     assert "ladder-approval.json" in ladder and "raise LadderError" in ladder
+
+
+def test_the_pilot_gap_is_closed_and_its_approval_is_not_self_authorising():
+    """Phase C increment 3, checked here as well as in its own module, because THIS file
+    is where the gap was recorded and where a regression would otherwise go unnoticed.
+
+    The subtle failure mode is a gate that reads "the approval file exists" - which would
+    pass forever, since .github/pilot-approval.json has been committed since September.
+    The pilot must therefore require a block that file does not carry, and must still not
+    carry today."""
+    pilot = (REPO_ROOT / "scripts" / "palace_coupled_pilot.py").read_text()
+    assert "pilot-approval.json" in pilot
+    assert "raise PilotRefusal" in pilot
+    assert "execution_authority" in pilot
+    approval = json.loads((REPO_ROOT / ".github" / "pilot-approval.json").read_text())
+    assert "execution_authority" not in approval, (
+        "the committed approval now self-authorises; the pilot is no longer inert. Granting a "
+        "real execution is deliberately a reviewed change to code AND pins, not a quiet data "
+        "edit: see GRANTING_NOTE in tests/test_pilot_execution_authority.py for the four pins "
+        "that must move together.")
 
 
 def test_a_new_module_that_could_launch_a_container_is_rejected(tmp_path: Path):
