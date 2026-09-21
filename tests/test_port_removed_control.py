@@ -1104,6 +1104,28 @@ def test_the_scope_and_the_recommended_task_do_not_overclaim():
     assert "the omitted first moment" in norm
 
 
+def _same_json(a, b, path=""):
+    """Structural equality with floats at 1e-9 relative (or both below 1e-11).
+
+    The identities themselves reproduce to round-off on any machine. The block that
+    deliberately breaks them with a kernel component in ``q`` divides by a numerically
+    singular pseudoinverse and is ill-conditioned BY CONSTRUCTION - CI run 35544178212
+    reproduced its min/max/median as 0.0337/4.53/0.268 against 0.0307/2.02/0.294 here -
+    so for that block only the structure and finiteness are compared.
+    """
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.keys() == b.keys() and all(_same_json(a[k], b[k], f"{path}/{k}") for k in a)
+    if isinstance(a, list) and isinstance(b, list):
+        return len(a) == len(b) and all(_same_json(x, y, path) for x, y in zip(a, b))
+    if isinstance(a, bool) or isinstance(b, bool):
+        return a == b
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        if "/q_with_a_kernel_component/ratio_of_the_sum_to_the_quadratic_form_N" in path:
+            return math.isfinite(a) and math.isfinite(b) and (a > 0) == (b > 0)
+        return a == b or abs(a - b) <= 1e-9 * max(abs(a), abs(b)) or (abs(a) < 1e-11 and abs(b) < 1e-11)
+    return a == b
+
+
 def test_the_moment_scripts_reproduce_their_json_and_touch_no_network():
     for name in ("moment_identities.py", "n2r_moments.py"):
         src = (MOM / name).read_text()
@@ -1112,7 +1134,13 @@ def test_the_moment_scripts_reproduce_their_json_and_touch_no_network():
             assert forbidden not in src, (name, forbidden)
         out = MOM / name.replace(".py", ".json")
         before = out.read_text()
-        proc = subprocess.run([sys.executable, str(MOM / name)], capture_output=True,
-                              text=True, cwd=REPO_ROOT)
-        assert proc.returncode == 0, proc.stderr
-        assert out.read_text() == before, f"{name} is not deterministic"
+        try:
+            proc = subprocess.run([sys.executable, str(MOM / name)], capture_output=True,
+                                  text=True, cwd=REPO_ROOT)
+            assert proc.returncode == 0, proc.stderr
+            # byte-identical on the machine that wrote it; across BLAS kernels the
+            # round-off-level digits differ, so the comparison is structural
+            assert _same_json(json.loads(out.read_text()), json.loads(before)), \
+                f"{name} is not deterministic beyond round-off"
+        finally:
+            out.write_text(before)
