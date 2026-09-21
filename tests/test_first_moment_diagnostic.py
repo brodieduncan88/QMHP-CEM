@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import ast
+import copy
+import csv
 import hashlib
 import importlib.util
 import json
@@ -55,78 +57,362 @@ def _norm(text: str) -> str:
     return " ".join(" ".join(lines).split())
 
 
-def _json_mismatch(a, b, path: str = "") -> str | None:
-    """Compare two regenerations of one artefact on everything EXCEPT float values.
+# --- the regeneration guard ----------------------------------------------------------
+#
+# This guard answers one question: does re-running the offline scripts reproduce the
+# committed artefacts? It is NOT the only check on their numbers - the physical values are
+# also asserted against known answers by the dedicated tests - but it must not accept a
+# corrupted document. Five corruptions that an earlier float-skipping version accepted are
+# pinned in test_the_regeneration_guard_rejects_corruption below.
+#
+# Floats are handled by class, never by one document-wide magnitude and never by skipping
+# them all:
+#   stable  - deterministic or well-conditioned; compared to the committed value
+#   noise   - residues of a DELIBERATELY perturbed solve, whose last digits differ between
+#             machines; each carries an explicit requirement matched to its meaning
+#   bound   - a maximum over random trials at round-off level; required to satisfy its
+#             declared scientific threshold, which is unchanged from the dedicated tests
 
-    Three CI failures taught this. The test was asserting that a floating-point artefact
-    reproduces across machines; that property is false, and no per-leaf tolerance captured
-    it. Each run named a different field of the same class, every one a residue of a
-    DELIBERATELY perturbed solve:
+#: Relative tolerance for a float that is deterministic or well conditioned. The physical
+#: quantities in these documents moved by 7e-13 when the LAPACK eigen driver was swapped;
+#: the worst-cancelling of them, the A_direct - A_saved difference, loses about one and a
+#: half digits to that subtraction and so moves by 2.3e-11. This leaves it a factor of 40,
+#: and every other stable float three orders or more. It is not a floor and not a
+#: document-wide magnitude: a float that has no business moving is held to it exactly.
+STABLE_TOL = 1e-9
 
-      run 35553777395  /evaluator/error_vs_truth_nd            7 percent
-      run 35554886550  /negative_discrepancy/threshold_GHz2    4.1e-07
-      run 35556211180  .../checks[16]/detail/relative_residual 5.9e-04
 
-    The last one is alone in its object, so a scale taken from its neighbours is its own
-    magnitude and no scale rule can ever exempt it. Tightening the constant again would
-    have been tuning until green.
+def _type_class(v) -> str:
+    if isinstance(v, bool):
+        return "bool"
+    if isinstance(v, int):
+        return "int"
+    if isinstance(v, float):
+        return "float"
+    if isinstance(v, str):
+        return "str"
+    if v is None:
+        return "null"
+    if isinstance(v, dict):
+        return "dict"
+    if isinstance(v, list):
+        return "list"
+    return type(v).__name__
 
-    So floats are not compared here at all, and the two properties that ARE true and DO
-    matter are asserted instead: structure and discrete content are identical (keys, list
-    lengths, strings, booleans, integers - which includes every verdict, every check name,
-    every passed flag and every mode list), and the regenerated numbers are checked
-    against the KNOWN truth recorded beside them by _truth_mismatches, rather than against
-    a previous run. The physical values are additionally asserted against known answers by
-    test_the_residual_error_identity_is_exact,
-    test_the_evaluator_recovers_a_known_omitted_moment_and_never_overstates_it,
-    test_the_saved_moment_interval_comes_from_the_printed_precision and
-    test_the_compiled_diagnostic_matches_an_independent_assembly.
 
-    Returns None when equivalent, else the path, so a failure names the field.
+def _stable(path: str, new: float, old: float, tol: float = STABLE_TOL) -> str | None:
+    if abs(new - old) <= tol * max(abs(new), abs(old)):
+        return None
+    rel = abs(new - old) / max(abs(new), abs(old), 1e-300)
+    return f"{path}: {new!r} != {old!r} (relative {rel:.2e} > {tol:g})"
+
+
+def _compare(new, old, float_rule=None, path: str = "") -> list[str]:
+    """Type-aware structural comparison. Type classes must match, so a boolean, an integer
+    count, a string or a container can never silently interchange with a float. Floats must
+    be finite in both documents before any numerical rule is applied.
+
+    With float_rule None this is the SHAPE pass: structure, type classes, discrete values
+    and finiteness only. It runs first because the numerical rules and the invariants read
+    values out of the document and presume they are finite numbers of the right type.
     """
-    if isinstance(a, dict) and isinstance(b, dict):
-        if a.keys() != b.keys():
-            return f"{path}: keys differ ({sorted(set(a) ^ set(b))})"
-        for k in a:
-            m = _json_mismatch(a[k], b[k], f"{path}/{k}")
-            if m:
-                return m
-        return None
-    if isinstance(a, list) and isinstance(b, list):
-        if len(a) != len(b):
-            return f"{path}: length {len(a)} != {len(b)}"
-        for i, (x, y) in enumerate(zip(a, b)):
-            m = _json_mismatch(x, y, f"{path}[{i}]")
-            if m:
-                return m
-        return None
-    if isinstance(a, bool) or isinstance(b, bool):
-        return None if a == b else f"{path}: {a} != {b}"
-    if isinstance(a, float) or isinstance(b, float):
-        return None                                  # see the docstring
-    return None if a == b else f"{path}: {a!r} != {b!r}"
+    tn, to = _type_class(new), _type_class(old)
+    if tn != to:
+        return [f"{path}: type {tn} != {to} ({new!r} vs {old!r})"]
+    if tn == "dict":
+        if new.keys() != old.keys():
+            return [f"{path}: keys differ ({sorted(set(new) ^ set(old))})"]
+        out = []
+        for k in new:
+            out += _compare(new[k], old[k], float_rule, f"{path}/{k}")
+        return out
+    if tn == "list":
+        if len(new) != len(old):
+            return [f"{path}: length {len(new)} != {len(old)}"]
+        out = []
+        for i, (x, y) in enumerate(zip(new, old)):
+            out += _compare(x, y, float_rule, f"{path}[{i}]")
+        return out
+    if tn == "float":
+        for label, v in (("regenerated", new), ("committed", old)):
+            if not math.isfinite(v):
+                return [f"{path}: {label} value is not finite ({v!r})"]
+        if float_rule is None:
+            return []
+        m = float_rule(path, new, old)
+        return [m] if m else []
+    return [] if new == old else [f"{path}: {new!r} != {old!r}"]
 
 
-def _truth_mismatches(doc: dict) -> list[str]:
-    """Check a regenerated fixture evaluation against the truth recorded inside it.
+# --- fixture_evaluation.json ---------------------------------------------------------
+#
+# The nine residues, each with a requirement that states what the number MEANS. The
+# measured magnitudes are in the comments; every requirement leaves at least three orders
+# of headroom over what has actually been observed across machines.
 
-    These hold on any machine because each compares quantities that move together, so
-    they pin the numbers without demanding cross-machine reproduction of any one of them.
+def _fixture_noise_rules(doc: dict) -> dict:
+    ev, truth = doc["evaluator"], doc["truth"]
+    full = doc["full_evaluation_of_the_good_record"]
+    A_nd = full["A_direct"]["A_nd"]
+    A_GHz2 = full["A_direct"]["A_GHz2"]
+    omitted = truth["omitted_first_moment_exact_nd"]
+    diff_GHz2 = full["difference"]["A_direct_minus_A_saved_GHz2"]
+    return {
+        # cancellation residue of two numbers near 1.75e-07; measured 3.3e-13 of the truth
+        "/evaluator/error_vs_truth_nd":
+            (lambda v: abs(v) <= 1e-9 * abs(omitted),
+             "|error vs truth| <= 1e-9 x the known omitted moment"),
+        # -(A_saved half width + uncertified estimate); measured 2.0e-07 of the difference
+        "/negative_discrepancy/threshold_GHz2":
+            (lambda v: v < 0.0 and abs(v) <= 1e-5 * abs(diff_GHz2),
+             "negative, and |threshold| <= 1e-5 x the difference"),
+        "/full_evaluation_of_the_good_record/difference/materially_negative_threshold_GHz2":
+            (lambda v: v < 0.0 and abs(v) <= 1e-5 * abs(diff_GHz2),
+             "negative, and |threshold| <= 1e-5 x the difference"),
+        # ||r||/||f|| of a solve perturbed at 1e-13 by construction; measured 1.3e-13
+        "/full_evaluation_of_the_good_record/checks[16]/detail/relative_residual":
+            (lambda v: 0.0 < v <= 1e-10,
+             "a positive relative residual no larger than 1e-10"),
+        # Re(x^H r), zero in exact arithmetic; measured 2.1e-13 of A
+        "/full_evaluation_of_the_good_record/mass_solve_uncertainty/x_dot_r_nd":
+            (lambda v: abs(v) <= 1e-9 * abs(A_nd), "|x.r| <= 1e-9 x A_nd"),
+        "/full_evaluation_of_the_good_record/mass_solve_uncertainty/certified_error_upper_bound_GHz2":
+            (lambda v: abs(v) <= 1e-9 * abs(A_GHz2),
+             "|certified error bound| <= 1e-9 x A_GHz2"),
+        "/full_evaluation_of_the_good_record/mass_solve_uncertainty/uncertified_error_estimate_GHz2":
+            (lambda v: 0.0 < v <= 1e-9 * abs(A_GHz2),
+             "a positive estimate no larger than 1e-9 x A_GHz2"),
+        "/full_evaluation_of_the_good_record/mass_solve_uncertainty/sufficient_condition_for_the_estimate_to_be_a_bound/threshold":
+            (lambda v: 0.0 < v <= 1e-6, "a positive ||r||/||x|| no larger than 1e-6"),
+        "/full_evaluation_of_the_good_record/checks[27]/detail/err_ub_nd":
+            (lambda v: abs(v) <= 1e-9 * abs(A_nd), "|certified error bound| <= 1e-9 x A_nd"),
+    }
+
+
+def _fixture_float_rule(doc: dict):
+    rules = _fixture_noise_rules(doc)
+
+    def rule(path: str, new: float, old: float) -> str | None:
+        if path in rules:
+            ok, why = rules[path]
+            return None if ok(new) else f"{path}: {new!r} fails its requirement: {why}"
+        return _stable(path, new, old)
+
+    return rule
+
+
+def _fixture_invariants(doc: dict, rm) -> list[str]:
+    """Cross-checks inside the document, and one INDEPENDENT recomputation.
+
+    The internal checks tie every nested value to its summary and to the unit conversion,
+    so a single field cannot drift alone. They cannot catch a COMMON-SCALE error, where
+    every related number is multiplied by the same factor, because such a document stays
+    internally consistent. The independent recomputation catches that: it recovers the
+    fixture's total moment by the dense free-dof solve, which is a different route from
+    the eigenbasis Parseval sum that produced the recorded value. It shares the fixture
+    construction, so it checks the recorded numbers, not the fixture itself.
     """
     out = []
-    truth, ev = doc["truth"], doc["evaluator"]
+
+    def near(label, a, b, tol=1e-9):
+        if not (abs(a - b) <= tol * max(abs(a), abs(b), 1e-300)):
+            out.append(f"{label}: {a!r} vs {b!r}")
+
+    ev, truth = doc["evaluator"], doc["truth"]
+    full = doc["full_evaluation_of_the_good_record"]
+    scale = rm.unit_scales(4.0e-3)["A_GHz2_per_nd"]
+
+    # unit conversion, computed here from physical constants rather than read back
+    near("A_GHz2 != A_nd x A_GHz2_per_nd",
+         full["A_direct"]["A_GHz2"], full["A_direct"]["A_nd"] * scale, 1e-12)
+    near("summary difference != nested difference / scale",
+         ev["A_direct_minus_A_saved_nd"] * scale,
+         full["difference"]["A_direct_minus_A_saved_GHz2"])
+    near("summary certified bound != nested certified bound / scale",
+         ev["certified_omitted_moment_lower_bound_nd"] * scale,
+         full["difference"]["certified_omitted_moment_lower_bound_GHz2"])
+    near("nested difference != A_direct - A_saved",
+         full["difference"]["A_direct_minus_A_saved_GHz2"],
+         full["A_direct"]["A_GHz2"] - full["A_saved"]["central_GHz2"])
+    near("relative_to_A_saved is inconsistent",
+         full["difference"]["relative_to_A_saved"],
+         full["difference"]["A_direct_minus_A_saved_GHz2"] / full["A_saved"]["central_GHz2"])
+    near("A_saved summary != A_saved uncertainty block",
+         full["A_saved"]["central_GHz2"], full["A_saved_uncertainty"]["central_GHz2"], 1e-15)
+    lo, hi = full["A_saved_uncertainty"]["printed_precision_interval_GHz2"]
+    if not lo <= full["A_saved_uncertainty"]["central_GHz2"] <= hi:
+        out.append("A_saved central lies outside its printed-precision interval")
+    # hi and lo are central +- halfwidth ROUNDED to double, so recovering the half width
+    # by subtracting them is exact only to the rounding of that pair. The requirement is
+    # therefore one ulp of the central value - an absolute bound set by the arithmetic -
+    # and not a relative tolerance, which at 1.65e-13 beside 7.9e-04 would be meaningless.
+    hw = full["A_saved_uncertainty"]["halfwidth_GHz2"]
+    if abs(hw - 0.5 * (hi - lo)) > math.ulp(full["A_saved_uncertainty"]["central_GHz2"]):
+        out.append(f"half width {hw!r} is not (hi - lo) / 2 to the rounding of hi and lo")
+    near("checks[26] A_GHz2 is inconsistent with its A_nd",
+         full["checks"][26]["detail"]["A_GHz2"],
+         full["checks"][26]["detail"]["A_nd"] * scale, 1e-12)
+
+    # truth, and the verdict that rests on it
     omitted = truth["omitted_first_moment_exact_nd"]
-    if abs((truth["A_total_nd"] - truth["A_saved_nd"]) - omitted) > 1e-12 * abs(omitted):
-        out.append("A_total - A_saved != omitted_first_moment_exact")
-    if abs(ev["A_direct_minus_A_saved_nd"] - omitted) > 1e-9 * abs(omitted):
-        out.append("the measured difference does not equal the known omitted moment")
+    near("A_total - A_saved != omitted", truth["A_total_nd"] - truth["A_saved_nd"],
+         omitted, 1e-12)
+    near("measured difference != the known omitted moment",
+         ev["A_direct_minus_A_saved_nd"], omitted)
     if ev["certified_omitted_moment_lower_bound_nd"] > omitted * (1 + 1e-12):
         out.append("the certified lower bound exceeds the truth")
     if ev["verdict"] != "OMITTED_MOMENT_CERTIFIED_LOWER_BOUND":
         out.append(f"verdict is {ev['verdict']}")
     if not ev["all_checks_passed"]:
         out.append("the good record did not pass its own checks")
+
+    # the interpretation renders the certified bound; tie the text to the number
+    rendered = re.findall(r"\d\.\d+e[+-]\d\d", ev["interpretation"])
+    bound_GHz2 = full["difference"]["certified_omitted_moment_lower_bound_GHz2"]
+    if len(rendered) != 1:
+        out.append(f"the interpretation renders {len(rendered)} numbers, expected one")
+    elif rendered[0] != f"{bound_GHz2:.6e}":
+        out.append(f"the interpretation renders {rendered[0]}, not the certified lower "
+                   f"bound {bound_GHz2:.6e}")
+
+    # INDEPENDENT: the dense free-dof solve, not the eigenbasis sum that produced the value
+    fx = rm.Fixture(np.random.default_rng(rm.RNG_SEED))
+    independent = rm.first_moment_free(fx.M, fx.f_true, fx.dbc, fx.L)
+    near("recorded A_total disagrees with an independent dense solve",
+         truth["A_total_nd"], independent)
     return out
+
+
+# --- reference_model.json ------------------------------------------------------------
+#
+# The trial maxima are round-off-level and differ between machines by O(1) relatively, so
+# they are required to satisfy their declared threshold rather than to reproduce. The
+# thresholds are exactly those the dedicated tests assert; none is relaxed here.
+
+RM_BOUNDS = {
+    "/worst_case/dual_assembly_vs_GetVoltage": ("<", 1e-12),
+    "/worst_case/free_restricted_functional_vs_GetVoltage_when_E_dbc_is_zero": ("<", 1e-12),
+    "/worst_case/padded_DIAG_ONE_zeroed_rhs_vs_free": ("<", 1e-12),
+    "/worst_case/padded_DIAG_ONE_unzeroed_rhs_minus_free_vs_sum_f_dbc2_over_L": ("<", 1e-12),
+    "/worst_case/parseval_all_modes_vs_free_solve": ("<", 1e-12),
+    "/worst_case/parseval_nonzero_modes_vs_free_solve": ("<", 1e-12),
+    "/worst_case/kernel_annihilation_same_points": ("<", 1e-12),
+    "/worst_case/K_port_minus_qq_min_eig_same_rule_min": (">=", -1e-12),
+    "/worst_case/epr_palace_vs_absolute_square": ("<", 1e-12),
+    "/worst_case/epr_phase_invariance": ("<", 1e-9),
+    "/worst_case/A_phase_invariance": ("<", 1e-12),
+    "/worst_case/unit_roundtrip_A_GHz2": ("<", 1e-12),
+    "/worst_case/zeroth_moment_vs_pseudoinverse": ("<", 1e-12),
+    "/error_qualification/trials/identity_max_error_relative_to_A": ("<", 1e-12),
+    "/error_qualification/trials/variational_equals_certified_max_rel": ("<", 1e-12),
+}
+
+
+def _reference_model_float_rule(path: str, new: float, old: float) -> str | None:
+    if path in RM_BOUNDS:
+        op, limit = RM_BOUNDS[path]
+        ok = new < limit if op == "<" else new >= limit
+        return None if ok else f"{path}: {new!r} fails {op} {limit:g}"
+    return _stable(path, new, old)
+
+
+def _reference_model_invariants(doc: dict, rm) -> list[str]:
+    out = []
+    expected = rm.unit_scales(4.0e-3)
+    for k, v in doc["expected_N2R_scales_from_Lc_4mm"].items():
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            if abs(v - expected[k]) > 1e-12 * abs(expected[k]):
+                out.append(f"expected scale {k} disagrees with unit_scales: {v!r}")
+    if abs(doc["expected_N2R_L_nd"] - rm.inductance_nd(1.0345665367517793e-07, 4.0e-3)) > 1e-9:
+        out.append("expected_N2R_L_nd disagrees with the inductance conversion")
+    for i, cx in enumerate(doc["error_qualification"]["counterexamples_to_the_old_quantity"]):
+        if cx["estimate_is_a_bound"] or not cx["certified_bound_holds"]:
+            out.append(f"counterexample {i} no longer demonstrates the failure")
+    if not doc["worst_case"]["padded_DIAG_ZERO_singular_in_every_trial"]:
+        out.append("DIAG_ZERO padding is no longer singular in every trial")
+    return out
+
+
+# --- proposal.json -------------------------------------------------------------------
+
+def _proposal_invariants(doc: dict, rm) -> list[str]:
+    """Digests against the files on disk, and the saved moments against an INDEPENDENT
+    recomputation from the committed columns - read here rather than through prepare.py,
+    so a common-scale error in the proposal is caught."""
+    out = []
+    one = doc["the_one_execution"]
+    for key, path in (("patch_sha256", PATCH), ("dockerfile_sha256", DOCKERFILE),
+                      ("production_dockerfile_sha256_untouched", PROD_DOCKERFILE)):
+        if one["image"][key] != _sha256(path):
+            out.append(f"{key} does not match {path.name} on disk")
+    if one["inputs"]["config_sha256"] != _sha256(FMD / "config.candidate.json"):
+        out.append("config_sha256 does not match config.candidate.json on disk")
+
+    post = (REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z" / "L2"
+            / "solver" / "postpro")
+
+    def column(name, idx):
+        rows = list(csv.reader((post / name).open()))[1:]
+        return [float(r[idx]) for r in rows]
+
+    f_GHz, abs_p = column("eig.csv", 1), [abs(v) for v in column("port-EPR.csv", 1)]
+    saved = doc["A_saved_from_committed_columns"]["A_all_saved_modes"]
+    independent = sum(abs_p[i - 1] * f_GHz[i - 1] ** 2 for i in saved["modes"])
+    if abs(saved["A_partial_GHz2"] - independent) > 1e-12 * independent:
+        out.append("A_saved disagrees with an independent sum over the committed columns")
+    if [row["mode"] for row in saved["per_mode"]] != saved["modes"]:
+        out.append("the per-mode rows do not match the saved mode list")
+    total = 0.0
+    for row in saved["per_mode"]:
+        i = row["mode"]
+        if abs(row["f_GHz"] - f_GHz[i - 1]) > 1e-12 * abs(f_GHz[i - 1]) or \
+                abs(row["abs_p"] - abs_p[i - 1]) > 1e-12 * abs(abs_p[i - 1]):
+            out.append(f"mode {i}: f_GHz or abs_p disagrees with the committed columns")
+        term = row["abs_p"] * row["f_GHz"] ** 2
+        if abs(row["abs_p_f2_GHz2"] - term) > 1e-12 * term:
+            out.append(f"mode {i}: abs_p_f2_GHz2 is not abs_p x f_GHz^2")
+        total += row["abs_p_f2_GHz2"]
+    if abs(saved["A_partial_GHz2"] - total) > 1e-12 * total:
+        out.append("A_partial_GHz2 is not the sum of its per-mode terms")
+    expected = rm.unit_scales(4.0e-3)
+    tc = doc["expected_scales"]["expected_exact_from_Lc_4mm"]["tc_ns"]
+    if abs(tc - expected["tc_ns"]) > 1e-12 * expected["tc_ns"]:
+        out.append("the proposal's tc disagrees with unit_scales")
+    if abs(saved["A_partial_nd_at_expected_tc"] * expected["A_GHz2_per_nd"]
+           - saved["A_partial_GHz2"]) > 1e-9 * saved["A_partial_GHz2"]:
+        out.append("the proposal's nd and GHz2 saved moments are inconsistent")
+    return out
+
+
+#: Every document the regeneration test checks, and how.
+REGENERATED = {
+    "reference_model.json": ("json", _reference_model_float_rule, _reference_model_invariants),
+    "proposal.json": ("json", lambda p, n, o: _stable(p, n, o), _proposal_invariants),
+    "fixture_evaluation.json": ("json", None, None),   # rules built from the document
+    "config.candidate.json": ("bytes", None, None),
+    "config.delta.txt": ("bytes", None, None),
+}
+
+
+def regeneration_mismatches(name: str, new_text: str, old_text: str, rm) -> list[str]:
+    """Every failure for one regenerated document, each naming its path."""
+    kind, float_rule, invariants = REGENERATED[name]
+    if kind == "bytes":
+        return [] if new_text == old_text else [f"{name}: not byte-identical"]
+    new, old = json.loads(new_text), json.loads(old_text)
+
+    def named(messages):
+        return [f"{name}{m}" if m.startswith("/") else f"{name}: {m}" for m in messages]
+
+    shape = _compare(new, old)
+    if shape:
+        return named(shape)
+    if name == "fixture_evaluation.json":
+        float_rule, invariants = _fixture_float_rule(new), _fixture_invariants
+    out = _compare(new, old, float_rule)
+    if invariants:
+        out += invariants(new, rm)
+    return named(out)
 
 
 def _load(name: str):
@@ -850,7 +1136,7 @@ def test_the_synthetic_fixture_is_not_the_qmhp_cell(synthetic):
 
 # --- 6b. preparation only, offline and inert -----------------------------------------
 
-def test_the_offline_scripts_are_deterministic_and_cannot_launch_anything():
+def test_the_offline_scripts_are_deterministic_and_cannot_launch_anything(rm):
     offline = ("reference_model.py", "prepare.py", "evaluate_record.py")
     for name in offline:
         src = (FMD / name).read_text()
@@ -864,9 +1150,8 @@ def test_the_offline_scripts_are_deterministic_and_cannot_launch_anything():
     qualifier = (FMD / "compiled_qualification.py").read_text()
     assert "assert_synthetic(config_path)" in qualifier
 
-    outputs = {p: p.read_text() for p in (
-        FMD / "reference_model.json", FMD / "config.candidate.json",
-        FMD / "config.delta.txt", FMD / "proposal.json", FMD / "fixture_evaluation.json")}
+    # EVERY generated document, each through the guard that knows what its numbers mean
+    outputs = {FMD / name: (FMD / name).read_text() for name in REGENERATED}
     try:
         for name, extra in (("reference_model.py", []), ("prepare.py", []),
                             ("evaluate_record.py", ["--fixture"])):
@@ -874,16 +1159,8 @@ def test_the_offline_scripts_are_deterministic_and_cannot_launch_anything():
                                   capture_output=True, text=True, cwd=REPO_ROOT)
             assert proc.returncode == 0, proc.stderr
         for p, before in outputs.items():
-            after = p.read_text()
-            if p.suffix == ".json":
-                was, now = json.loads(before), json.loads(after)
-                mismatch = _json_mismatch(now, was)
-                assert mismatch is None, f"{p.name}{mismatch}"
-                if p.name == "fixture_evaluation.json":
-                    # the regenerated numbers, against the truth recorded beside them
-                    assert _truth_mismatches(now) == [], p.name
-            else:
-                assert after == before, p.name
+            mismatches = regeneration_mismatches(p.name, p.read_text(), before, rm)
+            assert mismatches == [], mismatches
     finally:
         for p, before in outputs.items():
             p.write_text(before)
@@ -968,72 +1245,321 @@ def test_launch_safety_of_this_test_file():
             assert token not in a, (token, a)
 
 
-def test_the_artefact_comparison_rejects_real_change_and_the_truth_checks_bite():
-    """A comparison that only ever passes is worthless, so both halves are pinned.
+#: The paths in fixture_evaluation.json that carry the first moment's units. A COMMON
+#: SCALE ERROR - a wrong normalising length, a factor dropped from the functional - scales
+#: all of them together and nothing else. The document then stays internally consistent
+#: AND regenerates itself exactly, because the faulty calculation reproduces its own
+#: answer. Only a recomputation by an independent route can reject it.
+MOMENT_SCALED_PATHS = (
+    "/truth/A_total_nd",
+    "/truth/A_saved_nd",
+    "/truth/omitted_first_moment_exact_nd",
+    "/evaluator/A_direct_minus_A_saved_nd",
+    "/evaluator/certified_omitted_moment_lower_bound_nd",
+    "/evaluator/error_vs_truth_nd",
+    "/negative_discrepancy/difference_GHz2",
+    "/negative_discrepancy/threshold_GHz2",
+    "/full_evaluation_of_the_good_record/checks[26]/detail/A_nd",
+    "/full_evaluation_of_the_good_record/checks[26]/detail/A_GHz2",
+    "/full_evaluation_of_the_good_record/checks[27]/detail/lower_nd",
+    "/full_evaluation_of_the_good_record/checks[27]/detail/A_nd",
+    "/full_evaluation_of_the_good_record/checks[27]/detail/err_ub_nd",
+    "/full_evaluation_of_the_good_record/A_direct/A_nd",
+    "/full_evaluation_of_the_good_record/A_direct/A_GHz2",
+    "/full_evaluation_of_the_good_record/A_direct/certified_lower_bound_GHz2",
+    "/full_evaluation_of_the_good_record/A_saved/central_GHz2",
+    "/full_evaluation_of_the_good_record/difference/A_direct_minus_A_saved_GHz2",
+    "/full_evaluation_of_the_good_record/difference/certified_omitted_moment_lower_bound_GHz2",
+    "/full_evaluation_of_the_good_record/difference/materially_negative_threshold_GHz2",
+    "/full_evaluation_of_the_good_record/mass_solve_uncertainty/x_dot_r_nd",
+    "/full_evaluation_of_the_good_record/mass_solve_uncertainty/certified_error_upper_bound_GHz2",
+    "/full_evaluation_of_the_good_record/mass_solve_uncertainty/certified_lower_bound_A_GHz2",
+    "/full_evaluation_of_the_good_record/mass_solve_uncertainty/uncertified_error_estimate_GHz2",
+    "/full_evaluation_of_the_good_record/A_saved_uncertainty/central_GHz2",
+    "/full_evaluation_of_the_good_record/A_saved_uncertainty/printed_precision_interval_GHz2[0]",
+    "/full_evaluation_of_the_good_record/A_saved_uncertainty/printed_precision_interval_GHz2[1]",
+    "/full_evaluation_of_the_good_record/A_saved_uncertainty/halfwidth_GHz2",
+)
 
-    The structural half must catch every discrete edit and name its path. The truth half
-    must catch a wrong number, which the structural half deliberately no longer compares.
+
+def _at(doc, path: str):
+    """(container, key) for a /a/b[3]/c path, so the leaf can be read or written."""
+    node, keys = doc, path.lstrip("/").split("/")
+    for i, key in enumerate(keys):
+        last = i == len(keys) - 1
+        if key.endswith("]"):
+            key, idx = key[:-1].split("[")
+            if last:
+                return node[key], int(idx)
+            node = node[key][int(idx)]
+        else:
+            if last:
+                return node, key
+            node = node[key]
+    raise AssertionError(path)
+
+
+def _scale_the_moment(doc: dict, k: float) -> dict:
+    """Apply a common scale error, consistently, including the rendered interpretation."""
+    for path in MOMENT_SCALED_PATHS:
+        node, key = _at(doc, path)
+        node[key] *= k
+    bound = doc["full_evaluation_of_the_good_record"]["difference"][
+        "certified_omitted_moment_lower_bound_GHz2"]
+    doc["evaluator"]["interpretation"] = re.sub(
+        r"\d\.\d+e[+-]\d\d", f"{bound:.6e}", doc["evaluator"]["interpretation"])
+    return doc
+
+
+def test_the_regeneration_guard_rejects_corruption(rm):
+    """A guard that only ever passes is worthless, so every class of failure is pinned.
+
+    The five cases marked REGRESSION were all ACCEPTED by the float-skipping guard this
+    replaces. Each is asserted here together with the check that rejects it, so a later
+    simplification cannot quietly re-open the same hole. The legitimate round-off
+    variations are the three actually measured across machines, not imagined ones, and
+    they must still pass. No scientific threshold is relaxed to achieve that: the
+    thresholds in RM_BOUNDS are the ones the dedicated tests assert.
     """
-    import copy
+    committed = {name: (FMD / name).read_text() for name in REGENERATED}
+    for name, text in committed.items():
+        assert regeneration_mismatches(name, text, text, rm) == [], name
+    FIXTURE, RM, PROPOSAL = "fixture_evaluation.json", "reference_model.json", "proposal.json"
 
-    committed = json.loads((FMD / "fixture_evaluation.json").read_text())
-    assert _json_mismatch(committed, committed) is None
-    assert _truth_mismatches(committed) == []
+    def guard(name, doc):
+        return regeneration_mismatches(name, json.dumps(doc), committed[name], rm)
 
-    # solver-noise residues vary across machines and must NOT fail the structural half
-    for path, value in ((("evaluator", "error_vs_truth_nd"), 5.381306e-20),
-                        (("negative_discrepancy", "threshold_GHz2"), -1.65115204e-13)):
-        alt = copy.deepcopy(committed)
-        alt[path[0]][path[1]] = value
-        assert _json_mismatch(alt, committed) is None, path
-    noisy = copy.deepcopy(committed)
-    noisy["full_evaluation_of_the_good_record"]["checks"][16]["detail"][
-        "relative_residual"] = 1.279034924178295e-13
-    assert _json_mismatch(noisy, committed) is None
-
-    # every discrete edit must be caught AND named
-    discrete = {
-        "verdict string": lambda d: d["evaluator"].__setitem__("verdict", "NOT_RESOLVED"),
-        "boolean": lambda d: d["evaluator"].__setitem__(
-            "certified_lower_bound_is_below_the_truth", False),
-        "check name": lambda d: d["full_evaluation_of_the_good_record"]["checks"][0]
-            .__setitem__("check", "something else"),
-        "a check's passed flag": lambda d: d["full_evaluation_of_the_good_record"]["checks"][0]
-            .__setitem__("passed", False),
-        "missing key": lambda d: d["evaluator"].pop("verdict"),
-        "shortened list": lambda d: d["full_evaluation_of_the_good_record"].__setitem__(
-            "checks", d["full_evaluation_of_the_good_record"]["checks"][:-1]),
-        "mode list": lambda d: d["fixture"].__setitem__("n_modes_saved", 999),
-    }
-    for label, mutate in discrete.items():
-        bad = copy.deepcopy(committed)
+    def mutated(name, mutate):
+        bad = json.loads(committed[name])
         mutate(bad)
-        mismatch = _json_mismatch(bad, committed)
-        assert mismatch is not None, label
-        assert mismatch.startswith("/"), (label, mismatch)
+        return guard(name, bad)
 
-    # and a wrong NUMBER, which the structural half skips, must be caught by the truth half
-    numeric = {
-        "measured difference off by 1e-6": lambda d: d["evaluator"].__setitem__(
-            "A_direct_minus_A_saved_nd",
-            d["evaluator"]["A_direct_minus_A_saved_nd"] * (1 + 1e-6)),
-        "certified bound above the truth": lambda d: d["evaluator"].__setitem__(
-            "certified_omitted_moment_lower_bound_nd",
-            d["truth"]["omitted_first_moment_exact_nd"] * 1.001),
-        "truth internally inconsistent": lambda d: d["truth"].__setitem__(
-            "A_saved_nd", d["truth"]["A_saved_nd"] * 1.001),
-    }
-    for label, mutate in numeric.items():
-        bad = copy.deepcopy(committed)
-        mutate(bad)
-        assert _json_mismatch(bad, committed) is None, f"{label}: structural half should skip"
-        assert _truth_mismatches(bad) != [], label
+    # --- the legitimate variations: all three measured, all must PASS -----------------
+    for label, mutate in {
+        # run 35553777395: a cancellation residue near 6e-20 that moved 7 percent when
+        # the LAPACK eigen driver was swapped
+        "cancellation residue":
+            lambda d: d["evaluator"].__setitem__("error_vs_truth_nd", 5.381306e-20),
+        # run 35554886550: the exact value the runner produced
+        "negative-discrepancy threshold":
+            lambda d: d["negative_discrepancy"].__setitem__(
+                "threshold_GHz2", -1.6511520418429716e-13),
+        # run 35556211180: the committed value moved by the 5.9e-04 that run measured
+        # (the runner's own value was reported as a relative move, not recorded)
+        "perturbed-solve residual":
+            lambda d: d["full_evaluation_of_the_good_record"]["checks"][16]["detail"]
+                .__setitem__("relative_residual", 1.279034924178295e-13 * (1 + 5.9e-4)),
+    }.items():
+        assert mutated(FIXTURE, mutate) == [], label
+    # and a round-off-level trial maximum that lands elsewhere but inside its threshold
+    assert mutated(RM, lambda d: d["worst_case"].__setitem__(
+        "dual_assembly_vs_GetVoltage", 9.126e-16)) == []
+
+    # --- and the requirements those variations satisfy are not vacuous ---------------
+    # Each noise field pushed just outside the requirement that states what it MEANS.
+    exercised = set()
+    for path, value, why in (
+        ("/evaluator/error_vs_truth_nd", 1.8e-07,
+         "a residue as large as the moment it qualifies"),
+        ("/full_evaluation_of_the_good_record/difference/"
+         "materially_negative_threshold_GHz2", 1.6511527189666263e-13,
+         "a materiality threshold that is not negative"),
+        ("/full_evaluation_of_the_good_record/mass_solve_uncertainty/x_dot_r_nd", 1e-10,
+         "an x.r at 2e-05 of A_nd, far above round-off"),
+        ("/negative_discrepancy/threshold_GHz2", 1.6511527189666263e-13,
+         "a threshold that is not negative"),
+        ("/full_evaluation_of_the_good_record/checks[16]/detail/relative_residual", 1e-06,
+         "a residual of a solve that did not converge"),
+        ("/full_evaluation_of_the_good_record/mass_solve_uncertainty/"
+         "uncertified_error_estimate_GHz2", 0.0,
+         "an error estimate that is not positive"),
+        ("/full_evaluation_of_the_good_record/mass_solve_uncertainty/"
+         "certified_error_upper_bound_GHz2", 1e-05,
+         "a certified bound at 1 percent of A"),
+        ("/full_evaluation_of_the_good_record/mass_solve_uncertainty/"
+         "sufficient_condition_for_the_estimate_to_be_a_bound/threshold", 1.0,
+         "an order-one ||r||/||x||"),
+        ("/full_evaluation_of_the_good_record/checks[27]/detail/err_ub_nd", 1e-07,
+         "a certified bound at 2 percent of A_nd"),
+    ):
+        bad = json.loads(committed[FIXTURE])
+        node, key = _at(bad, path)
+        node[key] = value
+        found = guard(FIXTURE, bad)
+        assert any("fails its requirement" in m and path in m for m in found), (why, found)
+        exercised.add(path)
+    # every noise field has a requirement AND a negative control for it
+    assert exercised == set(_fixture_noise_rules(json.loads(committed[FIXTURE]))), \
+        exercised ^ set(_fixture_noise_rules(json.loads(committed[FIXTURE])))
+
+    # --- REGRESSION: the five corruptions the float-skipping guard accepted -----------
+    A_GHz2 = json.loads(committed[FIXTURE])[
+        "full_evaluation_of_the_good_record"]["A_direct"]["A_GHz2"]
+    for label, mutate, expected in (
+        ("a significant output multiplied by 100",
+         lambda d: d["full_evaluation_of_the_good_record"]["A_direct"].__setitem__(
+             "A_GHz2", A_GHz2 * 100),
+         "/full_evaluation_of_the_good_record/A_direct/A_GHz2"),
+        ("the same float replaced by a string",
+         lambda d: d["full_evaluation_of_the_good_record"]["A_direct"].__setitem__(
+             "A_GHz2", "not a number"),
+         "type str != float"),
+        ("NaN where a finite difference is required",
+         lambda d: d["evaluator"].__setitem__("A_direct_minus_A_saved_nd", float("nan")),
+         "is not finite"),
+        ("-infinity where a finite bound is required",
+         lambda d: d["evaluator"].__setitem__(
+             "certified_omitted_moment_lower_bound_nd", float("-inf")),
+         "is not finite"),
+        ("an integer count becoming a float",
+         lambda d: d["fixture"].__setitem__("n_modes_saved", 999.0),
+         "type float != int"),
+    ):
+        found = mutated(FIXTURE, mutate)
+        assert found, f"ACCEPTED: {label}"
+        assert any(expected in m for m in found), (label, expected, found)
+
+    # --- a COMMON SCALE ERROR, which regeneration alone can never catch ---------------
+    # Every quantity carrying the moment's units is scaled by 5 percent in BOTH the
+    # committed reference and the regenerated document, so the fault reproduces itself.
+    scaled = json.dumps(_scale_the_moment(json.loads(committed[FIXTURE]), 1.05))
+    structural = _compare(json.loads(scaled), json.loads(scaled),
+                          _fixture_float_rule(json.loads(scaled)))
+    assert structural == [], structural  # reproduces itself exactly: nothing to compare
+    internal = [m for m in _fixture_invariants(json.loads(scaled), rm)
+                if "independent dense solve" not in m]
+    assert internal == [], internal      # and stays internally consistent throughout
+    found = regeneration_mismatches(FIXTURE, scaled, scaled, rm)
+    assert len(found) == 1 and "independent dense solve" in found[0], found
+
+    # the same fault in the proposal, caught by the committed eigensolver columns
+    def scale_proposal(d):
+        saved = d["A_saved_from_committed_columns"]["A_all_saved_modes"]
+        saved["A_partial_GHz2"] *= 1.05
+        saved["A_partial_nd_at_expected_tc"] *= 1.05
+        for row in saved["per_mode"]:
+            row["abs_p_f2_GHz2"] *= 1.05
+    bad = json.loads(committed[PROPOSAL])
+    scale_proposal(bad)
+    found = regeneration_mismatches(PROPOSAL, json.dumps(bad), json.dumps(bad), rm)
+    assert any("independent sum over the committed columns" in m for m in found), found
+
+    # --- discrete edits: every one caught AND named ----------------------------------
+    for label, name, mutate in (
+        ("verdict string", FIXTURE,
+         lambda d: d["evaluator"].__setitem__("verdict", "NOT_RESOLVED")),
+        ("boolean", FIXTURE, lambda d: d["evaluator"].__setitem__(
+            "certified_lower_bound_is_below_the_truth", False)),
+        ("a boolean becoming an integer", RM, lambda d: d["error_qualification"]["trials"]
+            .__setitem__("cg_like_solution_A_hat_never_exceeds_A_exact", 1)),
+        ("check name", FIXTURE, lambda d: d["full_evaluation_of_the_good_record"]
+            ["checks"][0].__setitem__("check", "something else")),
+        ("a check's passed flag", FIXTURE, lambda d: d["full_evaluation_of_the_good_record"]
+            ["checks"][0].__setitem__("passed", False)),
+        ("missing key", FIXTURE, lambda d: d["evaluator"].pop("verdict")),
+        ("shortened list", FIXTURE, lambda d: d["full_evaluation_of_the_good_record"]
+            .__setitem__("checks", d["full_evaluation_of_the_good_record"]["checks"][:-1])),
+        ("mode count", FIXTURE, lambda d: d["fixture"].__setitem__("n_modes_saved", 999)),
+        ("a certified-bound violation count", RM,
+         lambda d: d["error_qualification"]["trials"].__setitem__(
+             "certified_bound_violations", 1)),
+        ("DIAG_ZERO padding no longer singular", RM,
+         lambda d: d["worst_case"].__setitem__(
+             "padded_DIAG_ZERO_singular_in_every_trial", False)),
+        ("a counterexample that no longer demonstrates the failure", RM,
+         lambda d: d["error_qualification"]["counterexamples_to_the_old_quantity"][0]
+            .__setitem__("estimate_is_a_bound", True)),
+        ("a digest", PROPOSAL,
+         lambda d: d["the_one_execution"]["image"].__setitem__("patch_sha256", "0" * 64)),
+    ):
+        found = mutated(name, mutate)
+        assert found, f"ACCEPTED: {label}"
+        assert found[0].startswith(f"{name}/"), (label, found)
+
+    # --- wrong numbers, each named with the check that rejects it ---------------------
+    for label, name, mutate, expected in (
+        ("the measured difference off by 1e-6", FIXTURE,
+         lambda d: d["evaluator"].__setitem__(
+             "A_direct_minus_A_saved_nd",
+             d["evaluator"]["A_direct_minus_A_saved_nd"] * (1 + 1e-6)),
+         "/evaluator/A_direct_minus_A_saved_nd"),
+        ("a certified bound above the truth", FIXTURE,
+         lambda d: d["evaluator"].__setitem__(
+             "certified_omitted_moment_lower_bound_nd",
+             d["truth"]["omitted_first_moment_exact_nd"] * 1.001),
+         "the certified lower bound exceeds the truth"),
+        ("truth internally inconsistent", FIXTURE,
+         lambda d: d["truth"].__setitem__("A_saved_nd", d["truth"]["A_saved_nd"] * 1.001),
+         "A_total - A_saved != omitted"),
+        ("the nested A_GHz2 no longer its A_nd times the unit scale", FIXTURE,
+         lambda d: d["full_evaluation_of_the_good_record"]["checks"][26]["detail"]
+            .__setitem__("A_GHz2", 1.0),
+         "checks[26] A_GHz2 is inconsistent with its A_nd"),
+        ("the summary difference no longer the nested one", FIXTURE,
+         lambda d: d["evaluator"].__setitem__(
+             "A_direct_minus_A_saved_nd",
+             d["truth"]["omitted_first_moment_exact_nd"] * (1 + 1e-7)),
+         "summary difference != nested difference"),
+        ("A_saved outside its printed-precision interval", FIXTURE,
+         lambda d: d["full_evaluation_of_the_good_record"]["A_saved_uncertainty"]
+            .__setitem__("printed_precision_interval_GHz2", [1.0, 2.0]),
+         "outside its printed-precision interval"),
+        ("a scientific threshold no longer met", RM,
+         lambda d: d["worst_case"].__setitem__("dual_assembly_vs_GetVoltage", 1e-6),
+         "fails < 1e-12"),
+        ("a one-sided threshold breached from below", RM,
+         lambda d: d["worst_case"].__setitem__(
+             "K_port_minus_qq_min_eig_same_rule_min", -1.0),
+         "fails >= -1e-12"),
+        ("the proposal's nd and GHz2 moments inconsistent", PROPOSAL,
+         lambda d: d["A_saved_from_committed_columns"]["A_all_saved_modes"].__setitem__(
+             "A_partial_nd_at_expected_tc",
+             d["A_saved_from_committed_columns"]["A_all_saved_modes"]
+             ["A_partial_nd_at_expected_tc"] * 1.001),
+         "nd and GHz2 saved moments are inconsistent"),
+        ("a per-mode term that is not its own product", PROPOSAL,
+         lambda d: d["A_saved_from_committed_columns"]["A_all_saved_modes"]["per_mode"][0]
+            .__setitem__("abs_p", 0.5),
+         "disagrees with the committed columns"),
+    ):
+        found = mutated(name, mutate)
+        assert found, f"ACCEPTED: {label}"
+        assert any(expected in m for m in found), (label, expected, found)
+
+    # Two reference-model invariants say what the document must CLAIM, not what it must
+    # reproduce, so they still bite when the committed copy carries the same regression.
+    doc = json.loads(committed[RM])
+    doc["worst_case"]["padded_DIAG_ZERO_singular_in_every_trial"] = False
+    doc["error_qualification"]["counterexamples_to_the_old_quantity"][0][
+        "estimate_is_a_bound"] = True
+    found = regeneration_mismatches(RM, json.dumps(doc), json.dumps(doc), rm)
+    assert any("no longer singular in every trial" in m for m in found), found
+    assert any("no longer demonstrates the failure" in m for m in found), found
+    doc = json.loads(committed[PROPOSAL])
+    doc["the_one_execution"]["image"]["patch_sha256"] = "0" * 64
+    found = regeneration_mismatches(PROPOSAL, json.dumps(doc), json.dumps(doc), rm)
+    assert any("patch_sha256 does not match" in m for m in found), found
+
+    # The interpretation renders the certified bound as text. An edited string is caught
+    # by the discrete comparison above, so the tie between the text and the number it
+    # renders is asserted directly on the invariant that makes it.
+    doc = json.loads(committed[FIXTURE])
+    doc["evaluator"]["interpretation"] = doc["evaluator"]["interpretation"].replace(
+        "2.491579e-05", "9.999999e-05")
+    assert any("not the certified lower bound" in m for m in _fixture_invariants(doc, rm))
+
+    # --- the two byte-compared documents ---------------------------------------------
+    for name in ("config.candidate.json", "config.delta.txt"):
+        text = committed[name]
+        assert regeneration_mismatches(name, text.replace("0", "1", 1), text, rm) == \
+            [f"{name}: not byte-identical"], name
 
     # The one place a float survives into a compared STRING: the interpretation renders
     # the certified lower bound. It is rendered to 7 significant digits while the bound
     # itself varies across machines at 1e-13 relative (measured on CI run 35553777395),
     # six orders of margin. Pinned so the rendering cannot quietly gain digits.
-    rendered = re.findall(r"(\d\.\d+)e[+-]\d\d", committed["evaluator"]["interpretation"])
-    assert rendered, committed["evaluator"]["interpretation"]
+    rendered = re.findall(r"(\d\.\d+)e[+-]\d\d",
+                          json.loads(committed[FIXTURE])["evaluator"]["interpretation"])
+    assert rendered
     for mantissa in rendered:
         assert len(mantissa.replace(".", "")) <= 7, mantissa
