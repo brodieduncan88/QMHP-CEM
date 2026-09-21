@@ -25,7 +25,7 @@ The owner's sequencing for the work that follows:
 |---|---|
 | A | adopt the contract as policy — **done**, `1cb4a9c` |
 | B | resolve and qualify the network/build environment; no scientific execution — **qualified as far as policy permits**, `86421a3`; the egress decision is still open |
-| C | implement enforcement incrementally, dangerous boundaries first: execution approval, workflow triggering, solver-launch authority, mutation of frozen evidence, evidence-status promotion — **increment 1 done** (workflow triggering, solver-launch authority) |
+| C | implement enforcement incrementally, dangerous boundaries first: execution approval, workflow triggering, solver-launch authority, mutation of frozen evidence, evidence-status promotion — **increments 1-2 done** (workflow triggering, solver-launch authority, frozen-evidence file integrity) |
 | D | only then authorise the separately controlled real Palace execution |
 
 ## Mapping to CLAUDE.md
@@ -54,6 +54,7 @@ The owner's sequencing for the work that follows:
 | 3 approval | `experiments/first-moment-diagnostic/run_diagnostic.py` refuses every entry point unless `EXECUTION-APPROVAL.json` exists **and** matches the prepared config/mesh/patch digests. That file is deliberately absent. | `test_the_launcher_is_prepared_but_inert`, `test_the_launcher_argv_and_caps_are_pinned`, `test_required_provenance_is_required_not_merely_reported` |
 | 4 provenance | `evaluate_record.py` refuses to qualify a record missing any required provenance field | `test_every_spoiled_provenance_prevents_qualification` |
 | 2 frozen evidence | the spent ladder approval and the production Dockerfile are pinned by sha256; a working-tree change to a solver trigger path fails the test | `test_no_trigger_path_is_touched_and_the_spent_approval_is_untouched` |
+| 2 frozen evidence: **file integrity and manifest membership only** | every committed `results/` record is re-hashed against the `manifest.sha256` its own driver wrote, using the repository's verifier (`orchestrator/manifest.py`), which reports content change, recorded-but-missing and present-but-unmanifested. The record SET is pinned so one cannot vanish or arrive unincorporated, and an aggregate digest over the manifests' own bytes refuses a mutation whose manifest was rewritten to agree — which per-record verification alone calls intact. Six negative controls on a synthetic record built by the real writer, plus a demonstration on a copy of a real executed record | `test_every_committed_record_verifies_against_its_own_manifest`, `test_the_manifests_themselves_cannot_be_rewritten`, `test_the_guard_rejects_mutation_deletion_mismatch_and_unregistered_addition`, `test_a_rewritten_manifest_passes_per_record_but_fails_the_aggregate`, `test_the_record_set_is_exactly_the_pinned_one` (phase C increment 2) |
 | 6 numerical taxonomy | scalar algebra, known-answer pencil (`K=diag(0,4,9)`, `M=diag(1,2,3)`, `f=(0,1,1)`, `L=2`; `A=5/12`, `N=13/72`) and a conditioning-aware round-off class, with every bounded field mapped to a gate or a named live test | `test_epr_palace_and_the_absolute_square_form_agree_as_scalar_algebra`, `test_the_diagonal_pencil_is_reproduced_exactly`, `test_every_round_off_field_is_mapped_and_every_named_gate_exists` (commit `38f8c9f`) |
 | 7 guards reject | the regeneration guard is tested against exactly the contract's list: ×100 output corruption, text-for-number, NaN, −infinity, integer-to-float, plus a common-scale error only an independent recomputation catches | `test_the_regeneration_guard_rejects_corruption` (commit `081ddbf`) |
 | 9 isolation | regeneration runs in a disposable view whose only writable part is a copy; tracked references are never opened for writing | `test_two_concurrent_regenerations_do_not_interfere`, `test_a_killed_regeneration_leaves_the_tracked_references_untouched`, `test_the_isolated_view_can_never_target_a_tracked_reference` (commit `92db708`) |
@@ -92,6 +93,28 @@ The owner's sequencing for the work that follows:
 - **Trigger inspection is narrowed, not eliminated.** The trigger *surface* is now pinned
   exactly, so it cannot change unnoticed. Deciding which workflows a particular push
   would start remains a manual step before pushing.
+- **Frozen-evidence enforcement is file immutability, NOT evidence governance.** It
+  proves a committed record's bytes have not moved and that its manifest membership is
+  complete. It says nothing about whether a record's verdict is justified, whether its
+  provenance was sufficient, or whether a status was promoted correctly — clause 5 and
+  evidence-status promotion remain behavioural, and increment 4 is where the latter is
+  meant to be addressed.
+- **One record has no manifest and is quarantined, not covered.**
+  `results/PALACE-VERIFY-20260915T063014Z` carries no `manifest.sha256`, so the verifier
+  cannot check it. That is a recorded failure of the run itself — the commit subject
+  that created it (`9cf7cb1`) says "campaign step failure, manifest failure" — and it is
+  left as executed, because writing a manifest now would alter historical evidence and
+  record a digest taken long after the run. Its eight decision-relevant files are pinned
+  by content instead, so they are frozen even though their membership has no register.
+- **`campaign.sha256` is not a file manifest**, despite its `sha256sum`-like format: it
+  records the campaign DEFINITION's digest (`build_campaign().sha256()`) with
+  `campaign.json` as a label, which `tests/test_verification.py` asserts. Reading it as a
+  file manifest produces a false integrity failure on all four verification campaigns.
+- **`master/` and `reference/` are not covered here.** Both are frozen and both have
+  their own CI verifiers (`cem verify-master`, `scripts/verify_reference_bundle.py`);
+  this increment asserts those steps are still wired into CI rather than duplicating
+  them. `verify_reference_bundle.py` does check both directions; `verify-master` was not
+  audited for that here.
 - **The launch-authority scan is source-level.** It catches a module that names a runtime
   and can exec. It would not catch an argv assembled from fragments at runtime, or an
   exec reached through a helper that hides the subprocess call.
