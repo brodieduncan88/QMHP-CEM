@@ -55,16 +55,74 @@ def _norm(text: str) -> str:
     return " ".join(" ".join(lines).split())
 
 
-def _same_json(a, b) -> bool:
+def _local_scale(obj) -> float:
+    """The largest float magnitude inside ONE object's subtree.
+
+    Deliberately local: the document as a whole also holds dof counts and the 250000 cap,
+    and using a document-wide scale would put the round-off floor at 2.5e-04 and swallow
+    the physical quantities entirely, which a negative control caught.
+    """
+    best = 0.0
+    stack = [obj]
+    while stack:
+        x = stack.pop()
+        if isinstance(x, dict):
+            stack.extend(x.values())
+        elif isinstance(x, list):
+            stack.extend(x)
+        elif isinstance(x, (int, float)) and not isinstance(x, bool):
+            best = max(best, abs(float(x)))
+    return best
+
+
+def _json_mismatch(a, b, path: str = "", scale: float | None = None) -> str | None:
+    """Compare two regenerations of the same artefact and NAME the first difference.
+
+    Rule 13 requires deciding what must be byte-identical, what must be structurally
+    identical, and what is only numerically equivalent within a justified tolerance:
+
+      * structure, strings, booleans and integers  -> identical
+      * floats at their own object's scale         -> 1e-9 relative
+      * floats at or below 1e-9 of that scale      -> round-off, not compared, because
+        they are cancellation residues whose RELATIVE value carries no information.
+        Measured: /evaluator/error_vs_truth_nd is the difference of two numbers near
+        1.75e-07 and lands near 6e-20; swapping the LAPACK eigen driver moves it by 7
+        percent while the quantities it qualifies move by 7e-13.
+
+    The scale is taken from the enclosing object, not the document. Returns None when
+    equivalent, else the path and both values, so a CI failure names the field.
+    """
     if isinstance(a, dict) and isinstance(b, dict):
-        return a.keys() == b.keys() and all(_same_json(a[k], b[k]) for k in a)
+        if a.keys() != b.keys():
+            return f"{path}: keys differ ({sorted(set(a) ^ set(b))})"
+        here = _local_scale(a)
+        for k in a:
+            m = _json_mismatch(a[k], b[k], f"{path}/{k}", here)
+            if m:
+                return m
+        return None
     if isinstance(a, list) and isinstance(b, list):
-        return len(a) == len(b) and all(_same_json(x, y) for x, y in zip(a, b))
+        if len(a) != len(b):
+            return f"{path}: length {len(a)} != {len(b)}"
+        here = _local_scale(a)
+        for i, (x, y) in enumerate(zip(a, b)):
+            m = _json_mismatch(x, y, f"{path}[{i}]", here)
+            if m:
+                return m
+        return None
     if isinstance(a, bool) or isinstance(b, bool):
-        return a == b
+        return None if a == b else f"{path}: {a} != {b}"
     if isinstance(a, (int, float)) and isinstance(b, (int, float)):
-        return a == b or abs(a - b) <= 1e-9 * max(abs(a), abs(b)) or (abs(a) < 1e-11 and abs(b) < 1e-11)
-    return a == b
+        if a == b:
+            return None
+        floor = 1e-9 * (scale if scale is not None else max(abs(a), abs(b)))
+        if abs(a) <= floor and abs(b) <= floor:
+            return None                      # round-off residue, not signal
+        if abs(a - b) <= 1e-9 * max(abs(a), abs(b)):
+            return None
+        rel = abs(a - b) / max(abs(a), abs(b), 1e-300)
+        return f"{path}: {a!r} != {b!r} (relative {rel:.2e}, round-off floor {floor:.2e})"
+    return None if a == b else f"{path}: {a!r} != {b!r}"
 
 
 def _load(name: str):
@@ -814,7 +872,9 @@ def test_the_offline_scripts_are_deterministic_and_cannot_launch_anything():
         for p, before in outputs.items():
             after = p.read_text()
             if p.suffix == ".json":
-                assert _same_json(json.loads(after), json.loads(before)), p.name
+                was, now = json.loads(before), json.loads(after)
+                mismatch = _json_mismatch(now, was)
+                assert mismatch is None, f"{p.name}{mismatch}"
             else:
                 assert after == before, p.name
     finally:
