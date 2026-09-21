@@ -9,6 +9,22 @@ programme.
 
 ---
 
+## Copyright and licence
+
+Copyright (c) 2026 Brodie Duncan. All rights reserved.
+
+This repository and its contents are proprietary. No licence is granted
+except by explicit written agreement.
+
+Portions of this repository interface with third-party software (e.g.,
+Palace, MFEM), which are governed by their own respective licences. This
+proprietary notice applies to the original QMHP-CEM source code and
+documentation authored by the copyright holder.
+
+See [`LICENSE`](LICENSE).
+
+---
+
 ## Scientific disclaimer
 
 > QMHP-CEM is computational-engineering infrastructure for the QMHP-CoPro
