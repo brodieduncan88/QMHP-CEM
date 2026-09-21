@@ -25,7 +25,7 @@ The owner's sequencing for the work that follows:
 |---|---|
 | A | adopt the contract as policy — **done**, `1cb4a9c` |
 | B | resolve and qualify the network/build environment; no scientific execution — **qualified as far as policy permits**, `86421a3`; the egress decision is still open |
-| C | implement enforcement incrementally, dangerous boundaries first: execution approval, workflow triggering, solver-launch authority, mutation of frozen evidence, evidence-status promotion — **increments 1-4 done** (workflow triggering, solver-launch authority, frozen-evidence file integrity, the pilot's in-module execution approval, evidence-status promotion into the h-sequence) |
+| C | implement enforcement incrementally, dangerous boundaries first: execution approval, workflow triggering, solver-launch authority, mutation of frozen evidence, evidence-status promotion — **increments 1-5 done** (workflow triggering, solver-launch authority, frozen-evidence file integrity, the pilot's in-module execution approval, evidence-status promotion into the h-sequence, pre-push secret scanning and record consistency). Phase C complete under its bounded scope |
 | D | only then authorise the separately controlled real Palace execution |
 
 ## Mapping to CLAUDE.md
@@ -61,6 +61,8 @@ The owner's sequencing for the work that follows:
 | 7 guards reject | the regeneration guard is tested against exactly the contract's list: ×100 output corruption, text-for-number, NaN, −infinity, integer-to-float, plus a common-scale error only an independent recomputation catches | `test_the_regeneration_guard_rejects_corruption` (commit `081ddbf`) |
 | 9 isolation | regeneration runs in a disposable view whose only writable part is a copy; tracked references are never opened for writing | `test_two_concurrent_regenerations_do_not_interfere`, `test_a_killed_regeneration_leaves_the_tracked_references_untouched`, `test_the_isolated_view_can_never_target_a_tracked_reference` (commit `92db708`) |
 | 11 secret scanning | `scripts/secret_scan.py`, gitleaks pinned by module version and checksum-database hash, fail-closed (exit 3), no baseline accepted, findings redacted twice; read-only CI job | `tests/test_secret_scan.py` incl. `test_a_missing_scanner_is_blocked_not_clean`, `test_a_baseline_is_refused`, `test_ci_runs_the_scanner_read_only` (commit `9ea3912`) |
+| 11 secret scanning: **pre-push**, layered under the CI job above | `.githooks/pre-push` runs the **same approved scanner** before any objects leave: `--range` for an existing branch, `--tree` for a ref the remote does not have. It is activated by `scripts/install_hooks.py`, which sets **this clone's** `core.hooksPath` and never touches the developer's global git configuration. It proceeds only on exit 0 **together with** the scanner's own clean marker — the marker matters because an uncaught Python exception also exits 1, so the exit code alone cannot separate findings from a crash. Refusals: missing interpreter, missing scanner, findings, BLOCKED, crash, unrecognised exit code, exit 0 with no marker, and an unresolvable remote commit. The hook is pinned by sha256 so it cannot be gutted unnoticed, and a deletion-only push is allowed without a tree scan. The CI job remains, unchanged, as the layer beneath | `tests/test_pre_push_guard.py`: `test_only_an_affirmative_clean_verdict_lets_a_push_through` (7 refusal paths), `test_the_real_scanner_end_to_end` (real scanner, real push, both directions), `test_a_clean_new_branch_passes`, `test_a_deletion_only_push_is_allowed_without_a_tree_scan`, `test_a_missing_scanner_is_blocked_not_clean`, `test_the_installer_never_touches_the_global_configuration` (phase C increment 5) |
+| 12 the record cannot become false | every **root-relative** path the record names must exist, every MECHANISM row must cite at least one test that exists, and every commit it cites must resolve. Preventive, not a repair: on the frozen snapshot the record was accurate, and what was reproduced is that a record naming a module that does not exist, and citing a commit that was never made, passed all 16 existing tests. (The two examples are named in the test module rather than here, because a record that cited them would be asserting exactly what these checks forbid.) | `tests/test_record_consistency.py`: `test_every_root_relative_path_the_record_names_exists`, `test_every_mechanism_row_names_at_least_one_test_that_exists`, `test_every_commit_the_record_cites_exists`, `test_the_checks_reject_a_record_that_has_become_false`, `test_prose_filenames_are_not_judged_as_paths` (phase C increment 5) |
 | 10 launch safety (partial) | no test in the diagnostic module can shell out to a container runtime or MPI launcher; the git reader is pinned to read-only subcommands | `test_launch_safety_of_this_test_file` |
 | 10 / 3 workflow triggering | the COMPLETE trigger surface of all five workflows is pinned **exactly** — events, push branches and push paths. A new workflow, an added branch, a widened path filter, a removed path filter or a `pull_request` trigger on a solve-capable workflow all fail. Six negative controls apply each mutation to a copy and require it to be named | `test_the_workflow_trigger_surface_is_exactly_the_pinned_one`, `test_a_widened_or_added_solver_trigger_is_rejected`, `test_only_an_approval_record_triggers_the_two_solve_on_push_workflows`, `test_no_workflow_carries_a_session_branch_trigger` (phase C increment 1) |
 | 3 / 10 solver-launch authority | the set of modules that can **execute** a container runtime or an MPI launcher is derived by AST (a subprocess primitive *and* a runtime or `-np` literal) and pinned: 5 production, 3 test. Each production module is classified as refusing in-module or as a named known gap; those claiming to refuse must actually contain a `raise`. Negative controls cover both directions — a synthetic launcher is caught, while a path segment named `docker` and a runtime in a comment are not | `test_the_set_of_launch_capable_modules_is_exactly_the_pinned_one`, `test_a_new_module_that_could_launch_a_container_is_rejected`, `test_every_launch_capable_production_module_is_classified`, `test_the_modules_that_claim_to_refuse_actually_raise` (phase C increment 1) |
@@ -81,7 +83,23 @@ The owner's sequencing for the work that follows:
 
 ## Known gaps in the mechanisms that do exist
 
-- **The secret scan is post-push.** `--staged` and `--range` exist and are tested but nothing invokes them automatically; CI scans the tip tree *after* the push, so a secret is already on GitHub when it is flagged. No history scan exists. Zero findings means no rule matched, not that there are no secrets.
+- **Secret scanning is now layered, and neither layer is complete.** `.githooks/pre-push`
+  scans before the objects leave; the CI job still scans the tip tree afterwards. What the
+  pre-push layer does **not** protect against, stated exactly:
+  - **A checkout that never installed it.** Git does not run hooks from a clone until
+    someone points it at them — deliberately, since a repository that executed code on
+    clone would be a delivery mechanism. `scripts/install_hooks.py` is therefore a manual
+    step. The test suite fails locally with instructions when the checkout is unprotected,
+    and skips that check in CI, which pushes nothing. A developer who never runs the
+    installer is not protected by it.
+  - **`git push --no-verify`**, which git itself honours before any hook runs. Nothing in
+    a repository can prevent it.
+  - **Anything that reaches the remote by another route**: the GitHub web UI, the API, a
+    force-push from an unprotected clone, or a workflow committing on the runner. The CI
+    job is the layer that sees those, after the fact.
+  - **History already pushed.** No history scan exists and this mechanism is not
+    retroactive; it makes no claim about anything committed or pushed before it existed.
+  - Zero findings still means no rule matched, not that there are no secrets.
 - **The pilot gap is CLOSED; `solvers/palace/adapter.py` is the one that remains.**
   Increment 1 recorded that `scripts/palace_coupled_pilot.py` could form a `docker run`
   argv with no approval read and no refusal path. Increment 3 closed it, and the
@@ -194,6 +212,19 @@ The owner's sequencing for the work that follows:
   believed, and pinned against `mode_admission.admit_modes` so the two cannot drift. This
   is the second time in phase C that a first-draft guard misread historical evidence — the
   first was reading `campaign.sha256` as a file manifest in increment 2.
+- **Record consistency checks what is derivable, and no more.** Paths, cited commits and
+  per-row test evidence are repository state. Whether a report is well written, whether a
+  task was bounded, whether a conclusion is sound, and whether reviewer independence was
+  sufficient are not, and are deliberately left BEHAVIOURAL ONLY rather than given a test
+  that would only look like enforcement.
+- **The cited-commit check does not run in CI.** `actions/checkout@v4` fetches depth 1, so
+  historical commits are absent and the check skips in a shallow checkout. It bites
+  locally and in any full clone; CI does not enforce it.
+- **A first draft of the path check would have false-failed on an accurate record.** It
+  flagged ten bare prose filenames — among them `summary.json`, `manifest.sha256` and
+  `campaign.sha256` — as missing, and `EXECUTION-APPROVAL.json`, which is deliberately
+  absent. Only references containing a path separator can be judged root-relative. This is
+  the third first-draft guard in phase C to misread the repository before being corrected.
 - **The launch-authority scan is source-level.** It catches a module that names a runtime
   and can exec. It would not catch an argv assembled from fragments at runtime, or an
   exec reached through a helper that hides the subprocess call.
