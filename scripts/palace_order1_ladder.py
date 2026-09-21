@@ -53,7 +53,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from orchestrator import manifest  # noqa: E402
+from orchestrator import manifest, promotion  # noqa: E402
 from solvers.palace import outputs as pout  # noqa: E402
 from solvers.palace.coupled_config import (  # noqa: E402
     COUPLED_SOLVER_RULES,
@@ -679,6 +679,21 @@ def earlier_rungs(root: Path | None = None) -> list[dict[str, Any]]:
                 f"{record.name}. The h-sequence takes exactly one record per level; "
                 f"retire or relabel one before fitting a convergence order over them."
             )
+        # The record CLAIMS it completed. Nothing used to check whether its evidence
+        # supported the claim: the status was a string in a JSON file, the numbers below
+        # were read straight out of the same file, and neither was ever weighed against
+        # the manifest the driver wrote. Editing one field promoted a rung.
+        #
+        # Placed after the refinement and duplicate-level guards on purpose, so those
+        # keep naming their own failure, and reached only by a record that asserts
+        # COMPLETED -- a genuine TIMEOUT or RUN_FAILED is still skipped above as the
+        # preserved evidence it is, not refused.
+        try:
+            promotion.require(record, "rung", level=promotion.EvidenceLevel.PROMOTABLE)
+        except promotion.PromotionRefused as exc:
+            raise LadderError(
+                f"{record.name} claims COMPLETED but its evidence does not support "
+                f"promotion into the h-sequence: {exc}") from exc
         rungs.append({
             "level": level,
             "h_gap_mm": mesh_sizes_mm(cell, level)[1],
@@ -1029,6 +1044,17 @@ def reference_modes(root: Path | None = None) -> tuple[list[Any], dict[str, Any]
     discrepancies = manifest.verify(record)
     if discrepancies:
         raise LadderError(f"{record} does not match its manifest: {discrepancies}")
+    # The manifest says the bytes are the ones the driver wrote. It says nothing about
+    # whether that run COMPLETED: re-registering a manifest over an edited summary makes
+    # it pass. Until this, a reference whose P2 had been marked RUN_FAILED was still
+    # folded in as level 1. QUALIFIED is the right bar and not CHECKED, because the
+    # committed pilot record predates the admission machinery and carries no per-mode
+    # disposition table; its admission is recomputed below from the postpro tables, which
+    # is stronger than trusting a stored verdict.
+    try:
+        promotion.require(record, REFERENCE_RUN, level=promotion.EvidenceLevel.QUALIFIED)
+    except promotion.PromotionRefused as exc:
+        raise LadderError(f"the level-1 reference cannot be used: {exc}") from exc
     modes = join_modes_by_id(record / REFERENCE_RUN / "solver" / "postpro")
     summary = json.loads((record / "summary.json").read_text())
     return modes, summary["runs"][REFERENCE_RUN]
