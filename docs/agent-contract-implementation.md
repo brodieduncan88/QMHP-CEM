@@ -23,9 +23,9 @@ The owner's sequencing for the work that follows:
 
 | phase | scope |
 |---|---|
-| A | adopt the contract as policy — **this commit** |
-| B | resolve and qualify the network/build environment; no scientific execution |
-| C | implement enforcement incrementally, dangerous boundaries first: execution approval, workflow triggering, solver-launch authority, mutation of frozen evidence, evidence-status promotion |
+| A | adopt the contract as policy — **done**, `1cb4a9c` |
+| B | resolve and qualify the network/build environment; no scientific execution — **qualified as far as policy permits**, `86421a3`; the egress decision is still open |
+| C | implement enforcement incrementally, dangerous boundaries first: execution approval, workflow triggering, solver-launch authority, mutation of frozen evidence, evidence-status promotion — **increment 1 done** (workflow triggering, solver-launch authority) |
 | D | only then authorise the separately controlled real Palace execution |
 
 ## Mapping to CLAUDE.md
@@ -59,6 +59,9 @@ The owner's sequencing for the work that follows:
 | 9 isolation | regeneration runs in a disposable view whose only writable part is a copy; tracked references are never opened for writing | `test_two_concurrent_regenerations_do_not_interfere`, `test_a_killed_regeneration_leaves_the_tracked_references_untouched`, `test_the_isolated_view_can_never_target_a_tracked_reference` (commit `92db708`) |
 | 11 secret scanning | `scripts/secret_scan.py`, gitleaks pinned by module version and checksum-database hash, fail-closed (exit 3), no baseline accepted, findings redacted twice; read-only CI job | `tests/test_secret_scan.py` incl. `test_a_missing_scanner_is_blocked_not_clean`, `test_a_baseline_is_refused`, `test_ci_runs_the_scanner_read_only` (commit `9ea3912`) |
 | 10 launch safety (partial) | no test in the diagnostic module can shell out to a container runtime or MPI launcher; the git reader is pinned to read-only subcommands | `test_launch_safety_of_this_test_file` |
+| 10 / 3 workflow triggering | the COMPLETE trigger surface of all five workflows is pinned **exactly** — events, push branches and push paths. A new workflow, an added branch, a widened path filter, a removed path filter or a `pull_request` trigger on a solve-capable workflow all fail. Six negative controls apply each mutation to a copy and require it to be named | `test_the_workflow_trigger_surface_is_exactly_the_pinned_one`, `test_a_widened_or_added_solver_trigger_is_rejected`, `test_only_an_approval_record_triggers_the_two_solve_on_push_workflows`, `test_no_workflow_carries_a_session_branch_trigger` (phase C increment 1) |
+| 3 / 10 solver-launch authority | the set of modules that can **execute** a container runtime or an MPI launcher is derived by AST (a subprocess primitive *and* a runtime or `-np` literal) and pinned: 5 production, 3 test. Each production module is classified as refusing in-module or as a named known gap; those claiming to refuse must actually contain a `raise`. Negative controls cover both directions — a synthetic launcher is caught, while a path segment named `docker` and a runtime in a comment are not | `test_the_set_of_launch_capable_modules_is_exactly_the_pinned_one`, `test_a_new_module_that_could_launch_a_container_is_rejected`, `test_every_launch_capable_production_module_is_classified`, `test_the_modules_that_claim_to_refuse_actually_raise` (phase C increment 1) |
+| 12 this record | every test this file names must exist, and the enforced/behavioural separation must survive | `test_every_test_named_by_the_implementation_record_exists`, `test_the_implementation_record_still_separates_enforced_from_behavioural` (phase C increment 1) |
 | 3 resource limits (prepared) | DOF 250 000 and 2 700 s wall caps are enforced by the launcher by streaming kill, with no retry | `test_the_hard_caps_and_the_space_identity_are_enforced` |
 
 **BEHAVIOURAL ONLY** — no mechanism. These are followed, not enforced.
@@ -75,6 +78,20 @@ The owner's sequencing for the work that follows:
 ## Known gaps in the mechanisms that do exist
 
 - **The secret scan is post-push.** `--staged` and `--range` exist and are tested but nothing invokes them automatically; CI scans the tip tree *after* the push, so a secret is already on GitHub when it is flagged. No history scan exists. Zero findings means no rule matched, not that there are no secrets.
-- **Approval enforcement covers the first-moment launcher only.** `scripts/palace_order1_ladder.py` and `scripts/palace_coupled_pilot.py` have their own approval reading, not covered by the tests named above.
-- **Trigger inspection is manual.** Nothing fails a commit that adds a solver-workflow trigger; the pinned test only detects an uncommitted change under a trigger path.
-- **This file can rot.** Nothing yet asserts that the tests named here still exist. That guard is the natural first item of phase C.
+- **`scripts/palace_coupled_pilot.py` has no in-module refusal.** Found by phase C
+  increment 1, and it corrects an earlier statement in this file that the pilot "has its
+  own approval reading" — it does not. It can form a `docker run` argv and contains no
+  approval-file read and no refusal path: its three approved runs are frozen constants
+  in the source, and its launch authority is the workflow trigger alone. That is
+  materially weaker than `scripts/palace_order1_ladder.py`, which reads
+  `.github/ladder-approval.json` and raises `LadderError` on a missing or
+  over-reaching approval. `solvers/palace/adapter.py` likewise gates nothing — it is the
+  exec funnel and launches whatever a caller hands it. Both are pinned in
+  `NO_IN_MODULE_REFUSAL` so the set cannot grow unnoticed, but neither is closed.
+  Closing it means editing a solver driver, which needs its own approval.
+- **Trigger inspection is narrowed, not eliminated.** The trigger *surface* is now pinned
+  exactly, so it cannot change unnoticed. Deciding which workflows a particular push
+  would start remains a manual step before pushing.
+- **The launch-authority scan is source-level.** It catches a module that names a runtime
+  and can exec. It would not catch an argv assembled from fragments at runtime, or an
+  exec reached through a helper that hides the subprocess call.
