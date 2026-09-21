@@ -55,6 +55,33 @@ jobs:
       - name: Acceptance — 3x3 Object 001 mock sweep
         run: uv run cem sweep sweeps/object001_grid.yaml --solver mock
 
+  # The approved secret scanner (CLAUDE.md §10). Read-only: it checks out the tree,
+  # scans it and writes nothing. The scanner is standalone and version-pinned —
+  # scripts/secret_scan.py builds exactly one gitleaks module version, whose hash the
+  # Go checksum database verifies, into a cache outside the working tree. Nothing is
+  # vendored and no scanner binary is committed. A scanner that cannot be provisioned,
+  # is the wrong version, or exits for any reason other than a clean-or-findings
+  # verdict BLOCKS this job (exit 3); a blocked scan is never a pass.
+  secrets:
+    name: secret scan (read-only)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # The pinned module declares a newer toolchain than this line; Go's default
+      # GOTOOLCHAIN=auto fetches it from the same module proxy that serves the pin.
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Scanner provenance
+        run: python3 scripts/secret_scan.py --print-provenance
+
+      - name: Secret scan (checked-out tree)
+        run: python3 scripts/secret_scan.py --tree
+
   dotnet:
     name: dotnet (PicoGK geometry)
     runs-on: ubuntu-latest
