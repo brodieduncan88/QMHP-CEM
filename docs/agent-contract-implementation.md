@@ -75,6 +75,7 @@ The owner's sequencing for the work that follows:
 | 5 | no test proves raw evidence survives an analysis or rendering failure on the first-moment path. The *promotion* half of clause 5 is now partly enforced — see the MECHANISM row — but only for the order-1 h-sequence |
 | 8 | nothing counts failed fixes at a gate or halts after two. This session reached **three** consecutive CI failures at one gate before the approach was replaced — the clause exists because of that, and nothing prevents a repeat |
 | 10 | nothing checks that a report carries the run ID, attempt, job and conclusion, that local results are not substituted for CI, or that a duration came from a real timestamp rather than a background timer |
+| 7.1 verification target | **nothing checks that an adversarial verification actually ran against a frozen pre-fix SHA.** The rule was added to `CLAUDE.md` after increment 3's review verified against the mutable working tree while fixes were landing in it, so every one of its 22 findings came back "refuted" and the verification stage produced no information. Increment 4 followed the rule by hand — frozen worktree at `a8bff6b`, reproduction and regression run as separate passes — but by discipline, not by a control |
 | 11 retention | no custody or retention record exists; workflow artefacts expire |
 | 12 | nothing checks that a report is bounded or that the model/effort was recorded |
 

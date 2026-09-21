@@ -135,6 +135,23 @@ For consequential new mathematics or numerical methods:
 Do not treat agreement between two calculations sharing the same assumptions or
 inputs as fully independent confirmation.
 
+### 7.1 Verification targets an immutable SHA
+
+**Adversarial verification must target an immutable pre-fix SHA. Verification against a
+mutable or already-fixed working tree is invalid evidence.**
+
+Consequences of that rule:
+
+- Record the pre-fix commit SHA BEFORE changing anything, and verify against a frozen
+  snapshot or worktree at that SHA.
+- A finding is REFUTED only by demonstrating that the claimed defect does not exist on
+  that snapshot. "Already fixed in current code", "handled elsewhere", inability to
+  reproduce, and uncertainty are NOT refutations. Record such findings UNRESOLVED.
+- Keep pre-fix defect reproduction and post-fix regression proof separate. They are
+  different claims and neither substitutes for the other.
+- Report the snapshot SHA, the reproduced mechanism and the exact positive and negative
+  controls. Reviewer counts are not evidence.
+
 ## 8. Numerical Integrity
 
 Never:
