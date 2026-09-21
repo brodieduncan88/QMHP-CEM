@@ -1,0 +1,56 @@
+{
+ "label": "FIRST-MOMENT DIAGNOSTIC - REFERENCE MODEL VERIFIED ON SYNTHETIC FIXTURES",
+ "trials": 60,
+ "seed": 20260920,
+ "worst_case": {
+  "dual_assembly_vs_GetVoltage": 7.816753314122808e-16,
+  "free_restricted_functional_vs_GetVoltage_when_E_dbc_is_zero": 4.567701760452868e-16,
+  "free_restricted_functional_mismatch_when_E_dbc_nonzero_min": 0.036425877056956255,
+  "padded_DIAG_ONE_zeroed_rhs_vs_free": 4.186570842550183e-16,
+  "padded_DIAG_ONE_unzeroed_rhs_minus_free_vs_sum_f_dbc2_over_L": 4.1722170617387166e-16,
+  "padded_DIAG_ZERO_singular_in_every_trial": true,
+  "parseval_all_modes_vs_free_solve": 1.695534871068348e-15,
+  "parseval_nonzero_modes_vs_free_solve": 1.695534871068348e-15,
+  "kernel_annihilation_same_points": 2.5579922508034294e-14,
+  "kernel_dim_min": 3,
+  "K_port_minus_qq_min_eig_same_rule_min": -1.5123368894954083e-16,
+  "K_port_minus_qq_min_eig_mismatched_rule_min": -0.14396420712712205,
+  "null_space_gap_min_over_random_fields": 0.9999927987611955,
+  "epr_palace_vs_absolute_square": 3.4046714783268464e-15,
+  "epr_phase_invariance": 4.780314450362408e-12,
+  "A_phase_invariance": 3.833940270494611e-16,
+  "unit_roundtrip_A_GHz2": 4.698562713506804e-16,
+  "zeroth_moment_vs_pseudoinverse": 3.8448575392743976e-14
+ },
+ "expected_N2R_scales_from_Lc_4mm": {
+  "Lc_m": 0.004,
+  "tc_ns": 0.01334256380791072,
+  "FrequencyScale_GHz": 11.92836289810609,
+  "InductanceScale_H": 5.026548245743669e-09,
+  "VoltageScale_V": 19.409541814844687,
+  "EnergyScale_J": 0.01334256380791072,
+  "A_GHz2_per_nd": 142.28584142891393,
+  "note": "Lc = 4.000e-03 m is the mesh bounding-box extent Palace printed for N2R (palace_log.txt:18-19, 't0 = 1.334e-02 ns'); the diagnostic record reports the exact values and the evaluator uses those, not these."
+ },
+ "expected_N2R_L_nd": 20.582047285188583,
+ "hard_caps": {
+  "dof": 250000,
+  "wall_s": 2700,
+  "meaning": "hard caps on any execution, not runtime promises"
+ },
+ "what_is_and_is_not_verified": {
+  "verified_here": [
+   "P^T v is the dual assembly GetVoltage's summed local dot products imply",
+   "the free-restricted functional reproduces GetVoltage exactly when the field satisfies the PEC constraint, and only then",
+   "DIAG_ONE padding with the right-hand side zeroed on the essential dofs is the free-dof quadratic form; without the zeroing it adds sum_dbc f_dbc^2 / L; DIAG_ZERO padding is singular",
+   "Parseval: A equals the sum over the complete constrained eigenbasis, and over the nonzero modes alone, because f annihilates ker(K)",
+   "f in range(K_port) whenever v and K_port share quadrature POINTS with positive weights; K_port >= q q^T whenever they share the WEIGHTS too; a mismatched rule breaks the inequality (negative control)",
+   "Palace's EPR magnitude equals |f^H E|^2 / (L lambda E^H M E) with its 1/2 energy convention, and both are phase invariant",
+   "A_GHz2 = A_nd / (2 pi tc)^2 is the sum of p f^2 with f in GHz"
+  ],
+  "not_verified_here": [
+   "the C++ patch is not compiled in this environment (no Palace toolchain); its built-in checks run on the real problem only under a separate approval",
+   "no N2R matrix, functional or moment is assembled or solved"
+  ]
+ }
+}

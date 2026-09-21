@@ -2,3 +2,7 @@
 # it needs is cloned or installed inside the build. Sending the checkout
 # (results/, vendored PDFs, .git) to the daemon would only slow the build.
 *
+# docker/palace-first-moment.Dockerfile copies exactly one file: the
+# diagnostic patch. Nothing else is admitted; the production Dockerfile still
+# copies nothing.
+!docker/patches/first-moment-diagnostic.patch

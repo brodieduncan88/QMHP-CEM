@@ -1,0 +1,218 @@
+{
+ "label": "FIXTURE EVALUATION - THE EVALUATOR RECOVERS A KNOWN OMITTED MOMENT",
+ "fixture": {
+  "n_true": 36,
+  "n_essential": 6,
+  "n_modes_total": 30,
+  "n_modes_saved": 15
+ },
+ "truth": {
+  "A_total_nd": 5.760403548249147e-06,
+  "A_saved_nd": 5.585292722124025e-06,
+  "omitted_first_moment_exact_nd": 1.751108261251215e-07
+ },
+ "evaluator": {
+  "A_direct_minus_A_saved_nd": 1.7511082612517926e-07,
+  "residual_bound_nd": 8.101431281211182e-19,
+  "error_vs_truth_nd": 5.77570590909026e-20,
+  "error_within_bound": true,
+  "difference_exceeds_bound": true,
+  "all_checks_passed": true,
+  "interpretation": "A_direct - A_saved is the first moment carried by modes absent from the saved set, qualified by the residual bound above"
+ },
+ "broken_records_are_unqualified": {
+  "functional": {
+   "all_checks_passed": false,
+   "interpretation": "UNQUALIFIED difference: one or more checks failed; do not read it as an omitted spectral moment",
+   "failed": [
+    "functional reproduces GetVoltage (complex, PEC-constrained field)"
+   ]
+  },
+  "null_space": {
+   "all_checks_passed": false,
+   "interpretation": "UNQUALIFIED difference: one or more checks failed; do not read it as an omitted spectral moment",
+   "failed": [
+    "K >= q q^H on the constrained assembly (solution + random fields)"
+   ]
+  },
+  "convergence": {
+   "all_checks_passed": false,
+   "interpretation": "UNQUALIFIED difference: one or more checks failed; do not read it as an omitted spectral moment",
+   "failed": [
+    "linear solve converged"
+   ]
+  }
+ },
+ "sloppy_solve": {
+  "relative_residual": 1e-06,
+  "all_checks_passed": false,
+  "failed": [
+   "independent relative residual <= 1e-12"
+  ],
+  "interpretation": "UNQUALIFIED difference: one or more checks failed; do not read it as an omitted spectral moment"
+ },
+ "full_evaluation_of_the_good_record": {
+  "hashes": {
+   "fixture": "synthetic"
+  },
+  "checks": [
+   {
+    "check": "record schema complete",
+    "passed": true,
+    "detail": {
+     "missing": []
+    }
+   },
+   {
+    "check": "functional reproduces GetVoltage (complex, PEC-constrained field)",
+    "passed": true,
+    "detail": {
+     "relative_error": 0.0,
+     "tolerance": 1e-10
+    }
+   },
+   {
+    "check": "K >= q q^H on the constrained assembly (solution + random fields)",
+    "passed": true,
+    "detail": {
+     "min_relative_gap": 0.9999839964795035,
+     "tolerance": -1e-10
+    }
+   },
+   {
+    "check": "linear solve converged",
+    "passed": true,
+    "detail": {
+     "iterations": 17
+    }
+   },
+   {
+    "check": "independent relative residual <= 1e-12",
+    "passed": true,
+    "detail": {
+     "relative_residual": 1.279034924178295e-13
+    }
+   },
+   {
+    "check": "solution vanishes on the essential dofs",
+    "passed": true,
+    "detail": {
+     "essential_norm": 0.0,
+     "norm": 0.0012186957948739756
+    }
+   },
+   {
+    "check": "Free == True - Essential",
+    "passed": true,
+    "detail": {
+     "True": 36,
+     "Essential": 6,
+     "Free": 30
+    }
+   },
+   {
+    "check": "true dofs within the 250000 hard cap",
+    "passed": true,
+    "detail": {
+     "true": 36,
+     "cap": 250000
+    }
+   },
+   {
+    "check": "same true-dof count as the saved eigenmode record",
+    "passed": true,
+    "detail": {
+     "true": 36,
+     "expected": 36
+    }
+   },
+   {
+    "check": "port inductance matches the configured L (henries)",
+    "passed": true,
+    "detail": {
+     "L_H": 1.034463628974047e-07,
+     "expected": 1.034463628974047e-07
+    }
+   },
+   {
+    "check": "tc_ns == 1e9 Lc / c0",
+    "passed": true,
+    "detail": {
+     "tc_ns": 0.01334256380791072,
+     "expected": 0.01334256380791072
+    }
+   },
+   {
+    "check": "FrequencyScale_GHz == 1/(2 pi tc)",
+    "passed": true,
+    "detail": {
+     "scale": 11.92836289810609,
+     "expected": 11.92836289810609
+    }
+   },
+   {
+    "check": "InductanceScale_H == mu0 Lc",
+    "passed": true,
+    "detail": {
+     "scale": 5.026548245743669e-09,
+     "expected": 5.026548245743669e-09
+    }
+   },
+   {
+    "check": "A_GHz2_per_nd == FrequencyScale^2",
+    "passed": true,
+    "detail": {}
+   },
+   {
+    "check": "A_GHz2 == A_nd * A_GHz2_per_nd",
+    "passed": true,
+    "detail": {
+     "A_GHz2": 0.0008196238658327395,
+     "A_nd": 5.760403548249205e-06
+    }
+   },
+   {
+    "check": "L_H == L_nd * InductanceScale_H",
+    "passed": true,
+    "detail": {}
+   },
+   {
+    "check": "wall time within the 2700 s hard cap",
+    "passed": true,
+    "detail": {
+     "wall_s": 12.5,
+     "cap_s": 2700
+    }
+   }
+  ],
+  "all_checks_passed": true,
+  "A_direct": {
+   "A_nd": 5.760403548249205e-06,
+   "A_GHz2": 0.0008196238658327395
+  },
+  "A_saved": {
+   "A_GHz2": 0.0007947080745942061,
+   "A_nd": 5.5852927221240245e-06
+  },
+  "difference": {
+   "A_direct_minus_A_saved_GHz2": 2.491579123853338e-05,
+   "A_direct_minus_A_saved_nd": 1.7511082612517926e-07,
+   "relative_to_A_saved": 0.031352130467852464
+  },
+  "numerical_qualification": {
+   "first_order_residual_correction_GHz2": -8.551811417959024e-18,
+   "residual_bound_GHz2": 1.1527189666256573e-16,
+   "bound_statement": "|A_computed - A_exact| <= ||x*|| ||r|| / L with r = M x - f; ||x*|| is taken as ||x|| up to the factor (1 + kappa(M_free) * relative_residual), which is within 1e-6 of 1 whenever kappa(M_free) <= 1e6 at the required 1e-12 relative residual. The bound is on the calculation error of A_direct only; A_saved carries the eigensolver's own tolerance, not accounted for here.",
+   "difference_exceeds_residual_bound": true,
+   "difference_over_bound": 216148011440.02277
+  },
+  "interpretation": "A_direct - A_saved is the first moment carried by modes absent from the saved set, qualified by the residual bound above",
+  "not_established_here": [
+   "a small raw difference does not prove a small tail unless it exceeds the calculation-error bound; a difference within the bound is 'not resolved', not 'zero'",
+   "the saved moment's own eigensolver error is not part of the bound"
+  ],
+  "N": "not measured by this diagnostic",
+  "E_C": "UNAVAILABLE",
+  "g": "UNAVAILABLE"
+ }
+}
