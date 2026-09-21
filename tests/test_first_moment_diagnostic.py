@@ -5,8 +5,10 @@ from __future__ import annotations
 import ast
 import copy
 import csv
+from fractions import Fraction
 import hashlib
 import importlib.util
+import inspect
 import json
 import math
 import re
@@ -70,8 +72,12 @@ def _norm(text: str) -> str:
 #   stable  - deterministic or well-conditioned; compared to the committed value
 #   noise   - residues of a DELIBERATELY perturbed solve, whose last digits differ between
 #             machines; each carries an explicit requirement matched to its meaning
-#   bound   - a maximum over random trials at round-off level; required to satisfy its
-#             declared scientific threshold, which is unchanged from the dedicated tests
+#   gate    - a maximum over random trials at round-off level whose size is stable across
+#             BLAS kernels and eigen drivers (measured); required to satisfy its declared
+#             scientific threshold, unchanged from the dedicated tests
+#   diagnostic - a maximum whose size is set by the conditioning of the DRAWN mode, which
+#             the document does not record; required to be a finite non-negative float,
+#             with the identity it measures gated by named live tests (RM_FIELDS)
 
 #: Relative tolerance for a float that is deterministic or well conditioned. The physical
 #: quantities in these documents moved by 7e-13 when the LAPACK eigen driver was swapped;
@@ -285,34 +291,82 @@ def _fixture_invariants(doc: dict, rm) -> list[str]:
 
 # --- reference_model.json ------------------------------------------------------------
 #
-# The trial maxima are round-off-level and differ between machines by O(1) relatively, so
-# they are required to satisfy their declared threshold rather than to reproduce. The
-# thresholds are exactly those the dedicated tests assert; none is relaxed here.
+# Every bounded float is a maximum over seeded random trials of the residual of an exact
+# identity. Each is mapped to what it verifies and to one specific check. Measured across
+# 18 configurations - OPENBLAS_CORETYPE default, HASWELL, SANDYBRIDGE, PRESCOTT, NEHALEM
+# and SKYLAKEX, each with numpy's eigh and scipy's 'ev' and 'evr' drivers - the
+# regenerated maxima fall into two classes (min..max over the 18 in each entry):
+#
+#   gate        stable: spread <= 5x and at least 380x inside the declared threshold,
+#               which is applied to the regenerated value unchanged, with the strict
+#               operator the dedicated test uses on the committed record.
+#   diagnostic  set by the conditioning of the DRAWN fixture or mode - the port-voltage
+#               cancellation kappa2, up to 2.5e4 in the seeded trials, or the eigensolver's
+#               accuracy on the smallest kept eigenvalue and on the kernel - which the
+#               document does not record and the BLAS kernel changes:
+#               epr_palace_vs_absolute_square is 2.5e-15 on one kernel and 2.232e-12, the
+#               CI run 35559951610 value bit for bit, on HASWELL. Its regenerated
+#               MAGNITUDE therefore carries no machine-reproducible information and is not
+#               gated here: it must be a finite, non-negative float, and the identity it
+#               measures is gated by the named live tests, where the answer is exact or
+#               the conditioning is measured. The declared threshold stays asserted on the
+#               COMMITTED record by test_the_reference_model_record_is_reproduced_and_
+#               within_tolerance; that alone gates no regeneration, hence the named tests.
 
-RM_BOUNDS = {
-    "/worst_case/dual_assembly_vs_GetVoltage": ("<", 1e-12),
-    "/worst_case/free_restricted_functional_vs_GetVoltage_when_E_dbc_is_zero": ("<", 1e-12),
-    "/worst_case/padded_DIAG_ONE_zeroed_rhs_vs_free": ("<", 1e-12),
-    "/worst_case/padded_DIAG_ONE_unzeroed_rhs_minus_free_vs_sum_f_dbc2_over_L": ("<", 1e-12),
-    "/worst_case/parseval_all_modes_vs_free_solve": ("<", 1e-12),
-    "/worst_case/parseval_nonzero_modes_vs_free_solve": ("<", 1e-12),
-    "/worst_case/kernel_annihilation_same_points": ("<", 1e-12),
-    "/worst_case/K_port_minus_qq_min_eig_same_rule_min": (">=", -1e-12),
-    "/worst_case/epr_palace_vs_absolute_square": ("<", 1e-12),
-    "/worst_case/epr_phase_invariance": ("<", 1e-9),
-    "/worst_case/A_phase_invariance": ("<", 1e-12),
-    "/worst_case/unit_roundtrip_A_GHz2": ("<", 1e-12),
-    "/worst_case/zeroth_moment_vs_pseudoinverse": ("<", 1e-12),
-    "/error_qualification/trials/identity_max_error_relative_to_A": ("<", 1e-12),
-    "/error_qualification/trials/variational_equals_certified_max_rel": ("<", 1e-12),
+RM_FIELDS = {
+    "/worst_case/dual_assembly_vs_GetVoltage": (                      # 2.1e-16..1.0e-15
+        "P^T v_loc . E reproduces GetVoltage on any complex field", ("gate", "<", 1e-12)),
+    "/worst_case/free_restricted_functional_vs_GetVoltage_when_E_dbc_is_zero": (
+        "the free-restricted functional is GetVoltage when E vanishes on dbc",
+        ("gate", "<", 1e-12)),                                        # 2.6e-16..4.6e-16
+    "/worst_case/padded_DIAG_ONE_zeroed_rhs_vs_free": (               # 2.7e-16..4.3e-16
+        "the DIAG_ONE padded solve with a zeroed rhs is the free-dof form",
+        ("gate", "<", 1e-12)),
+    "/worst_case/padded_DIAG_ONE_unzeroed_rhs_minus_free_vs_sum_f_dbc2_over_L": (
+        "an unzeroed rhs adds exactly sum f_dbc^2 / L", ("gate", "<", 1e-12)),  # ..4.2e-16
+    "/worst_case/parseval_all_modes_vs_free_solve": (                 # 1.1e-15..2.6e-15
+        "Parseval over the complete constrained basis is the free solve",
+        ("gate", "<", 1e-12)),
+    "/worst_case/parseval_nonzero_modes_vs_free_solve": (             # 1.1e-15..2.6e-15
+        "zero modes carry no first-moment weight", ("gate", "<", 1e-12)),
+    "/worst_case/kernel_annihilation_same_points": (                  # 4.4e-15..5.9e-14
+        "f annihilates ker K (f lies in range K_port)",
+        ("diagnostic", "test_the_diagonal_pencil_is_reproduced_exactly",
+         "test_the_functional_lies_in_range_of_the_port_stiffness_and_annihilates_ker_k")),
+    "/worst_case/K_port_minus_qq_min_eig_same_rule_min": (            # -1.5e-16..-8.7e-17
+        "K_port >= q q^T when both use the same quadrature rule", ("gate", ">=", -1e-12)),
+    "/worst_case/epr_palace_vs_absolute_square": (                    # 2.5e-15..2.2e-12
+        "GetInductorParticipation equals |V|^2 / (L lam E^H M E)",
+        ("diagnostic", "test_epr_palace_and_the_absolute_square_form_agree_as_scalar_algebra",
+         "test_the_diagonal_pencil_is_reproduced_exactly",
+         "test_the_epr_residuals_in_the_trial_sweep_are_bounded_by_their_measured_cancellation")),
+    "/worst_case/epr_phase_invariance": (                             # 2.0e-13..4.8e-12
+        # the same cancellation class, but its declared 1e-9 lies inside the derived
+        # round-off bound on every seeded trial (asserted by the trial-sweep test), so the
+        # declared threshold is provably safe here and stays a gate
+        "|p| is invariant under a complex rescaling of the mode", ("gate", "<", 1e-9)),
+    "/worst_case/A_phase_invariance": (                               # 2.8e-16..4.7e-16
+        "the first moment is invariant under per-mode phases", ("gate", "<", 1e-12)),
+    "/worst_case/unit_roundtrip_A_GHz2": (                            # 4.7e-16
+        "A_GHz2 = sum p f^2 round-trips through lambda_nd", ("gate", "<", 1e-12)),
+    "/worst_case/zeroth_moment_vs_pseudoinverse": (                   # 3.4e-14..1.2e-13
+        "the eigen-sum zeroth moment is f^T K^+ f / L",
+        ("diagnostic", "test_the_diagonal_pencil_is_reproduced_exactly")),
+    "/error_qualification/trials/identity_max_error_relative_to_A": (  # 5.2e-16..7.9e-16
+        "A_computed - A_exact = (Re x^H r - r^H M^-1 r) / L", ("gate", "<", 1e-12)),
+    "/error_qualification/trials/variational_equals_certified_max_rel": (  # ..4.9e-16
+        "the variational lower bound is the certified lower bound", ("gate", "<", 1e-12)),
 }
 
 
 def _reference_model_float_rule(path: str, new: float, old: float) -> str | None:
-    if path in RM_BOUNDS:
-        op, limit = RM_BOUNDS[path]
-        ok = new < limit if op == "<" else new >= limit
-        return None if ok else f"{path}: {new!r} fails {op} {limit:g}"
+    if path in RM_FIELDS:
+        check = RM_FIELDS[path][1]
+        if check[0] == "gate":
+            _, op, limit = check
+            ok = new < limit if op == "<" else new >= limit
+            return None if ok else f"{path}: {new!r} fails {op} {limit:g}"
+        return None if new >= 0.0 else f"{path}: {new!r} is negative"
     return _stable(path, new, old)
 
 
@@ -624,6 +678,391 @@ def test_palace_epr_equals_the_absolute_square_form_with_its_half_energy(rm):
         # with E^H M E = 1 (Palace's RescaleEigenvectors), p = (q^H E)^2 / lambda
         q = f / math.sqrt(fx.L)
         assert abs(p_unit - (q @ Em[:, m]) ** 2 / lam[m]) <= 1e-12 * p_unit
+
+
+# --- 3b. the EPR formulas: scalar algebra, known answers, and the round-off class ------
+#
+# CI run 35559951610 regenerated worst_case/epr_palace_vs_absolute_square as 2.232e-12
+# against its declared 1e-12 while run 35559946775, the same commit, passed. Reproduced
+# here BIT FOR BIT with OPENBLAS_CORETYPE=HASWELL (2.2320564950712836e-12). The field is
+# a maximum over randomly drawn modes of a RELATIVE residual whose denominator is the
+# drawn mode's port voltage |V|^2. The seeded trial with the weakest coupling has
+# |V| = 7.2e-07 and a dot-product cancellation factor kappa2 = 2.5e4 (measured inside the
+# loop, test_the_epr_residuals_in_the_trial_sweep_are_bounded_by_their_measured_
+# cancellation), so its residual is round-off amplified by cancellation and set by the
+# BLAS kernel's summation order - not a property of the formulas. Across 18 kernel x
+# eigen-driver configurations every such residual stayed within 6.6 u kappa2.
+#
+# The tests therefore split by WHAT THEY VERIFY:
+#   the algebra          - exact, scalar, explicit inputs         (section a)
+#   the implementations  - exact, well-conditioned known answers  (section b)
+#   the round-off class  - bounded by the cancellation it measures (section c)
+
+U = 2.0 ** -53      # unit round-off, IEEE binary64, round to nearest
+
+
+def _gamma(n: int) -> float:
+    """Higham, Accuracy and Stability of Numerical Algorithms, 2nd ed. (SIAM, 2002),
+    Lemma 3.1: gamma_n = n u / (1 - n u); with (3.5), for ANY summation order,
+    |fl(x . y) - x . y| <= gamma_n sum_i |x_i y_i|."""
+    return n * U / (1.0 - n * U)
+
+
+def _epr_scalar(V: complex, L: float, omega: float, E_m: float) -> float:
+    """The absolute-square form as scalar algebra, written here independently of the
+    reference model: |V|^2 / (L omega^2 . 2 E_m), signed by Im V, because
+    I = V / (i omega L) has Re I = Im V / (omega L)."""
+    return math.copysign((V.real ** 2 + V.imag ** 2) / (L * omega ** 2 * 2.0 * E_m), V.imag)
+
+
+def _ulps(a: float, b: float, n: int) -> bool:
+    return abs(a - b) <= n * U * max(abs(a), abs(b))
+
+
+# -- (a) scalar algebra ---------------------------------------------------------------
+
+def test_epr_palace_and_the_absolute_square_form_agree_as_scalar_algebra(rm):
+    """SCALAR ALGEBRA ONLY. Both formulas are fed the same explicitly known voltage and
+    electric energy. This validates neither the voltage functional nor the energy
+    assembly - those are the known-answer tests below - only that GetInductorParticipation
+    as transcribed is |V|^2 / (L omega^2 2 E_m) with the sign of Im V."""
+    # V = 3+4i: |V|^2 = 25; L = 2; omega = 3; E_m = 5  ->  p = 25 / (2 . 9 . 10) = 5/36,
+    # I = V / (6i) = (4 - 3i) / 6, Re I = 2/3 > 0. Each expected value is computed by hand.
+    cases = {
+        (3 + 4j, 2.0, 3.0, 5.0): 5.0 / 36.0,
+        (3 - 4j, 2.0, 3.0, 5.0): -5.0 / 36.0,        # Im V < 0 flips the sign ...
+        (-3 + 4j, 2.0, 3.0, 5.0): 5.0 / 36.0,        # ... Re V does not
+        (1 + 1j, 4.0, 0.5, 0.25): 4.0,               # 2 / (4 . 1/4 . 1/2)
+        (6j, 3.0, 2.0, 1.5): 1.0,                    # 36 / (3 . 4 . 3)
+        (-6j, 3.0, 2.0, 1.5): -1.0,
+        (0.5 + 0.25j, 1.0, 1.0, 0.125): 1.25,        # (5/16) / (1 . 1 . 1/4)
+    }
+    for (V, L, om, Em), expected in cases.items():
+        p = rm.epr_palace(V, L, om, Em)
+        assert _ulps(p, expected, 16), (V, L, om, Em, p, expected)
+        assert _ulps(_epr_scalar(V, L, om, Em), expected, 16)
+
+    # phase rotation: |p| invariant, sign follows Im(V e^{i theta}); scalings: V -> cV
+    # multiplies by |c|^2, E_m -> kE_m divides by k, L -> kL divides by k, omega -> k omega
+    # divides by k^2.
+    V, L, om, Em, p0 = 3 + 4j, 2.0, 3.0, 5.0, 5.0 / 36.0
+    for k in range(1, 24):
+        theta = k * math.pi / 12
+        Vt = V * complex(math.cos(theta), math.sin(theta))
+        if abs(Vt.imag) < 1e-12:
+            continue
+        p = rm.epr_palace(Vt, L, om, Em)
+        assert _ulps(abs(p), p0, 64), theta          # a rotated V carries ~4 extra ops
+        assert math.copysign(1.0, p) == math.copysign(1.0, Vt.imag), theta
+    for c in (2.0, -3.0, 0.25 + 0.5j, 1j):
+        assert _ulps(rm.epr_palace(c * V, L, om, Em), abs(c) ** 2 * p0
+                     * math.copysign(1.0, (c * V).imag), 64), c
+    assert _ulps(rm.epr_palace(V, L, om, 4 * Em), p0 / 4, 16)
+    assert _ulps(rm.epr_palace(V, 4 * L, om, Em), p0 / 4, 16)
+    assert _ulps(rm.epr_palace(V, L, 2 * om, Em), p0 / 4, 16)
+
+    # negative controls: three wrong transcriptions, each O(1) off the hand answer
+    I = V / (1j * om * L)
+    wrong = {
+        "|I| instead of |I|^2": 0.5 * L * abs(I) / Em,
+        "the half-energy factor dropped": L * abs(I) ** 2 / Em,
+        "omega instead of omega^2": abs(V) ** 2 / (L * om * 2 * Em),
+    }
+    for label, p in wrong.items():
+        assert abs(p - p0) > 0.1 * p0, label
+
+
+# -- (b) known-answer implementation coverage ------------------------------------------
+
+def _known_port():
+    """A port small enough to assemble by hand. Three TRUE dofs, four LOCAL dofs with
+    local dof 3 a shared copy of true dof 0, two quadrature points, width 1/2, length 1/4
+    (area 1/8), coefficient c = 1/w = 2, so a c = (1/8, 1/8) and
+        v_loc  = Q^T (a c) = (1/8, 3/8, 1/2, 1/2)
+        f_true = P^T v_loc = (5/8, 3/8, 1/2)         dof 0 accumulates 1/8 + 1/2
+    All values are binary fractions, so every product and sum below is exact."""
+    P = np.array([[1.0, 0, 0], [0, 1, 0], [0, 0, 1], [1, 0, 0]])
+    Q = np.array([[1.0, 2, 0, 3], [0, 1, 4, 1]])
+    w, l = 0.5, 0.25
+    a = np.array([w * l / 2, w * l / 2])
+    return P, Q, a, 1.0 / w
+
+
+KNOWN_E = np.array([1 + 2j, -1 + 1j, 2 - 1j])
+KNOWN_V = 1.25 + 1.125j       # 5/8 (1+2i) + 3/8 (-1+i) + 1/2 (2-i) = 5/4 + 9i/8
+
+
+def test_get_voltage_and_the_assembled_functional_on_a_known_port(rm):
+    """The local voltage form (GetVoltage on the local vector) and the true-dof
+    functional (P^T v_loc . E) against a HAND answer, on a well-conditioned port: the
+    terms of V have no cancellation to speak of, so an exact comparison is justified.
+    Agreement between the two routes is NOT the criterion - a shared wrong input keeps
+    them agreeing - the hand answer is."""
+    P, Q, a, c = _known_port()
+    v_loc = Q.T @ (a * c)
+    assert np.array_equal(v_loc, [0.125, 0.375, 0.5, 0.5])
+    f = rm.dual_assemble(P, v_loc)
+    assert np.array_equal(f, [0.625, 0.375, 0.5])
+    assert rm.voltage_palace(v_loc, P, KNOWN_E) == KNOWN_V
+    assert rm.voltage_from_functional(f, KNOWN_E) == KNOWN_V
+
+    # the shared local dof NOT accumulated: both routes still agree with each other and
+    # both are wrong - the hand answer catches what route-vs-route cannot
+    P_bad = P.copy()
+    P_bad[3, 0] = 0.0
+    f_bad = rm.dual_assemble(P_bad, v_loc)
+    assert rm.voltage_palace(v_loc, P_bad, KNOWN_E) == rm.voltage_from_functional(f_bad, KNOWN_E)
+    assert rm.voltage_from_functional(f_bad, KNOWN_E) != KNOWN_V
+    # a factor of two in the coefficient, and in the weights
+    for v_wrong in (Q.T @ (a * c / 2), Q.T @ (2 * a * c)):
+        f_wrong = rm.dual_assemble(P, v_wrong)
+        assert rm.voltage_palace(v_wrong, P, KNOWN_E) == rm.voltage_from_functional(f_wrong, KNOWN_E)
+        assert abs(rm.voltage_from_functional(f_wrong, KNOWN_E) - KNOWN_V) > 0.4 * abs(KNOWN_V)
+    # a common scaling of the whole assembly
+    for k in (1.001, 3.0):
+        assert abs(rm.voltage_from_functional(k * f, KNOWN_E) - KNOWN_V) >= (k - 1) * abs(KNOWN_V) * 0.999
+
+
+def test_pec_restriction_on_the_known_port(rm):
+    """With true dof 1 essential, the free-restricted functional is (5/8, 0, 1/2). It
+    reproduces GetVoltage exactly when E vanishes on the essential dof, and the mismatch
+    otherwise is exactly f_1 E_1 - the boundary term the driver must zero."""
+    P, Q, a, c = _known_port()
+    f = rm.dual_assemble(P, Q.T @ (a * c))
+    dbc = np.array([1])
+    f_free = rm.restrict_to_free(f, dbc)
+    assert np.array_equal(f_free, [0.625, 0.0, 0.5])
+    E0 = KNOWN_E.copy()
+    E0[1] = 0.0
+    # 5/8 (1+2i) + 1/2 (2-i) = 13/8 + 3i/4
+    assert rm.voltage_from_functional(f_free, E0) == 1.625 + 0.75j
+    assert rm.voltage_palace(Q.T @ (a * c), P, E0) == 1.625 + 0.75j
+    assert rm.voltage_from_functional(f, KNOWN_E) - rm.voltage_from_functional(f_free, KNOWN_E) \
+        == f[1] * KNOWN_E[1] == -0.375 + 0.375j
+    # the padded solve with the rhs zeroed on dbc is the free-dof form (DIAG_ONE)
+    M = np.array([[2.0, 1, 0], [1, 2, 1], [0, 1, 2]])
+    assert _ulps(rm.first_moment_padded(M, f, dbc, 2.0, "DIAG_ONE", True),
+                 rm.first_moment_free(M, f, dbc, 2.0), 16)
+
+
+def test_electric_energy_normalisation_on_a_known_answer(rm):
+    """GetElectricFieldEnergy is 0.5 (E_r^T M E_r + E_i^T M E_i). With M = diag(1,2,3) and
+    E = (1+2i, -1+i, 2-i): E_r^T M E_r = 1 + 2 + 12 = 15, E_i^T M E_i = 4 + 2 + 3 = 9, so
+    E_m = 12 and Re(E^H M E) = 24. With the tridiagonal M below: M E_r = (1, 1, 3),
+    E_r . M E_r = 6; M E_i = (5, 3, -1), E_i . M E_i = 14; E_m = 10."""
+    for M, Em in ((np.diag([1.0, 2.0, 3.0]), 12.0),
+                  (np.array([[2.0, 1, 0], [1, 2, 1], [0, 1, 2]]), 10.0)):
+        assert rm.electric_energy_palace(M, KNOWN_E) == Em
+        assert np.real(np.vdot(KNOWN_E, M @ KNOWN_E)) == 2 * Em
+        assert rm.electric_energy_palace(M, 2j * KNOWN_E) == 4 * Em      # E -> cE: |c|^2
+        assert rm.electric_energy_palace(3 * M, KNOWN_E) == 3 * Em       # M -> kM: k
+        # the half-energy factor dropped, and a factor of two in M, are both O(1) off
+        assert np.real(np.vdot(KNOWN_E, M @ KNOWN_E)) - Em == Em
+        assert rm.electric_energy_palace(2 * M, KNOWN_E) == 2 * Em
+
+
+#: A diagonal pencil whose every answer is a small rational, verified with exact
+#: arithmetic (fractions) before use:  lambda = (0, 2, 3); M-orthonormal modes
+#: e_i / sqrt(M_i); (q . E_m)^2 = f_m^2 / (L M_m) = (0, 1/4, 1/6).
+#:   A = sum (q.E_m)^2 = 5/12 = f^T M^-1 f / L        first moment, two routes
+#:   N = sum_{lam>0} (q.E_m)^2 / lam = 13/72 = f^T K^+ f / L   zeroth moment, two routes
+#:   p_2 = 1/8, p_3 = 1/18, and sum p_m = N            EPR per mode, and their total
+PENCIL = dict(K=np.diag([0.0, 4.0, 9.0]), M=np.diag([1.0, 2.0, 3.0]),
+              f=np.array([0.0, 1.0, 1.0]), L=2.0)
+PENCIL_ANSWERS = dict(A=5 / 12, N=13 / 72, p={1: 1 / 8, 2: 1 / 18})
+
+
+def _pencil_mismatches(rm, K, M, f, L, answers, scale_out: float = 1.0) -> list[str]:
+    """Every pencil identity against its hand answer, each within 16 ulps. `scale_out`
+    multiplies every computed moment, modelling a common scale error in the outputs."""
+    out = []
+    none = np.array([], dtype=int)
+
+    def near(label, a, b):
+        if not _ulps(a, b, 16):
+            out.append(f"{label}: {a!r} != {b!r}")
+
+    lam, E = rm.constrained_eigenbasis(K, M, none)
+    near("A by the free solve", scale_out * rm.first_moment_free(M, f, none, L), answers["A"])
+    A_all, A_nz = rm.parseval_first_moment(f, L, lam, E)
+    near("A by Parseval", scale_out * A_all, answers["A"])
+    near("A by Parseval over nonzero modes", scale_out * A_nz, answers["A"])
+    near("N by the eigen-sum", scale_out * rm.zeroth_moment(f, L, lam, E), answers["N"])
+    near("N by the pseudoinverse", scale_out * float(f @ np.linalg.pinv(K) @ f / L), answers["N"])
+    total = 0.0
+    for m, p_m in answers["p"].items():
+        for c in (1.0 + 0j, 3.7 * np.exp(0.9j), -2j):          # complex scale and phase
+            Ec = E[:, m] * c
+            p_abs = rm.epr_from_functional(f, L, lam[m], M, Ec)
+            p_pal = rm.epr_palace(rm.voltage_from_functional(f, Ec), L, math.sqrt(lam[m]),
+                                  rm.electric_energy_palace(M, Ec))
+            near(f"mode {m} EPR by the absolute-square form (c={c})", scale_out * p_abs, p_m)
+            near(f"mode {m} EPR by GetInductorParticipation (c={c})", scale_out * abs(p_pal), p_m)
+        total += rm.epr_from_functional(f, L, lam[m], M, E[:, m].astype(complex))
+    near("the EPRs sum to the zeroth moment", scale_out * total, answers["N"])
+    if rm.kernel_annihilation(K, f) != 0.0:                    # f = (0,1,1) is exactly _|_ e_1
+        out.append("f does not annihilate ker K exactly")
+    return out
+
+
+def test_the_diagonal_pencil_is_reproduced_exactly(rm):
+    """Well-conditioned known answers for every quantity the round-off class qualifies:
+    kappa2 = 1 for each mode, so 16 ulps is the justified requirement, and the answers
+    are hand-verified rationals rather than a previous run."""
+    P = PENCIL
+    assert _pencil_mismatches(rm, P["K"], P["M"], P["f"], P["L"], PENCIL_ANSWERS) == []
+    # the mutations that must fail, each caught by the hand answers
+    faults = {
+        "the functional doubled": dict(f=2 * P["f"]),                   # A, N, p all x4
+        "the inductance doubled": dict(L=2 * P["L"]),                   # A, N, p all /2
+        "the mass doubled": dict(M=2 * P["M"]),                         # A /2, lam /2 ...
+        "the stiffness doubled": dict(K=2 * P["K"]),                    # N, p /2
+        "a shared dof dropped from the functional": dict(f=np.array([0.0, 1.0, 0.0])),
+    }
+    for label, change in faults.items():
+        args = {**P, **change}
+        found = _pencil_mismatches(rm, args["K"], args["M"], args["f"], args["L"], PENCIL_ANSWERS)
+        assert found, f"ACCEPTED: {label}"
+    for k in (1.05, 100.0):                                            # every output scaled
+        assert _pencil_mismatches(rm, P["K"], P["M"], P["f"], P["L"], PENCIL_ANSWERS, k), k
+    # and a GENUINE invariance, pinned so the test is known not to be unit-sensitive:
+    # (f, L, M, K) -> k (f, L, M, K) leaves A, N and every EPR unchanged
+    for k in (0.3, 7.0):
+        assert _pencil_mismatches(rm, k * P["K"], k * P["M"], k * P["f"], k * P["L"],
+                                  PENCIL_ANSWERS) == [], k
+
+
+# -- (c) the round-off class ------------------------------------------------------------
+
+def _voltage_conditioning(f: np.ndarray, E: np.ndarray) -> tuple[float, float]:
+    """kappa2 and kappa3 of V = f . E, from the sums S_r = sum |f_i Re E_i| and
+    S_i = sum |f_i Im E_i|: the error of |V|^2 evaluated from rounded components is
+    exactly 2 V_r d_r + 2 V_i d_i + d_r^2 + d_i^2 with |d| <= gamma_n S, so
+    |fl(|V|^2) - |V|^2| / |V|^2 <= 2 gamma_n kappa2 + gamma_n^2 kappa3."""
+    V = complex(f @ E.real, f @ E.imag)
+    S_r, S_i = float(np.abs(f * E.real).sum()), float(np.abs(f * E.imag).sum())
+    v2 = abs(V) ** 2
+    return (abs(V.real) * S_r + abs(V.imag) * S_i) / v2, (S_r ** 2 + S_i ** 2) / v2
+
+
+def _energy_conditioning(M: np.ndarray, E: np.ndarray) -> float:
+    """kappa_M = sum_ij |E_i| |M_ij| |E_j| / Re(E^H M E), over the real and imaginary
+    parts: a matvec then a dot, each within gamma_n of its absolute-value sum, gives
+    |fl(x^T M x) - x^T M x| <= 3 gamma_n sum_ij |x_i M_ij x_j|."""
+    A = np.abs(M)
+    T = float(np.abs(E.real) @ A @ np.abs(E.real) + np.abs(E.imag) @ A @ np.abs(E.imag))
+    return T / float(E.real @ M @ E.real + E.imag @ M @ E.imag)
+
+
+def _epr_round_off_bound(n: int, kappa2: float, kappa3: float, kappa_M: float) -> float:
+    """Relative error of ONE evaluation of p = |V|^2 / (L lam 2 E_m) from its rounded
+    parts: the |V|^2 term above, the energy term (with gamma_2n, covering the complex
+    route's length-2n real accumulation), and at most 16 elementary operations in the
+    scalar tail (sqrt, the complex division, abs, square, three products/quotients),
+    each within u. First two are Higham (3.5)-derived; the tail is an operation count."""
+    g, g2 = _gamma(n), _gamma(2 * n)
+    return 2 * g * kappa2 + g * g * kappa3 + 3 * g2 * kappa_M + 16 * U
+
+
+def test_the_voltage_dot_product_error_is_bounded_by_its_measured_cancellation(rm):
+    """A NEAR-ZERO voltage: forty terms of order one whose exact sum is ~1e-9. Each
+    route's error is measured against the EXACT sum of the double inputs (fractions), so
+    nothing rests on the routes agreeing with each other. The requirement is Higham's
+    (3.5) with the measured sum of |f_i E_i| - an ABSOLUTE bound. The relative error is
+    what the cancellation makes it and is reported, not asserted small."""
+    rng = np.random.default_rng(20260921)
+    n = 40
+    f = rng.uniform(0.5, 1.5, size=n) / 3.0            # not binary fractions: products round
+    parts = []
+    for _ in range(2):
+        E = rng.uniform(-1.0, 1.0, size=n) / 7.0
+        s = sum(Fraction(x) * Fraction(y) for x, y in zip(f[:-1], E[:-1]))
+        E[-1] = float((Fraction(1, 10 ** 9) - s) / Fraction(f[-1]))   # cancel to ~1e-9
+        parts.append(E)
+    E = parts[0] + 1j * parts[1]
+    exact = [sum(Fraction(x) * Fraction(y) for x, y in zip(f, p)) for p in parts]
+    S = [float(np.abs(f * p).sum()) for p in parts]
+    assert all(abs(float(e)) < 2e-9 for e in exact), exact
+    kappa2, _ = _voltage_conditioning(f, E)
+    assert kappa2 > 1e6, kappa2                        # a genuinely ill-conditioned sum
+    routes = {"functional": rm.voltage_from_functional(f, E),
+              "vdot": complex(np.vdot(f, E)),
+              "local, P = I": rm.voltage_palace(f, np.eye(n), E)}
+    for label, V in routes.items():
+        for comp, e, s in ((V.real, exact[0], S[0]), (V.imag, exact[1], S[1])):
+            err = abs(Fraction(comp) - e)
+            assert err <= _gamma(n) * s, (label, float(err), _gamma(n) * s,
+                                          f"relative {float(err / abs(e)):.1e}")
+    # the bound is not vacuous: one term dropped, or a factor of two, is far outside it
+    assert abs(Fraction(float(f[:-1] @ E.real[:-1])) - exact[0]) > 100 * _gamma(n) * S[0]
+    assert abs(Fraction(2 * routes["vdot"].real) - exact[0]) > 100 * _gamma(n) * S[0]
+
+
+def test_the_epr_residuals_in_the_trial_sweep_are_bounded_by_their_measured_cancellation(rm):
+    """The gate for epr_palace_vs_absolute_square and epr_phase_invariance, placed where
+    the cancellation can be MEASURED: inside the reference model's own trial loop, by
+    wrapping the four functions each trial calls - no replication of the random sequence.
+    Every residual must satisfy _epr_round_off_bound with the kappas of its own inputs.
+    The pairing is checked against the loop's own maxima bit for bit, and the bound's
+    strength is pinned: it rejects any error above 1e-8, ten orders below a factor of two.
+    Measured here across the 18 BLAS-kernel x eigen-driver configurations listed at
+    RM_FIELDS: every palace-vs-absolute residual within 6.6 u kappa2 and every phase
+    residual within 3 u (kappa2 + kappa2'), the bound never closer than 67x to any of
+    them, and 4.0e-10 at its largest."""
+    calls, state = [], {}
+    orig = {k: getattr(rm, k) for k in
+            ("voltage_from_functional", "electric_energy_palace", "epr_palace",
+             "epr_from_functional")}
+
+    def voltage(f, E):
+        state["V"] = _voltage_conditioning(f, E) + (f.size,)
+        return orig["voltage_from_functional"](f, E)
+
+    def energy(M, E):
+        state["M"] = _energy_conditioning(M, E)
+        return orig["electric_energy_palace"](M, E)
+
+    def palace(V, L, om, Em):
+        p = orig["epr_palace"](V, L, om, Em)
+        k2, k3, n = state["V"]
+        calls.append({"p_pal": p, "B_pal": _epr_round_off_bound(n, k2, k3, state["M"]),
+                      "kappa2": k2})
+        return p
+
+    def absolute(f, L, lam, M, E):
+        p = orig["epr_from_functional"](f, L, lam, M, E)
+        k2, k3 = _voltage_conditioning(f, E)
+        B = _epr_round_off_bound(f.size, k2, k3, _energy_conditioning(M, E))
+        slot = "abs" if "p_abs" not in calls[-1] else "abs0"
+        calls[-1][f"p_{slot}"], calls[-1][f"B_{slot}"] = p, B
+        return p
+
+    try:
+        for name, fn in (("voltage_from_functional", voltage), ("electric_energy_palace", energy),
+                         ("epr_palace", palace), ("epr_from_functional", absolute)):
+            setattr(rm, name, fn)
+        worst = rm.run_trials()
+    finally:
+        for name, fn in orig.items():
+            setattr(rm, name, fn)
+
+    assert len(calls) == rm.TRIALS and all("p_abs0" in c for c in calls)
+    r_pal, r_phase, bounds = [], [], []
+    for c in calls:
+        r1 = abs(abs(c["p_pal"]) - c["p_abs"]) / c["p_abs"]
+        r2 = abs(c["p_abs"] - c["p_abs0"]) / c["p_abs0"]
+        b1 = (c["B_pal"] + c["B_abs"]) / (1 - c["B_abs"])       # the divisor is p_abs, not p
+        b2 = (c["B_abs"] + c["B_abs0"]) / (1 - c["B_abs0"])
+        assert r1 <= b1, ("palace vs absolute square", r1, b1, c["kappa2"])
+        assert r2 <= b2, ("phase invariance", r2, b2, c["kappa2"])
+        r_pal.append(r1), r_phase.append(r2), bounds.append(max(b1, b2))
+    # the wrapper saw exactly what the loop recorded
+    assert max(r_pal) == worst["epr_palace_vs_absolute_square"]
+    assert max(r_phase) == worst["epr_phase_invariance"]
+    # the bound has teeth: nothing above 1e-8 could pass it, on any trial
+    assert max(bounds) <= 1e-8, max(bounds)
+    # and the declared 1e-9 for epr_phase_invariance is inside the bound on every trial
+    assert max((c["B_abs"] + c["B_abs0"]) / (1 - c["B_abs0"]) for c in calls) < 1e-9
 
 
 def test_the_driver_keeps_internal_units_internal(patch_text):
@@ -1318,8 +1757,9 @@ def test_the_regeneration_guard_rejects_corruption(rm):
     replaces. Each is asserted here together with the check that rejects it, so a later
     simplification cannot quietly re-open the same hole. The legitimate round-off
     variations are the three actually measured across machines, not imagined ones, and
-    they must still pass. No scientific threshold is relaxed to achieve that: the
-    thresholds in RM_BOUNDS are the ones the dedicated tests assert.
+    they must still pass. No scientific threshold is relaxed to achieve that: the gates
+    in RM_FIELDS are the thresholds the dedicated tests assert, and a diagnostic field's
+    identity is gated by the live tests RM_FIELDS names.
     """
     committed = {name: (FMD / name).read_text() for name in REGENERATED}
     for name, text in committed.items():
@@ -1444,6 +1884,25 @@ def test_the_regeneration_guard_rejects_corruption(rm):
     found = regeneration_mismatches(PROPOSAL, json.dumps(bad), json.dumps(bad), rm)
     assert any("independent sum over the committed columns" in m for m in found), found
 
+    # --- the diagnostic fields: what the guard does and does not reject ---------------
+    # A diagnostic's magnitude is set by the drawn mode's conditioning, so the guard
+    # requires only a finite, non-negative float of it. A sign or type corruption is
+    # rejected here; a magnitude corruption is NOT, and is pinned as accepted so that
+    # the contract is explicit: the identity is gated by the tests RM_FIELDS names.
+    diag = "/worst_case/epr_palace_vs_absolute_square"
+    for value, expected in ((-1e-15, "is negative"), (float("nan"), "is not finite"),
+                            ("0.0", "type str != float"), (True, "type bool != float")):
+        bad = json.loads(committed[RM])
+        bad["worst_case"]["epr_palace_vs_absolute_square"] = value
+        found = guard(RM, bad)
+        assert any(expected in m and diag in m for m in found), (value, found)
+    bad = json.loads(committed[RM])
+    bad["worst_case"]["epr_palace_vs_absolute_square"] = 1e-6
+    assert guard(RM, bad) == [], "a diagnostic magnitude is not the guard's to gate"
+    # ... and the identity behind it IS gated: a factor of two in any EPR fails the pencil
+    assert _pencil_mismatches(rm, PENCIL["K"], PENCIL["M"], PENCIL["f"], PENCIL["L"],
+                              {**PENCIL_ANSWERS, "p": {1: 2 / 8, 2: 2 / 18}})
+
     # --- discrete edits: every one caught AND named ----------------------------------
     for label, name, mutate in (
         ("verdict string", FIXTURE,
@@ -1563,3 +2022,42 @@ def test_the_regeneration_guard_rejects_corruption(rm):
     assert rendered
     for mantissa in rendered:
         assert len(mantissa.replace(".", "")) <= 7, mantissa
+
+
+
+def test_every_round_off_field_is_mapped_and_every_named_gate_exists(rm):
+    """The field map cannot silently lose a field or point at a test that is not there.
+    Every RM_FIELDS key exists in the committed record; every round-off-level float under
+    worst_case and error_qualification/trials is in RM_FIELDS, so none is left to the
+    stable rule by accident; every diagnostic names live tests defined in this module,
+    and every gate's threshold is the one the dedicated record test asserts."""
+    doc = json.loads((FMD / "reference_model.json").read_text())
+
+    def leaf(path):
+        node = doc
+        for key in path.lstrip("/").split("/"):
+            node = node[key]
+        return node
+
+    for path, (prop, check) in RM_FIELDS.items():
+        v = leaf(path)
+        assert isinstance(v, float) and not isinstance(v, bool), path
+        assert prop and check[0] in ("gate", "diagnostic"), path
+        if check[0] == "diagnostic":
+            assert len(check) > 1, path
+            for name in check[1:]:
+                assert callable(globals().get(name)), (path, name)
+        else:
+            assert v < check[2] if check[1] == "<" else v >= check[2], (path, v)
+    for section in ("/worst_case", "/error_qualification/trials"):
+        for key, v in leaf(section).items():
+            if isinstance(v, float) and not isinstance(v, bool) and 0.0 < abs(v) < 1e-9:
+                assert f"{section}/{key}" in RM_FIELDS, f"{section}/{key} = {v!r} is unmapped"
+    # the gates are the dedicated record test's thresholds, unchanged
+    src = inspect.getsource(test_the_reference_model_record_is_reproduced_and_within_tolerance)
+    assert "< 1e-12" in src and ">= -1e-12" in src
+    gates = {p: c for p, (_, c) in RM_FIELDS.items() if c[0] == "gate"}
+    assert sum(c[2] == 1e-12 and c[1] == "<" for c in gates.values()) == 10
+    assert gates["/worst_case/K_port_minus_qq_min_eig_same_rule_min"] == ("gate", ">=", -1e-12)
+    assert gates["/worst_case/epr_phase_invariance"] == ("gate", "<", 1e-9)
+    assert sum(c[0] == "diagnostic" for _, c in RM_FIELDS.values()) == 3
