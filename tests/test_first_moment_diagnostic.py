@@ -55,91 +55,78 @@ def _norm(text: str) -> str:
     return " ".join(" ".join(lines).split())
 
 
-#: A float below this fraction of its object's scale is solver-noise residue,
-#: not signal. Justified by measurement in _json_mismatch's docstring.
-NOISE_FLOOR = 1e-6
+def _json_mismatch(a, b, path: str = "") -> str | None:
+    """Compare two regenerations of one artefact on everything EXCEPT float values.
 
+    Three CI failures taught this. The test was asserting that a floating-point artefact
+    reproduces across machines; that property is false, and no per-leaf tolerance captured
+    it. Each run named a different field of the same class, every one a residue of a
+    DELIBERATELY perturbed solve:
 
-def _local_scale(obj) -> float:
-    """The largest float magnitude inside ONE object's subtree.
+      run 35553777395  /evaluator/error_vs_truth_nd            7 percent
+      run 35554886550  /negative_discrepancy/threshold_GHz2    4.1e-07
+      run 35556211180  .../checks[16]/detail/relative_residual 5.9e-04
 
-    Deliberately local: the document as a whole also holds dof counts and the 250000 cap,
-    and using a document-wide scale would put the round-off floor at 2.5e-04 and swallow
-    the physical quantities entirely, which a negative control caught.
-    """
-    best = 0.0
-    stack = [obj]
-    while stack:
-        x = stack.pop()
-        if isinstance(x, dict):
-            stack.extend(x.values())
-        elif isinstance(x, list):
-            stack.extend(x)
-        elif isinstance(x, (int, float)) and not isinstance(x, bool):
-            best = max(best, abs(float(x)))
-    return best
+    The last one is alone in its object, so a scale taken from its neighbours is its own
+    magnitude and no scale rule can ever exempt it. Tightening the constant again would
+    have been tuning until green.
 
+    So floats are not compared here at all, and the two properties that ARE true and DO
+    matter are asserted instead: structure and discrete content are identical (keys, list
+    lengths, strings, booleans, integers - which includes every verdict, every check name,
+    every passed flag and every mode list), and the regenerated numbers are checked
+    against the KNOWN truth recorded beside them by _truth_mismatches, rather than against
+    a previous run. The physical values are additionally asserted against known answers by
+    test_the_residual_error_identity_is_exact,
+    test_the_evaluator_recovers_a_known_omitted_moment_and_never_overstates_it,
+    test_the_saved_moment_interval_comes_from_the_printed_precision and
+    test_the_compiled_diagnostic_matches_an_independent_assembly.
 
-def _json_mismatch(a, b, path: str = "", scale: float | None = None) -> str | None:
-    """Compare two regenerations of the same artefact and NAME the first difference.
-
-    Rule 13 requires deciding what must be byte-identical, what must be structurally
-    identical, and what is only numerically equivalent within a justified tolerance:
-
-      * structure, strings, booleans and integers  -> identical
-      * floats at their own object's scale         -> 1e-9 relative
-      * floats at or below NOISE_FLOOR of it       -> not compared
-
-    The exempt class is solver-noise residue, whose RELATIVE value carries no
-    information. Two cross-machine measurements set the constant:
-
-      /evaluator/error_vs_truth_nd          3.3e-13 of its object's scale; swapping the
-                                            LAPACK eigen driver moved it by 7 percent
-      /negative_discrepancy/threshold_GHz2  2.0e-07 of its object's scale; CI run
-                                            35554886550 moved it by 4.1e-07
-
-    while the physical quantities in the same documents moved by 7e-13. The floor sits
-    five times above the tightest measured ratio. Every field it exempts is asserted by
-    a dedicated test that compares it against a KNOWN answer rather than against a
-    previous run: the saved-moment interval by
-    test_the_saved_moment_interval_comes_from_the_printed_precision, the counterexample
-    constants by test_the_old_quantity_is_not_a_bound_even_at_a_tiny_residual, and the
-    error bound by test_the_residual_error_identity_is_exact.
-
-    The scale is taken from the enclosing object, not the document. Returns None when
-    equivalent, else the path and both values, so a CI failure names the field.
+    Returns None when equivalent, else the path, so a failure names the field.
     """
     if isinstance(a, dict) and isinstance(b, dict):
         if a.keys() != b.keys():
             return f"{path}: keys differ ({sorted(set(a) ^ set(b))})"
-        here = _local_scale(a)
         for k in a:
-            m = _json_mismatch(a[k], b[k], f"{path}/{k}", here)
+            m = _json_mismatch(a[k], b[k], f"{path}/{k}")
             if m:
                 return m
         return None
     if isinstance(a, list) and isinstance(b, list):
         if len(a) != len(b):
             return f"{path}: length {len(a)} != {len(b)}"
-        here = _local_scale(a)
         for i, (x, y) in enumerate(zip(a, b)):
-            m = _json_mismatch(x, y, f"{path}[{i}]", here)
+            m = _json_mismatch(x, y, f"{path}[{i}]")
             if m:
                 return m
         return None
     if isinstance(a, bool) or isinstance(b, bool):
         return None if a == b else f"{path}: {a} != {b}"
-    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
-        if a == b:
-            return None
-        floor = NOISE_FLOOR * (scale if scale is not None else max(abs(a), abs(b)))
-        if abs(a) <= floor and abs(b) <= floor:
-            return None                      # round-off residue, not signal
-        if abs(a - b) <= 1e-9 * max(abs(a), abs(b)):
-            return None
-        rel = abs(a - b) / max(abs(a), abs(b), 1e-300)
-        return f"{path}: {a!r} != {b!r} (relative {rel:.2e}, round-off floor {floor:.2e})"
+    if isinstance(a, float) or isinstance(b, float):
+        return None                                  # see the docstring
     return None if a == b else f"{path}: {a!r} != {b!r}"
+
+
+def _truth_mismatches(doc: dict) -> list[str]:
+    """Check a regenerated fixture evaluation against the truth recorded inside it.
+
+    These hold on any machine because each compares quantities that move together, so
+    they pin the numbers without demanding cross-machine reproduction of any one of them.
+    """
+    out = []
+    truth, ev = doc["truth"], doc["evaluator"]
+    omitted = truth["omitted_first_moment_exact_nd"]
+    if abs((truth["A_total_nd"] - truth["A_saved_nd"]) - omitted) > 1e-12 * abs(omitted):
+        out.append("A_total - A_saved != omitted_first_moment_exact")
+    if abs(ev["A_direct_minus_A_saved_nd"] - omitted) > 1e-9 * abs(omitted):
+        out.append("the measured difference does not equal the known omitted moment")
+    if ev["certified_omitted_moment_lower_bound_nd"] > omitted * (1 + 1e-12):
+        out.append("the certified lower bound exceeds the truth")
+    if ev["verdict"] != "OMITTED_MOMENT_CERTIFIED_LOWER_BOUND":
+        out.append(f"verdict is {ev['verdict']}")
+    if not ev["all_checks_passed"]:
+        out.append("the good record did not pass its own checks")
+    return out
 
 
 def _load(name: str):
@@ -892,6 +879,9 @@ def test_the_offline_scripts_are_deterministic_and_cannot_launch_anything():
                 was, now = json.loads(before), json.loads(after)
                 mismatch = _json_mismatch(now, was)
                 assert mismatch is None, f"{p.name}{mismatch}"
+                if p.name == "fixture_evaluation.json":
+                    # the regenerated numbers, against the truth recorded beside them
+                    assert _truth_mismatches(now) == [], p.name
             else:
                 assert after == before, p.name
     finally:
@@ -978,54 +968,72 @@ def test_launch_safety_of_this_test_file():
             assert token not in a, (token, a)
 
 
-def test_the_artefact_comparison_accepts_round_off_and_rejects_real_change():
-    """The classifier itself, tested against both measured variations and real edits.
+def test_the_artefact_comparison_rejects_real_change_and_the_truth_checks_bite():
+    """A comparison that only ever passes is worthless, so both halves are pinned.
 
-    A comparison that only ever passes is worthless, so the exempt class is pinned by the
-    two cross-machine variations actually observed, and the non-exempt class by six
-    deliberate edits that must all be caught AND named.
+    The structural half must catch every discrete edit and name its path. The truth half
+    must catch a wrong number, which the structural half deliberately no longer compares.
     """
     import copy
 
     committed = json.loads((FMD / "fixture_evaluation.json").read_text())
     assert _json_mismatch(committed, committed) is None
+    assert _truth_mismatches(committed) == []
 
-    # the two measured cross-machine variations must be accepted
+    # solver-noise residues vary across machines and must NOT fail the structural half
     for path, value in ((("evaluator", "error_vs_truth_nd"), 5.381306e-20),
-                        (("negative_discrepancy", "threshold_GHz2"), -1.6511520418429716e-13)):
+                        (("negative_discrepancy", "threshold_GHz2"), -1.65115204e-13)):
         alt = copy.deepcopy(committed)
         alt[path[0]][path[1]] = value
         assert _json_mismatch(alt, committed) is None, path
+    noisy = copy.deepcopy(committed)
+    noisy["full_evaluation_of_the_good_record"]["checks"][16]["detail"][
+        "relative_residual"] = 1.279034924178295e-13
+    assert _json_mismatch(noisy, committed) is None
 
-    # and real changes must be rejected, each naming its own path
-    def bump(d, *path, factor):
-        node = d
-        for k in path[:-1]:
-            node = node[k]
-        node[path[-1]] = node[path[-1]] * factor
-
-    cases = {
-        "headline float 1e-8": lambda d: bump(d, "evaluator", "A_direct_minus_A_saved_nd",
-                                              factor=1 + 1e-8),
-        "nested float 1e-8": lambda d: bump(d, "full_evaluation_of_the_good_record",
-                                            "difference", "A_direct_minus_A_saved_GHz2",
-                                            factor=1 + 1e-8),
+    # every discrete edit must be caught AND named
+    discrete = {
         "verdict string": lambda d: d["evaluator"].__setitem__("verdict", "NOT_RESOLVED"),
         "boolean": lambda d: d["evaluator"].__setitem__(
             "certified_lower_bound_is_below_the_truth", False),
+        "check name": lambda d: d["full_evaluation_of_the_good_record"]["checks"][0]
+            .__setitem__("check", "something else"),
+        "a check's passed flag": lambda d: d["full_evaluation_of_the_good_record"]["checks"][0]
+            .__setitem__("passed", False),
         "missing key": lambda d: d["evaluator"].pop("verdict"),
         "shortened list": lambda d: d["full_evaluation_of_the_good_record"].__setitem__(
             "checks", d["full_evaluation_of_the_good_record"]["checks"][:-1]),
+        "mode list": lambda d: d["fixture"].__setitem__("n_modes_saved", 999),
     }
-    for label, mutate in cases.items():
+    for label, mutate in discrete.items():
         bad = copy.deepcopy(committed)
         mutate(bad)
         mismatch = _json_mismatch(bad, committed)
         assert mismatch is not None, label
         assert mismatch.startswith("/"), (label, mismatch)
 
-    # the exemption must not swallow a field that sits AT its object's scale
-    assert NOISE_FLOOR == 1e-6
-    nd = committed["negative_discrepancy"]
-    assert abs(nd["threshold_GHz2"]) / _local_scale(nd) < NOISE_FLOOR
-    assert abs(nd["difference_GHz2"]) / _local_scale(nd) == 1.0
+    # and a wrong NUMBER, which the structural half skips, must be caught by the truth half
+    numeric = {
+        "measured difference off by 1e-6": lambda d: d["evaluator"].__setitem__(
+            "A_direct_minus_A_saved_nd",
+            d["evaluator"]["A_direct_minus_A_saved_nd"] * (1 + 1e-6)),
+        "certified bound above the truth": lambda d: d["evaluator"].__setitem__(
+            "certified_omitted_moment_lower_bound_nd",
+            d["truth"]["omitted_first_moment_exact_nd"] * 1.001),
+        "truth internally inconsistent": lambda d: d["truth"].__setitem__(
+            "A_saved_nd", d["truth"]["A_saved_nd"] * 1.001),
+    }
+    for label, mutate in numeric.items():
+        bad = copy.deepcopy(committed)
+        mutate(bad)
+        assert _json_mismatch(bad, committed) is None, f"{label}: structural half should skip"
+        assert _truth_mismatches(bad) != [], label
+
+    # The one place a float survives into a compared STRING: the interpretation renders
+    # the certified lower bound. It is rendered to 7 significant digits while the bound
+    # itself varies across machines at 1e-13 relative (measured on CI run 35553777395),
+    # six orders of margin. Pinned so the rendering cannot quietly gain digits.
+    rendered = re.findall(r"(\d\.\d+)e[+-]\d\d", committed["evaluator"]["interpretation"])
+    assert rendered, committed["evaluator"]["interpretation"]
+    for mantissa in rendered:
+        assert len(mantissa.replace(".", "")) <= 7, mantissa
