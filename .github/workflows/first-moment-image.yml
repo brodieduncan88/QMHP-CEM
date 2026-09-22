@@ -22,8 +22,20 @@
 # the default branch, so this file must reach main before it can be dispatched
 # at all; dispatching then runs the version at the chosen ref.
 #
-# ONE ATTEMPT. No step retries, and no step is continue-on-error except the
-# deliberate restore check, whose result is reported rather than swallowed.
+# DISPATCH INPUT HANDLING. No ${{ }} expansion is ever placed inside a `run:`
+# script. GitHub substitutes expressions as TEXT before bash parses the script,
+# so a confirmation string of  x" ; touch INJECTED ; echo "  would RUN, and only
+# then be refused. Every input and every piece of ref text reaches the shell
+# through `env:` and is compared as a quoted variable, where it is data.
+#
+# EXIT STATUS. The qualification command decides and exits nonzero when the
+# image did not qualify, so a step that completes is no longer read as an image
+# that qualified. Pipelines run under `pipefail` and digests are computed into
+# variables, so a failure is never masked by the exit status of a trailing tee.
+#
+# ONE ATTEMPT. No step retries, and no step is continue-on-error. Evidence
+# collection and upload run on failure as well as success, so a build or a
+# qualification that fails still leaves its logs, configurations and records.
 
 name: First-moment image (build + synthetic qualification)
 
@@ -48,6 +60,7 @@ concurrency:
 
 env:
   IMAGE: qmhp-cem/palace-first-moment:0.13.0
+  ARCHIVE_NAME: palace-first-moment-0.13.0.tar.gz
 
 jobs:
   build-and-qualify:
@@ -56,8 +69,11 @@ jobs:
     timeout-minutes: 120          # declared before dispatch; the job is killed at the cap
     steps:
       - name: Refuse an unconfirmed dispatch
+        env:
+          CONFIRM: ${{ inputs.confirm }}   # DATA, not shell source
         run: |
-          if [ "${{ inputs.confirm }}" != "build-and-qualify" ]; then
+          set -euo pipefail
+          if [ "$CONFIRM" != "build-and-qualify" ]; then
             echo "REFUSED: confirmation string not given; nothing was built." >&2
             exit 1
           fi
@@ -65,42 +81,69 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Record what is actually checked out
+        env:
+          REF: ${{ github.ref }}                   # ref TEXT, through the environment
+          REF_NAME: ${{ github.ref_name }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
+          set -euo pipefail
+          # Each digest is computed into a VARIABLE. An assignment carries the exit
+          # status of its command substitution, so a missing or unreadable file fails
+          # this step; inside `echo "x=$(...)"` it would have been swallowed and the
+          # record would have claimed an empty digest as a measured one.
+          sha() { sha256sum "$1" | cut -d' ' -f1; }
+          checked_out_sha=$(git rev-parse HEAD)
+          workflow_sha256=$(sha .github/workflows/first-moment-image.yml)
+          dockerfile_sha256=$(sha docker/palace-first-moment.Dockerfile)
+          patch_sha256=$(sha docker/patches/first-moment-diagnostic.patch)
+          dockerignore_sha256=$(sha .dockerignore)
+          production_dockerfile_sha256=$(sha docker/palace.Dockerfile)
+          qualifier_sha256=$(sha experiments/first-moment-diagnostic/compiled_qualification.py)
           {
-            echo "checked_out_sha=$(git rev-parse HEAD)"
-            echo "ref=${{ github.ref }}"
-            echo "run_id=${{ github.run_id }}"
-            echo "run_attempt=${{ github.run_attempt }}"
-            echo "workflow_sha256=$(sha256sum .github/workflows/first-moment-image.yml | cut -d' ' -f1)"
-            echo "dockerfile_sha256=$(sha256sum docker/palace-first-moment.Dockerfile | cut -d' ' -f1)"
-            echo "patch_sha256=$(sha256sum docker/patches/first-moment-diagnostic.patch | cut -d' ' -f1)"
-            echo "dockerignore_sha256=$(sha256sum .dockerignore | cut -d' ' -f1)"
-            echo "production_dockerfile_sha256=$(sha256sum docker/palace.Dockerfile | cut -d' ' -f1)"
-          } | tee "$RUNNER_TEMP/build-inputs.txt"
+            echo "checked_out_sha=$checked_out_sha"
+            echo "ref=$REF"
+            echo "ref_name=$REF_NAME"
+            echo "run_id=$RUN_ID"
+            echo "run_attempt=$RUN_ATTEMPT"
+            echo "workflow_sha256=$workflow_sha256"
+            echo "dockerfile_sha256=$dockerfile_sha256"
+            echo "patch_sha256=$patch_sha256"
+            echo "dockerignore_sha256=$dockerignore_sha256"
+            echo "production_dockerfile_sha256=$production_dockerfile_sha256"
+            echo "qualifier_sha256=$qualifier_sha256"
+          } > "$RUNNER_TEMP/build-inputs.txt"
+          cat "$RUNNER_TEMP/build-inputs.txt"
 
       - name: Free runner disk
         run: |
+          set -euo pipefail
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h /
 
       - name: Build the reviewed image
+        id: build
         timeout-minutes: 75
         run: |
-          set -eux
+          set -euxo pipefail
+          # pipefail is what makes `| tee` safe here: without it the step would take
+          # tee's exit status and a failed build would read as a successful one.
           docker build --progress=plain \
             -f docker/palace-first-moment.Dockerfile \
-            -t "$IMAGE" .
+            -t "$IMAGE" . 2>&1 | tee "$RUNNER_TEMP/build.log"
 
       - name: Image identity, and the four PALACE_* files read from INSIDE the image
         run: |
-          set -eux
+          set -euxo pipefail
           docker image inspect "$IMAGE" --format '{{.Id}}'                > "$RUNNER_TEMP/image_id.txt"
           docker image inspect "$IMAGE" --format '{{json .RepoDigests}}'  > "$RUNNER_TEMP/repo_digests.json"
           docker image inspect "$IMAGE" --format '{{json .Config.Labels}}'> "$RUNNER_TEMP/labels.json"
+          : > "$RUNNER_TEMP/in_image_identity.txt"
           for f in PALACE_VERSION PALACE_COMMIT PALACE_PATCH PALACE_PATCH_SHA256; do
-            printf '%s=' "$f"
-            docker run --rm --network none --entrypoint /bin/sh "$IMAGE" -c "cat /opt/palace/$f"
-          done | tee "$RUNNER_TEMP/in_image_identity.txt"
+            value=$(docker run --rm --network none --entrypoint /bin/sh "$IMAGE" -c "cat /opt/palace/$f")
+            printf '%s=%s\n' "$f" "$value" >> "$RUNNER_TEMP/in_image_identity.txt"
+          done
+          cat "$RUNNER_TEMP/in_image_identity.txt"
           echo "--- asserting the in-image identity is the reviewed one ---"
           docker run --rm --network none --entrypoint /bin/sh "$IMAGE" -c '
             set -eu
@@ -121,7 +164,7 @@ jobs:
 
       - name: Container shim, so the harness qualifies the IMAGE and not a binary
         run: |
-          set -eux
+          set -euxo pipefail
           cat > "$RUNNER_TEMP/palace-in-container" <<'SHIM'
           #!/bin/bash
           # The qualification harness invokes `<palace> --serial config.json` (or
@@ -132,7 +175,7 @@ jobs:
           # Palace reads its identity files from the in-image default /opt/palace
           # and records ImageInfoDirIsDefault=true. Passing a host directory is
           # what marks a run a developer build, which is exactly what this
-          # workflow exists to avoid.
+          # workflow exists to avoid, and what the qualification decision refuses.
           set -euo pipefail
           exec docker run --rm --network none --hostname localhost \
             -u "$(id -u):$(id -g)" \
@@ -144,49 +187,104 @@ jobs:
           cat "$RUNNER_TEMP/palace-in-container"
 
       - name: Synthetic qualification, through the built image
+        id: qualify
         timeout-minutes: 30
         run: |
-          set -eux
+          set -euxo pipefail
           mkdir -p "$RUNNER_TEMP/qualify-work"
+          # The command DECIDES. It exits nonzero when the image did not qualify - a
+          # wrong A, a crashed fixture, a fixture that wrote no record, a failed
+          # functional check or a developer-build provenance - so completing this step
+          # is not the same as, and no longer stands in for, the image qualifying.
           uv run python experiments/first-moment-diagnostic/compiled_qualification.py \
             --palace "$RUNNER_TEMP/palace-in-container" \
             --workroot "$RUNNER_TEMP/qualify-work" \
-            --out "$RUNNER_TEMP/image_qualification.json"
+            --out "$RUNNER_TEMP/image_qualification.json" \
+            2>&1 | tee "$RUNNER_TEMP/qualification.log"
           # --out is OUTSIDE the repository on purpose: the committed
           # compiled_qualification.json is the NATIVE qualification record and
           # is historical evidence. This run does not overwrite it.
 
-      - name: Show the qualification record
+      - name: Show the qualification record and its decision
         if: always()
         run: |
+          set -uo pipefail
           echo "::group::image_qualification.json"
           cat "$RUNNER_TEMP/image_qualification.json" || echo "(not written)"
           echo "::endgroup::"
+          python3 - <<'PY' || true
+          import json, os, pathlib
+          p = pathlib.Path(os.environ["RUNNER_TEMP"]) / "image_qualification.json"
+          d = json.loads(p.read_text()).get("decision", {})
+          print("DECISION:", d.get("decision", "(absent)"))
+          for f in d.get("failed", []):
+              print("  FAILED:", f)
+          for n in d.get("not_established", []):
+              print("  NOT ESTABLISHED:", n)
+          PY
 
-      - name: Save the exact qualified image, with a checksum
+      - name: Save the exact image, with a checksum
+        if: always() && steps.build.outcome == 'success'
         run: |
-          set -eux
-          docker save "$IMAGE" | gzip -9 > "$RUNNER_TEMP/palace-first-moment-0.13.0.tar.gz"
-          sha256sum "$RUNNER_TEMP/palace-first-moment-0.13.0.tar.gz" \
-            | tee "$RUNNER_TEMP/image_archive_sha256.txt"
-          ls -l "$RUNNER_TEMP/palace-first-moment-0.13.0.tar.gz"
+          set -euxo pipefail
+          # pipefail again: without it a failed `docker save` would leave a valid but
+          # truncated gzip and the step would pass.
+          docker save "$IMAGE" | gzip -9 > "$RUNNER_TEMP/$ARCHIVE_NAME"
+          archive_sha256=$(sha256sum "$RUNNER_TEMP/$ARCHIVE_NAME" | cut -d' ' -f1)
+          printf '%s  %s\n' "$archive_sha256" "$ARCHIVE_NAME" \
+            > "$RUNNER_TEMP/image_archive_sha256.txt"
+          cat "$RUNNER_TEMP/image_archive_sha256.txt"
+          ls -l "$RUNNER_TEMP/$ARCHIVE_NAME"
 
       - name: Verify the archive restores to the SAME image ID
+        if: always() && steps.build.outcome == 'success'
         run: |
-          set -eux
+          set -euxo pipefail
           BEFORE="$(cat "$RUNNER_TEMP/image_id.txt")"
           docker rmi -f "$IMAGE"
           docker image inspect "$IMAGE" >/dev/null 2>&1 && { echo "image still present" >&2; exit 1; } || true
-          gunzip -c "$RUNNER_TEMP/palace-first-moment-0.13.0.tar.gz" | docker load
+          gunzip -c "$RUNNER_TEMP/$ARCHIVE_NAME" | docker load
           AFTER="$(docker image inspect "$IMAGE" --format '{{.Id}}')"
-          echo "image_id_before_save=$BEFORE"
-          echo "image_id_after_restore=$AFTER"
-          [ "$BEFORE" = "$AFTER" ] || { echo "RESTORE MISMATCH" >&2; exit 1; }
+          archive_sha256=$(cut -d' ' -f1 < "$RUNNER_TEMP/image_archive_sha256.txt")
           {
-            echo "image_id=$AFTER"
-            echo "archive_sha256=$(cut -d' ' -f1 < "$RUNNER_TEMP/image_archive_sha256.txt")"
+            echo "image_id_before_save=$BEFORE"
+            echo "image_id_after_restore=$AFTER"
+            echo "archive_sha256=$archive_sha256"
             echo "note=image_id, archive_sha256 and any registry repo digest are three DIFFERENT identifiers"
-          } | tee "$RUNNER_TEMP/restore_verification.txt"
+          } > "$RUNNER_TEMP/restore_verification.txt"
+          cat "$RUNNER_TEMP/restore_verification.txt"
+          [ "$BEFORE" = "$AFTER" ] || { echo "RESTORE MISMATCH" >&2; exit 1; }
+
+      - name: Collect the evidence, whatever the outcome
+        if: always()
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}      # through the environment, as data
+          QUALIFY_OUTCOME: ${{ steps.qualify.outcome }}
+        run: |
+          set -uo pipefail
+          # Runs after a failed build and after a failed qualification, so the logs,
+          # the executed fixture configurations and synthetic inputs, the result
+          # records and the structured FAILED records are retained either way.
+          mkdir -p "$RUNNER_TEMP/qualify-work"
+          {
+            echo "build_step_outcome=$BUILD_OUTCOME"
+            echo "qualify_step_outcome=$QUALIFY_OUTCOME"
+          } > "$RUNNER_TEMP/qualification-decision.txt"
+          python3 - >> "$RUNNER_TEMP/qualification-decision.txt" <<'PY' || true
+          import json, os, pathlib
+          p = pathlib.Path(os.environ["RUNNER_TEMP"]) / "image_qualification.json"
+          d = json.loads(p.read_text()).get("decision", {}) if p.is_file() else {}
+          print("qualification_decision=" + d.get("decision", "NOT PRODUCED"))
+          for f in d.get("failed", []):
+              print("failed_check=" + f)
+          for n in d.get("not_established", []):
+              print("not_established=" + n)
+          PY
+          cat "$RUNNER_TEMP/qualification-decision.txt"
+          ( cd "$RUNNER_TEMP" && find . -maxdepth 3 -type f \
+              \( -name '*.json' -o -name '*.txt' -o -name '*.log' -o -name '*.msh' \) \
+              -printf '%s\t%p\n' | sort -k2 ) > "$RUNNER_TEMP/evidence-manifest.txt"
+          cat "$RUNNER_TEMP/evidence-manifest.txt"
 
       - name: Upload the image archive and every qualification artefact
         if: always()
@@ -199,9 +297,14 @@ jobs:
             ${{ runner.temp }}/palace-first-moment-0.13.0.tar.gz
             ${{ runner.temp }}/image_archive_sha256.txt
             ${{ runner.temp }}/image_qualification.json
+            ${{ runner.temp }}/qualification-decision.txt
+            ${{ runner.temp }}/qualification.log
+            ${{ runner.temp }}/qualify-work
+            ${{ runner.temp }}/build.log
+            ${{ runner.temp }}/build-inputs.txt
+            ${{ runner.temp }}/evidence-manifest.txt
             ${{ runner.temp }}/image_id.txt
             ${{ runner.temp }}/repo_digests.json
             ${{ runner.temp }}/labels.json
             ${{ runner.temp }}/in_image_identity.txt
-            ${{ runner.temp }}/build-inputs.txt
             ${{ runner.temp }}/restore_verification.txt

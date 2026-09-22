@@ -12,6 +12,7 @@ import importlib.util
 import inspect
 import json
 import math
+import os
 import re
 import shutil
 import subprocess
@@ -26,6 +27,9 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FMD = REPO_ROOT / "experiments" / "first-moment-diagnostic"
+#: the NATIVE qualification record, historical evidence: the image
+#: qualification writes outside the repository and never overwrites it.
+COMPILED_QUALIFICATION_SHA256 = "9f1c77964494ea7d66a52c7a3ab48a1ec02e4b59db658ec443a5bc8248c390f1"
 DOC = REPO_ROOT / "docs" / "coupled-candidate" / "first-moment-diagnostic.md"
 PATCH = REPO_ROOT / "docker" / "patches" / "first-moment-diagnostic.patch"
 DOCKERFILE = REPO_ROOT / "docker" / "palace-first-moment.Dockerfile"
@@ -1673,6 +1677,428 @@ def test_the_compiled_qualification_refuses_anything_but_the_synthetic_fixtures(
     assert "SYNTHETIC" in src and "refuses to execute anything" in src
 
 
+# --- 5d. the qualification DECISION ---------------------------------------------------
+#
+# Collecting fixture results and printing them is not qualifying an image. Before the
+# decision existed, compiled_qualification.py's main() returned 0 whatever the fixtures
+# did, and the workflow step that runs it read "the command succeeded" as "the image
+# qualified". Reproduced at the pre-fix SHA 220aac00c9ff67711f0aff093715832bfd6a7bb7 in
+# a detached worktree: with a mock palace and no Palace anywhere, a 50% wrong A, a
+# fixture that exited 3, a fixture that wrote no record at all, a failed functional
+# check and a developer-build provenance ALL exited 0.
+#
+# These tests drive the same mock through the real command and check the EXIT STATUS,
+# not just a helper. The mock writes the record the real compiled binary wrote, taking
+# its numbers from the committed native qualification record, and each mode spoils
+# exactly one thing.
+
+MOCK_PALACE = '''#!/usr/bin/env python3
+"""A MOCK palace. Runs no FEM: it recognises which synthetic fixture config it was
+handed and writes the record the real compiled binary wrote for it. MOCK_FM_MODE
+spoils exactly one thing."""
+import json, os, sys
+from pathlib import Path
+
+MODE = os.environ.get("MOCK_FM_MODE", "good")
+cwd = Path.cwd()
+cfg = json.loads((cwd / "config.json").read_text())
+port = cfg["Boundaries"]["LumpedPort"][0]
+L_H, active = port["L"], port.get("Active", True)
+maxits = cfg["Solver"]["FirstMoment"]["MaxIts"]
+argv = sys.argv[1:]
+np_ranks = int(argv[argv.index("-np") + 1]) if "-np" in argv else 1
+name = "D" if not active else "C" if maxits == 1 else "B" if L_H == 1e-08 else "A"
+
+print(f"mock palace: fixture {name}, np={np_ranks}, mode={MODE}")
+print("Initialization                   0.006       0.006       0.006")
+post = cwd / "postpro"
+post.mkdir(parents=True, exist_ok=True)
+
+PROV = {"ConfigMesh": "fm_synthetic.msh", "ImageInfoDir": "/opt/palace",
+        "ImageInfoDirIsDefault": True, "MpiSize": np_ranks,
+        "PALACE_COMMIT": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+        "PALACE_PATCH": "first-moment-diagnostic",
+        "PALACE_PATCH_SHA256":
+            "e8a1ad51d4e355b0426e84c70cb9c796a4915b1216bb035d5fe60913de512fee",
+        "PALACE_VERSION": "0.13.0"}
+SCALES = {"A_GHz2_per_nd": 569.1433657156557, "FrequencyScale_GHz": 23.85672579621218,
+          "InductanceScale_H": 2.5132741228718347e-09, "Lc_m": 0.002,
+          "tc_ns": 0.00667128190395536}
+SOLNORM = 42.14286916348303
+SPEC = {
+    "A": dict(A_nd=64.16250164577238, A_GHz2=36517.66213941119, clb=64.16250164577238,
+              xr=-3.480182745601994e-16, conv=True, its=32,
+              relres=1.2459756972030213e-12, gap=0.9433754934463132,
+              L_nd=0.3978873577297383),
+    "B": dict(A_nd=6.416250164577237, A_GHz2=3651.7662139411186, clb=6.416250164577237,
+              xr=-3.480182745601994e-16, conv=True, its=32,
+              relres=1.2459756972030213e-12, gap=0.9939660838546912,
+              L_nd=3.9788735772973833),
+    "C": dict(A_nd=54.2087085166793, A_GHz2=30852.52681628179, clb=54.208708516679316,
+              xr=-6.3976601794024646e-15, conv=False, its=1,
+              relres=0.4129210005633967, gap=0.9069987035151496,
+              L_nd=0.3978873577297383),
+}
+
+if name == "D":
+    (post / "first-moment-FAILED.json").write_text(json.dumps(
+        {"Diagnostic": "FirstMoment", "Status": "FAILED",
+         "Reason": "no active lumped port with nonzero inductance",
+         "Provenance": PROV}, indent=1))
+    print("no active lumped port with nonzero inductance", file=sys.stderr)
+    sys.exit(1)
+if MODE == "crash" and name == "A":
+    print("mock: segmentation fault in the mass solve", file=sys.stderr)
+    sys.exit(3)
+if MODE == "no_record" and name == "A":
+    print("mock: exiting 0 without writing a record", file=sys.stderr)
+    sys.exit(0)
+
+s = dict(SPEC[name])
+if MODE in ("wrong_A", "deflated_A") and name == "A":
+    f = 1.5 if MODE == "wrong_A" else 0.5
+    s["A_nd"] *= f; s["A_GHz2"] *= f; s["clb"] *= f
+if MODE == "developer_build":
+    PROV = dict(PROV, ImageInfoDir="/host/palace-good", ImageInfoDirIsDefault=False)
+if MODE == "unreviewed_binary":
+    PROV = dict(PROV, PALACE_COMMIT="deadbeef" * 5)
+func_rel, func_pass = ((1e-3, False) if MODE == "functional_broken" and name == "A"
+                       else (0.0, True))
+if MODE == "nan" and name == "A":
+    s["A_nd"] = float("nan")
+
+resnorm = s["relres"] * SOLNORM
+rec = {
+    "Diagnostic": "FirstMoment", "Status": "COMPLETED", "Provenance": PROV,
+    "Port": {"Index": 1, "L_nd": s["L_nd"], "L_H": L_H, "NumElements": 26},
+    "Dofs": {"True": 663, "Essential": 129, "Free": 534},
+    "Scales": SCALES,
+    "Functional": {"NormSquaredFull": 0.5601841337765997,
+                   "NormSquaredFree": 0.5374534814822652,
+                   "NormSquaredEssential": 0.022730652294334464,
+                   "Check": {"RelativeError": func_rel, "Passed": func_pass}},
+    "LinearSolve": {"Type": "PCG+Jacobi on M(DIAG_ONE)", "RelTol": 1e-12,
+                    "MaxIts": maxits, "Iterations": s["its"], "Converged": s["conv"],
+                    "SolverFinalRes": s["relres"], "ResidualNorm": resnorm,
+                    "RhsNorm": 0.7331121887, "RelativeResidual": s["relres"],
+                    "SolutionNorm": SOLNORM, "SolutionEssentialNorm": 0.0},
+    "A": {"A_nd": s["A_nd"], "A_GHz2": s["A_GHz2"],
+          "ErrorIdentity": "A_computed - A_exact = (Re(x^H r) - r^H M^-1 r)/L",
+          "XDotR_nd": s["xr"],
+          "CertifiedErrorUpperBound_nd": "UNAVAILABLE",
+          "CertifiedErrorUpperBound_GHz2": "UNAVAILABLE",
+          "CertifiedLowerBound_A_nd": s["clb"],
+          "CertifiedLowerBound_A_GHz2": s["clb"] * SCALES["A_GHz2_per_nd"],
+          "UncertifiedErrorEstimate_nd": resnorm * SOLNORM / s["L_nd"],
+          "UncertifiedErrorEstimate_GHz2": 0.0, "CertifiedUpperBound": "UNAVAILABLE"},
+    "NullSpaceCheck": {"Enabled": True, "IsSampledNotProof": True,
+                       "MinRelativeGap": s["gap"]},
+    "Resources": {"WallTime_s": 0.46, "MaxRSS_MB": 120.0},
+}
+if MODE == "truncated_record" and name == "A":
+    rec.pop("NullSpaceCheck")
+(post / "first-moment.json").write_text(json.dumps(rec, indent=1))
+sys.exit(0)
+'''
+
+#: Each mode spoils exactly one thing, and names the check that must catch it.
+SPOILED_MODES = {
+    "wrong_A": "A agrees with the independent assembly",
+    "deflated_A": "A agrees with the independent assembly",
+    "crash": "exited 0",
+    "no_record": "wrote a first-moment record",
+    "functional_broken": "the functional check passed",
+    "developer_build": "not a developer build",
+    "unreviewed_binary": "carries the reviewed Palace identity",
+    "truncated_record": "matches the declared schema",
+    "nan": "the record is finite",
+}
+
+
+@pytest.fixture(scope="module")
+def mock_palace(tmp_path_factory) -> Path:
+    p = tmp_path_factory.mktemp("mock-palace") / "palace"
+    p.write_text(MOCK_PALACE)
+    p.chmod(0o755)
+    return p
+
+
+def run_qualification(mock: Path, out_dir: Path, mode: str) -> tuple[int, dict | None]:
+    """The REAL command, end to end, against the mock. Returns its exit status and the
+    report it wrote - which is what the workflow step's success or failure comes from."""
+    out = out_dir / "report.json"
+    proc = subprocess.run(
+        [sys.executable, str(FMD / "compiled_qualification.py"),
+         "--palace", str(mock), "--workroot", str(out_dir / "work"), "--out", str(out)],
+        capture_output=True, text=True, cwd=REPO_ROOT,
+        env=dict(os.environ, MOCK_FM_MODE=mode))
+    report = json.loads(out.read_text()) if out.is_file() else None
+    return proc.returncode, report
+
+
+def test_a_faithful_image_qualification_exits_zero_and_says_QUALIFIED(mock_palace, tmp_path):
+    rc, report = run_qualification(mock_palace, tmp_path, "good")
+    assert rc == 0, report
+    d = report["decision"]
+    assert d["decision"] == "QUALIFIED" and d["qualified"] is True
+    assert d["failed"] == []
+    assert len(d["checks"]) > 40, "the decision must actually check things"
+    # the committed NATIVE record is not what was judged, and was not written to
+    assert _sha256(FMD / "compiled_qualification.json") == COMPILED_QUALIFICATION_SHA256
+
+
+@pytest.mark.parametrize("mode", sorted(SPOILED_MODES))
+def test_a_spoiled_image_qualification_exits_nonzero_and_says_NOT_QUALIFIED(
+        mock_palace, tmp_path, mode):
+    """The pre-fix behaviour, mode by mode: every one of these exited 0 at
+    220aac00c9ff67711f0aff093715832bfd6a7bb7."""
+    rc, report = run_qualification(mock_palace, tmp_path, mode)
+    assert rc != 0, f"{mode} was accepted"
+    d = report["decision"]
+    assert d["decision"] == "NOT QUALIFIED" and d["qualified"] is False
+    assert any(SPOILED_MODES[mode] in f for f in d["failed"]), (mode, d["failed"])
+    # evidence before presentation: the report survives the refusal
+    assert report["runs"], "the fixture results must be kept even when it refuses"
+
+
+def test_the_decision_agrees_with_the_committed_native_qualification(compiled):
+    """The control that the criteria are neither stricter nor looser than what this
+    repository already accepted: the historical NATIVE qualification record, real
+    compiled output, passes every check when judged on its own terms - and is refused
+    under the default for exactly one reason, that it is a developer build."""
+    mod = _load("compiled_qualification")
+    lenient = mod.decide(compiled, require_in_image_identity=False)
+    assert lenient["decision"] == "QUALIFIED", lenient["failed"]
+    strict = mod.decide(compiled)
+    assert strict["decision"] == "NOT QUALIFIED"
+    assert all("developer build" in f for f in strict["failed"]), strict["failed"]
+    assert len(strict["failed"]) == 3, "one per fixture that wrote a record"
+
+
+def test_an_intended_failure_passes_but_an_arbitrary_crash_does_not(mock_palace, tmp_path):
+    """An intended failure fixture is not automatically a qualification failure:
+    D-port-inactive exits 1 by design and the good run is QUALIFIED. An arbitrary crash
+    is not the intended negative result either - it exits nonzero and writes no
+    structured evidence, so the same fixture refuses."""
+    mod = _load("compiled_qualification")
+    rc, report = run_qualification(mock_palace, tmp_path, "good")
+    assert rc == 0
+    d = report["runs"]["D-port-inactive"]
+    assert d["returncode"] != 0 and d["wrote_first_moment_json"] is False
+    assert d["failed_record"]["Status"] == "FAILED"
+    for spoil, why in (({"failed_record": None, "returncode": 139}, "a segfault"),
+                       ({"failed_record": {"Status": "FAILED"}}, "no reason given"),
+                       ({"failed_record_has_provenance": False}, "no provenance"),
+                       ({"returncode": 0, "wrote_first_moment_json": True}, "it succeeded")):
+        crashed = copy.deepcopy(report)
+        crashed["runs"]["D-port-inactive"].update(spoil)
+        out = mod.decide(crashed)
+        assert out["decision"] == "NOT QUALIFIED", why
+        assert any("D-port-inactive" in f for f in out["failed"]), why
+
+
+def test_fault_injection_is_not_claimed_unless_it_actually_ran(mock_palace, tmp_path, compiled):
+    """--faulted-palace is optional and the workflow does not pass it. The decision must
+    say so rather than let its absence read as a pass."""
+    mod = _load("compiled_qualification")
+    _, report = run_qualification(mock_palace, tmp_path, "good")
+    d = report["decision"]
+    assert "fault_injection" not in report
+    assert d["coverage"]["fault_injection"].startswith("NOT RUN")
+    assert any("fault" in n for n in d["not_established"])
+    assert not any("fault" in c["check"] for c in d["checks"]), (
+        "an absent fault injection must produce no passing check")
+    # and when it DID run, as in the committed native record, it is checked
+    ran = mod.decide(compiled, require_in_image_identity=False)
+    assert ran["coverage"]["fault_injection"] == "RAN"
+    assert any("fault injection" in c["check"] and c["passed"] for c in ran["checks"])
+    broken = copy.deepcopy(compiled)
+    broken["fault_injection"]["caught_at"] = []
+    assert mod.decide(broken, require_in_image_identity=False)["decision"] == "NOT QUALIFIED"
+
+
+@pytest.mark.parametrize("report", [
+    {}, {"runs": {}}, {"runs": "nonsense"}, {"runs": None},
+    {"label": "no runs at all"},
+])
+def test_a_malformed_report_refuses(report):
+    mod = _load("compiled_qualification")
+    out = mod.decide(report)
+    assert out["decision"] == "NOT QUALIFIED" and out["failed"]
+
+
+def test_incomplete_coverage_refuses(mock_palace, tmp_path):
+    """Missing fixtures, missing ranks and a rank that silently ran with the wrong
+    number of processes are all refusals, not omissions."""
+    mod = _load("compiled_qualification")
+    _, good = run_qualification(mock_palace, tmp_path, "good")
+    assert mod.decide(good)["decision"] == "QUALIFIED"
+    for mutate, why in (
+            (lambda r: r["runs"].pop("B-scaled-L"), "a fixture did not run"),
+            (lambda r: r["mpi_sweep"].pop("np=4"), "a required rank did not run"),
+            (lambda r: r["mpi_sweep"]["np=3"]["good"].update({"mpi_size": 1}),
+             "a rank ran with the wrong process count"),
+            (lambda r: r.pop("L_scaling"), "the 1/L scaling was not measured"),
+            (lambda r: r["mpi_sweep"]["np=2"]["good"].update({"A_nd": 1.0}),
+             "the ranks disagree")):
+        spoiled = copy.deepcopy(good)
+        mutate(spoiled)
+        assert mod.decide(spoiled)["decision"] == "NOT QUALIFIED", why
+
+
+def test_the_decision_uses_this_module_s_own_declared_tolerances():
+    """No tolerance in the decision is new. Each one is the number this module already
+    asserts against the committed record, read out of that test's source so the two
+    cannot drift apart silently."""
+    mod = _load("compiled_qualification")
+    declared = inspect.getsource(test_the_compiled_diagnostic_matches_an_independent_assembly)
+    assert 'r["relative_error_vs_independent"] < 1e-12' in declared
+    assert 'r["functional_check_relative_error"] <= 1e-10' in declared
+    assert 'compiled["L_scaling"]["relative_error"] < 1e-12' in declared
+    nonconv = inspect.getsource(
+        test_the_compiled_diagnostic_handles_non_convergence_and_failed_checks)
+    assert 'c["relative_residual"] > 1e-3' in nonconv
+    assert mod.REL_TO_INDEPENDENT == 1e-12
+    assert mod.FUNCTIONAL_CHECK_REL == 1e-10
+    assert mod.L_SCALING_REL == 1e-12
+    assert mod.NONCONVERGENCE_RELRES == 1e-3
+    assert mod.REQUIRED_MPI_RANKS == (1, 2, 3, 4)
+    # every declared fixture has a declared expected outcome, so a fixture added later
+    # cannot pass by being unclassified
+    declared_fixtures = set(json.loads((FMD / "synthetic_fixture.json").read_text())["fixtures"])
+    classified = set(mod.MUST_SUCCEED + mod.MUST_NOT_CONVERGE + mod.MUST_FAIL_CLOSED)
+    assert declared_fixtures == classified, declared_fixtures ^ classified
+    # and what has no declared criterion is named, not quietly given one
+    assert len(mod.decide({"runs": {}})["undeclared_criteria"]) >= 2
+
+
+def test_the_decision_cannot_be_relaxed_from_the_command_line():
+    """require_in_image_identity is a keyword for the controls above, not a flag: there
+    must be no way to accept a developer build by passing an argument."""
+    src = (FMD / "compiled_qualification.py").read_text()
+    tree = ast.parse(src)
+    added = [n.args[0].value for n in ast.walk(tree)
+             if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+             and n.func.attr == "add_argument" and n.args
+             and isinstance(n.args[0], ast.Constant)]
+    assert "--image-info-dir" in added, "the existing flags are unchanged"
+    for forbidden in ("--allow-developer-build", "--no-decide", "--skip-decision",
+                      "--require-in-image-identity", "--allow", "--force"):
+        assert forbidden not in added, forbidden
+    assert "require_in_image_identity" not in "".join(added)
+
+
+# --- 5e. the build workflow's evidence, exit status and input handling ----------------
+
+def workflow_steps() -> list[dict]:
+    import yaml
+    data = yaml.safe_load((REPO_ROOT / ".github" / "workflows" /
+                           "first-moment-image.yml").read_text())
+    return data["jobs"]["build-and-qualify"]["steps"]
+
+
+def has_pipeline(body: str) -> bool:
+    lines = [ln for ln in body.splitlines() if not ln.lstrip().startswith("#")]
+    return "|" in "\n".join(lines).replace("||", "")
+
+
+def test_no_dispatch_input_or_ref_text_reaches_shell_source():
+    """GitHub substitutes ${{ }} as TEXT before bash parses the script, so an expression
+    inside a `run:` body is source code, not data. Reproduced at
+    220aac00c9ff67711f0aff093715832bfd6a7bb7: the refusal step interpolated
+    inputs.confirm directly, and a confirmation of  x" ; touch INJECTED ; echo "  RAN
+    before being refused."""
+    for step in workflow_steps():
+        body = step.get("run")
+        if body:
+            assert "${{" not in body, step.get("name")
+    named = {step.get("name"): step for step in workflow_steps()}
+    assert named["Refuse an unconfirmed dispatch"]["env"]["CONFIRM"] == "${{ inputs.confirm }}"
+    env = named["Record what is actually checked out"]["env"]
+    assert env["REF"] == "${{ github.ref }}" and env["REF_NAME"] == "${{ github.ref_name }}"
+
+
+def test_shell_metacharacters_in_the_confirmation_stay_literal_and_are_refused(tmp_path):
+    """Harmless and end to end: the step's ACTUAL body, run by bash, with hostile
+    confirmation values. Nothing may execute, and the genuine string must still pass -
+    a guard that refused everything would satisfy the first half alone."""
+    step = {s.get("name"): s for s in workflow_steps()}["Refuse an unconfirmed dispatch"]
+    script = tmp_path / "step.sh"
+    script.write_text(step["run"])
+    hostile = ['x" ; touch INJECTED ; echo "', "$(touch SUBST)", "`touch TICK`",
+               "build-and-qualify; touch SEMI", "*"]
+    for payload in hostile:
+        proc = subprocess.run(["bash", str(script)], cwd=tmp_path, capture_output=True,
+                              text=True, env={"CONFIRM": payload, "PATH": os.environ["PATH"]})
+        assert proc.returncode == 1, payload
+        assert "REFUSED" in proc.stderr, payload
+    for marker in ("INJECTED", "SUBST", "TICK", "SEMI"):
+        assert not (tmp_path / marker).exists(), f"{marker}: the payload executed"
+    ok = subprocess.run(["bash", str(script)], cwd=tmp_path, capture_output=True, text=True,
+                        env={"CONFIRM": "build-and-qualify", "PATH": os.environ["PATH"]})
+    assert ok.returncode == 0, "the guard must still admit the real confirmation"
+
+
+def test_every_workflow_pipeline_preserves_the_underlying_exit_status():
+    for step in workflow_steps():
+        body = step.get("run")
+        if body and has_pipeline(body):
+            assert "pipefail" in body, step.get("name")
+
+
+def test_the_pipefail_guard_is_not_vacuous(tmp_path):
+    """The construct the workflow used, and the one it uses now, on the same failure.
+    Without this the test above would only be checking that a word appears."""
+    masked = tmp_path / "masked.sh"
+    masked.write_text('set -eux\n{ echo "d=$(sha256sum /no/such/file | cut -d\' \' -f1)"; }'
+                      ' | tee out.txt\n')
+    assert subprocess.run(["bash", str(masked)], cwd=tmp_path,
+                          capture_output=True).returncode == 0
+    assert (tmp_path / "out.txt").read_text().strip() == "d=", "an empty digest, recorded"
+    guarded = tmp_path / "guarded.sh"
+    guarded.write_text('set -euo pipefail\nsha() { sha256sum "$1" | cut -d\' \' -f1; }\n'
+                       'd=$(sha /no/such/file)\necho "d=$d" > out2.txt\n')
+    assert subprocess.run(["bash", str(guarded)], cwd=tmp_path,
+                          capture_output=True).returncode != 0
+    assert not (tmp_path / "out2.txt").exists()
+
+
+def test_the_workflow_retains_the_full_qualification_evidence():
+    """Raw solver logs, the executed fixture configurations and synthetic inputs, the
+    result records and the structured FAILED records all live under qualify-work, which
+    was not uploaded at all; the build log existed only in the job log; and a failed
+    qualification skipped the save step and retained nothing."""
+    steps = {s.get("name"): s for s in workflow_steps()}
+    upload = steps["Upload the image archive and every qualification artefact"]
+    paths = [p.strip() for p in upload["with"]["path"].splitlines() if p.strip()]
+    for needed in ("qualify-work", "build.log", "qualification.log",
+                   "image_qualification.json", "qualification-decision.txt",
+                   "evidence-manifest.txt", "build-inputs.txt", "in_image_identity.txt",
+                   "image_id.txt", "restore_verification.txt",
+                   "palace-first-moment-0.13.0.tar.gz", "image_archive_sha256.txt"):
+        assert any(needed in p for p in paths), needed
+    assert upload["if"] == "always()"
+    assert steps["Collect the evidence, whatever the outcome"]["if"] == "always()"
+    # the image and its restore check survive a FAILED qualification; they are skipped
+    # only when there is no image, i.e. when the build itself failed
+    for name in ("Save the exact image, with a checksum",
+                 "Verify the archive restores to the SAME image ID"):
+        assert steps[name]["if"] == "always() && steps.build.outcome == 'success'", name
+    # the build log is written, and the committed native record is still not the target
+    assert 'tee "$RUNNER_TEMP/build.log"' in steps["Build the reviewed image"]["run"]
+    qual = steps["Synthetic qualification, through the built image"]["run"]
+    assert "$RUNNER_TEMP/image_qualification.json" in qual
+    # on the EXECUTABLE lines: the step's comment names the committed native record
+    # deliberately, to say that this run does not overwrite it
+    runnable = "\n".join(ln for ln in qual.splitlines() if not ln.lstrip().startswith("#"))
+    assert "compiled_qualification.json" not in runnable
+
+
+def test_the_committed_native_qualification_record_is_untouched():
+    """Historical evidence. The image qualification writes OUTSIDE the repository."""
+    assert _sha256(FMD / "compiled_qualification.json") == COMPILED_QUALIFICATION_SHA256
+
+
 def test_the_synthetic_fixture_is_not_the_qmhp_cell(synthetic):
     assert "NOT the QMHP-CEM coupled cell" in (FMD / "synthetic_fixture.py").read_text()
     assert synthetic["mesh"]["n_tets"] < 2000, "small by construction"
@@ -1986,14 +2412,36 @@ def test_launch_safety_of_this_test_file():
             # subcommand at runtime; the literal call sites are pinned here
             assert a in ("['git', *argv]", "['git', 'diff', '--name-only', 'HEAD']"), a
             continue
+        if a.startswith("['bash'"):
+            # a shell script written into pytest's tmp_path by the test that runs it:
+            # the build workflow's own refusal step, run to show that a hostile
+            # confirmation stays data, and the two three-line scripts that show what a
+            # trailing tee does to an exit status. Pinned literally, like the git calls,
+            # and still subject to the container and MPI ban below.
+            assert a in ("['bash', str(script)]", "['bash', str(masked)]",
+                         "['bash', str(guarded)]"), a
+            continue
         # a python interpreter running a script in this diagnostic's directory: the
         # tracked one, its disposable copy, the pinned inert launcher, or a test stub
         assert "sys.executable" in a, a
         assert any(t in a for t in ("FMD /", "fmd /", "str(fmd)", "launcher", "stub")), a
     # no test here shells out to a container runtime or an MPI launcher
     for a in argv:
+        # `--palace` is a FLAG of the synthetic-only qualifier and the value given to it
+        # is the mock this file writes, never a solver. That one literal pair is
+        # exempted by text, so `'--palace', '/usr/bin/palace'` would still fail here.
+        probe = a.replace("'--palace', str(mock)", "")
         for token in ("docker", "podman", "mpirun", "palace"):
-            assert token not in a, (token, a)
+            assert token not in probe, (token, a)
+    # and the mock cannot launch anything either: it writes JSON and exits
+    for token in ("docker", "podman", "mpirun", "subprocess", "Popen", "os.system"):
+        assert token not in MOCK_PALACE, token
+    # the one bash script whose text is not a literal in this file is the workflow's
+    # refusal step, read from the workflow. It may not name either, so running it here
+    # cannot start anything.
+    refusal = {s.get("name"): s for s in workflow_steps()}["Refuse an unconfirmed dispatch"]
+    for token in ("docker", "podman", "mpirun", "palace"):
+        assert token not in refusal["run"], token
     # and the read-only git allowlist is exactly that: no writing verb may join it
     assert set(GIT_READ_ONLY) == {"status", "diff", "ls-files", "rev-parse"}
     for writer in ("checkout", "reset", "clean", "stash", "restore", "commit", "add"):
