@@ -1,0 +1,207 @@
+# First-moment diagnostic image: BUILD AND SYNTHETIC QUALIFICATION ONLY.
+#
+# This workflow builds docker/palace-first-moment.Dockerfile and runs the
+# repository's existing synthetic qualification through the built IMAGE. It
+# exists because the Claude analysis environment cannot build the image: its
+# egress policy answers 403 to CONNECT for production.cloudfront.docker.com,
+# the Docker Hub blob CDN, which is required for the digest-pinned base image.
+# That denial is reported, never routed around.
+#
+# WHAT IT DOES NOT DO. It runs NO QMHP scientific input. The qualification
+# harness refuses anything that is not a fixture in
+# experiments/first-moment-diagnostic/fixtures naming the synthetic mesh, so
+# N2R, the ladder meshes and every committed record are unreachable through it.
+# It computes no E_C and no g. It does not run the first-moment diagnostic on
+# N2R: that needs a separate approval at
+# experiments/first-moment-diagnostic/EXECUTION-APPROVAL.json, which this
+# workflow neither creates nor reads.
+#
+# TRIGGER. workflow_dispatch ONLY - no push, no pull_request, no schedule - and
+# the dispatch must type the confirmation string, so an accidental click does
+# not start a 1-2 hour build. GitHub registers dispatchable workflows only from
+# the default branch, so this file must reach main before it can be dispatched
+# at all; dispatching then runs the version at the chosen ref.
+#
+# ONE ATTEMPT. No step retries, and no step is continue-on-error except the
+# deliberate restore check, whose result is reported rather than swallowed.
+
+name: First-moment image (build + synthetic qualification)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type exactly: build-and-qualify'
+        required: true
+        default: ''
+      retention_days:
+        description: 'Artefact retention in days'
+        required: false
+        default: '90'
+
+permissions:
+  contents: read          # builds and qualifies; it must never write to the repository
+
+concurrency:
+  group: first-moment-image-${{ github.ref }}
+  cancel-in-progress: false   # a build that is running is not superseded
+
+env:
+  IMAGE: qmhp-cem/palace-first-moment:0.13.0
+
+jobs:
+  build-and-qualify:
+    name: build the reviewed image and qualify it on synthetic fixtures
+    runs-on: ubuntu-latest        # the approved runner class; no escalation
+    timeout-minutes: 120          # declared before dispatch; the job is killed at the cap
+    steps:
+      - name: Refuse an unconfirmed dispatch
+        run: |
+          if [ "${{ inputs.confirm }}" != "build-and-qualify" ]; then
+            echo "REFUSED: confirmation string not given; nothing was built." >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - name: Record what is actually checked out
+        run: |
+          {
+            echo "checked_out_sha=$(git rev-parse HEAD)"
+            echo "ref=${{ github.ref }}"
+            echo "run_id=${{ github.run_id }}"
+            echo "run_attempt=${{ github.run_attempt }}"
+            echo "workflow_sha256=$(sha256sum .github/workflows/first-moment-image.yml | cut -d' ' -f1)"
+            echo "dockerfile_sha256=$(sha256sum docker/palace-first-moment.Dockerfile | cut -d' ' -f1)"
+            echo "patch_sha256=$(sha256sum docker/patches/first-moment-diagnostic.patch | cut -d' ' -f1)"
+            echo "dockerignore_sha256=$(sha256sum .dockerignore | cut -d' ' -f1)"
+            echo "production_dockerfile_sha256=$(sha256sum docker/palace.Dockerfile | cut -d' ' -f1)"
+          } | tee "$RUNNER_TEMP/build-inputs.txt"
+
+      - name: Free runner disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: Build the reviewed image
+        timeout-minutes: 75
+        run: |
+          set -eux
+          docker build --progress=plain \
+            -f docker/palace-first-moment.Dockerfile \
+            -t "$IMAGE" .
+
+      - name: Image identity, and the four PALACE_* files read from INSIDE the image
+        run: |
+          set -eux
+          docker image inspect "$IMAGE" --format '{{.Id}}'                > "$RUNNER_TEMP/image_id.txt"
+          docker image inspect "$IMAGE" --format '{{json .RepoDigests}}'  > "$RUNNER_TEMP/repo_digests.json"
+          docker image inspect "$IMAGE" --format '{{json .Config.Labels}}'> "$RUNNER_TEMP/labels.json"
+          for f in PALACE_VERSION PALACE_COMMIT PALACE_PATCH PALACE_PATCH_SHA256; do
+            printf '%s=' "$f"
+            docker run --rm --network none --entrypoint /bin/sh "$IMAGE" -c "cat /opt/palace/$f"
+          done | tee "$RUNNER_TEMP/in_image_identity.txt"
+          echo "--- asserting the in-image identity is the reviewed one ---"
+          docker run --rm --network none --entrypoint /bin/sh "$IMAGE" -c '
+            set -eu
+            [ "$(cat /opt/palace/PALACE_VERSION)" = "0.13.0" ]
+            [ "$(cat /opt/palace/PALACE_COMMIT)" = "a61c8cbe0cacf496cde3c62e93085fae0d6299ac" ]
+            [ "$(cat /opt/palace/PALACE_PATCH)" = "first-moment-diagnostic" ]
+            [ "$(cat /opt/palace/PALACE_PATCH_SHA256)" = "e8a1ad51d4e355b0426e84c70cb9c796a4915b1216bb035d5fe60913de512fee" ]
+            echo "in-image identity matches the reviewed pins"'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.11"
+
+      - name: Sync locked environment
+        run: uv sync --locked --all-extras --dev
+
+      - name: Container shim, so the harness qualifies the IMAGE and not a binary
+        run: |
+          set -eux
+          cat > "$RUNNER_TEMP/palace-in-container" <<'SHIM'
+          #!/bin/bash
+          # The qualification harness invokes `<palace> --serial config.json` (or
+          # `-np N config.json`) with cwd set to the fixture's working directory.
+          # This maps that onto the built image, mounting that directory at /work.
+          #
+          # PALACE_IMAGE_INFO_DIR is deliberately NOT passed: unset, the patched
+          # Palace reads its identity files from the in-image default /opt/palace
+          # and records ImageInfoDirIsDefault=true. Passing a host directory is
+          # what marks a run a developer build, which is exactly what this
+          # workflow exists to avoid.
+          set -euo pipefail
+          exec docker run --rm --network none --hostname localhost \
+            -u "$(id -u):$(id -g)" \
+            -e HOME=/tmp -e OMP_NUM_THREADS=1 -e OPENBLAS_NUM_THREADS=1 \
+            -v "$PWD:/work" -w /work \
+            qmhp-cem/palace-first-moment:0.13.0 "$@"
+          SHIM
+          chmod +x "$RUNNER_TEMP/palace-in-container"
+          cat "$RUNNER_TEMP/palace-in-container"
+
+      - name: Synthetic qualification, through the built image
+        timeout-minutes: 30
+        run: |
+          set -eux
+          mkdir -p "$RUNNER_TEMP/qualify-work"
+          uv run python experiments/first-moment-diagnostic/compiled_qualification.py \
+            --palace "$RUNNER_TEMP/palace-in-container" \
+            --workroot "$RUNNER_TEMP/qualify-work" \
+            --out "$RUNNER_TEMP/image_qualification.json"
+          # --out is OUTSIDE the repository on purpose: the committed
+          # compiled_qualification.json is the NATIVE qualification record and
+          # is historical evidence. This run does not overwrite it.
+
+      - name: Show the qualification record
+        if: always()
+        run: |
+          echo "::group::image_qualification.json"
+          cat "$RUNNER_TEMP/image_qualification.json" || echo "(not written)"
+          echo "::endgroup::"
+
+      - name: Save the exact qualified image, with a checksum
+        run: |
+          set -eux
+          docker save "$IMAGE" | gzip -9 > "$RUNNER_TEMP/palace-first-moment-0.13.0.tar.gz"
+          sha256sum "$RUNNER_TEMP/palace-first-moment-0.13.0.tar.gz" \
+            | tee "$RUNNER_TEMP/image_archive_sha256.txt"
+          ls -l "$RUNNER_TEMP/palace-first-moment-0.13.0.tar.gz"
+
+      - name: Verify the archive restores to the SAME image ID
+        run: |
+          set -eux
+          BEFORE="$(cat "$RUNNER_TEMP/image_id.txt")"
+          docker rmi -f "$IMAGE"
+          docker image inspect "$IMAGE" >/dev/null 2>&1 && { echo "image still present" >&2; exit 1; } || true
+          gunzip -c "$RUNNER_TEMP/palace-first-moment-0.13.0.tar.gz" | docker load
+          AFTER="$(docker image inspect "$IMAGE" --format '{{.Id}}')"
+          echo "image_id_before_save=$BEFORE"
+          echo "image_id_after_restore=$AFTER"
+          [ "$BEFORE" = "$AFTER" ] || { echo "RESTORE MISMATCH" >&2; exit 1; }
+          {
+            echo "image_id=$AFTER"
+            echo "archive_sha256=$(cut -d' ' -f1 < "$RUNNER_TEMP/image_archive_sha256.txt")"
+            echo "note=image_id, archive_sha256 and any registry repo digest are three DIFFERENT identifiers"
+          } | tee "$RUNNER_TEMP/restore_verification.txt"
+
+      - name: Upload the image archive and every qualification artefact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: first-moment-image-${{ github.run_id }}
+          retention-days: ${{ inputs.retention_days }}
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/palace-first-moment-0.13.0.tar.gz
+            ${{ runner.temp }}/image_archive_sha256.txt
+            ${{ runner.temp }}/image_qualification.json
+            ${{ runner.temp }}/image_id.txt
+            ${{ runner.temp }}/repo_digests.json
+            ${{ runner.temp }}/labels.json
+            ${{ runner.temp }}/in_image_identity.txt
+            ${{ runner.temp }}/build-inputs.txt
+            ${{ runner.temp }}/restore_verification.txt

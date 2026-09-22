@@ -57,6 +57,15 @@ WORKFLOW_TRIGGERS: dict[str, dict] = {
         "push_branches": ["**"],
         "push_paths": None,
     },
+    # Build + synthetic qualification of the first-moment image. workflow_dispatch
+    # ONLY: no push, no pull_request, no schedule, so nothing an ordinary commit does
+    # can start it. It is listed in SOLVER_WORKFLOWS because it CAN execute Palace -
+    # on the synthetic fixtures its harness restricts it to, never on a QMHP input.
+    "first-moment-image.yml": {
+        "events": ["workflow_dispatch"],
+        "push_branches": None,
+        "push_paths": None,
+    },
     "palace-coupled-pilot.yml": {
         "events": ["push", "workflow_dispatch"],
         "push_branches": ["palace/**"],
@@ -83,8 +92,11 @@ WORKFLOW_TRIGGERS: dict[str, dict] = {
 
 #: The workflows that can start a Palace solve. ci.yml cannot: it runs the mock solver
 #: only (spec section 12.8), which is why it alone may take an unfiltered push.
-SOLVER_WORKFLOWS = frozenset({"palace-coupled-pilot.yml", "palace-golden.yml",
-                              "palace-order1-ladder.yml", "palace-verify.yml"})
+#: first-moment-image.yml can, so it is listed here even though the only inputs its
+#: harness accepts are synthetic fixtures - the classification is by capability.
+SOLVER_WORKFLOWS = frozenset({"first-moment-image.yml", "palace-coupled-pilot.yml",
+                              "palace-golden.yml", "palace-order1-ladder.yml",
+                              "palace-verify.yml"})
 
 #: The two workflows whose trigger IS a human approval record. Nothing else may put an
 #: approval file in a trigger path, and these may name nothing else.

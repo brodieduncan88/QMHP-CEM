@@ -1226,6 +1226,73 @@ def test_the_diagnostic_image_is_the_production_one_plus_the_patch_step():
     assert [ln for ln in ignore if ln.startswith("!")] == ["!docker/patches/first-moment-diagnostic.patch"]
 
 
+def trigger_filter_paths(workflow: Path) -> list[str]:
+    """Every path a workflow's push/pull_request triggers filter on.
+
+    This is what decides whether a commit can START the workflow. A path named
+    anywhere else in the file - the Dockerfile a manually dispatched build builds,
+    a comment, a step argument - cannot start anything.
+    """
+    import yaml
+
+    data = yaml.safe_load(workflow.read_text()) or {}
+    on = data.get("on", data.get(True)) or {}           # PyYAML reads bare `on` as True
+    out: list[str] = []
+    for event in ("push", "pull_request"):
+        spec = on.get(event) or {}
+        if isinstance(spec, dict):
+            out += list(spec.get("paths") or [])
+            out += list(spec.get("paths-ignore") or [])
+    return out
+
+
+def test_a_trigger_filter_naming_an_owned_path_is_rejected(tmp_path: Path):
+    """The negative control for the narrowing above: the guard still catches the thing
+    it exists to catch, and does not catch a dispatch-only workflow that merely names
+    the file it builds."""
+    caught = tmp_path / "caught.yml"
+    caught.write_text(
+        "name: x\non:\n  push:\n    branches: ['palace/**']\n"
+        "    paths:\n      - docker/palace-first-moment.Dockerfile\njobs: {}\n")
+    assert "docker/palace-first-moment.Dockerfile" in trigger_filter_paths(caught)
+
+    pr = tmp_path / "pr.yml"
+    pr.write_text("name: x\non:\n  pull_request:\n    paths:\n"
+                  "      - experiments/first-moment-diagnostic/run_diagnostic.py\njobs: {}\n")
+    assert "experiments/first-moment-diagnostic/run_diagnostic.py" in trigger_filter_paths(pr)
+
+    allowed = tmp_path / "allowed.yml"
+    allowed.write_text(
+        "name: x\non:\n  workflow_dispatch:\njobs:\n  b:\n    runs-on: ubuntu-latest\n"
+        "    steps:\n      - run: docker build -f docker/palace-first-moment.Dockerfile .\n")
+    assert trigger_filter_paths(allowed) == [], "a dispatch-only build names it, triggers on nothing"
+
+
+def test_the_build_workflow_is_dispatch_only_and_runs_no_qmhp_input():
+    """The workflow the owner authorised: it must never acquire a push, pull_request or
+    schedule trigger, and must not name a QMHP scientific input."""
+    import yaml
+
+    wf = REPO_ROOT / ".github" / "workflows" / "first-moment-image.yml"
+    assert wf.is_file()
+    data = yaml.safe_load(wf.read_text())
+    on = data.get("on", data.get(True))
+    assert sorted(on) == ["workflow_dispatch"], on
+    assert data["permissions"] == {"contents": "read"}, "it must not be able to write"
+    text = wf.read_text()
+    # Checked on the EXECUTABLE lines only. The header comment names
+    # EXECUTION-APPROVAL.json deliberately, to say the workflow neither creates nor
+    # reads it, and PALACE_IMAGE_INFO_DIR to say it is deliberately not passed. A
+    # whole-file grep would forbid the file from explaining itself.
+    executable = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("#"))
+    for forbidden in ("COUPLED-LADDER", "COUPLED-PILOT", "PALACE-GOLDEN", "results/",
+                      "EXECUTION-APPROVAL.json", "ladder-approval", "pilot-approval",
+                      "coupled_chip_cell", "PALACE_IMAGE_INFO_DIR="):
+        assert forbidden not in executable, forbidden
+    # and it must not overwrite the committed NATIVE qualification record
+    assert "--out " in text and "$RUNNER_TEMP/image_qualification.json" in text
+
+
 def test_no_trigger_path_is_touched_and_the_spent_approval_is_untouched(proposal):
     assert _sha256(APPROVAL) == APPROVAL_SHA256
     assert _sha256(PROD_DOCKERFILE) == PROD_DOCKERFILE_SHA256
@@ -1238,14 +1305,52 @@ def test_no_trigger_path_is_touched_and_the_spent_approval_is_untouched(proposal
     assert ".github/workflows/" in triggers and "solvers/palace/" in triggers
     for path in owned:
         assert not any(path.startswith(t) for t in triggers), path
-    # every workflow's push-path filter is checked literally against the owned paths
-    for wf in (REPO_ROOT / ".github" / "workflows").glob("*.yml"):
-        text = wf.read_text()
+    # Every workflow's TRIGGER is checked against the owned paths. What this protects
+    # is that no ordinary commit can start anything by touching the diagnostic: no
+    # owned path may appear in a push/pull_request `paths` filter, and no workflow may
+    # take an unfiltered push on a branch pattern this repository uses.
+    #
+    # NARROWED, 2026-09-22, under the owner's authorisation of one build-and-
+    # qualification workflow. It previously asserted the owned paths appeared nowhere
+    # in a workflow's TEXT at all. That protected the preparation-only state - "no
+    # workflow builds this image" - by forbidding the file from being named, which is
+    # strictly stronger than forbidding it from being a trigger, and which a manually
+    # dispatched build workflow cannot satisfy while still naming the Dockerfile it
+    # builds. The protection itself is unchanged and is checked here directly on the
+    # parsed `on:` block; `test_a_trigger_filter_naming_an_owned_path_is_rejected`
+    # below applies the exact mutation this guard exists to catch.
+    for wf in sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml")):
         for path in owned:
-            assert path not in text, (wf.name, path)
+            assert path not in trigger_filter_paths(wf), (wf.name, path)
+    # No UNCOMMITTED change may touch a path that triggers a solver workflow - with one
+    # exemption, pinned exactly: the build-and-qualification workflow the owner
+    # authorised on 2026-09-22. It lives under `.github/workflows/`, which is itself a
+    # trigger path, so without naming it this assertion fails for as long as that file
+    # is staged and passes again once committed - a guard whose verdict depends on
+    # commit timing rather than on what changed. Every other trigger path, including
+    # every other workflow, is still guarded.
+    authorised = ".github/workflows/first-moment-image.yml"
+    assert (REPO_ROOT / authorised).is_file(), "the exemption names a file that must exist"
     changed = subprocess.run(["git", "diff", "--name-only", "HEAD"], capture_output=True,
                              text=True, cwd=REPO_ROOT).stdout.split()
-    assert not any(any(c.startswith(t) for t in triggers) for c in changed), changed
+    offending = [c for c in changed if c != authorised
+                 and any(c.startswith(t) for t in triggers)]
+    assert not offending, offending
+
+
+def test_the_trigger_path_exemption_is_exactly_one_file(proposal):
+    """The exemption above must not widen. Any other workflow, and both approval files,
+    stay guarded."""
+    triggers = proposal["workflow_trigger_paths_untouched"]
+    for still_guarded in (".github/workflows/palace-golden.yml",
+                          ".github/workflows/palace-order1-ladder.yml",
+                          ".github/workflows/ci.yml",
+                          ".github/ladder-approval.json",
+                          ".github/pilot-approval.json",
+                          "docker/palace.Dockerfile",
+                          "solvers/palace/adapter.py"):
+        assert any(still_guarded.startswith(t) for t in triggers), still_guarded
+        assert still_guarded != ".github/workflows/first-moment-image.yml"
 
 
 
