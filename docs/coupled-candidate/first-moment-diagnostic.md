@@ -262,6 +262,58 @@ prepared and the current digest, so the revision is recorded rather than hidden.
 `EXECUTION-APPROVAL.json` remains **absent**: this revision fixes the binding and grants
 nothing.
 
+## 4b. The execution mechanism — prepared, and still inert
+
+`.github/workflows/first-moment-n2r.yml` is the **only** workflow that may run a QMHP
+input through this diagnostic. `first-moment-image.yml` is untouched and stays
+synthetic-only. The execution workflow is `workflow_dispatch`-only — no push, no
+pull_request, no schedule, no `workflow_run` chaining — and refuses at its first
+approval-shaped step unless `EXECUTION-APPROVAL.json` is **committed**; it never creates
+one. It restores the qualified image from run 35691886143's artefact, verifying the
+archive checksum before loading and the image ID after, with no rebuild and no fallback.
+
+**One attempt, and what makes it one.** `"authorises": "one execution"` is a sentence,
+not a mechanism: nothing in it stops a second dispatch or a re-run. The approval's
+`one_attempt` block binds the **repository**, the **workflow-and-ref**, **one run
+number** and **attempt 1**, each read from the metadata GitHub assigns — never from a
+dispatch input, because a caller may not state its own run number. A duplicate dispatch
+carries the next run number and refuses; a re-run, including *re-run failed jobs*,
+carries the next attempt number and refuses. The check is in `run_diagnostic.py`, on the
+execution path itself, so a partial re-run cannot slip past it in a predecessor job. The
+attempt is then **spent** by an atomic `O_EXCL` reservation written before the first
+container starts, so failure, timeout, cancellation or a crash afterwards leave it spent;
+nothing removes it. Concurrency grouping is supplementary and is not the mechanism.
+
+**What this does not do**, stated rather than implied. It trusts the runner's
+environment — a workflow step could export a different `GITHUB_RUN_NUMBER` — and what
+makes that trust meaningful is that the approval also pins the **sha256 of the workflow
+file**, so a workflow edited to forge its own metadata no longer matches and refuses. It
+cannot stop a human with write access from committing a second approval naming the next
+run number; that is the intended escape hatch, because another attempt is meant to
+require another human decision. The run number must be named before the run exists: a new
+workflow starts at 1, and if run 1 is consumed without launching, the approval is spent
+and a fresh one naming run 2 is required. It does not bind the commit, because the
+approval file is part of the commit it would have to name — the reviewed state is bound by
+digest instead: the workflow, the launcher, `run_authority.py`, and the config, mesh and
+patch the launcher already checks.
+
+**Four different questions, kept apart.** The workflow records, separately: whether the
+**execution completed**, whether the **solve converged**, whether the record is
+**provenance-qualified**, and what the **scientific verdict** is. The evaluator exiting 0
+answers none of them by itself, and `NOT_RESOLVED` is a legitimate outcome rather than a
+failure. The 250 000-DOF budget is enforced against Palace's own reported count on the
+actual run; 103 411 is the N2R baseline's expectation, recorded for comparison and never
+used in place of the measurement. The 2 700 s solver cap is enforced inside the launcher;
+the workflow's own step and job timeouts are a separate budget for restoring the image and
+uploading evidence and do not enlarge it.
+
+**The proposed approval is a draft, outside the live path**, at
+`docs/coupled-candidate/first-moment-n2r-approval.DRAFT.json`, with full measured digests.
+A test checks every digest in it against the file on disk, so a stale draft fails rather
+than proposing something that is not here. Copying it to the live path is the act of
+approving, and only a human does that; `ARMING_CHANGE` in the test module states the exact
+reviewed change that arming would require, and no refusal test is removed by it.
+
 ## 5. Files
 
 | file | role |

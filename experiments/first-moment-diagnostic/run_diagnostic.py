@@ -16,6 +16,14 @@ What it enforces when a separate approval does exist:
   * DOF CAP - the streamed log is probed for Palace's one-shot
     "number of global unknowns" line and the container is killed the moment the
     finest ND count exceeds the budget, before the solve proceeds.
+  * ONE ATTEMPT - the approval must bind to ONE GitHub run, by the metadata the
+    runner assigns rather than by anything the caller states: repository,
+    workflow-and-ref, run number, and attempt 1. A duplicate dispatch has
+    another run number; a re-run, including "re-run failed jobs", has another
+    attempt number; both refuse. The attempt is then SPENT by an atomic
+    reservation written before the first container starts, so a failure, a
+    timeout, a cancellation or a crash afterwards does not restore permission.
+    See run_authority.py, which also states what this does not cover.
   * IMAGE BINDING - the approval must NAME the image it authorises, as a full
     immutable ID. Before any container starts, the local image is resolved by
     METADATA INSPECTION ONLY (``docker image inspect``, which runs nothing) and
@@ -54,6 +62,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 sys.path.insert(0, str(HERE))
+import run_authority  # noqa: E402
 from reference_model import DOF_HARD_CAP, WALL_HARD_CAP_S  # noqa: E402
 
 #: The approval that would authorise ONE execution. Absent by design.
@@ -62,7 +71,7 @@ CONTAINER_WORKDIR = "/work"
 CONFIG_FILENAME = "config.json"
 IMAGE = "qmhp-cem/palace-first-moment:0.13.0"
 DIAGNOSTIC_CODE = ("reference_model.py", "prepare.py", "evaluate_record.py",
-                   "run_diagnostic.py")
+                   "run_diagnostic.py", "run_authority.py")
 IMAGE_IDENTITY_FILES = ("PALACE_VERSION", "PALACE_COMMIT", "PALACE_PATCH",
                         "PALACE_PATCH_SHA256")
 #: A full immutable image ID. A tag, a short ID or a repo digest is NOT an identity: a
@@ -340,7 +349,7 @@ def _stream_with_caps(command: list[str], *, name: str, runtime: str, order: int
 def run(record_dir: Path, *, config: Path, mesh: Path, image: str = IMAGE,
         runtime: str = "docker", order: int = 1, np_processes: int = 1,
         dof_cap: int = DOF_HARD_CAP, wall_cap_s: float = WALL_HARD_CAP_S,
-        approval: Path = APPROVAL_PATH) -> dict:
+        approval: Path = APPROVAL_PATH, reservation: Path | None = None) -> dict:
     """One execution, under the caps, with provenance. Refuses without an approval."""
     # 1. THE APPROVAL, FIRST. Nothing is inspected and nothing is created until a human
     #    approval exists, matches the prepared digests and names the image it authorises.
@@ -348,18 +357,30 @@ def run(record_dir: Path, *, config: Path, mesh: Path, image: str = IMAGE,
     body = load_approval(approval, required={"config_sha256": digests["config_sha256"],
                                              "mesh_sha256": digests["mesh_sha256"],
                                              "patch_sha256": digests["patch_sha256"]})
-    # 2. THE BINDING. Metadata inspection only - no container has started, and none may
-    #    until the image actually present is the image the approval named.
+    # 2. ONE ATTEMPT. Checked HERE, on the execution path, not only in some earlier job
+    #    that a partial re-run could skip: whatever reached this function must be the one
+    #    run the approval authorised, judged by metadata the runner assigns.
+    authority = run_authority.require_one_attempt(body)
+    # 3. THE IMAGE BINDING. Metadata inspection only - no container has started, and none
+    #    may until the image actually present is the image the approval named.
     image_id = require_approved_image(body, image, runtime=runtime)
     if not IMAGE_ID_RE.fullmatch(image_id):        # unreachable; the invariant, asserted
         raise Refusal("internal: the accepted image reference is not an immutable ID")
-    # 3. Only now may anything be written or launched, and only ever by that ID.
+    # 4. Only now may anything be written or launched, and only ever by that ID.
     record_dir = Path(record_dir)
     solver = record_dir / "solver"
     solver.mkdir(parents=True, exist_ok=False)
     shutil.copy2(config, solver / CONFIG_FILENAME)
     shutil.copy2(mesh, solver / Path(mesh).name)
     frozen = freeze_approval(record_dir, approval)
+    # 5. SPEND THE ATTEMPT, before the first container. Everything after this line -
+    #    success, failure, timeout, cancellation, or no outcome at all - leaves the
+    #    attempt spent.
+    reserved = run_authority.reserve_attempt(
+        Path(reservation) if reservation
+        else run_authority.default_reservation(authority["observed"]),
+        detail={"run": authority["observed"], "record_dir": str(record_dir),
+                "approved_image_id": image_id})
     name = f"qmhp-first-moment-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
     command = build_command(image_id, workdir=solver, name=name,
                             np_processes=np_processes, runtime=runtime)
@@ -377,6 +398,7 @@ def run(record_dir: Path, *, config: Path, mesh: Path, image: str = IMAGE,
         "status": ("COMPLETED" if probe["returncode"] == 0 and not probe["timed_out"]
                    and not probe["refused_on_dof"] else "FAILED"),
         "no_retry": "a timeout, a DOF refusal or a nonzero exit is the recorded outcome",
+        "one_attempt": {"authority": authority, "reservation": reserved},
         "image_binding": {
             "approved_image_id": image_id,
             "image_requested": image,
@@ -399,6 +421,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--config", type=Path, default=HERE / "config.candidate.json")
     ap.add_argument("--mesh", type=Path)
     ap.add_argument("--image", default=IMAGE)
+    ap.add_argument("--reservation", type=Path,
+                    help="where the spent-attempt marker is written; defaults to a "
+                         "run-scoped path so a second invocation cannot dodge it by "
+                         "naming another record directory")
     ap.add_argument("--print-command", action="store_true",
                     help="print the argv a run would execute and exit without running")
     args = ap.parse_args(argv)
@@ -414,7 +440,8 @@ def main(argv: list[str] | None = None) -> int:
     if not args.record_dir or not args.mesh:
         print("REFUSED: --record-dir and --mesh are required", file=sys.stderr)
         return 2
-    prov = run(args.record_dir, config=args.config, mesh=args.mesh, image=args.image)
+    prov = run(args.record_dir, config=args.config, mesh=args.mesh, image=args.image,
+               reservation=args.reservation)
     print(json.dumps({k: prov[k] for k in ("status", "image_id", "config_sha256")}, indent=1))
     return 0 if prov["status"] == "COMPLETED" else 1
 

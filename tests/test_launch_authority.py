@@ -66,6 +66,15 @@ WORKFLOW_TRIGGERS: dict[str, dict] = {
         "push_branches": None,
         "push_paths": None,
     },
+    # The ONE workflow that may run a QMHP scientific input through the first-moment
+    # diagnostic. workflow_dispatch ONLY - no push, no pull_request, no schedule and no
+    # workflow_run chaining - and inert besides: the launcher refuses unless a committed
+    # human approval binds this exact run, and that approval is deliberately absent.
+    "first-moment-n2r.yml": {
+        "events": ["workflow_dispatch"],
+        "push_branches": None,
+        "push_paths": None,
+    },
     "palace-coupled-pilot.yml": {
         "events": ["push", "workflow_dispatch"],
         "push_branches": ["palace/**"],
@@ -94,7 +103,8 @@ WORKFLOW_TRIGGERS: dict[str, dict] = {
 #: only (spec section 12.8), which is why it alone may take an unfiltered push.
 #: first-moment-image.yml can, so it is listed here even though the only inputs its
 #: harness accepts are synthetic fixtures - the classification is by capability.
-SOLVER_WORKFLOWS = frozenset({"first-moment-image.yml", "palace-coupled-pilot.yml",
+SOLVER_WORKFLOWS = frozenset({"first-moment-image.yml", "first-moment-n2r.yml",
+                              "palace-coupled-pilot.yml",
                               "palace-golden.yml", "palace-order1-ladder.yml",
                               "palace-verify.yml"})
 

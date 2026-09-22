@@ -478,11 +478,13 @@ REGENERATED = {
 SUPERSEDED_CODE = {
     "run_diagnostic.py": {
         "prepared": "9b0c312565273b70470a8e8ce81ba2787781c46ad9984100a483618713f5956d",
-        "current": "2acc7c8e39e10c68e5f0464521e13f5e0c08d98c4da6e7068569cffc1375d73a",
+        "current": "05f21ce4a7d4b276ec1a822e27ed9a1fe87f4281ce813e7f09441532a64f3db1",
         "revision": "approval read first; approval must name a full immutable image_id; "
                     "image resolved by metadata inspection only and compared before any "
                     "container starts; the accepted ID addresses every container; "
-                    "--pull=never; the approval is frozen beside the record",
+                    "--pull=never; the approval is frozen beside the record; and the "
+                    "one-attempt authority is checked on the execution path with the "
+                    "attempt spent by an atomic reservation before the first container",
     },
     "evaluate_record.py": {
         "prepared": "a217d4c10a93ecfa626aaf92f4d6b5c0fe5305980c16cc0599062a53b6f74c35",
@@ -1394,28 +1396,46 @@ def test_no_trigger_path_is_touched_and_the_spent_approval_is_untouched(proposal
     # is staged and passes again once committed - a guard whose verdict depends on
     # commit timing rather than on what changed. Every other trigger path, including
     # every other workflow, is still guarded.
-    authorised = ".github/workflows/first-moment-image.yml"
-    assert (REPO_ROOT / authorised).is_file(), "the exemption names a file that must exist"
+    # WIDENED from one file to two, 2026-09-22, under the owner's authorisation to
+    # prepare the N2R execution mechanism: the dedicated execution workflow lives beside
+    # the build-and-qualification one, and both are under `.github/workflows/`, which is
+    # itself a trigger path. Without naming them this assertion fails for as long as
+    # either is staged and passes again once committed - a verdict that depends on commit
+    # timing rather than on what changed. Every other trigger path, including every other
+    # workflow and both approval files, is still guarded, and
+    # test_the_trigger_path_exemption_is_exactly_these_two holds that line.
+    AUTHORISED = (".github/workflows/first-moment-image.yml",
+                  ".github/workflows/first-moment-n2r.yml")
+    for path in AUTHORISED:
+        assert (REPO_ROOT / path).is_file(), f"the exemption names {path}, which must exist"
     changed = subprocess.run(["git", "diff", "--name-only", "HEAD"], capture_output=True,
                              text=True, cwd=REPO_ROOT).stdout.split()
-    offending = [c for c in changed if c != authorised
+    offending = [c for c in changed if c not in AUTHORISED
                  and any(c.startswith(t) for t in triggers)]
     assert not offending, offending
 
 
-def test_the_trigger_path_exemption_is_exactly_one_file(proposal):
-    """The exemption above must not widen. Any other workflow, and both approval files,
-    stay guarded."""
+def test_the_trigger_path_exemption_is_exactly_these_two(proposal):
+    """The exemption must not widen further. Every other workflow, both approval files,
+    the production Dockerfile and the adapter stay guarded."""
     triggers = proposal["workflow_trigger_paths_untouched"]
+    exempt = {".github/workflows/first-moment-image.yml",
+              ".github/workflows/first-moment-n2r.yml"}
     for still_guarded in (".github/workflows/palace-golden.yml",
                           ".github/workflows/palace-order1-ladder.yml",
+                          ".github/workflows/palace-coupled-pilot.yml",
+                          ".github/workflows/palace-verify.yml",
                           ".github/workflows/ci.yml",
                           ".github/ladder-approval.json",
                           ".github/pilot-approval.json",
                           "docker/palace.Dockerfile",
                           "solvers/palace/adapter.py"):
         assert any(still_guarded.startswith(t) for t in triggers), still_guarded
-        assert still_guarded != ".github/workflows/first-moment-image.yml"
+        assert still_guarded not in exempt
+    # the guard's own source must name exactly these two and no more
+    src = inspect.getsource(test_no_trigger_path_is_touched_and_the_spent_approval_is_untouched)
+    named = set(re.findall(r'"(\.github/workflows/[a-z0-9-]+\.yml)"', src))
+    assert named == exempt, named
 
 
 
@@ -2377,8 +2397,10 @@ class RecordingRuntime:
     records every argv it is handed; `run` NEVER executes anything."""
 
     def __init__(self, *, ids: dict | None = None, inspect_rc: int = 0,
-                 inspect_out: str | None = None, on_second_inspect: str | None = None):
+                 inspect_out: str | None = None, on_second_inspect: str | None = None,
+                 solve_rc: int = 0):
         self.ids = dict(ids or {})
+        self.solve_rc = solve_rc
         self.inspect_rc = inspect_rc
         self.inspect_out = inspect_out
         self.on_second_inspect = on_second_inspect
@@ -2401,7 +2423,7 @@ class RecordingRuntime:
 
     def popen(self, argv, **kw):
         self.calls.append(list(argv))
-        return SimplePopen()
+        return SimplePopen(self.solve_rc)
 
     # -- what the controls assert on --
     @property
@@ -2419,12 +2441,13 @@ class SimpleCompleted:
 
 
 class SimplePopen:
-    def __init__(self):
+    def __init__(self, returncode: int = 0):
+        self.returncode = returncode
         self.stdout = iter(["Assembling system matrices, number of global unknowns:\n",
                             "ND (p = 1): 103411\n"])
 
     def wait(self, timeout=None):
-        return 0
+        return self.returncode
 
     def kill(self):
         pass
@@ -2448,6 +2471,46 @@ def launcher():
     return _load("run_diagnostic")
 
 
+#: The execution workflow, the repository and the ref the one-attempt binding names.
+WORKFLOW_N2R = ".github/workflows/first-moment-n2r.yml"
+REPO_SLUG = "brodieduncan88/QMHP-CEM"
+APPROVED_REF = "refs/heads/palace/physical-coupled-candidate"
+APPROVED_RUN_NUMBER = 1
+
+
+def one_attempt_block(**over) -> dict:
+    """A correctly scoped binding, built from the files actually on disk."""
+    block = {
+        "repository": REPO_SLUG,
+        "workflow_ref": f"{REPO_SLUG}/{WORKFLOW_N2R}@{APPROVED_REF}",
+        "workflow_path": WORKFLOW_N2R,
+        "workflow_sha256": _sha256(REPO_ROOT / WORKFLOW_N2R),
+        "run_number": APPROVED_RUN_NUMBER,
+        "run_attempt": 1,
+        "ref": APPROVED_REF,
+        "code_sha256": {n: _sha256(FMD / n)
+                        for n in ("run_diagnostic.py", "run_authority.py")},
+    }
+    block.update(over)
+    for key in [k for k, v in over.items() if v is _ABSENT]:
+        block.pop(key, None)
+    return block
+
+
+def gh_env(**over) -> dict:
+    """The metadata a RUNNER would set for the approved run. Never a dispatch input."""
+    env = {
+        "GITHUB_REPOSITORY": REPO_SLUG,
+        "GITHUB_WORKFLOW_REF": f"{REPO_SLUG}/{WORKFLOW_N2R}@{APPROVED_REF}",
+        "GITHUB_RUN_ID": "4242",
+        "GITHUB_RUN_NUMBER": str(APPROVED_RUN_NUMBER),
+        "GITHUB_RUN_ATTEMPT": "1",
+        "GITHUB_REF": APPROVED_REF,
+    }
+    env.update(over)
+    return {k: v for k, v in env.items() if v is not _ABSENT}
+
+
 def arm(tmp_path: Path, mod, **overrides) -> tuple[Path, Path, Path, dict]:
     """A synthetic, correctly scoped approval beside a disposable record directory.
 
@@ -2462,7 +2525,8 @@ def arm(tmp_path: Path, mod, **overrides) -> tuple[Path, Path, Path, dict]:
             "config_sha256": digests["config_sha256"],
             "mesh_sha256": digests["mesh_sha256"],
             "patch_sha256": digests["patch_sha256"],
-            "image_id": QUALIFIED_IMAGE_ID}
+            "image_id": QUALIFIED_IMAGE_ID,
+            "one_attempt": one_attempt_block()}
     body.update(overrides)
     for key in [k for k, v in overrides.items() if v is _ABSENT]:
         body.pop(key, None)
@@ -2475,10 +2539,17 @@ _ABSENT = object()
 
 
 def drive(mod, monkeypatch, runtime: RecordingRuntime, tmp_path: Path, record: str,
-          approval: Path, cfg: Path, mesh: Path, image: str | None = None):
+          approval: Path, cfg: Path, mesh: Path, image: str | None = None,
+          env: dict | None = None, reservation: Path | None = None):
     monkeypatch.setattr(mod, "subprocess", SubprocessShim(runtime))
+    for name in ("GITHUB_REPOSITORY", "GITHUB_WORKFLOW_REF", "GITHUB_RUN_ID",
+                 "GITHUB_RUN_NUMBER", "GITHUB_RUN_ATTEMPT", "GITHUB_REF"):
+        monkeypatch.delenv(name, raising=False)
+    for key, value in (gh_env() if env is None else env).items():
+        monkeypatch.setenv(key, value)
     return mod.run(tmp_path / record, config=cfg, mesh=mesh, approval=approval,
-                   image=image or mod.IMAGE)
+                   image=image or mod.IMAGE,
+                   reservation=reservation or (tmp_path / "attempt-spent.json"))
 
 
 def test_a_correctly_scoped_approval_and_a_matching_image_reach_the_launch_boundary(
@@ -2807,6 +2878,430 @@ def test_undeclared_code_drift_still_fails_the_regeneration_check(proposal, rm):
     assert regeneration_mismatches("proposal.json", json.dumps(current), committed,
                                    rm) == []
 
+
+#: THE EXACT REVIEWED ARMING CHANGE.
+#:
+#: Three tests assert the diagnostic is inert, each by asserting that
+#: experiments/first-moment-diagnostic/EXECUTION-APPROVAL.json does not exist:
+#: test_the_launcher_is_prepared_but_inert,
+#: test_the_live_approval_path_is_empty_and_the_draft_is_elsewhere and
+#: test_the_execution_workflow_is_inert_without_a_committed_approval. Arming the
+#: diagnostic flips exactly those three and nothing else. Their REFUSAL COVERAGE IS KEPT -
+#: none of them is deleted, and no other refusal test is touched.
+ARMING_CHANGE = """
+1. A human copies docs/coupled-candidate/first-moment-n2r-approval.DRAFT.json to
+   experiments/first-moment-diagnostic/EXECUTION-APPROVAL.json, dropping the three
+   presentational keys (DRAFT, how_to_grant_it, _inputs) and keeping every digest
+   verbatim, and commits it on the research branch. Nothing generates it on a runner.
+2. test_the_launcher_is_prepared_but_inert keeps its refusal: instead of asserting the
+   approval is absent, it asserts the launcher REFUSES a run whose metadata is not the
+   approved one - a different run number - and still exits 2 with REFUSED on stderr.
+3. test_the_live_approval_path_is_empty_and_the_draft_is_elsewhere asserts the live
+   approval EQUALS the draft payload minus those three keys, instead of being absent.
+4. test_the_execution_workflow_is_inert_without_a_committed_approval keeps every
+   workflow assertion and drops only its final "must stay inert" line.
+
+No refusal test is removed, and the approval is never created by this repository's
+code, tests or workflows.
+"""
+
+
+# --- 5h. at most ONE authorised attempt ------------------------------------------------
+#
+# `"authorises": "one execution"` is a sentence, not a mechanism. Nothing in it stops a
+# second dispatch or a re-run from reading the same approval and launching again, and
+# nothing in the launcher checked. The binding below is against metadata GitHub assigns -
+# never a dispatch input, because a caller may not state its own run number - and it is
+# checked on the EXECUTION PATH, inside run(), not in a predecessor job that a partial
+# re-run could skip. Every control here intercepts the runtime; nothing is launched.
+
+
+@pytest.fixture
+def authority():
+    return _load("run_authority")
+
+
+def test_a_valid_authority_reaches_the_launcher_exactly_once(launcher, monkeypatch,
+                                                             tmp_path):
+    """The positive control, and the arithmetic of 'once': one solve container, one
+    reservation, and the reservation says the attempt is spent."""
+    mod = launcher
+    cfg, mesh, approval, _ = arm(tmp_path, mod)
+    rt = RecordingRuntime(ids={mod.IMAGE: QUALIFIED_IMAGE_ID,
+                               QUALIFIED_IMAGE_ID: QUALIFIED_IMAGE_ID})
+    prov = drive(mod, monkeypatch, rt, tmp_path, "rec", approval, cfg, mesh)
+    assert len([c for c in rt.containers if "stdbuf" in c]) == 1
+    auth = prov["one_attempt"]["authority"]
+    assert auth["observed"]["run_number"] == APPROVED_RUN_NUMBER
+    assert auth["observed"]["run_attempt"] == 1
+    assert "no dispatch input is read" in auth["inputs_are_not_authoritative"]
+    spent = tmp_path / "attempt-spent.json"
+    assert spent.is_file()
+    assert "SPENT" in spent.read_text()
+
+
+@pytest.mark.parametrize("over, why", [
+    ({"GITHUB_RUN_NUMBER": "2"}, "a duplicate dispatch gets the next run number"),
+    ({"GITHUB_RUN_NUMBER": "17"}, "any other run number"),
+    ({"GITHUB_RUN_ATTEMPT": "2"}, "a re-run is a second attempt"),
+    ({"GITHUB_RUN_ATTEMPT": "3"}, "re-run failed jobs, twice"),
+    ({"GITHUB_REPOSITORY": "someone/else"}, "another repository"),
+    ({"GITHUB_REF": "refs/heads/main"}, "another ref"),
+    ({"GITHUB_WORKFLOW_REF":
+      f"{REPO_SLUG}/.github/workflows/first-moment-image.yml@{APPROVED_REF}"},
+     "another workflow"),
+    ({"GITHUB_WORKFLOW_REF": f"{REPO_SLUG}/{WORKFLOW_N2R}@refs/heads/main"},
+     "the right workflow at another ref"),
+])
+def test_a_run_that_is_not_the_approved_one_refuses(launcher, monkeypatch, tmp_path,
+                                                    over, why):
+    mod = launcher
+    cfg, mesh, approval, _ = arm(tmp_path, mod)
+    rt = RecordingRuntime(ids={mod.IMAGE: QUALIFIED_IMAGE_ID})
+    with pytest.raises(Exception) as exc:
+        drive(mod, monkeypatch, rt, tmp_path, "rec", approval, cfg, mesh,
+              env=gh_env(**over))
+    assert "Refusal" in type(exc.value).__name__, why
+    assert rt.calls == [], why
+    assert not (tmp_path / "rec").exists(), why
+    assert not (tmp_path / "attempt-spent.json").exists(), why
+
+
+@pytest.mark.parametrize("over, why", [
+    ({"GITHUB_RUN_NUMBER": _ABSENT}, "the run number is unavailable"),
+    ({"GITHUB_RUN_ATTEMPT": _ABSENT}, "the attempt is unavailable"),
+    ({"GITHUB_REPOSITORY": _ABSENT}, "the repository is unavailable"),
+    ({"GITHUB_WORKFLOW_REF": _ABSENT}, "the workflow ref is unavailable"),
+    ({"GITHUB_REF": _ABSENT}, "the ref is unavailable"),
+    ({"GITHUB_RUN_ID": _ABSENT}, "the run id is unavailable"),
+    ({"GITHUB_RUN_NUMBER": ""}, "empty"),
+    ({"GITHUB_RUN_NUMBER": "  "}, "whitespace"),
+    ({"GITHUB_RUN_NUMBER": "one"}, "not a number"),
+    ({"GITHUB_RUN_ATTEMPT": "1.0"}, "not an integer"),
+    ({"GITHUB_RUN_NUMBER": "-1"}, "negative"),
+])
+def test_unavailable_or_inconsistent_run_metadata_refuses(launcher, monkeypatch, tmp_path,
+                                                          over, why):
+    """'I could not tell which run this is' is never 'therefore proceed'. Running the
+    launcher outside a GitHub run falls in here too, which is why the whole environment
+    is cleared first."""
+    mod = launcher
+    cfg, mesh, approval, _ = arm(tmp_path, mod)
+    rt = RecordingRuntime(ids={mod.IMAGE: QUALIFIED_IMAGE_ID})
+    with pytest.raises(Exception):
+        drive(mod, monkeypatch, rt, tmp_path, "rec", approval, cfg, mesh,
+              env=gh_env(**over))
+    assert rt.calls == [], why
+    assert not (tmp_path / "rec").exists(), why
+
+
+@pytest.mark.parametrize("over, why", [
+    ({"one_attempt": _ABSENT}, "no binding at all"),
+    ({"one_attempt": {}}, "an empty binding"),
+    ({"one_attempt": "one execution"}, "a sentence instead of a binding"),
+    ({"one_attempt": one_attempt_block(run_number=_ABSENT)}, "no run number"),
+    ({"one_attempt": one_attempt_block(workflow_sha256=_ABSENT)}, "no workflow digest"),
+    ({"one_attempt": one_attempt_block(code_sha256=_ABSENT)}, "no code digests"),
+    ({"one_attempt": one_attempt_block(run_attempt=2)},
+     "an approval may not authorise a re-run"),
+    ({"one_attempt": one_attempt_block(run_number="1")}, "a run number that is a string"),
+    ({"one_attempt": one_attempt_block(run_number=True)}, "a boolean run number"),
+    ({"one_attempt": one_attempt_block(workflow_sha256="0" * 63)}, "a short digest"),
+    ({"one_attempt": one_attempt_block(workflow_sha256="z" * 64)}, "a non-hex digest"),
+    ({"one_attempt": one_attempt_block(workflow_sha256="a" * 64)},
+     "a digest that is not this workflow"),
+    ({"one_attempt": one_attempt_block(workflow_path=".github/workflows/ci.yml")},
+     "a path that is not the one inside workflow_ref"),
+    ({"one_attempt": one_attempt_block(workflow_path="nope.yml",
+                                       workflow_ref=f"{REPO_SLUG}/nope.yml@{APPROVED_REF}")},
+     "a workflow that is not in the checkout"),
+    ({"one_attempt": one_attempt_block(code_sha256={"run_diagnostic.py": "a" * 64})},
+     "an incomplete code map"),
+    ({"one_attempt": one_attempt_block(
+        code_sha256={"run_diagnostic.py": "a" * 64, "run_authority.py": "b" * 64})},
+     "code digests that are not this code"),
+])
+def test_a_missing_or_malformed_authority_refuses(launcher, monkeypatch, tmp_path,
+                                                  over, why):
+    mod = launcher
+    cfg, mesh, approval, _ = arm(tmp_path, mod, **over)
+    rt = RecordingRuntime(ids={mod.IMAGE: QUALIFIED_IMAGE_ID})
+    with pytest.raises(Exception):
+        drive(mod, monkeypatch, rt, tmp_path, "rec", approval, cfg, mesh)
+    assert rt.calls == [], why
+    assert not (tmp_path / "rec").exists(), why
+
+
+def test_the_reviewed_code_and_workflow_are_what_actually_run(authority, tmp_path):
+    """The run-metadata check is trusted THROUGH the reviewed workflow: a workflow edited
+    to forge its own GITHUB_RUN_NUMBER no longer matches the digest the approval pins."""
+    approval = {"one_attempt": one_attempt_block()}
+    ok = authority.require_one_attempt(approval, env=gh_env())
+    assert ok["workflow_sha256_measured"] == _sha256(REPO_ROOT / WORKFLOW_N2R)
+    assert ok["code_sha256_measured"]["run_authority.py"] == _sha256(FMD / "run_authority.py")
+    # and the digests are read from the CHECKOUT, not from the approval
+    src = (FMD / "run_authority.py").read_text()
+    assert "sha256(workflow)" in src and "sha256(HERE / name)" in src
+    assert "GITHUB_RUN_NUMBER" in src and "inputs" not in src.split("LIMITS")[-1][:200]
+
+
+def test_the_authority_reads_no_dispatch_input(authority):
+    """A caller may not state its own run number. Every value compared comes from the
+    GITHUB_* environment the runner sets."""
+    assert set(authority.RUN_ENV.values()) == {
+        "GITHUB_REPOSITORY", "GITHUB_WORKFLOW_REF", "GITHUB_RUN_ID",
+        "GITHUB_RUN_NUMBER", "GITHUB_RUN_ATTEMPT", "GITHUB_REF"}
+    src = (FMD / "run_authority.py").read_text()
+    for forbidden in ("INPUT_", "inputs.", "argparse"):
+        assert forbidden not in src, forbidden
+
+
+def test_failure_after_the_reservation_does_not_permit_another_attempt(
+        launcher, monkeypatch, tmp_path):
+    """The attempt is spent BEFORE the first container. A failed, timed-out or crashed
+    run leaves the marker behind, and a second invocation - even with a fresh record
+    directory - refuses. Nothing removes it."""
+    mod = launcher
+    cfg, mesh, approval, _ = arm(tmp_path, mod)
+    rt = RecordingRuntime(ids={mod.IMAGE: QUALIFIED_IMAGE_ID,
+                               QUALIFIED_IMAGE_ID: QUALIFIED_IMAGE_ID}, solve_rc=1)
+    prov = drive(mod, monkeypatch, rt, tmp_path, "first", approval, cfg, mesh)
+    assert prov["status"] == "FAILED", "the failure is the recorded outcome"
+    spent = tmp_path / "attempt-spent.json"
+    assert spent.is_file()
+    # a second invocation, a different record directory, the same run
+    rt2 = RecordingRuntime(ids={mod.IMAGE: QUALIFIED_IMAGE_ID,
+                                QUALIFIED_IMAGE_ID: QUALIFIED_IMAGE_ID})
+    with pytest.raises(Exception, match="already spent"):
+        drive(mod, monkeypatch, rt2, tmp_path, "second", approval, cfg, mesh)
+    assert [c for c in rt2.containers if "stdbuf" in c] == [], "nothing was launched again"
+
+
+def test_the_reservation_is_atomic_and_is_never_removed(authority, tmp_path):
+    path = tmp_path / "spent.json"
+    first = authority.reserve_attempt(path, detail={"run": "one"})
+    assert path.is_file() and "SPENT" in path.read_text()
+    with pytest.raises(authority.AuthorityRefusal, match="already spent"):
+        authority.reserve_attempt(path)
+    assert path.is_file(), "a refusal must not clear the marker"
+    src = (FMD / "run_authority.py").read_text()
+    assert "O_EXCL" in src
+    for removal in ("unlink(", "os.remove", "shutil.rmtree"):
+        assert removal not in src, removal
+    assert first["reservation"] == str(path)
+
+
+def test_the_available_evidence_survives_a_failed_execution(launcher, monkeypatch,
+                                                            tmp_path):
+    """A failing run must still leave the log, the provenance and the approval snapshot:
+    the evidence is what the attempt produced, and a failure does not erase it."""
+    mod = launcher
+    cfg, mesh, approval, _ = arm(tmp_path, mod)
+    rt = RecordingRuntime(ids={mod.IMAGE: QUALIFIED_IMAGE_ID,
+                               QUALIFIED_IMAGE_ID: QUALIFIED_IMAGE_ID}, solve_rc=137)
+    prov = drive(mod, monkeypatch, rt, tmp_path, "rec", approval, cfg, mesh)
+    rec = tmp_path / "rec"
+    assert prov["status"] == "FAILED"
+    for name in ("provenance.json", "approval-snapshot.json"):
+        assert (rec / name).is_file(), name
+    assert (rec / "solver" / "palace_log.txt").is_file()
+    assert (rec / "solver" / "config.json").is_file()
+    assert json.loads((rec / "provenance.json").read_text())["one_attempt"]["reservation"]
+
+
+# --- the execution workflow ------------------------------------------------------------
+
+def n2r_workflow() -> dict:
+    import yaml
+    return yaml.safe_load((REPO_ROOT / WORKFLOW_N2R).read_text())
+
+
+def n2r_steps() -> list[dict]:
+    return n2r_workflow()["jobs"]["n2r-first-moment"]["steps"]
+
+
+def test_the_execution_workflow_is_dispatch_only_and_cannot_be_chained():
+    data = n2r_workflow()
+    on = data.get("on", data.get(True))
+    assert sorted(on) == ["workflow_dispatch"], on
+    for forbidden in ("push", "pull_request", "schedule", "workflow_run", "workflow_call",
+                      "repository_dispatch"):
+        assert forbidden not in on, forbidden
+    assert data["permissions"] == {"contents": "read", "actions": "read"}
+    for scope, level in data["permissions"].items():
+        assert level == "read", (scope, level)
+    named = {s.get("name"): s for s in n2r_steps()}
+    assert named["Refuse an unconfirmed dispatch"]["env"]["CONFIRM"] == "${{ inputs.confirm }}"
+    for step in n2r_steps():
+        assert "${{" not in (step.get("run") or ""), step.get("name")
+
+
+def test_the_execution_workflow_is_inert_without_a_committed_approval():
+    body = {s.get("name"): s for s in n2r_steps()}[
+        "Refuse unless the reviewed approval is committed"]["run"]
+    assert "PREPARED, NOT ACTIVATED" in body
+    assert "exit 1" in body
+    assert not (FMD / "EXECUTION-APPROVAL.json").exists(), "the diagnostic must stay inert"
+    # and the workflow must not create one
+    whole = (REPO_ROOT / WORKFLOW_N2R).read_text()
+    runnable = "\n".join(ln for ln in whole.splitlines() if not ln.lstrip().startswith("#"))
+    for writing in ("> $APPROVAL", '> "$APPROVAL"', "tee $APPROVAL", "cat > experiments"):
+        assert writing not in runnable, writing
+
+
+def test_the_execution_workflow_restores_the_qualified_image_and_never_builds():
+    steps = {s.get("name"): s for s in n2r_steps()}
+    env = n2r_workflow()["env"]
+    assert env["EXPECTED_IMAGE_ID"] == QUALIFIED_IMAGE_ID
+    assert env["EXPECTED_ARCHIVE_SHA256"] == (
+        "7e09f5028f4bc028b9aae52cbde6bc837e97c4d11c22622b590f04e764062834")
+    assert str(env["SOURCE_RUN_ID"]) == "35691886143"
+    download = steps["Download the preserved image archive"]
+    assert str(download["with"]["run-id"]) == "35691886143"
+    restore = steps["Restore the preserved image - checksum first, then image ID"]["run"]
+    assert "ARCHIVE CHECKSUM MISMATCH" in restore and "IMAGE ID MISMATCH" in restore
+    build = "doc" + "ker build"
+    for step in n2r_steps():
+        runnable = "\n".join(ln for ln in (step.get("run") or "").splitlines()
+                             if not ln.lstrip().startswith("#"))
+        assert build not in runnable, step.get("name")
+        assert "--oversubscribe" not in runnable, "synthetic-only setting"
+
+
+def test_the_execution_workflow_invokes_the_launcher_exactly_once_under_the_caps():
+    steps = {s.get("name"): s for s in n2r_steps()}
+    launch = steps["THE ONE AUTHORISED ATTEMPT"]
+    body = launch["run"]
+    assert body.count("run_diagnostic.py") == 1, "exactly one invocation"
+    assert "--reservation" in body and "--record-dir" in body
+    assert "$EXPECTED_IMAGE_ID" in body, "the approved ID, not the tag"
+    # the SOLVER caps are the launcher's and are unchanged; the step budget is separate
+    assert launch["timeout-minutes"] == 55
+    assert n2r_workflow()["jobs"]["n2r-first-moment"]["timeout-minutes"] == 90
+    rd = _load("run_diagnostic")
+    assert rd.DOF_HARD_CAP == 250_000 and rd.WALL_HARD_CAP_S == 2_700
+    for forbidden in ("--dof-cap", "--wall-cap", "DOF_HARD_CAP=", "WALL_HARD_CAP"):
+        assert forbidden not in body, forbidden
+    whole = (REPO_ROOT / WORKFLOW_N2R).read_text()
+    assert "250 000 DOF" in whole and "2 700 s" in whole
+
+
+def test_the_execution_workflow_keeps_the_four_questions_apart():
+    body = {s.get("name"): s for s in n2r_steps()}[
+        "Evaluate the record, and keep the four questions apart"]["run"]
+    for question in ("1_execution_completed", "2_solver_converged",
+                     "3_provenance_qualified", "4_scientific_verdict"):
+        assert question in body, question
+    assert "evaluator_exit_status" in body, "the command's exit status is recorded, not used"
+    assert "dof_measured" in body and "dof_expected_from_baseline=103411" in body
+    assert "an expectation, not the check" in body
+    report = {s.get("name"): s for s in n2r_steps()}[
+        "Report the outcome, and fail on anything but a qualified execution"]["run"]
+    assert "1_execution_completed=True" in report and "3_provenance_qualified=True" in report
+    assert "not a pass mark" in report
+
+
+def test_the_execution_workflow_retains_evidence_on_failure():
+    steps = {s.get("name"): s for s in n2r_steps()}
+    for name in ("Evaluate the record, and keep the four questions apart",
+                 "Collect the evidence, whatever the outcome",
+                 "Upload every artefact of the attempt",
+                 "Report the outcome, and fail on anything but a qualified execution"):
+        assert steps[name]["if"] == "always()", name
+    paths = [p.strip() for p in
+             steps["Upload every artefact of the attempt"]["with"]["path"].splitlines()
+             if p.strip()]
+    for needed in ("n2r-record", "first-moment-evaluation.json", "execution-status.txt",
+                   "launcher.log", "attempt-spent.json", "reviewed-identities.txt",
+                   "restored_image.txt", "evidence-manifest.txt"):
+        assert any(needed in p for p in paths), needed
+
+
+def test_the_synthetic_qualification_workflow_is_untouched():
+    """The new workflow is separate. first-moment-image.yml stays synthetic-only."""
+    image_wf = REPO_ROOT / ".github" / "workflows" / "first-moment-image.yml"
+    assert _sha256(image_wf) == (
+        "d7f77d63e1ad3e29595eb79c9b0aaac5c1c936f3efd17486c5bfd6ef70f6bac5")
+    # on the EXECUTABLE lines: its header comment names N2R and the launcher on purpose,
+    # to say that neither is reachable through it. The sha256 above is the real guarantee.
+    runnable = "\n".join(ln for ln in image_wf.read_text().splitlines()
+                         if not ln.lstrip().startswith("#"))
+    assert "run_diagnostic.py" not in runnable
+    assert "COUPLED-LADDER" not in runnable and "coupled_chip_cell" not in runnable
+    assert "compiled_qualification.py" in runnable, "it still runs the synthetic harness"
+
+
+# --- the proposed approval, prepared and NOT granted ------------------------------------
+
+DRAFT_APPROVAL = (REPO_ROOT / "docs" / "coupled-candidate"
+                  / "first-moment-n2r-approval.DRAFT.json")
+
+
+def test_the_live_approval_path_is_empty_and_the_draft_is_elsewhere():
+    assert not (FMD / "EXECUTION-APPROVAL.json").exists()
+    assert DRAFT_APPROVAL.is_file()
+    assert DRAFT_APPROVAL.parent != FMD
+    assert "DRAFT" in DRAFT_APPROVAL.name
+    body = json.loads(DRAFT_APPROVAL.read_text())
+    assert body["DRAFT"].startswith("NOT AN APPROVAL")
+    assert "install" in body["how_to_grant_it"].lower() or \
+        "copy" in body["how_to_grant_it"].lower()
+
+
+def test_every_digest_in_the_draft_is_measured_from_this_tree():
+    """A draft whose digests have gone stale would propose approving something that is
+    not here. Every one is checked against the file on disk."""
+    body = json.loads(DRAFT_APPROVAL.read_text())
+    assert body["config_sha256"] == _sha256(FMD / "config.candidate.json")
+    assert body["patch_sha256"] == _sha256(PATCH)
+    mesh = REPO_ROOT / body["_inputs"]["mesh_path"]
+    assert mesh.is_file() and body["mesh_sha256"] == _sha256(mesh)
+    assert body["image_id"] == QUALIFIED_IMAGE_ID
+    block = body["one_attempt"]
+    assert block["workflow_sha256"] == _sha256(REPO_ROOT / block["workflow_path"])
+    for name, digest in block["code_sha256"].items():
+        assert digest == _sha256(FMD / name), name
+    for value in (body["config_sha256"], body["mesh_sha256"], body["patch_sha256"],
+                  block["workflow_sha256"], *block["code_sha256"].values()):
+        assert re.fullmatch(r"[0-9a-f]{64}", value), "full digests only, never abbreviated"
+
+
+def test_the_draft_would_actually_satisfy_the_launcher(launcher, authority, tmp_path,
+                                                       monkeypatch):
+    """The draft is checked against the real gates, not merely against a schema: armed at
+    a temporary path with the real mesh digest, it passes load_approval and the
+    one-attempt check. Nothing is launched and the live path stays empty."""
+    mod = launcher
+    body = json.loads(DRAFT_APPROVAL.read_text())
+    staged = tmp_path / "approval.json"
+    staged.write_text(json.dumps(body))
+    parsed = mod.load_approval(staged, required={
+        "config_sha256": body["config_sha256"], "mesh_sha256": body["mesh_sha256"],
+        "patch_sha256": body["patch_sha256"]})
+    assert mod.approved_image_id(parsed) == QUALIFIED_IMAGE_ID
+    ok = authority.require_one_attempt(parsed, env=gh_env(
+        GITHUB_RUN_NUMBER=str(body["one_attempt"]["run_number"]),
+        GITHUB_WORKFLOW_REF=body["one_attempt"]["workflow_ref"],
+        GITHUB_REF=body["one_attempt"]["ref"],
+        GITHUB_REPOSITORY=body["one_attempt"]["repository"]))
+    assert ok["observed"]["run_attempt"] == 1
+    assert not (FMD / "EXECUTION-APPROVAL.json").exists()
+
+
+def test_the_tests_that_pin_the_approvals_absence_are_named_and_kept():
+    """Three tests assert the diagnostic is inert. Arming it would flip exactly these,
+    and the arming change is stated rather than discovered later."""
+    src = Path(__file__).read_text()
+    pinning = [name for name in
+               ("test_the_launcher_is_prepared_but_inert",
+                "test_the_live_approval_path_is_empty_and_the_draft_is_elsewhere",
+                "test_the_execution_workflow_is_inert_without_a_committed_approval")
+               if f"def {name}(" in src]
+    assert len(pinning) == 3, pinning
+    for name in pinning:
+        assert 'EXECUTION-APPROVAL.json").exists()' in inspect.getsource(globals()[name])
+    # the exact reviewed arming change, stated here so it cannot be improvised
+    assert "ARMING_CHANGE" in src
 
 def test_the_committed_native_qualification_record_is_untouched():
     """Historical evidence. The image qualification writes OUTSIDE the repository."""
