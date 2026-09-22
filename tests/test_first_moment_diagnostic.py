@@ -27,6 +27,15 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FMD = REPO_ROOT / "experiments" / "first-moment-diagnostic"
+#: ARMED. The reviewed approval was granted by a human copying the draft and dropping only
+#: the three presentational keys; nothing in this repository's code, tests or workflows
+#: creates it. These two names let the activation tests state that exact relationship
+#: instead of merely asserting a file exists.
+LIVE_APPROVAL = FMD / "EXECUTION-APPROVAL.json"
+PRESENTATIONAL_KEYS = ("DRAFT", "how_to_grant_it", "_inputs")
+#: the approved N2R mesh, the one the approval's mesh_sha256 names
+MESH = (REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z" / "L2"
+        / "solver" / "coupled_chip_cell_L2.msh")
 #: the NATIVE qualification record, historical evidence: the image
 #: qualification writes outside the repository and never overwrites it.
 COMPILED_QUALIFICATION_SHA256 = "9f1c77964494ea7d66a52c7a3ab48a1ec02e4b59db658ec443a5bc8248c390f1"
@@ -496,6 +505,42 @@ SUPERSEDED_CODE = {
 }
 
 
+#: proposal.json also records a LIVE OBSERVATION of the working tree at preparation time:
+#: approval_absent, true while the diagnostic was prepared and not activated. A human has
+#: since granted the approval, so a regeneration now observes false. The committed record
+#: is NOT rewritten - it stated the truth about the tree it was written from, and §1 keeps
+#: it immutable. The transition is declared here instead, and honoured ONLY when the
+#: committed record says true, the regeneration says false, and the live approval actually
+#: exists and is exactly the reviewed payload. Any other drift in that block still fails.
+ACTIVATED_SINCE_PREPARATION = {
+    "/the_one_execution/launcher/approval_absent": {
+        "prepared": True,
+        "current": False,
+        "revision": "the reviewed approval was granted by a human copying the draft "
+                    "payload minus its three presentational keys; the launcher is armed "
+                    "for the one authorised attempt and refuses any other run",
+    },
+}
+
+
+def _activated_paths(new: dict, old: dict) -> set[str]:
+    """The declared preparation-time observations whose transition is checked at both
+    ends AND against the live approval itself."""
+    allowed = set()
+    if not LIVE_APPROVAL.is_file():
+        return allowed
+    if json.loads(LIVE_APPROVAL.read_text()) != draft_minus_presentational():
+        return allowed
+    for path, entry in ACTIVATED_SINCE_PREPARATION.items():
+        node_old, node_new = old, new
+        for part in path.strip("/").split("/"):
+            node_old = node_old.get(part) if isinstance(node_old, dict) else None
+            node_new = node_new.get(part) if isinstance(node_new, dict) else None
+        if node_old is entry["prepared"] and node_new is entry["current"]:
+            allowed.add(path)
+    return allowed
+
+
 def _superseded_code_paths(new: dict, old: dict) -> set[str]:
     """The /code_sha256 paths whose drift is DECLARED, with both ends checked."""
     allowed = set()
@@ -521,7 +566,9 @@ def regeneration_mismatches(name: str, new_text: str, old_text: str, rm) -> list
     def named(messages):
         return [f"{name}{m}" if m.startswith("/") else f"{name}: {m}" for m in messages]
 
-    declared = _superseded_code_paths(new, old) if name == "proposal.json" else set()
+    declared = set()
+    if name == "proposal.json":
+        declared = _superseded_code_paths(new, old) | _activated_paths(new, old)
     shape = _drop_declared(_compare(new, old), declared)
     if shape:
         return named(shape)
@@ -1643,15 +1690,35 @@ def test_required_provenance_is_required_not_merely_reported(rm, prep):
 
 
 def test_the_launcher_is_prepared_but_inert():
+    """ARMED, per ARMING_CHANGE item 2. The approval is committed, so the absence
+    assertion is replaced by the refusal that now matters: a run whose GitHub-assigned
+    metadata is NOT the approved one is refused, and nothing is created or launched.
+
+    Measured deviation from item 2 as written. That item expected the refusal to "still
+    exit 2 with REFUSED on stderr". It does not: AuthorityRefusal is not a Refusal, and
+    main() catches only Refusal, around load_approval(). The refusal is correct and
+    nothing launches, but the process exits 1 with a traceback. run_diagnostic.py is NOT
+    changed to smooth that over, because the committed approval pins its sha256 - editing
+    it would invalidate the approval that authorises this run. The exit-2/REFUSED contract
+    is therefore asserted below against the CLI path that still produces it.
+    """
     launcher = FMD / "run_diagnostic.py"
     assert launcher.is_file()
-    assert not (FMD / "EXECUTION-APPROVAL.json").exists(), "the diagnostic must not be armed"
-    proc = subprocess.run([sys.executable, str(launcher), "--record-dir", "/tmp/nope",
-                           "--mesh", "/tmp/nope"], capture_output=True, text=True,
+    assert LIVE_APPROVAL.is_file(), "armed: the reviewed approval is committed"
+    rec = Path(tempfile.mkdtemp()) / "never-created"
+    proc = subprocess.run(
+        [sys.executable, str(launcher), "--record-dir", str(rec), "--mesh", str(MESH)],
+        capture_output=True, text=True, cwd=REPO_ROOT,
+        env={**os.environ, **gh_env(GITHUB_RUN_NUMBER=str(APPROVED_RUN_NUMBER + 6))})
+    assert proc.returncode != 0
+    assert "AuthorityRefusal" in proc.stderr
+    assert "the approval authorises run number 1" in proc.stderr
+    assert "Nothing is launched." in proc.stderr
+    assert not rec.exists(), "a refused run creates no record directory"
+    # the CLI's own refusal still exits 2 and says REFUSED
+    bare = subprocess.run([sys.executable, str(launcher)], capture_output=True, text=True,
                           cwd=REPO_ROOT)
-    assert proc.returncode == 2
-    assert "REFUSED" in proc.stderr and "PREPARED, NOT ACTIVATED" in proc.stderr
-    assert "spent PO1 approval" in proc.stderr
+    assert bare.returncode == 2 and bare.stderr.startswith("REFUSED:")
     src = launcher.read_text()
     for token in ("DOF_HARD_CAP", "WALL_HARD_CAP_S", "docker", "kill"):
         assert token in src
@@ -1666,8 +1733,11 @@ def test_the_launcher_argv_and_caps_are_pinned():
     assert "--entrypoint" in argv and "stdbuf" in argv
     assert "-v" in argv and "/w:/work" in argv
     assert mod.DOF_HARD_CAP == 250_000 and mod.WALL_HARD_CAP_S == 2_700
+    # ARMED: the default path now carries the reviewed approval, so it loads instead of
+    # refusing. The refusal it used to give is still proved, against a path with none.
+    assert mod.load_approval()["image_id"] == QUALIFIED_IMAGE_ID
     with pytest.raises(mod.Refusal):
-        mod.load_approval()
+        mod.load_approval(REPO_ROOT / "no-such-dir" / "EXECUTION-APPROVAL.json")
     # the DOF pattern matches the finest-space line and not the multigrid lines, checked
     # against the committed N2R log
     pat = mod.dof_probe_pattern(1)
@@ -2574,8 +2644,9 @@ def test_a_correctly_scoped_approval_and_a_matching_image_reach_the_launch_bound
     assert snap.read_bytes() == approval.read_bytes()
     assert prov["approval_sha256"] == _sha256(snap)
     assert prov["approval_source_commit"] and prov["approval_source_path"]
-    # and the live approval was not created
-    assert not (FMD / "EXECUTION-APPROVAL.json").exists()
+    # and this test did not touch the live approval: it ran off a staged copy in tmp_path
+    assert approval.parent == tmp_path and approval != LIVE_APPROVAL
+    assert json.loads(LIVE_APPROVAL.read_text()) == draft_minus_presentational()
 
 
 def test_a_missing_approval_refuses_before_anything_is_inspected(launcher, monkeypatch,
@@ -3141,8 +3212,9 @@ def test_the_execution_workflow_is_inert_without_a_committed_approval():
         "Refuse unless the reviewed approval is committed"]["run"]
     assert "PREPARED, NOT ACTIVATED" in body
     assert "exit 1" in body
-    assert not (FMD / "EXECUTION-APPROVAL.json").exists(), "the diagnostic must stay inert"
-    # and the workflow must not create one
+    # and the workflow must not create one - ARMED, so only the inertness line is dropped;
+    # every assertion that the workflow REFUSES without a committed approval, and never
+    # writes one itself, is kept
     whole = (REPO_ROOT / WORKFLOW_N2R).read_text()
     runnable = "\n".join(ln for ln in whole.splitlines() if not ln.lstrip().startswith("#"))
     for writing in ("> $APPROVAL", '> "$APPROVAL"', "tee $APPROVAL", "cat > experiments"):
@@ -3237,8 +3309,24 @@ DRAFT_APPROVAL = (REPO_ROOT / "docs" / "coupled-candidate"
                   / "first-moment-n2r-approval.DRAFT.json")
 
 
+def draft_minus_presentational() -> dict:
+    """The reviewed payload exactly as granting it produces: the draft with the three
+    presentational keys dropped and nothing else touched."""
+    body = json.loads(DRAFT_APPROVAL.read_text())
+    return {k: v for k, v in body.items() if k not in PRESENTATIONAL_KEYS}
+
+
 def test_the_live_approval_path_is_empty_and_the_draft_is_elsewhere():
-    assert not (FMD / "EXECUTION-APPROVAL.json").exists()
+    """ARMED, per ARMING_CHANGE item 3: the live approval EQUALS the draft payload minus
+    the three presentational keys. That is the whole grant - no digest, scope sentence or
+    one_attempt field may differ, and nothing may have been added."""
+    live = json.loads(LIVE_APPROVAL.read_text())
+    assert live == draft_minus_presentational()
+    draft = json.loads(DRAFT_APPROVAL.read_text())
+    assert set(draft) - set(live) == set(PRESENTATIONAL_KEYS), "only those three removed"
+    assert set(live) - set(draft) == set(), "and nothing added"
+    for key in live:
+        assert live[key] == draft[key], key
     assert DRAFT_APPROVAL.is_file()
     assert DRAFT_APPROVAL.parent != FMD
     assert "DRAFT" in DRAFT_APPROVAL.name
@@ -3285,21 +3373,51 @@ def test_the_draft_would_actually_satisfy_the_launcher(launcher, authority, tmp_
         GITHUB_REF=body["one_attempt"]["ref"],
         GITHUB_REPOSITORY=body["one_attempt"]["repository"]))
     assert ok["observed"]["run_attempt"] == 1
-    assert not (FMD / "EXECUTION-APPROVAL.json").exists()
+    # this test staged its own copy; the live approval is untouched by it
+    assert staged != LIVE_APPROVAL
+    assert json.loads(LIVE_APPROVAL.read_text()) == draft_minus_presentational()
 
 
 def test_the_tests_that_pin_the_approvals_absence_are_named_and_kept():
-    """Three tests assert the diagnostic is inert. Arming it would flip exactly these,
-    and the arming change is stated rather than discovered later."""
+    """The three named tests are KEPT, by name, now carrying their armed form. None was
+    deleted to obtain green CI, and each still refers to the live approval rather than
+    having had its subject removed.
+
+    ARMING_CHANGE named three tests. Arming in fact moved six, because three more carried
+    an incidental "and the live path is still empty" tail. Those three are listed here so
+    the undercount is recorded rather than discovered later; each kept its own contract
+    and none lost a refusal."""
     src = Path(__file__).read_text()
-    pinning = [name for name in
-               ("test_the_launcher_is_prepared_but_inert",
-                "test_the_live_approval_path_is_empty_and_the_draft_is_elsewhere",
-                "test_the_execution_workflow_is_inert_without_a_committed_approval")
-               if f"def {name}(" in src]
-    assert len(pinning) == 3, pinning
-    for name in pinning:
-        assert 'EXECUTION-APPROVAL.json").exists()' in inspect.getsource(globals()[name])
+    named = ("test_the_launcher_is_prepared_but_inert",
+             "test_the_live_approval_path_is_empty_and_the_draft_is_elsewhere",
+             "test_the_execution_workflow_is_inert_without_a_committed_approval")
+    also_moved = ("test_the_launcher_argv_and_caps_are_pinned",
+                  "test_a_correctly_scoped_approval_and_a_matching_image_reach_the_launch_boundary",
+                  "test_the_draft_would_actually_satisfy_the_launcher")
+    for name in named + also_moved:
+        assert f"def {name}(" in src, name
+    # each still asserts its own subject rather than having had it deleted. The workflow
+    # test is the one that never reads the live path - it reads the workflow - so what it
+    # must keep is its refusal, which ARMING_CHANGE item 4 explicitly preserves.
+    keeps = {
+        named[0]: ("LIVE_APPROVAL", "AuthorityRefusal", "run number 1"),
+        named[1]: ("LIVE_APPROVAL", "draft_minus_presentational"),
+        named[2]: ("PREPARED, NOT ACTIVATED", "exit 1", "must not create one"),
+        also_moved[0]: ("LIVE_APPROVAL_LOADS", "pytest.raises(mod.Refusal)"),
+        also_moved[1]: ("LIVE_APPROVAL",),
+        also_moved[2]: ("LIVE_APPROVAL",),
+    }
+    for name, tokens in keeps.items():
+        body = inspect.getsource(globals()[name])
+        for token in tokens:
+            if token == "LIVE_APPROVAL_LOADS":
+                assert "mod.load_approval()" in body, name
+                continue
+            assert token in body, (name, token)
+    # and the missing-approval refusal, which the launcher CLI can no longer reach now
+    # that the approval is committed, is still proved at the API level
+    assert "PREPARED, NOT ACTIVATED" in inspect.getsource(
+        globals()["test_a_missing_approval_refuses_before_anything_is_inspected"])
     # the exact reviewed arming change, stated here so it cannot be improvised
     assert "ARMING_CHANGE" in src
 
