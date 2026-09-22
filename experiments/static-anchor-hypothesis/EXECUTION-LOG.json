@@ -1,0 +1,23 @@
+{
+ "record": "execution log of the one approved static-anchor attempt",
+ "written_by": "the operator after the run, from the captured console; the record directory is untouched and its files are exactly as the program wrote them",
+ "authorisation": "user approval of one execution, conditional on the numerical-validity fix, tests, full suite, secret scan and CI all passing; met by CI run 35771860306 (run 229) on ffeaf15",
+ "source_commit_at_launch": "ffeaf15a1a3f71d859d5e15e86ea70d3ca8295aa",
+ "working_tree_at_launch": "clean except the untracked experiments/static-anchor-hypothesis/TEST-APPROVAL.json",
+ "approval_sha256": "b6bacb308c4912718be379d2f159d186f271ee9186ac440fa28a6764bb2d39a4",
+ "invocation": "timeout --signal=KILL 1860 .venv/bin/python experiments/static-anchor-hypothesis/static_capacitance.py",
+ "cwd": "repository root",
+ "start_utc": "2026-09-22T19:22:43.285339089Z",
+ "end_utc": "2026-09-22T19:23:00.382541074Z",
+ "exit_code": 0,
+ "stdout": "/home/user/QMHP-CEM/results/STATIC-ANCHOR-TEST-20260922T192243Z\n",
+ "stderr": "",
+ "stderr_note": "empty: no warning of any kind was emitted",
+ "record_dir": "results/STATIC-ANCHOR-TEST-20260922T192243Z",
+ "record_sha256": {
+  "results/STATIC-ANCHOR-TEST-20260922T192243Z/level0.json": "55f1f657dfb5cc476845b1cd4e283e4786206881db5b7d3860ae8e0714a0d3b9",
+  "results/STATIC-ANCHOR-TEST-20260922T192243Z/level1.json": "0fc3e70a569734ae71dec6967aa98f37515f469dd567e4acb35c2321d84e7ec6",
+  "results/STATIC-ANCHOR-TEST-20260922T192243Z/summary.json": "93db9bc22003c137adfeb8399445a9f6958e4ea4bd6c882b46262338167381d6"
+ },
+ "attempts": "1 of 1; no retry is authorised or will be made"
+}

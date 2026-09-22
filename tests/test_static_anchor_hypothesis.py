@@ -75,13 +75,74 @@ def measured():
 
 # --- the gate ---------------------------------------------------------------------------
 
-def test_no_approval_is_committed_and_the_test_refuses_without_one():
-    assert not (HERE / "TEST-APPROVAL.json").exists(), "prepared, not approved"
+#: EXECUTED ONCE, under the user's approval, from ffeaf15 with only the approval added.
+#: The record is append-only evidence: these digests are its bytes as the program wrote
+#: them, and a test fails if any file changes, appears or disappears.
+EXECUTED_RECORD = REPO / "results" / "STATIC-ANCHOR-TEST-20260922T192243Z"
+EXECUTED_RECORD_SHA256 = {
+    "level0.json": "55f1f657dfb5cc476845b1cd4e283e4786206881db5b7d3860ae8e0714a0d3b9",
+    "level1.json": "0fc3e70a569734ae71dec6967aa98f37515f469dd567e4acb35c2321d84e7ec6",
+    "summary.json": "93db9bc22003c137adfeb8399445a9f6958e4ea4bd6c882b46262338167381d6",
+}
+APPROVAL_SHA256 = "b6bacb308c4912718be379d2f159d186f271ee9186ac440fa28a6764bb2d39a4"
+
+
+def test_without_an_approval_the_test_refuses_and_writes_nothing(sc, tmp_path, monkeypatch):
+    # was a check that no approval was committed; the approval now exists, so the refusal
+    # is exercised against an absent approval path instead
+    monkeypatch.setattr(sc, "APPROVAL", tmp_path / "TEST-APPROVAL.json")
+    monkeypatch.setattr(sc, "RESULTS_ROOT", tmp_path / "results")
+    with pytest.raises(sc.Refusal, match="PREPARED, NOT APPROVED"):
+        sc.execute()
+    assert not (tmp_path / "results").exists()
+
+
+def test_the_one_attempt_is_spent_and_the_real_invocation_now_refuses():
+    before = sorted(p.name for p in (REPO / "results").glob("STATIC-ANCHOR-TEST-*"))
+    assert before == [EXECUTED_RECORD.name], "exactly one attempt exists"
     proc = subprocess.run([sys.executable, str(HERE / "static_capacitance.py")],
-                          capture_output=True, text=True, cwd=REPO)
+                          capture_output=True, text=True, cwd=REPO, timeout=300)
     assert proc.returncode == 2
-    assert proc.stderr.startswith("REFUSED:") and "PREPARED, NOT APPROVED" in proc.stderr
-    assert not list((REPO / "results").glob("STATIC-ANCHOR-TEST-*")), "nothing was written"
+    assert proc.stderr.startswith("REFUSED:") and "the one attempt is spent" in proc.stderr
+    after = sorted(p.name for p in (REPO / "results").glob("STATIC-ANCHOR-TEST-*"))
+    assert after == before, "a refused invocation wrote nothing"
+    assert {p.name: _sha(p) for p in EXECUTED_RECORD.iterdir()} == EXECUTED_RECORD_SHA256
+
+
+def test_the_committed_approval_is_exactly_the_reviewed_draft():
+    draft = json.loads((HERE / "TEST-APPROVAL.draft.json").read_text())
+    granted = json.loads((HERE / "TEST-APPROVAL.json").read_text())
+    assert granted == {k: v for k, v in draft.items() if k not in ("DRAFT", "how_to_grant_it")}
+    assert _sha(HERE / "TEST-APPROVAL.json") == APPROVAL_SHA256
+
+
+def test_the_executed_record_is_preserved_exactly_as_produced(sc, pre):
+    assert {p.name: _sha(p) for p in EXECUTED_RECORD.iterdir()} == EXECUTED_RECORD_SHA256
+    summary = json.loads((EXECUTED_RECORD / "summary.json").read_text())
+    assert summary["predeclaration_sha256"] == PREDECLARATION_SHA256
+    assert summary["approval_sha256"] == APPROVAL_SHA256
+    assert summary["mesh_sha256"] == pre["configuration"]["mesh_sha256"]
+    assert summary["environment"]["code_sha256"] == \
+        json.loads((HERE / "TEST-APPROVAL.json").read_text())["code_sha256"]
+    assert summary["integrity_failures"] == []
+    assert summary["outcome"]["verdict"] == "UNRESOLVED"
+    log = json.loads((HERE / "EXECUTION-LOG.json").read_text())
+    assert log["exit_code"] == 0 and log["stderr"] == ""
+    assert log["source_commit_at_launch"] == "ffeaf15a1a3f71d859d5e15e86ea70d3ca8295aa"
+    assert log["record_sha256"] == {f"results/{EXECUTED_RECORD.name}/{n}": d
+                                    for n, d in EXECUTED_RECORD_SHA256.items()}
+
+
+def test_the_recorded_verdict_follows_from_the_raw_levels_and_the_frozen_table(sc, pre):
+    # a consistency check on the preserved bytes, not a re-run: nothing is solved here
+    levels = [json.loads((EXECUTED_RECORD / f"level{i}.json").read_text()) for i in (0, 1)]
+    B0 = sc.band_baseline(pre)
+    assert sc.integrity(levels, pre, B0) == []
+    decided = sc.decide(levels[0]["S_GHz2"], levels[1]["S_GHz2"], B0, pre)
+    summary = json.loads((EXECUTED_RECORD / "summary.json").read_text())
+    assert decided == summary["outcome"]
+    assert 1.25 < decided["rho"] < 1.9, "UNRESOLVED: r0 is not read"
+    assert levels[1]["C_F"] <= levels[0]["C_F"], "nested refinement did not raise C_h"
 
 
 def test_a_stale_approval_is_refused_before_anything_is_created(sc, pre, tmp_path,

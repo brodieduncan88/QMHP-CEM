@@ -1,0 +1,43 @@
+{
+ "predeclaration_sha256": "6f31470a38a58cfbe33eb7bee61c6ec06eeea428bdfbd943b39e52e3e4868f29",
+ "approval_sha256": "b6bacb308c4912718be379d2f159d186f271ee9186ac440fa28a6764bb2d39a4",
+ "approval_run_label": "static-anchor test, attempt 1 of 1",
+ "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+ "band_baseline_B0_GHz2": 2.14839665776427,
+ "environment": {
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "platform": "Linux-6.18.44-fc-v37-x86_64-with-glibc2.39",
+  "code_sha256": {
+   "static_capacitance.py": "54dd810f93f8d7af967cdfffb9fac78d0a583c8003c104e0c00002e2b8e98aab",
+   "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1"
+  }
+ },
+ "limits": {
+  "cpu_s": 600,
+  "cpu_hard_kill_s": 660,
+  "address_space_bytes": 8589934592,
+  "wall_s": 1800
+ },
+ "resources": {
+  "wall_s": 16.71858619800014,
+  "cpu_s": 19.017688999999997,
+  "max_rss_MB": 1253.2890625
+ },
+ "S0_GHz2": 2.1413534596006496,
+ "S1_GHz2": 2.9785062321795324,
+ "C0_fF": 114.33875970637405,
+ "C1_fF": 82.2021777287097,
+ "integrity_failures": [],
+ "outcome": {
+  "verdict": "UNRESOLVED",
+  "reason": "the static quantity is not resolved on the base mesh",
+  "r0": 0.996721649078085,
+  "rho": 1.3909456277876737,
+  "B0_GHz2": 2.14839665776427,
+  "lumped_one_sided_relation_S0_le_B0": true,
+  "note": "r0 and rho are the only decisive numbers; the one-sided relation is a reported diagnostic, never decisive"
+ },
+ "not_reported": "E_C,F1F1 (see predeclaration.relation_to_registered_E_C); no coupling, readout frequency or Route A output is used"
+}
