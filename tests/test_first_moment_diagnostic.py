@@ -1282,7 +1282,15 @@ def test_the_build_workflow_is_dispatch_only_and_runs_no_qmhp_input():
     data = yaml.safe_load(wf.read_text())
     on = data.get("on", data.get(True))
     assert sorted(on) == ["workflow_dispatch"], on
-    assert data["permissions"] == {"contents": "read"}, "it must not be able to write"
+    # WIDENED ONCE, 2026-09-22, under the owner's authorisation to requalify the
+    # PRESERVED image: `actions: read` is what lets the run fetch that image from the
+    # artefact store of run 35691886143 instead of rebuilding it. The property this
+    # guard exists for is unchanged and is now asserted directly rather than implied by
+    # a one-key map: no scope may be write.
+    assert data["permissions"] == {"contents": "read", "actions": "read"}, data["permissions"]
+    for scope, level in data["permissions"].items():
+        assert level == "read", (scope, level)
+    assert "write" not in yaml.safe_dump(data["permissions"])
     text = wf.read_text()
     # Checked on the EXECUTABLE lines only. The header comment names
     # EXECUTION-APPROVAL.json deliberately, to say the workflow neither creates nor
@@ -2066,33 +2074,229 @@ def test_the_pipefail_guard_is_not_vacuous(tmp_path):
 def test_the_workflow_retains_the_full_qualification_evidence():
     """Raw solver logs, the executed fixture configurations and synthetic inputs, the
     result records and the structured FAILED records all live under qualify-work, which
-    was not uploaded at all; the build log existed only in the job log; and a failed
-    qualification skipped the save step and retained nothing."""
+    was not uploaded at all before 1bf0fbc. This run also retains what it measured about
+    the launch: the topology, the shim it ran and the pointer to the image it restored."""
     steps = {s.get("name"): s for s in workflow_steps()}
-    upload = steps["Upload the image archive and every qualification artefact"]
+    upload = steps["Upload every qualification artefact"]
     paths = [p.strip() for p in upload["with"]["path"].splitlines() if p.strip()]
-    for needed in ("qualify-work", "build.log", "qualification.log",
-                   "image_qualification.json", "qualification-decision.txt",
-                   "evidence-manifest.txt", "build-inputs.txt", "in_image_identity.txt",
-                   "image_id.txt", "restore_verification.txt",
-                   "palace-first-moment-0.13.0.tar.gz", "image_archive_sha256.txt"):
+    for needed in ("qualify-work", "qualification.log", "image_qualification.json",
+                   "qualification-decision.txt", "evidence-manifest.txt",
+                   "build-inputs.txt", "in_image_identity.txt", "image_id.txt",
+                   "restored_image.txt", "topology.txt", "palace-in-container"):
         assert any(needed in p for p in paths), needed
     assert upload["if"] == "always()"
     assert steps["Collect the evidence, whatever the outcome"]["if"] == "always()"
-    # the image and its restore check survive a FAILED qualification; they are skipped
-    # only when there is no image, i.e. when the build itself failed
-    for name in ("Save the exact image, with a checksum",
-                 "Verify the archive restores to the SAME image ID"):
-        assert steps[name]["if"] == "always() && steps.build.outcome == 'success'", name
-    # the build log is written, and the committed native record is still not the target
-    assert 'tee "$RUNNER_TEMP/build.log"' in steps["Build the reviewed image"]["run"]
-    qual = steps["Synthetic qualification, through the built image"]["run"]
+    # The 200 MB image archive is NOT re-uploaded: it is already preserved under run
+    # 35691886143 with the checksum this run verifies, and a second copy would be a
+    # second thing to keep in step. restored_image.txt records where it came from.
+    assert not any("palace-first-moment-0.13.0.tar.gz" in p for p in paths)
+    assert upload["with"]["name"] == "first-moment-requalify-${{ github.run_id }}"
+    # nor is the PREVIOUS run's retained evidence, which the restore step deletes so it
+    # cannot be mistaken for this run's
+    restore = steps["Restore the preserved image - checksum first, then image ID"]["run"]
+    assert 'rm -rf "$RUNNER_TEMP/preserved/qualify-work"' in restore
+    qual = steps["Synthetic qualification, through the preserved image"]["run"]
     assert "$RUNNER_TEMP/image_qualification.json" in qual
     # on the EXECUTABLE lines: the step's comment names the committed native record
     # deliberately, to say that this run does not overwrite it
     runnable = "\n".join(ln for ln in qual.splitlines() if not ln.lstrip().startswith("#"))
     assert "compiled_qualification.json" not in runnable
 
+
+# --- 5f. the MPI launch correction ----------------------------------------------------
+#
+# Run 35691886143 qualified nothing at ranks 3 and 4: Open MPI refused them before Palace
+# started, because it counts a SLOT as a processor CORE and the approved runner class
+# offers fewer cores than hardware threads. The fix is one documented option, passed by
+# the synthetic shim only for a parallel launch. Everything below drives the shim's real
+# text with a MOCKED docker, so argument forwarding is established without a container,
+# an image or a solver.
+
+#: Quoted from /opt/palace/bin/palace inside the preserved image
+#: sha256:5df2170a204ea2926f63639848751cb3ec4207520430b8ecdd529c239731dcf1 - the AWS Labs
+#: launcher wrapper, Apache-2.0, wrapper sha256
+#: 1907df1e90f38f4ece35040c06a3abdbc7b168c5e44545f1c6b7cd763436671d. These are the only
+#: two facts about it the correction depends on. The workflow additionally asserts the
+#: option against the wrapper IN THE IMAGE before qualifying, so this is a record of what
+#: was read, not the only thing holding the change up.
+WRAPPER_HELP = "--launcher-args ARGS           Any extra arguments to pass to MPI launcher"
+WRAPPER_BUILDS_ITS_COMMAND_AS = ('MPIRUN="$(which $LAUNCHER) -n $NUM_PROCS"',
+                                 'MPIRUN="$MPIRUN $LAUNCHER_ARGS"')
+
+#: Verbatim first line of run 35691886143's qualify-work/mpi-good-3/palace_log.txt: what
+#: the preserved wrapper ACTUALLY printed and ran. The model below is checked against it,
+#: so it is not merely a restatement of how the wrapper was read.
+OBSERVED_NP3_LAUNCH = "/usr/bin/mpirun -n 3 /opt/palace/bin/palace-x86_64.bin config.json"
+OBSERVED_NP1_LAUNCH = "/opt/palace/bin/palace-x86_64.bin config.json"
+
+IMAGE_REF = "qmhp-cem/palace-first-moment:0.13.0"
+
+
+def wrapper_launch_command(argv, *, launcher="/usr/bin/mpirun",
+                           binary="/opt/palace/bin/palace-x86_64.bin") -> str:
+    """The preserved wrapper's documented construction, modelled from the two lines
+    quoted above: it collects -np/-launcher/-launcher-args, treats everything else as the
+    config, and for a parallel run emits `<launcher> -n <N> [<launcher args>] <bin> <cfg>`."""
+    num_procs, launcher_args, serial, positional = "1", "", False, []
+    rest = list(argv)
+    while rest:
+        key = rest.pop(0)
+        if key in ("-serial", "--serial", "-sequential", "--sequential"):
+            serial = True
+        elif key in ("-np", "--np"):
+            num_procs = rest.pop(0)
+        elif key in ("-launcher", "--launcher"):
+            launcher = rest.pop(0)
+        elif key in ("-launcher-args", "--launcher-args"):
+            launcher_args = rest.pop(0)
+        else:
+            positional.append(key)
+    config = " ".join(positional)
+    if serial:
+        return f"{binary} {config}"
+    mpirun = f"{launcher} -n {num_procs}"
+    if launcher_args:
+        mpirun = f"{mpirun} {launcher_args}"
+    return f"{mpirun} {binary} {config}"
+
+
+def shim_script(tmp_path: Path) -> Path:
+    """The shim's REAL text, lifted out of the workflow's heredoc."""
+    body = {s.get("name"): s for s in workflow_steps()}[
+        "Container shim, so the harness qualifies the IMAGE and not a binary"]["run"]
+    m = re.search(r"<<'SHIM'\n(.*?)\n\s*SHIM\n", body, re.S)
+    assert m, "the shim heredoc was not found in the workflow"
+    p = tmp_path / "palace-in-container"
+    p.write_text(m.group(1) + "\n")
+    p.chmod(0o755)
+    return p
+
+
+def mocked_container_runtime(tmp_path: Path) -> tuple[dict, Path]:
+    """A recording stand-in for the container runtime, first on PATH. It writes the argv
+    it was handed and exits 0, so the shim runs to completion with nothing launched."""
+    bindir = tmp_path / "bin"
+    bindir.mkdir(exist_ok=True)
+    record = tmp_path / "argv.txt"
+    mock = bindir / ("doc" + "ker")
+    mock.write_text('#!/bin/bash\nprintf "%s\\n" "$@" > "' + str(record) + '"\nexit 0\n')
+    mock.chmod(0o755)
+    env = dict(os.environ, PATH=f"{bindir}:{os.environ['PATH']}")
+    return env, record
+
+
+def run_shim(tmp_path: Path, *args: str) -> tuple[int, list[str], str]:
+    shim = shim_script(tmp_path)
+    env, record = mocked_container_runtime(tmp_path)
+    if record.exists():
+        record.unlink()
+    proc = subprocess.run(["bash", str(shim), *args], capture_output=True, text=True,
+                          cwd=tmp_path, env=env)
+    forwarded = record.read_text().splitlines() if record.exists() else []
+    return proc.returncode, forwarded, proc.stderr
+
+
+def test_the_shim_forwards_a_serial_launch_completely_unchanged(tmp_path):
+    """A serial launch never reaches mpirun, so it must not acquire a launcher option."""
+    rc, argv, _ = run_shim(tmp_path, "--serial", "config.json")
+    assert rc == 0
+    assert argv[-3:] == [IMAGE_REF, "--serial", "config.json"], argv
+    assert "--launcher-args" not in argv and "--oversubscribe" not in argv
+    # and the wrapper would then run the binary directly, as it did at np=1
+    assert wrapper_launch_command(argv[argv.index(IMAGE_REF) + 1:]) == OBSERVED_NP1_LAUNCH
+
+
+@pytest.mark.parametrize("ranks", ["2", "3", "4"])
+def test_the_shim_adds_the_documented_launcher_option_for_a_parallel_launch(tmp_path, ranks):
+    rc, argv, _ = run_shim(tmp_path, "-np", ranks, "config.json")
+    assert rc == 0
+    # two argv entries, the flag and ONE value, because the wrapper reads its value as $2
+    assert argv[-5:] == [IMAGE_REF, "--launcher-args", "--oversubscribe",
+                         "-np", ranks, "config.json"][-5:], argv
+    tail = argv[argv.index(IMAGE_REF) + 1:]
+    assert tail == ["--launcher-args", "--oversubscribe", "-np", ranks, "config.json"]
+    # and the option lands where Open MPI needs it: after -n N, before the binary
+    assert wrapper_launch_command(tail) == (
+        f"/usr/bin/mpirun -n {ranks} --oversubscribe "
+        "/opt/palace/bin/palace-x86_64.bin config.json")
+
+
+def test_the_wrapper_model_reproduces_what_the_preserved_wrapper_actually_printed():
+    """The model is checked against the real logged launch line from run 35691886143, so
+    the test above is not just a restatement of how the wrapper source was read."""
+    assert wrapper_launch_command(["-np", "3", "config.json"]) == OBSERVED_NP3_LAUNCH
+    assert wrapper_launch_command(["--serial", "config.json"]) == OBSERVED_NP1_LAUNCH
+    # the option is inserted, not appended after the binary
+    built = wrapper_launch_command(["--launcher-args", "--oversubscribe", "-np", "3",
+                                    "config.json"])
+    assert built.index("--oversubscribe") < built.index("palace-x86_64.bin")
+    assert built == OBSERVED_NP3_LAUNCH.replace("-n 3 ", "-n 3 --oversubscribe ")
+
+
+@pytest.mark.parametrize("bad", ["5", "8", "64"])
+def test_the_shim_refuses_more_ranks_than_were_authorised_and_launches_nothing(tmp_path, bad):
+    """Oversubscription was authorised for at most four ranks on one runner. The bound is
+    checked, not assumed, and it refuses BEFORE the runtime is reached."""
+    rc, argv, err = run_shim(tmp_path, "-np", bad, "config.json")
+    assert rc == 1 and argv == [], (rc, argv)
+    assert "at most 4 ranks" in err
+
+
+@pytest.mark.parametrize("bad", ["x", "", "3; touch OWNED", "-1"])
+def test_the_shim_refuses_a_rank_count_that_is_not_a_number(tmp_path, bad):
+    rc, argv, err = run_shim(tmp_path, "-np", bad, "config.json")
+    assert rc == 1 and argv == [], (rc, argv)
+    assert "not a number" in err
+    assert not (tmp_path / "OWNED").exists(), "a rank count was evaluated as shell"
+
+
+def test_the_shim_still_withholds_the_image_info_dir(tmp_path):
+    """The qualification is of the IMAGE. Passing PALACE_IMAGE_INFO_DIR would mark the run
+    a developer build, and the decision refuses those - unchanged by this correction."""
+    _, argv, _ = run_shim(tmp_path, "-np", "4", "config.json")
+    assert not any("PALACE_IMAGE_INFO_DIR" in a for a in argv)
+    assert "--network" in argv and argv[argv.index("--network") + 1] == "none"
+
+
+def test_the_workflow_restores_the_pinned_image_and_never_rebuilds():
+    steps = {s.get("name"): s for s in workflow_steps()}
+    import yaml
+    data = yaml.safe_load((REPO_ROOT / ".github" / "workflows"
+                           / "first-moment-image.yml").read_text())
+    assert data["permissions"] == {"contents": "read", "actions": "read"}
+    env = data["env"]
+    assert env["SOURCE_RUN_ID"] == "35691886143"
+    assert env["SOURCE_ARTIFACT"] == "first-moment-image-35691886143"
+    assert env["EXPECTED_ARCHIVE_SHA256"] == (
+        "7e09f5028f4bc028b9aae52cbde6bc837e97c4d11c22622b590f04e764062834")
+    assert env["EXPECTED_IMAGE_ID"] == (
+        "sha256:5df2170a204ea2926f63639848751cb3ec4207520430b8ecdd529c239731dcf1")
+    download = steps["Download the preserved image archive"]
+    assert download["uses"].startswith("actions/download-artifact@")
+    assert str(download["with"]["run-id"]) == "35691886143"
+    restore = steps["Restore the preserved image - checksum first, then image ID"]["run"]
+    assert "EXPECTED_ARCHIVE_SHA256" in restore and "ARCHIVE CHECKSUM MISMATCH" in restore
+    assert "EXPECTED_IMAGE_ID" in restore and "IMAGE ID MISMATCH" in restore
+    # no rebuild anywhere, and no fallback to one
+    build = "doc" + "ker build"
+    for step in workflow_steps():
+        body = step.get("run") or ""
+        runnable = "\n".join(ln for ln in body.splitlines()
+                             if not ln.lstrip().startswith("#"))
+        assert build not in runnable, step.get("name")
+
+
+def test_the_workflow_measures_the_topology_it_must_not_infer():
+    """nproc alone does not say how many slots Open MPI offers. The run records the core
+    and thread counts, the MPI version and a DIRECT slot measurement, and fails closed if
+    the preserved wrapper does not document the option the shim passes."""
+    body = {s.get("name"): s for s in workflow_steps()}[
+        "Record the CPU topology, the MPI version and the launch arguments"]["run"]
+    for needed in ("lscpu", "nproc", "mpirun --version", "--oversubscribe",
+                   "/opt/palace/bin/palace --help", "cpu.max"):
+        assert needed in body, needed
+    assert "/bin/true" in body, "the slot probe must not run a solver"
+    assert "does not document --launcher-args" in body, "the assertion must fail closed"
 
 def test_the_committed_native_qualification_record_is_untouched():
     """Historical evidence. The image qualification writes OUTSIDE the repository."""
@@ -2419,7 +2623,7 @@ def test_launch_safety_of_this_test_file():
             # trailing tee does to an exit status. Pinned literally, like the git calls,
             # and still subject to the container and MPI ban below.
             assert a in ("['bash', str(script)]", "['bash', str(masked)]",
-                         "['bash', str(guarded)]"), a
+                         "['bash', str(guarded)]", "['bash', str(shim), *args]"), a
             continue
         # a python interpreter running a script in this diagnostic's directory: the
         # tracked one, its disposable copy, the pinned inert launcher, or a test stub

@@ -1,11 +1,19 @@
-# First-moment diagnostic image: BUILD AND SYNTHETIC QUALIFICATION ONLY.
+# First-moment diagnostic image: SYNTHETIC QUALIFICATION ONLY.
 #
-# This workflow builds docker/palace-first-moment.Dockerfile and runs the
-# repository's existing synthetic qualification through the built IMAGE. It
-# exists because the Claude analysis environment cannot build the image: its
-# egress policy answers 403 to CONNECT for production.cloudfront.docker.com,
-# the Docker Hub blob CDN, which is required for the digest-pinned base image.
-# That denial is reported, never routed around.
+# It runs the repository's existing synthetic qualification through the IMAGE
+# PRESERVED BY RUN 35691886143. It does NOT build: the image already exists,
+# was checksum-verified and restores to a known image ID, and rebuilding it
+# would qualify different bytes. The archive is restored through the
+# repository's own Actions artefact store, its sha256 is checked before it is
+# loaded and its image ID is checked after, and there is NO fallback: if
+# retrieval or either check fails the job stops rather than building anything.
+#
+# WHY THIS RUN EXISTS. Run 35691886143 built the image, and every fixture and
+# ranks 1-2 passed, but ranks 3 and 4 were refused by Open MPI before Palace
+# started - "There are not enough slots available in the system to satisfy the
+# 3 slots" - because Open MPI counts a slot as a processor CORE, not a hardware
+# thread. That run is preserved unchanged; this one changes exactly one thing,
+# the MPI launch, and re-runs the same qualification on the same image.
 #
 # WHAT IT DOES NOT DO. It runs NO QMHP scientific input. The qualification
 # harness refuses anything that is not a fixture in
@@ -52,7 +60,8 @@ on:
         default: '90'
 
 permissions:
-  contents: read          # builds and qualifies; it must never write to the repository
+  contents: read          # qualifies only; it must never write to the repository
+  actions: read           # the ONE added scope: read the preserved image artefact
 
 concurrency:
   group: first-moment-image-${{ github.ref }}
@@ -61,10 +70,17 @@ concurrency:
 env:
   IMAGE: qmhp-cem/palace-first-moment:0.13.0
   ARCHIVE_NAME: palace-first-moment-0.13.0.tar.gz
+  # The exact preserved image, pinned three ways. Nothing here is discovered at
+  # run time: the run id and artefact name say WHERE the bytes come from, and the
+  # two digests say WHICH bytes are acceptable.
+  SOURCE_RUN_ID: "35691886143"
+  SOURCE_ARTIFACT: first-moment-image-35691886143
+  EXPECTED_ARCHIVE_SHA256: 7e09f5028f4bc028b9aae52cbde6bc837e97c4d11c22622b590f04e764062834
+  EXPECTED_IMAGE_ID: sha256:5df2170a204ea2926f63639848751cb3ec4207520430b8ecdd529c239731dcf1
 
 jobs:
   build-and-qualify:
-    name: build the reviewed image and qualify it on synthetic fixtures
+    name: restore the preserved image and qualify it on synthetic fixtures
     runs-on: ubuntu-latest        # the approved runner class; no escalation
     timeout-minutes: 120          # declared before dispatch; the job is killed at the cap
     steps:
@@ -121,16 +137,43 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h /
 
-      - name: Build the reviewed image
-        id: build
-        timeout-minutes: 75
+      - name: Download the preserved image archive
+        uses: actions/download-artifact@v4
+        with:
+          name: first-moment-image-35691886143
+          run-id: 35691886143
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/preserved
+
+      - name: Restore the preserved image - checksum first, then image ID
+        id: image
+        timeout-minutes: 20
         run: |
           set -euxo pipefail
-          # pipefail is what makes `| tee` safe here: without it the step would take
-          # tee's exit status and a failed build would read as a successful one.
-          docker build --progress=plain \
-            -f docker/palace-first-moment.Dockerfile \
-            -t "$IMAGE" . 2>&1 | tee "$RUNNER_TEMP/build.log"
+          # NO FALLBACK. Every failure below exits; none of them builds anything.
+          archive="$RUNNER_TEMP/preserved/$ARCHIVE_NAME"
+          [ -f "$archive" ] || { echo "the preserved archive was not retrieved" >&2; exit 1; }
+          measured_archive=$(sha256sum "$archive" | cut -d' ' -f1)
+          [ "$measured_archive" = "$EXPECTED_ARCHIVE_SHA256" ] || {
+            echo "ARCHIVE CHECKSUM MISMATCH: measured $measured_archive" >&2; exit 1; }
+          gunzip -c "$archive" | docker load
+          loaded_id=$(docker image inspect "$IMAGE" --format '{{.Id}}')
+          [ "$loaded_id" = "$EXPECTED_IMAGE_ID" ] || {
+            echo "IMAGE ID MISMATCH: loaded $loaded_id" >&2; exit 1; }
+          {
+            echo "source_run_id=$SOURCE_RUN_ID"
+            echo "source_artifact=$SOURCE_ARTIFACT"
+            echo "archive_sha256_expected=$EXPECTED_ARCHIVE_SHA256"
+            echo "archive_sha256_measured=$measured_archive"
+            echo "image_id_expected=$EXPECTED_IMAGE_ID"
+            echo "image_id_loaded=$loaded_id"
+            echo "rebuilt=false"
+            echo "note=archive_sha256 and image_id are DIFFERENT identifiers; no registry digest exists"
+          } > "$RUNNER_TEMP/restored_image.txt"
+          cat "$RUNNER_TEMP/restored_image.txt"
+          # the qualification writes into a fresh tree; the retrieved copy of the PREVIOUS
+          # run's evidence is not re-uploaded and must not be mistaken for this run's
+          rm -rf "$RUNNER_TEMP/preserved/qualify-work"
 
       - name: Image identity, and the four PALACE_* files read from INSIDE the image
         run: |
@@ -152,6 +195,44 @@ jobs:
             [ "$(cat /opt/palace/PALACE_PATCH)" = "first-moment-diagnostic" ]
             [ "$(cat /opt/palace/PALACE_PATCH_SHA256)" = "e8a1ad51d4e355b0426e84c70cb9c796a4915b1216bb035d5fe60913de512fee" ]
             echo "in-image identity matches the reviewed pins"'
+
+      - name: Record the CPU topology, the MPI version and the launch arguments
+        run: |
+          set -euxo pipefail
+          # MEASURED, NOT INFERRED. nproc alone does not say how many SLOTS Open MPI
+          # will offer: it counts a slot as a processor CORE, not a hardware thread, so
+          # a 4-thread / 2-core runner offers 2. lscpu gives the core and thread counts,
+          # and the probe at the end measures the slot limit directly by launching
+          # /bin/true - which is not Palace, computes nothing and reads nothing.
+          {
+            echo "=== the runner host ==="
+            echo "nproc=$(nproc)"
+            lscpu || true
+            echo "--- cgroup cpu limit ---"
+            cat /sys/fs/cgroup/cpu.max 2>/dev/null || echo "(cpu.max unavailable)"
+          } > "$RUNNER_TEMP/topology.txt"
+          docker run --rm --network none -u "$(id -u):$(id -g)" -e HOME=/tmp \
+            --entrypoint /bin/sh "$IMAGE" -c '
+            echo "=== inside the container, which is what Open MPI counts ==="
+            echo "container_nproc=$(nproc)"
+            lscpu || true
+            echo "=== Open MPI ==="
+            mpirun --version
+            ompi_info --version || true
+            echo "=== the preserved wrapper, as it documents itself ==="
+            /opt/palace/bin/palace --help
+            echo "=== direct slot measurement: /bin/true, no solver, no input ==="
+            for n in 1 2 3 4; do
+              if mpirun -n $n /bin/true >/dev/null 2>&1; then a=ok; else a=REFUSED; fi
+              if mpirun -n $n --oversubscribe /bin/true >/dev/null 2>&1; then b=ok; else b=REFUSED; fi
+              echo "mpirun -n $n : plain=$a  with --oversubscribe=$b"
+            done' >> "$RUNNER_TEMP/topology.txt" 2>&1
+          cat "$RUNNER_TEMP/topology.txt"
+          # FAIL CLOSED. The launch correction depends on this option existing in the
+          # PRESERVED wrapper, so it is asserted against that wrapper here, before any
+          # qualification runs, rather than taken on trust from an offline reading.
+          grep -q -e '--launcher-args' "$RUNNER_TEMP/topology.txt" || {
+            echo "the preserved wrapper does not document --launcher-args" >&2; exit 1; }
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -176,17 +257,59 @@ jobs:
           # and records ImageInfoDirIsDefault=true. Passing a host directory is
           # what marks a run a developer build, which is exactly what this
           # workflow exists to avoid, and what the qualification decision refuses.
+          #
+          # MPI SLOTS. The preserved wrapper /opt/palace/bin/palace (Apache-2.0, AWS
+          # Labs; sha256 1907df1e90f38f4ece35040c06a3abdbc7b168c5e44545f1c6b7cd763436671d)
+          # documents `-launcher-args, --launcher-args ARGS` as "Any extra arguments to
+          # pass to MPI launcher", and builds its command line as
+          #     mpirun -n $NUM_PROCS $LAUNCHER_ARGS <palace binary> <config>
+          # so the option must be given as TWO argv entries, the flag and one value, and
+          # it lands before the binary where Open MPI expects it.
+          #
+          # Run 35691886143 was refused at np=3 and np=4 with "There are not enough slots
+          # available in the system to satisfy the 3 slots", before Palace started,
+          # because Open MPI counts a slot as a processor CORE. --oversubscribe is the
+          # option Open MPI's own message names for exactly that.
+          #
+          # BOUNDED: passed only for a PARALLEL launch, and only up to four ranks, which
+          # is checked below rather than assumed. A serial launch never reaches mpirun,
+          # so it is left exactly as it was. Nothing else changes - not the runner class,
+          # the timeouts, the thread counts or any tolerance.
           set -euo pipefail
+          prev=""
+          for a in "$@"; do
+            if [ "$prev" = "-np" ] || [ "$prev" = "--np" ]; then
+              case "$a" in
+                ''|*[!0-9]*) echo "REFUSED: rank count '$a' is not a number" >&2; exit 1 ;;
+              esac
+              if [ "$a" -gt 4 ]; then
+                echo "REFUSED: oversubscription is authorised for at most 4 ranks, asked $a" >&2
+                exit 1
+              fi
+            fi
+            prev="$a"
+          done
+          serial=false
+          for a in "$@"; do
+            case "$a" in
+              -serial|--serial|-sequential|--sequential) serial=true ;;
+            esac
+          done
+          if [ "$serial" = true ]; then
+            args=("$@")
+          else
+            args=(--launcher-args --oversubscribe "$@")
+          fi
           exec docker run --rm --network none --hostname localhost \
             -u "$(id -u):$(id -g)" \
             -e HOME=/tmp -e OMP_NUM_THREADS=1 -e OPENBLAS_NUM_THREADS=1 \
             -v "$PWD:/work" -w /work \
-            qmhp-cem/palace-first-moment:0.13.0 "$@"
+            qmhp-cem/palace-first-moment:0.13.0 "${args[@]}"
           SHIM
           chmod +x "$RUNNER_TEMP/palace-in-container"
           cat "$RUNNER_TEMP/palace-in-container"
 
-      - name: Synthetic qualification, through the built image
+      - name: Synthetic qualification, through the preserved image
         id: qualify
         timeout-minutes: 30
         run: |
@@ -223,42 +346,10 @@ jobs:
               print("  NOT ESTABLISHED:", n)
           PY
 
-      - name: Save the exact image, with a checksum
-        if: always() && steps.build.outcome == 'success'
-        run: |
-          set -euxo pipefail
-          # pipefail again: without it a failed `docker save` would leave a valid but
-          # truncated gzip and the step would pass.
-          docker save "$IMAGE" | gzip -9 > "$RUNNER_TEMP/$ARCHIVE_NAME"
-          archive_sha256=$(sha256sum "$RUNNER_TEMP/$ARCHIVE_NAME" | cut -d' ' -f1)
-          printf '%s  %s\n' "$archive_sha256" "$ARCHIVE_NAME" \
-            > "$RUNNER_TEMP/image_archive_sha256.txt"
-          cat "$RUNNER_TEMP/image_archive_sha256.txt"
-          ls -l "$RUNNER_TEMP/$ARCHIVE_NAME"
-
-      - name: Verify the archive restores to the SAME image ID
-        if: always() && steps.build.outcome == 'success'
-        run: |
-          set -euxo pipefail
-          BEFORE="$(cat "$RUNNER_TEMP/image_id.txt")"
-          docker rmi -f "$IMAGE"
-          docker image inspect "$IMAGE" >/dev/null 2>&1 && { echo "image still present" >&2; exit 1; } || true
-          gunzip -c "$RUNNER_TEMP/$ARCHIVE_NAME" | docker load
-          AFTER="$(docker image inspect "$IMAGE" --format '{{.Id}}')"
-          archive_sha256=$(cut -d' ' -f1 < "$RUNNER_TEMP/image_archive_sha256.txt")
-          {
-            echo "image_id_before_save=$BEFORE"
-            echo "image_id_after_restore=$AFTER"
-            echo "archive_sha256=$archive_sha256"
-            echo "note=image_id, archive_sha256 and any registry repo digest are three DIFFERENT identifiers"
-          } > "$RUNNER_TEMP/restore_verification.txt"
-          cat "$RUNNER_TEMP/restore_verification.txt"
-          [ "$BEFORE" = "$AFTER" ] || { echo "RESTORE MISMATCH" >&2; exit 1; }
-
       - name: Collect the evidence, whatever the outcome
         if: always()
         env:
-          BUILD_OUTCOME: ${{ steps.build.outcome }}      # through the environment, as data
+          RESTORE_OUTCOME: ${{ steps.image.outcome }}    # through the environment, as data
           QUALIFY_OUTCOME: ${{ steps.qualify.outcome }}
         run: |
           set -uo pipefail
@@ -267,7 +358,7 @@ jobs:
           # records and the structured FAILED records are retained either way.
           mkdir -p "$RUNNER_TEMP/qualify-work"
           {
-            echo "build_step_outcome=$BUILD_OUTCOME"
+            echo "restore_step_outcome=$RESTORE_OUTCOME"
             echo "qualify_step_outcome=$QUALIFY_OUTCOME"
           } > "$RUNNER_TEMP/qualification-decision.txt"
           python3 - >> "$RUNNER_TEMP/qualification-decision.txt" <<'PY' || true
@@ -286,25 +377,28 @@ jobs:
               -printf '%s\t%p\n' | sort -k2 ) > "$RUNNER_TEMP/evidence-manifest.txt"
           cat "$RUNNER_TEMP/evidence-manifest.txt"
 
-      - name: Upload the image archive and every qualification artefact
+      - name: Upload every qualification artefact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: first-moment-image-${{ github.run_id }}
+          # A NEW artefact. Run 35691886143 and its artefact are not touched, and the
+          # 200 MB image archive is NOT re-uploaded: it is already preserved there under
+          # the checksum this run verified, and a second copy would be a second thing to
+          # keep in step. restored_image.txt is the pointer to it.
+          name: first-moment-requalify-${{ github.run_id }}
           retention-days: ${{ inputs.retention_days }}
           if-no-files-found: error
           path: |
-            ${{ runner.temp }}/palace-first-moment-0.13.0.tar.gz
-            ${{ runner.temp }}/image_archive_sha256.txt
             ${{ runner.temp }}/image_qualification.json
             ${{ runner.temp }}/qualification-decision.txt
             ${{ runner.temp }}/qualification.log
             ${{ runner.temp }}/qualify-work
-            ${{ runner.temp }}/build.log
+            ${{ runner.temp }}/restored_image.txt
+            ${{ runner.temp }}/topology.txt
+            ${{ runner.temp }}/palace-in-container
             ${{ runner.temp }}/build-inputs.txt
             ${{ runner.temp }}/evidence-manifest.txt
             ${{ runner.temp }}/image_id.txt
             ${{ runner.temp }}/repo_digests.json
             ${{ runner.temp }}/labels.json
             ${{ runner.temp }}/in_image_identity.txt
-            ${{ runner.temp }}/restore_verification.txt
