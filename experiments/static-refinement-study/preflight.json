@@ -1,0 +1,218 @@
+{
+ "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+ "linear_solves": 0,
+ "levels": {
+  "0": {
+   "mesh_digest": "5087fee82eae901c989ddc81f1236d44e5c273f01a72ace0091ddab53f373b54",
+   "n_tets": 64434,
+   "n_nodes": 13991,
+   "boundary": {
+    "max_face_multiplicity": 2,
+    "boundary_faces": 3040,
+    "every_boundary_face_is_tagged": true
+   },
+   "preconditions_failed": [],
+   "poincare": {
+    "box_extent_nd": [
+     1.0,
+     1.0,
+     0.4825
+    ],
+    "lambda1_box": 62.133278553696805,
+    "eps_min": 1.0,
+    "c": 62.133278553696805
+   },
+   "element_quality": {
+    "aspect_p50_p90_p99_max": [
+     4.698862653485424,
+     10.40103850988986,
+     14.209837377724428,
+     22.98010157963879
+    ],
+    "edge_nd_min_median_max": [
+     0.0008304705775127445,
+     0.017880239444930304,
+     0.1128319604071819
+    ]
+   },
+   "port": {
+    "t_ground": -0.02875,
+    "t_island": -0.018750000000000003,
+    "l_nd": 0.009999999999999998,
+    "w_nd": 0.0050000000000000044,
+    "n_port_tris": 25,
+    "n_port_nodes": 22,
+    "end_line_spread_rel": 0.0,
+    "outside_end_lines_rel": 0.0,
+    "normal_spread": 0.0,
+    "direction_out_of_plane": 0.0,
+    "area_over_lw_minus_1": 2.220446049250313e-16
+   },
+   "problems": {
+    "C": {
+     "n_unknowns": 4558,
+     "nnz_A": 49716,
+     "n_port_nodes_constrained_off_conductors": 0,
+     "certificate_floor_nd": 5.135435288208106e-20
+    },
+    "Cprime": {
+     "n_unknowns": 4543,
+     "nnz_A": 49535,
+     "n_port_nodes_constrained_off_conductors": 15,
+     "certificate_floor_nd": 5.073566565276338e-20
+    }
+   }
+  },
+  "1": {
+   "mesh_digest": "c1a93691a02c72d21849a0dad11ed36c86462e9a3b14a8e4c399f903be4a87fd",
+   "n_tets": 515472,
+   "n_nodes": 93935,
+   "boundary": {
+    "max_face_multiplicity": 2,
+    "boundary_faces": 12160,
+    "every_boundary_face_is_tagged": true
+   },
+   "preconditions_failed": [],
+   "poincare": {
+    "box_extent_nd": [
+     1.0,
+     1.0,
+     0.4825
+    ],
+    "lambda1_box": 62.133278553696805,
+    "eps_min": 1.0,
+    "c": 62.133278553696805
+   },
+   "element_quality": {
+    "aspect_p50_p90_p99_max": [
+     4.861029967618802,
+     11.159910187318328,
+     16.770855513824014,
+     32.52758432683514
+    ],
+    "edge_nd_min_median_max": [
+     0.0004152352887563618,
+     0.009062132617489227,
+     0.0605751103241502
+    ]
+   },
+   "port": {
+    "t_ground": -0.028750000000000005,
+    "t_island": -0.018750000000000006,
+    "l_nd": 0.009999999999999998,
+    "w_nd": 0.0050000000000000044,
+    "n_port_tris": 100,
+    "n_port_nodes": 68,
+    "end_line_spread_rel": 0.0,
+    "outside_end_lines_rel": 3.4694469519536147e-16,
+    "normal_spread": 0.0,
+    "direction_out_of_plane": 0.0,
+    "area_over_lw_minus_1": 0.0
+   },
+   "problems": {
+    "C": {
+     "n_unknowns": 60608,
+     "nnz_A": 766864,
+     "n_port_nodes_constrained_off_conductors": 0,
+     "certificate_floor_nd": 3.956604313393055e-17,
+     "galerkin_identity_rel": 6.594853697671926e-15,
+     "fixed_rows_from_free_coarse_nnz": 0
+    },
+    "Cprime": {
+     "n_unknowns": 60552,
+     "nnz_A": 765912,
+     "n_port_nodes_constrained_off_conductors": 56,
+     "certificate_floor_nd": 3.951364961313896e-17,
+     "galerkin_identity_rel": 6.594853697671926e-15,
+     "fixed_rows_from_free_coarse_nnz": 0
+    }
+   }
+  },
+  "2": {
+   "mesh_digest": "1f780cdb5c1675756de95812f10113a87165008ea6f8173d9f63a8fc341f5348",
+   "n_tets": 4123776,
+   "n_nodes": 709421,
+   "boundary": {
+    "max_face_multiplicity": 2,
+    "boundary_faces": 48640,
+    "every_boundary_face_is_tagged": true
+   },
+   "preconditions_failed": [],
+   "poincare": {
+    "box_extent_nd": [
+     1.0,
+     1.0,
+     0.4825
+    ],
+    "lambda1_box": 62.133278553696805,
+    "eps_min": 1.0,
+    "c": 62.133278553696805
+   },
+   "element_quality": {
+    "aspect_p50_p90_p99_max": [
+     4.852042864078854,
+     11.266352770404518,
+     17.140428698970894,
+     34.18296308451856
+    ],
+    "edge_nd_min_median_max": [
+     0.00020761764437816262,
+     0.004527494747706242,
+     0.03028755516207514
+    ]
+   },
+   "port": {
+    "t_ground": -0.028750000000000005,
+    "t_island": -0.018749999999999996,
+    "l_nd": 0.010000000000000009,
+    "w_nd": 0.0050000000000000044,
+    "n_port_tris": 400,
+    "n_port_nodes": 235,
+    "end_line_spread_rel": 0.0,
+    "outside_end_lines_rel": 0.0,
+    "normal_spread": 0.0,
+    "direction_out_of_plane": 0.0,
+    "area_over_lw_minus_1": -1.1102230246251565e-15
+   },
+   "problems": {
+    "C": {
+     "n_unknowns": 584914,
+     "nnz_A": 8073624,
+     "n_port_nodes_constrained_off_conductors": 0,
+     "certificate_floor_nd": 1.1111425138761289e-15,
+     "galerkin_identity_rel": 2.2686723185240468e-14,
+     "fixed_rows_from_free_coarse_nnz": 0
+    },
+    "Cprime": {
+     "n_unknowns": 584701,
+     "nnz_A": 8069405,
+     "n_port_nodes_constrained_off_conductors": 213,
+     "certificate_floor_nd": 1.1106623567083632e-15,
+     "galerkin_identity_rel": 2.2686723185240468e-14,
+     "fixed_rows_from_free_coarse_nnz": 0
+    }
+   }
+  }
+ },
+ "resources": {
+  "wall_s": 68.56056857300018,
+  "cpu_s": 67.919095,
+  "max_rss_MB": 3703.546875,
+  "peak_address_space_MB": 4128.03515625
+ },
+ "environment": {
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "platform": "Linux-6.18.44-fc-v37-x86_64-with-glibc2.39",
+  "longdouble_eps": 1.0842021724855044e-19,
+  "code_sha256": {
+   "study_driver.py": "6e90d4dc979e41fb0693e8c0b442e9ad45112e066675cb0ba8ba8d49d6c8dd38",
+   "nested_solver.py": "051304f2bf755caadddc190ef2f145626e2bd84382150d3edb841f8f9611ebe3",
+   "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
+   "orchestrator/manifest.py": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f",
+   "synthetic_cells.py": "625a69b6795ce8684135c7a15adae17e4fc9b3905ff4ac7676edc75e600161cb",
+   "verify_solver.py": "ce0713dd4fbf7ff5035d2a91be4c6a6711c7fc9ccc4300c92471f2d21144f3c7"
+  }
+ }
+}

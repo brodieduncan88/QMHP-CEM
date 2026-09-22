@@ -1,0 +1,327 @@
+{
+ "cell": {
+  "h0": 0.02,
+  "q": 1.6,
+  "hmax": 0.5
+ },
+ "element_quality_level0": {
+  "aspect_p50_p90_p99_max": [
+   5.046151716329123,
+   15.154596008792788,
+   25.100385102704607,
+   29.973701260534057
+  ],
+  "edge_nd_min_median_max": [
+   0.004062499999999998,
+   0.02845199999999999,
+   0.24443176235031971
+  ]
+ },
+ "level2_pcg_timing": {
+  "C": {
+   "setup_wall_s": 21.660691942000085,
+   "iterations": 120,
+   "pcg_wall_s": 38.714323152999896,
+   "wall_s_per_iteration": 0.3226193596083325
+  },
+  "Cprime": {
+   "setup_wall_s": 26.584236961999977,
+   "iterations": 120,
+   "pcg_wall_s": 40.986927240000114,
+   "wall_s_per_iteration": 0.3415577270000009
+  }
+ },
+ "limits": {
+  "cpu_s": 3600,
+  "cpu_hard_kill_s": 3660,
+  "address_space_bytes": 12884901888,
+  "wall_s": 3600
+ },
+ "resources": {
+  "wall_s": 237.70683686300026,
+  "cpu_s": 374.250876,
+  "max_rss_MB": 4486.05859375,
+  "peak_address_space_MB": 7569.9375
+ },
+ "per_level": [
+  {
+   "level": 0,
+   "n_tets": 78120,
+   "n_nodes": 14880,
+   "resources_so_far": {
+    "wall_s": 7.25670955600026,
+    "cpu_s": 8.953994,
+    "max_rss_MB": 734.77734375,
+    "peak_address_space_MB": 1160.625
+   },
+   "problems": {
+    "C": {
+     "n_unknowns": 10482,
+     "C_fF": 70.40154377491183,
+     "bound_rel": 4.944596440485356e-14,
+     "solver": {
+      "method": "direct",
+      "status": null,
+      "iterations": null,
+      "galerkin_identity_rel": null
+     },
+     "cross_check": null,
+     "cpu_s": 0.18814404099999926,
+     "wall_s": 0.1844479350002075
+    },
+    "Cprime": {
+     "n_unknowns": 10480,
+     "C_fF": 70.42469041136965,
+     "bound_rel": 4.964207951001616e-14,
+     "solver": {
+      "method": "direct",
+      "status": null,
+      "iterations": null,
+      "galerkin_identity_rel": null
+     },
+     "cross_check": null,
+     "cpu_s": 0.5813326210000014,
+     "wall_s": 0.1853555719999349
+    }
+   }
+  },
+  {
+   "level": 1,
+   "n_tets": 624960,
+   "n_nodes": 111447,
+   "resources_so_far": {
+    "wall_s": 59.556878532000155,
+    "cpu_s": 68.895675,
+    "max_rss_MB": 1787.54296875,
+    "peak_address_space_MB": 2432.49609375
+   },
+   "problems": {
+    "C": {
+     "n_unknowns": 93826,
+     "C_fF": 61.983758431223904,
+     "bound_rel": 1.5614554105570744e-12,
+     "solver": {
+      "method": "direct",
+      "status": null,
+      "iterations": null,
+      "galerkin_identity_rel": null
+     },
+     "cross_check": {
+      "status": "CERTIFIED",
+      "iterations": 85
+     },
+     "cpu_s": 21.618127394,
+     "wall_s": 21.70953326300014
+    },
+    "Cprime": {
+     "n_unknowns": 93817,
+     "C_fF": 62.04612399513517,
+     "bound_rel": 1.5654080005935224e-12,
+     "solver": {
+      "method": "direct",
+      "status": null,
+      "iterations": null,
+      "galerkin_identity_rel": null
+     },
+     "cross_check": {
+      "status": "CERTIFIED",
+      "iterations": 85
+     },
+     "cpu_s": 24.047398851000004,
+     "wall_s": 23.736378580999826
+    }
+   }
+  },
+  {
+   "level": 2,
+   "n_tets": 4999680,
+   "n_nodes": 862125,
+   "resources_so_far": {
+    "wall_s": 237.70402550100016,
+    "cpu_s": 374.235836,
+    "max_rss_MB": 4486.05859375,
+    "peak_address_space_MB": 7569.9375
+   },
+   "problems": {
+    "C": {
+     "n_unknowns": 791574,
+     "C_fF": 58.74909888483172,
+     "bound_rel": 5.3043093180941546e-11,
+     "solver": {
+      "method": "twogrid",
+      "status": "CERTIFIED",
+      "iterations": 120,
+      "galerkin_identity_rel": 1.0835437663113733e-15
+     },
+     "cross_check": null,
+     "cpu_s": 128.580214668,
+     "wall_s": 65.54957744500007
+    },
+    "Cprime": {
+     "n_unknowns": 791539,
+     "C_fF": 58.84872246423701,
+     "bound_rel": 5.318146958258855e-11,
+     "solver": {
+      "method": "twogrid",
+      "status": "CERTIFIED",
+      "iterations": 120,
+      "galerkin_identity_rel": 1.0835437663113733e-15
+     },
+     "cross_check": null,
+     "cpu_s": 135.933776626,
+     "wall_s": 72.76914181800021
+    }
+   }
+  }
+ ],
+ "analysis_of_the_synthetic_levels": {
+  "integrity_failures": [],
+  "classes": {
+   "C": {
+    "values": [
+     1.9878035463289,
+     1.7501254690992756,
+     1.6587941236099972
+    ],
+    "d1": 0.23767807722962453,
+    "d2": 0.09133134548927835,
+    "d1_certified_range": [
+     0.23767807722679346,
+     0.2376780772324556
+    ],
+    "d2_certified_range": [
+     0.09133134539855803,
+     0.09133134557999867
+    ],
+    "R": 2.602371354066236,
+    "R_certified_range": [
+     2.6023713514502775,
+     2.602371356682195
+    ],
+    "p_obs": 1.379826846929878,
+    "limit_bracket_model_based": [
+     1.5674627781207189,
+     1.6017965086329742
+    ],
+    "remaining_rel_error_at_level2_bracket": [
+     0.03558355550772592,
+     0.05826699476639465
+    ],
+    "cls": "CONVERGING",
+    "reason": "rate consistent with theory; level 2 not yet within tau",
+    "rigorous_upper_bound_fF": 58.74909888794795
+   },
+   "Cprime": {
+    "values": [
+     1.9884570968559108,
+     1.751886374932647,
+     1.661607017956078
+    ],
+    "d1": 0.23657072192326378,
+    "d2": 0.09027935697656897,
+    "d1_certified_range": [
+     0.2365707219204225,
+     0.23657072192610507
+    ],
+    "d2_certified_range": [
+     0.09027935688545985,
+     0.09027935706767809
+    ],
+    "R": 2.620429850698462,
+    "R_certified_range": [
+     2.6204298480224755,
+     2.6204298533744486
+    ],
+    "p_obs": 1.3898034883293633,
+    "limit_bracket_model_based": [
+     1.571327660979509,
+     1.6058938027634206
+    ],
+    "remaining_rel_error_at_level2_bracket": [
+     0.0346929635675697,
+     0.05745418935748389
+    ],
+    "cls": "CONVERGING",
+    "reason": "rate consistent with theory; level 2 not yet within tau",
+    "rigorous_upper_bound_fF": 58.84872246736667
+   },
+   "delta": {
+    "values": [
+     0.0003287802399878359,
+     0.0010061597665209643,
+     0.0016957465100968516
+    ],
+    "d1": -0.0006773795265331284,
+    "d2": -0.0006895867435758873,
+    "d1_certified_range": [
+     -0.0006773795297625451,
+     -0.0006773795233039337
+    ],
+    "d2_certified_range": [
+     -0.000689586853110491,
+     -0.0006895866340410617
+    ],
+    "R": 0.9822977788414873,
+    "R_certified_range": [
+     0.9822976181296176,
+     0.9822979395540464
+    ],
+    "p_obs": -0.025767657989844327,
+    "cls": "NON-CONVERGENT",
+    "reason": "the differences do not shrink",
+    "max_delta": 0.0016957465100968516,
+    "S_and_H_within_1_percent_on_every_level": true
+   },
+   "S": {
+    "cls": "CONVERGING",
+    "values_GHz2": [
+     3.4777603662569407,
+     3.950062159192255,
+     4.167548154971037
+    ],
+    "rigorous_lower_bound_GHz2": 4.167548154749977,
+    "limit_bracket_model_based_GHz2": [
+     4.315844336074569,
+     4.4103786615054315
+    ]
+   },
+   "H": {
+    "cls": "CONVERGING",
+    "values_GHz2": [
+     3.4766173231790805,
+     3.9460917604279113,
+     4.160493013463174
+    ],
+    "rigorous_lower_bound_GHz2": 4.160493013241913,
+    "limit_bracket_model_based_GHz2": [
+     4.30483284600238,
+     4.3995307668791765
+    ]
+   }
+  },
+  "consistency_check": "not applicable (synthetic dry run)",
+  "outcome": {
+   "verdict": "QUALIFIED",
+   "C": "CONVERGING",
+   "Cprime_and_H": "CONVERGING",
+   "delta": "NON-CONVERGENT",
+   "consistency_check": null
+  }
+ },
+ "environment": {
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "platform": "Linux-6.18.44-fc-v37-x86_64-with-glibc2.39",
+  "longdouble_eps": 1.0842021724855044e-19,
+  "code_sha256": {
+   "study_driver.py": "6e90d4dc979e41fb0693e8c0b442e9ad45112e066675cb0ba8ba8d49d6c8dd38",
+   "nested_solver.py": "051304f2bf755caadddc190ef2f145626e2bd84382150d3edb841f8f9611ebe3",
+   "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
+   "orchestrator/manifest.py": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f",
+   "synthetic_cells.py": "625a69b6795ce8684135c7a15adae17e4fc9b3905ff4ac7676edc75e600161cb",
+   "verify_solver.py": "ce0713dd4fbf7ff5035d2a91be4c6a6711c7fc9ccc4300c92471f2d21144f3c7"
+  }
+ },
+ "qmhp_data_read": false
+}

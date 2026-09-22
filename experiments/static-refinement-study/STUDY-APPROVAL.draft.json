@@ -1,0 +1,31 @@
+{
+ "DRAFT": "NOT AN APPROVAL. This is the approval a human would grant for the static-only nested refinement study, prepared for review. The driver reads only STUDY-APPROVAL.json, and this file authorises nothing. The study is PREPARED, NOT APPROVED, NOT EXECUTED.",
+ "how_to_grant_it": "A human who approves writes experiments/static-refinement-study/STUDY-APPROVAL.json containing every field below except DRAFT and how_to_grant_it, unchanged. The driver refuses if any digest differs from the files as they are at execution, so a change to the pre-declaration, the mesh or any code file after review voids the approval.",
+ "authorises": "one execution of the static-only nested refinement study",
+ "run_label": "static-only nested refinement study, attempt 1 of 1",
+ "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+ "predeclaration_sha256": "8dd72c51faec8e1b5462756b78f78bd30e5098007d7f7ee6a0ac6c8fb8797da9",
+ "code_sha256": {
+  "study_driver.py": "6e90d4dc979e41fb0693e8c0b442e9ad45112e066675cb0ba8ba8d49d6c8dd38",
+  "nested_solver.py": "051304f2bf755caadddc190ef2f145626e2bd84382150d3edb841f8f9611ebe3",
+  "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
+  "orchestrator/manifest.py": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f"
+ },
+ "invocation": "from the repository root, locally, no workflow, no network: timeout --signal=KILL 3660 .venv/bin/python experiments/static-refinement-study/study_driver.py",
+ "budget": {
+  "cpu_minutes": 60,
+  "memory_GB": 12,
+  "wall_cap_minutes": 60,
+  "attempts": 1,
+  "retry": "none. A failure, a refusal after the record exists, a timeout, a budget limit or an integrity failure is the recorded outcome."
+ },
+ "does_not_authorise": [
+  "a second attempt, whatever the first one's outcome (any class, a failure, a timeout, a budget limit or an integrity failure)",
+  "a level 3, another mesh, another refinement method, or any change to the solver settings, tolerances, windows or rules",
+  "reading the consistency window more widely than declared",
+  "combining C_h, C'_h, S_h, H_h or delta_h with g, f_R or any Route A output",
+  "reporting any value as E_C,F1F1",
+  "any Palace solve or workflow dispatch",
+  "any change to the withdrawn paired test or to the executed static-anchor record"
+ ]
+}
