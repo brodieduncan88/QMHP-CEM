@@ -58,8 +58,25 @@ PALACE_COMMIT = "a61c8cbe0cacf496cde3c62e93085fae0d6299ac"
 IMAGE = "qmhp-cem/palace-first-moment:0.13.0"
 
 #: The diagnostic's own solver block (config["Solver"]["FirstMoment"], parsed by the patch).
+#:
+#: Tol is the PCG STOPPING tolerance, not the acceptance criterion. Those are different
+#: numbers and were briefly the same one: run 35721700281 stopped on Tol = 1e-12 and was
+#: then refused because the INDEPENDENTLY recomputed residual, ||M x - f|| / ||f||, came
+#: out at 1.3313e-12, just above the 1e-12 acceptance limit in reference_model.evaluate.
+#: A stopping rule cannot be asked to beat itself, so the SOLVE is tightened here and the
+#: acceptance limit is left exactly where it was.
+#:
+#: 1e-14 was measured, not guessed, against the attainable floor of the recomputed
+#: residual (docs/coupled-candidate/first-moment-tolerance-verification.md):
+#:   - N2R base mesh, 56050 free dofs, assembled independently: kappa(D^-1/2 M D^-1/2)
+#:     = 148.7, floor = 1.02e-15, i.e. 980x below the 1e-12 acceptance limit;
+#:   - at Tol = 1e-14 that solve stops in 126-133 iterations with a recomputed residual
+#:     of 9.4e-15, ~107x inside the limit, against a 2000-iteration budget;
+#:   - kappa and the floor are mesh-size independent for this element family (measured
+#:     flat over a 4x refinement), so the 2-level box refinement does not move them.
+#: The floor sits BELOW 1e-14, so the solve converges rather than stagnating.
 FIRST_MOMENT_BLOCK = {
-    "Tol": 1e-12,
+    "Tol": 1e-14,
     "MaxIts": 2000,
     "CheckFunctional": True,
     "CheckNullSpace": True,

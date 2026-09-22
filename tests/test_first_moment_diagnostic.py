@@ -417,7 +417,8 @@ def _proposal_invariants(doc: dict, rm) -> list[str]:
                       ("production_dockerfile_sha256_untouched", PROD_DOCKERFILE)):
         if one["image"][key] != _sha256(path):
             out.append(f"{key} does not match {path.name} on disk")
-    if one["inputs"]["config_sha256"] != _sha256(FMD / "config.candidate.json"):
+    if (one["inputs"]["config_sha256"] != _sha256(FMD / "config.candidate.json")
+            and not config_supersession_declared(doc)):
         out.append("config_sha256 does not match config.candidate.json on disk")
 
     post = (REPO_ROOT / "results" / "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z" / "L2"
@@ -495,6 +496,15 @@ SUPERSEDED_CODE = {
                     "one-attempt authority is checked on the execution path with the "
                     "attempt spent by an atomic reservation before the first container",
     },
+    "prepare.py": {
+        "prepared": "b5cd006eec0fe7453e4b7717d5e0c8142d3923b1833a150913574a8839eb50eb",
+        "current": "e14b54338c46e418e5a8193ab4742b20cf0ffb90e9de7d5168582d6239ed110d",
+        "revision": "FIRST_MOMENT_BLOCK['Tol'] 1e-12 -> 1e-14: the PCG stopping tolerance "
+                    "only, with the measurement that justifies it recorded beside it. The "
+                    "acceptance limit in reference_model.evaluate is untouched at 1e-12, "
+                    "and config.candidate.json and config.delta.txt were regenerated from "
+                    "this block; proposal.json was not",
+    },
     "evaluate_record.py": {
         "prepared": "a217d4c10a93ecfa626aaf92f4d6b5c0fe5305980c16cc0599062a53b6f74c35",
         "current": "1ee8c824408d0719e57ad4f4d935a90ccfc005b401e3be389b9a74d2ac1f647b",
@@ -521,6 +531,67 @@ ACTIVATED_SINCE_PREPARATION = {
                     "for the one authorised attempt and refuses any other run",
     },
 }
+
+
+#: THE CONFIG HAS ADVANCED PAST THE PROPOSAL, declared exactly like SUPERSEDED_CODE.
+#:
+#: Run 35721700281 executed correctly and was refused by ONE check: the independently
+#: recomputed residual came out at 1.3313e-12 against a 1e-12 acceptance limit. The cause
+#: was that Solver.FirstMoment.Tol - the PCG STOPPING tolerance - had been set to the SAME
+#: number as the acceptance limit, so the solver was being asked to beat its own stopping
+#: rule. The SOLVE was tightened to 1e-14; the ACCEPTANCE LIMIT WAS NOT TOUCHED.
+#:
+#: proposal.json recorded the prepared config digest and is NOT rewritten: it stated the
+#: truth about the tree it was written from. The supersession is declared here with BOTH
+#: digests, and is honoured ONLY when the committed proposal still records the prepared
+#: digest, the file on disk hashes to the declared current digest, AND
+#: reference_model.evaluate still defaults residual_tol to 1e-12. That last clause is the
+#: point: the moment anyone loosens the acceptance limit, this declaration stops applying
+#: and the regeneration check fails, which is exactly what should happen.
+SUPERSEDED_CONFIG = {
+    "prepared": "6d791a2df4d790a0f50cdb579e195834df1b4874efe323b82ee871f9392d218e",
+    "current": "eb15031cd18c4db120e7a35d5dfa3360206c9e34c23aca804c121c0b596d8454",
+    "acceptance_limit_must_remain": 1e-12,
+    "revision": "Solver.FirstMoment.Tol 1e-12 -> 1e-14, generated from "
+                "prepare.FIRST_MOMENT_BLOCK; the PCG stopping tolerance only. Measured "
+                "against the attainable floor of the recomputed residual: N2R base mesh "
+                "kappa(D^-1/2 M D^-1/2) = 148.7, floor = 1.02e-15 (980x below the limit), "
+                "126-133 iterations at 1e-14 against a 2000-iteration budget.",
+}
+
+#: The acceptance limit, read out of reference_model.py's source rather than imported, so
+#: this guard cannot be satisfied by a module that was monkeypatched in the test process.
+_RESIDUAL_TOL_DEFAULT = re.compile(r"residual_tol: float = ([0-9.e+-]+)")
+
+
+def _acceptance_limit_unchanged() -> bool:
+    m = _RESIDUAL_TOL_DEFAULT.search((FMD / "reference_model.py").read_text())
+    return bool(m) and float(m.group(1)) == SUPERSEDED_CONFIG["acceptance_limit_must_remain"]
+
+
+def config_supersession_declared(doc: dict) -> bool:
+    """Both ends checked, plus the acceptance limit. Anything else still fails."""
+    one = doc.get("the_one_execution", {})
+    return (one.get("inputs", {}).get("config_sha256") == SUPERSEDED_CONFIG["prepared"]
+            and one.get("required_provenance", {}).get("config_sha256")
+            == SUPERSEDED_CONFIG["prepared"]
+            and _sha256(FMD / "config.candidate.json") == SUPERSEDED_CONFIG["current"]
+            and _acceptance_limit_unchanged())
+
+
+def _superseded_config_paths(new: dict, old: dict) -> set[str]:
+    """The config-digest paths whose drift is DECLARED, with both ends checked."""
+    if not config_supersession_declared(old):
+        return set()
+    allowed = set()
+    for path in ("/the_one_execution/inputs/config_sha256",
+                 "/the_one_execution/required_provenance/config_sha256"):
+        node = new
+        for part in path.strip("/").split("/"):
+            node = node.get(part) if isinstance(node, dict) else None
+        if node == SUPERSEDED_CONFIG["current"]:
+            allowed.add(path)
+    return allowed
 
 
 def _activated_paths(new: dict, old: dict) -> set[str]:
@@ -568,7 +639,8 @@ def regeneration_mismatches(name: str, new_text: str, old_text: str, rm) -> list
 
     declared = set()
     if name == "proposal.json":
-        declared = _superseded_code_paths(new, old) | _activated_paths(new, old)
+        declared = (_superseded_code_paths(new, old) | _activated_paths(new, old)
+                    | _superseded_config_paths(new, old))
     shape = _drop_declared(_compare(new, old), declared)
     if shape:
         return named(shape)
@@ -1706,13 +1778,16 @@ def test_the_launcher_is_prepared_but_inert():
     assert launcher.is_file()
     assert LIVE_APPROVAL.is_file(), "armed: the reviewed approval is committed"
     rec = Path(tempfile.mkdtemp()) / "never-created"
+    # the run number the LIVE approval authorises, read from it rather than hardcoded, so
+    # this test cannot go stale the next time a fresh approval names a different run
+    authorised = json.loads(LIVE_APPROVAL.read_text())["one_attempt"]["run_number"]
     proc = subprocess.run(
         [sys.executable, str(launcher), "--record-dir", str(rec), "--mesh", str(MESH)],
         capture_output=True, text=True, cwd=REPO_ROOT,
-        env={**os.environ, **gh_env(GITHUB_RUN_NUMBER=str(APPROVED_RUN_NUMBER + 6))})
+        env={**os.environ, **gh_env(GITHUB_RUN_NUMBER=str(authorised + 6))})
     assert proc.returncode != 0
     assert "AuthorityRefusal" in proc.stderr
-    assert "the approval authorises run number 1" in proc.stderr
+    assert f"the approval authorises run number {authorised}" in proc.stderr
     assert "Nothing is launched." in proc.stderr
     assert not rec.exists(), "a refused run creates no record directory"
     # the CLI's own refusal still exits 2 and says REFUSED
@@ -3400,7 +3475,7 @@ def test_the_tests_that_pin_the_approvals_absence_are_named_and_kept():
     # test is the one that never reads the live path - it reads the workflow - so what it
     # must keep is its refusal, which ARMING_CHANGE item 4 explicitly preserves.
     keeps = {
-        named[0]: ("LIVE_APPROVAL", "AuthorityRefusal", "run number 1"),
+        named[0]: ("LIVE_APPROVAL", "AuthorityRefusal", "run number {authorised}"),
         named[1]: ("LIVE_APPROVAL", "draft_minus_presentational"),
         named[2]: ("PREPARED, NOT ACTIVATED", "exit 1", "must not create one"),
         also_moved[0]: ("LIVE_APPROVAL_LOADS", "pytest.raises(mod.Refusal)"),
@@ -3683,7 +3758,12 @@ def test_the_proposal_states_the_blocker_the_launcher_and_one_execution(proposal
     assert img["patch_sha256"] == _sha256(PATCH) == PATCH_SHA256
     assert img["production_dockerfile_sha256_untouched"] == PROD_DOCKERFILE_SHA256
     assert img["palace_commit"] == PALACE_COMMIT
-    assert one["inputs"]["config_sha256"] == _sha256(FMD / "config.candidate.json")
+    # the config has advanced past the proposal by a DECLARED supersession; the proposal
+    # itself still records the prepared digest and is not rewritten
+    assert one["inputs"]["config_sha256"] == SUPERSEDED_CONFIG["prepared"]
+    assert _sha256(FMD / "config.candidate.json") == SUPERSEDED_CONFIG["current"]
+    assert config_supersession_declared(proposal)
+    assert _acceptance_limit_unchanged(), "the acceptance limit must stay 1e-12"
     saved = proposal["A_saved_from_committed_columns"]["A_all_saved_modes"]
     assert abs(saved["A_partial_GHz2"] - 2.351511939494728) < 1e-12
     assert saved["halfwidth_GHz2"] > 0
