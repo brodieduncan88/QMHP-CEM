@@ -624,6 +624,8 @@ def test_every_new_source_file_carries_the_approved_header():
 def test_the_record_separates_measurement_proof_and_prediction():
     text = DOC.read_text()
     for heading in ("## 2. Measurements", "## 3. Mathematics", "## 4. Predictions",
-                    "## 5. The prepared test"):
+                    "## 5. The prepared test", "## 8. Result of the one execution: UNRESOLVED"):
         assert heading in text, heading
-    assert "PREPARED, NOT APPROVED, NOT EXECUTED" in text
+    assert "Before that run the test was PREPARED, NOT APPROVED, NOT EXECUTED." in text
+    assert "EXECUTED ONCE, AND THE VERDICT IS\nUNRESOLVED" in text
+    assert "`r0` is **not read**" in text and "UNAVAILABLE" in text

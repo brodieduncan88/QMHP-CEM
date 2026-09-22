@@ -1,7 +1,9 @@
 # The static-anchor hypothesis
 
-**HYPOTHESIS RECORD.** The electrostatic comparison it proposes is
-**PREPARED, NOT APPROVED, NOT EXECUTED**: no static capacitance has been computed on the QMHP mesh.
+**HYPOTHESIS RECORD. THE ELECTROSTATIC TEST WAS EXECUTED ONCE, AND THE VERDICT IS
+UNRESOLVED** (§8). Before that run the test was PREPARED, NOT APPROVED, NOT EXECUTED.
+Sections 1–7 are the record as prepared. The only change to them is the guard correction
+in §5, made before the run.
 Nothing here changes the first-moment diagnostic, Route A, the registered definitions or
 any historical record. `E_C,F1F1` and `g` stay **UNAVAILABLE**.
 Record: `experiments/static-anchor-hypothesis/`.
@@ -217,3 +219,85 @@ It does not change:
 | `predeclaration.json` | the frozen question, configuration, relation to `E_C`, integrity checks and outcome table |
 | `measurements.json` | every measured value, by class, with its source |
 | `TEST-APPROVAL.draft.json` | the approval to review; granting it means saving it as `TEST-APPROVAL.json` without its `DRAFT` and `how_to_grant_it` keys |
+| `TEST-APPROVAL.json` | the granted approval: the draft with only those two keys removed (sha256 `b6bacb30…`) |
+| `EXECUTION-LOG.json` | the one run's command, source commit, timestamps, exit code, console and record digests, written from the captured console |
+| `results/STATIC-ANCHOR-TEST-20260922T192243Z/` | the record, exactly as the program wrote it (§8) |
+
+## 8. Result of the one execution: UNRESOLVED
+
+The test ran **once**, under the user's approval, on 2026-09-22 (19:22:43–19:23:00 UTC).
+
+- **Source:** `ffeaf15`, with only the approval added.
+- **Command:** the exact pre-declared one, run locally.
+- **Outcome:** exit 0, no warning of any kind.
+- **Resources:** 16.7 s wall, 19.0 s CPU and 1.25 GB, all inside the enforced limits.
+
+The record `results/STATIC-ANCHOR-TEST-20260922T192243Z/` is preserved exactly as the
+program wrote it. Its bytes are pinned in the tests, and `EXECUTION-LOG.json` records the
+console. No retry, further refinement or window change is authorised, and none was made.
+
+**Measured (class A, this record):**
+
+| | level 0 (committed mesh) | level 1 (one nested red refinement) |
+|---|---|---|
+| tetrahedra / unknowns | 64,434 / 4,558 | 515,472 / 60,608 |
+| island capacitance `C_h` | 114.339 fF | 82.202 fF |
+| `S_h = 1/((2π)² L_F C_h)` | 2.14135 GHz² | 2.97851 GHz² |
+| port voltage, route agreement, PEC gradient | 1, exact, 0 | 1 − 1e-16, exact, 0 |
+| solve residual | 4.3e-16 | 2.2e-15 |
+
+No integrity check failed. The two routes to `S` agree exactly, which confirms that the
+measured quantity is the first-moment quotient restricted to curl-free fields.
+
+**Verdict, by the frozen table:** `ρ = S1/S0 = 1.391`, inside the UNRESOLVED band
+(1.25, 1.9). **UNRESOLVED:** the static quantity is not resolved on the base mesh.
+
+The table says that in this band `r0` is **not read**. `r0 = S0/B0 = 0.997` is in the record,
+but it decides nothing. It compares two numbers on the same base mesh, which one refinement
+has just shown to be under-resolved by tens of percent for this quantity. A coincidence of
+shared discretisation error cannot be excluded.
+
+**What is established regardless of the verdict:**
+
+1. **Rigorous (Dirichlet principle on nested conforming spaces).** The island capacitance
+   of this electrostatic model is at most 82.20 fF. Its static quantity is therefore at least
+   2.979 GHz², which is 1.39 × `B0`. Only this one-sided bound is known; there is no upper
+   bound on `S` and no convergence rate.
+2. **Measured.** Under the same refinement, the static quantity grew by ×1.39. The
+   guaranteed lower bound on the complete first moment grew by ×1.94. So the static quantity
+   did not reach the pre-declared "grows like the divergent moment" threshold, but one step
+   cannot show that it converges.
+3. **Measured.** Restricting the port quotient to curl-free fields removes more than 99 % of
+   the complete first moment on the same meshes. `S0` is 0.58 % of the exact complete moment
+   on the base mesh (class D, 367.88 GHz²). `S1` is at most 0.45 % of the complete moment at
+   level 1, whose guaranteed lower bound is 659.72 GHz².
+4. **Derived arithmetic (class B).** Under assumption A-R, `e²/(2 C_h)` gives a lower bound
+   on `E_C,F1F1`: `E_C,F1F1/h ≥ 235.6 MHz` from level 1 (169.4 MHz from level 0). This is a
+   bound, not a value. `E_C,F1F1` and `g` stay **UNAVAILABLE**, and nothing here is combined
+   with any Route A output.
+
+**A consequence, not a pre-declared test.** The rigorous lower bound, 2.979 GHz², is
+already above every band estimate recorded so far: 2.148, 2.310 and 2.353 GHz² on this
+mesh family, and 2.941 GHz² on L3. So if H1 is right, the band estimate must also rise under
+refinement. The recorded band values did rise under port refinement (2.148 → 2.310 →
+2.353), but that refinement differs from this one, so the two cannot be compared step for
+step. This is stated for the next pre-declaration, not read as a verdict.
+
+**What it means for the hypothesis.** H1 is neither supported nor weakened. The test
+could not decide, because the base mesh does not resolve the electrostatic capacitance: it
+fell 28 % in one refinement. That is consistent with the field singularities expected at the
+edges of a thin conductor, but that explanation is not established.
+
+**What would resolve it.** A new pre-declaration and approval, then either of these:
+
+- a convergence study of the static quantity with at least three nested levels, or with
+  refinement concentrated at the island edges;
+- the static and band quantities compared on the same refined discrete spaces.
+
+Either needs its own budget, and a level-2 solve (4.1 M tetrahedra) would probably need an
+iterative solver rather than the direct solve used here. This record does not authorise
+any of it.
+
+**What does not change.** Route A, the first-moment diagnostic, the registered
+definitions and every historical record are untouched. Nothing here makes Route A or
+QMHP-CoPro valid or invalid. `E_C,F1F1` and `g` stay UNAVAILABLE.
