@@ -24,6 +24,7 @@ from pathlib import Path
 
 import numpy as np
 import scipy.sparse as sp
+import scipy.sparse.linalg as spla
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "static-anchor-hypothesis"))
 import anchor_fem as af  # noqa: E402
@@ -91,3 +92,31 @@ def moments(lam, E, f_free, L_nd, zero_rel: float = 1e-10) -> dict:
     p = V ** 2 / (L_nd * lam)
     return {"lam": lam, "p": p, "N": float(p.sum()), "inv_moment": float((p / lam).sum()),
             "first_moment": float((p * lam).sum()), "null_dim": int((~keep).sum())}
+
+
+def port_constrained_energy(mesh: dict, model: dict) -> float:
+    """The Dirichlet energy with the port-face potential ALSO held linear along the port
+    direction (0 at the ground end, 1 at the island end). For Palace's distributed sheet
+    port this is exact: N = 1 and sum over all modes of p/lambda = L C'_h, so
+    delta = C'_h / C_h - 1 >= 0 needs no eigen-solve. Derivation: with psi linear on the
+    rectangular port face, K_sheet grad(psi) = f / L (L_s = L w/l), K_curl grad(psi) = 0,
+    and the M-orthogonality to the kernel makes psi the constrained Dirichlet minimiser.
+    Requires a rectangular port face whose conductor nodes lie only on its two end lines."""
+    ground, island = af.conductor_components(mesh, model["pec_attrs"])
+    xyz = af.scales(mesh, model["L0_m"], model["L_H"])["xyz_nd"]
+    port = np.unique(mesh["tris"][mesh["tri_attr"] == model["port_attr"]])
+    d = np.asarray(model["direction"], float)
+    d = d / np.linalg.norm(d)
+    t = xyz @ d
+    tg, ti = t[np.intersect1d(port, ground)].mean(), t[np.intersect1d(port, island)].mean()
+    n = len(xyz)
+    phi, fixed = np.zeros(n), np.zeros(n, dtype=bool)
+    fixed[ground] = fixed[island] = True
+    phi[island] = 1.0
+    inner = port[~fixed[port]]
+    phi[inner], fixed[inner] = (t[inner] - tg) / (ti - tg), True
+    K = af.p1_stiffness(mesh, xyz, model["eps_r"])
+    used = np.unique(mesh["tets"])
+    free = used[~fixed[used]]
+    phi[free] = spla.spsolve(K[free][:, free].tocsc(), -(K[free][:, fixed] @ phi[fixed]))
+    return float(phi @ (K @ phi))

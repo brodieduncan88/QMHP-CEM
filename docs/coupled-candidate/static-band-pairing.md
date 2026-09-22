@@ -1,30 +1,37 @@
-# The paired static-vs-band refinement test
+# The paired static-vs-band refinement test — withdrawn before approval
 
-**PREPARED, NOT APPROVED, NOT EXECUTED.** No Palace solve and no QMHP static solve has
-been run for this test; no refined QMHP mesh exists. The static-anchor test's verdict,
-**UNRESOLVED**, is unchanged. Route A, the first-moment diagnostic and the registered
-definitions are unchanged. `E_C,F1F1` and `g` stay **UNAVAILABLE**.
+**WITHDRAWN. Never approved, never executed.** No Palace solve and no QMHP static solve
+was run for it. It was prepared (commit `72aec54`), then withdrawn after an independent
+adversarial review found two things:
+
+- its decisive comparison is **fixed by an exact identity**;
+- **three defects would each have spent the single attempt**.
+
+`WITHDRAWN.json` records each reason and how it was verified. The static-anchor test's
+verdict, **UNRESOLVED**, is unchanged. Route A, the first-moment diagnostic and the
+registered definitions are unchanged. `E_C,F1F1` and `g` stay **UNAVAILABLE**.
 Record: `experiments/static-band-pairing/`.
 
-This record answers the three questions asked before the test could be prepared, then
-prepares the test. It keeps apart what is **proved**, what is **measured** (and by what),
-and what is **predicted**.
+Three questions had to be settled before the test could be prepared. This record answers
+them, and keeps apart what is **proved**, what is **measured** (and by what), and what is
+only **predicted**. The status line of the test it prepared read "PREPARED, NOT APPROVED,
+NOT EXECUTED" until the withdrawal.
 
 ## 1. Can the capacitance only decrease under refinement, and is 82.2 fF a rigorous bound?
 
 **Yes to both, for the implementation actually used, within a precisely stated model.**
-The two claims rest on different conditions, and the earlier wording ran them together.
+The two claims rest on different conditions.
 
 - **The bound `C ≤ C_h` needs only conformity.** Every admissible P1 function (1 at the
   island's nodes, 0 at the ground's) equals 1 on each island triangle and 0 on each
-  ground triangle. So it is admissible for the continuum Dirichlet problem on the same
-  polyhedral domain, and the continuum minimum cannot exceed the discrete one. The energy
+  ground triangle, so it is admissible for the continuum Dirichlet problem on the same
+  polyhedral domain. The 543 interior edges that join two nodes of one conductor only
+  constrain the discrete function further, so they can only raise `C_h`. The energy
   `static_capacitance.py` reports is the quadratic form of an exactly constrained vector,
   so the bound does not depend on solver accuracy, only on round-off.
-- **Monotonicity `C_{h+1} ≤ C_h` needs nesting**:
-  - the coarse space lies inside the fine one;
-  - the coarse admissible set lies inside the fine one;
-  - the functional is unchanged.
+- **Monotonicity `C_{h+1} ≤ C_h` needs nesting**: the coarse space and admissible set lie
+  inside the fine ones, and the functional is unchanged. Algebraically,
+  `PᵀK_{h+1}P = K_h` plus constraint inclusion already implies it.
 
 **Verified on the committed mesh and its red refinement, with no solve**
 (`nesting_verification.json`):
@@ -32,26 +39,22 @@ The two claims rest on different conditions, and the earlier wording ran them to
 | check | result |
 |---|---|
 | conforming: tetrahedra per face | at most 2 |
+| every face shared by one tetrahedron is a tagged boundary triangle (excludes hanging nodes) | yes, both levels |
 | coincident nodes | 0 |
-| every tagged triangle is a tetrahedron face | yes |
 | outer boundary | all 3,040 faces are grounded walls |
 | every conductor triangle lies in one conductor | yes |
-| coarse nodes unchanged; midpoints exactly on the edges | yes, error 0 |
+| coarse nodes unchanged; midpoints exact | yes, error 0 |
 | children's volumes sum to the parent's | 2.2e-15 |
 | **Galerkin identity `PᵀK₁P = K₀`** | **6.9e-15** |
-| fine constrained nodes prolonged only from the same conductor | yes |
-| interior edges joining two nodes of one conductor at level 0 (freed at level 1) | 543 |
+| constraint sets nested | yes |
 
-**Negative controls on synthetic geometry**, each removing one condition of the proof:
+**Negative controls, synthetic:**
 
 | case | Galerkin identity | C₁/C₀ |
 |---|---|---|
 | nested refinement | 9.5e-16 | 0.953 |
 | spaces not nested, same model | 0.17 (detected) | 0.954 (no violation in this instance) |
 | constraint sets not nested | — | **1.055: C rises** |
-
-So the verification detects a non-nested refinement, and constraint nesting is genuinely
-necessary.
 
 **What 82.2 fF is.** It is a rigorous upper bound on the island capacitance of the
 *continuum electrostatic problem posed on the meshed geometry*:
@@ -61,221 +64,171 @@ necessary.
 - ε_r = 1 and 11.45;
 - the port face open.
 
-It is exact up to assembly round-off; the two independent energy evaluations in the
-record agreed exactly. It is **not** a bound on the physical device, whose geometry and
-enclosure the mesh models. It is also not a bound on `C_FF` without assumption A-R.
+It is exact up to assembly round-off. It is **not** a bound on the physical device, and
+not a bound on `C_FF` without assumption A-R.
 
-A clarification to my earlier chat summary, which said the bound held "because
-refinement can only lower the capacitance": the bound follows from conformity, and the
-monotonicity from nesting. The record's own §8 wording was correct.
+Two wording corrections:
+
+- My earlier chat summary said the bound held "because refinement can only lower the
+  capacitance". It follows from conformity; the monotonicity follows from nesting.
+- The record's P1 and edge-route energies agree exactly, but that is an **algebraic
+  consistency check** of the de Rham identity. They share φ, the mesh and ε, so they are
+  not independent confirmation.
 
 ## 2. What relationship should S_static and S_band have?
 
-**Not a ratio that converges to 1.** They are different spectral moments.
+**Not a ratio that converges to 1.** They are different spectral moments, and on each mesh
+they are tied together by exact identities.
 
-**Proved, for the declared lumped port** (the rank-one inductor term `ffᵀ/L`, and a port
-whose Dirichlet voltage is `V`). Over all modes of the pencil, with `p` the port
-participation:
+**Proved, for the declared lumped port** (rank-one inductor term `ffᵀ/L`, port Dirichlet
+voltage `V`). Over all modes, with `p` the port participation:
 
 - `N = Σ p = 1`;
 - `Σ p/λ = L·C_h / V²`;
 - `Σ p·λ = fᵀM⁻¹f / L`, which is Parseval.
 
 So with `V = 1`, `S_h = 1/(L·C_h)` is **exactly the participation-weighted harmonic mean
-of λ over the complete spectrum** (the −1 moment). The complete first moment `A` is the
-arithmetic mean (the +1 moment), and it diverges for the sheet port. For every truncation
-to the lowest k modes, Cauchy–Schwarz gives `S_h ≤ B_k/N_k`.
+of λ over the complete spectrum**, and Cauchy–Schwarz gives `S_h ≤ B_k/N_k` for every set
+of k modes. The complete first moment `A = Σ p·λ` depends only on `f` and `M`. It
+diverges under refinement for **both** port models, because the port functional is a
+surface average over a sheet face.
 
-**Verified to machine precision** on synthetic geometries, with every eigenpair computed
-(`identities.json`):
+**Proved, for Palace's actual port**: the distributed sheet `∫_Γ (1/L_s)|E_t|² dS`, with
+`p` reported from the rank-one voltage. With `ψ` 0 on ground, 1 on the island and linear
+along the port direction on the rectangular port face:
 
-- `Σp/λ = L·C_h/V²` to 1e-12, and `N = 1` to 1e-12;
-- Parseval to 1e-16;
-- `S ≤ B_k/N_k` for all k.
+- `K_sheet ∇ψ = f/L` (because `L_s = L·w/l`) and `K_curl ∇ψ = 0`;
+- therefore `N = 1` and `Σ p/λ = L·C'_h`, where `C'_h` is the static capacitance with the
+  port-face potential also held linear;
+- so **`S_h = (1 + δ_h)·H_h(all modes)` exactly, with `δ_h = C'_h/C_h − 1 ≥ 0` a static
+  quantity**.
 
-The n = 2 slab has `V = 0.5` and reproduces the `1/V²` factor exactly. It is a
-malformed-port negative control.
+The identity needs a rectangular port face whose conductor nodes lie only on its two end
+lines. That holds on L2: area/(l·w) = 1.0000000000000002.
 
-**Palace's port is not rank-one.** It assembles `∫_Γ (1/L_s)|E_t|² dS` over the full
-tangential field (`lumpedportoperator.cpp`, pinned `a61c8cbe`; `fem-spectral-mapping.md`
-§1), but it reports `p` from the rank-one voltage. For that pencil:
+This was found by the independent review. I re-derived it, and my own implementation
+(`spectral.port_constrained_energy`) reproduces the dense-eigen sheet δ to **1.1e-12 and
+1.2e-12** (`identities.json`).
 
-- **Parseval still holds exactly**, because the +1 moment does not involve `K`.
-- **The −1 moment is perturbed.** `δ = S·Σp/λ − 1` is +2.3% and +3.0% on the synthetic
-  slabs, whose port face is comparable to the whole structure.
-- **`S ≤ B_k/N_k` can fail**, by up to 2.7%.
-- `K_port − ffᵀ/L` is positive semi-definite to round-off.
+**Checked on synthetic geometries** (`identities.json`, every eigenpair computed):
 
-**Measured on the committed L2 mesh, the same mesh as static level 0:**
+- lumped: `N = 1` and `Σp/λ = L·C_h/V²` to 1e-12; Parseval to 1e-16; `S ≤ B_k/N_k` for
+  every k;
+- sheet: Parseval exact; `δ` = +2.3% and +3.0% on slabs whose port face is comparable to
+  the structure; `S ≤ B_k/N_k` can fail (by up to 2.7%);
+- `K_sheet − ffᵀ/L` is positive semi-definite to round-off;
+- the malformed-port slab (V = 0.5) reproduces `1/V²` exactly.
 
-| quantity | value |
-|---|---|
-| Palace's band `Σ\|p\|/f²` | 0.467302 GHz⁻² |
-| `1/S0` | 0.466994 GHz⁻² |
-| **`δ ≥ +6.6e-4`** | the sheet port's effect, band part only |
-| `S0 ≤ B0/N_B` | still holds here, with 0.39% to spare |
+These identities do not depend on `K_curl` beyond its null space, so they cannot detect
+an error in `K_curl` itself.
 
-**The lumped circuit meaning.** In a two-node reduction:
+**On the committed L2 mesh, the same mesh as static level 0:** Palace's band gives
+`Σ|p|/f²` = 0.467302 GHz⁻², against the executed record's `1/S0` = 0.466994. So
+**`δ_0 ≥ +6.6e-4`**, a lower bound from band data. Its exact value is
+`C'_0/C_0 − 1`, which needs one static solve on the QMHP mesh. That solve has **not** been
+run.
 
-- `B/S → C_FF·(C⁻¹)_FF = 1/(1−k²)`, the Schur gap;
-- the band's arithmetic moment corresponds to `(C⁻¹)_FF/L_F`, which is what the registered
-  `E_C` is defined from;
-- the harmonic moment corresponds to `1/(C_FF·L_F)`, which is the static quantity.
+**The band arithmetic moment.** `B_h = (B/H)·H_h`, where `B/H` is the dispersion of the
+band's participation spectrum: 1.004–1.009 on the committed rungs (`H/B` = 0.991–0.996).
+It is inflated by high, weakly participating modes, which barely touch `H` or `S`.
 
-So `S/B` should tend to about `1 − k²_eff`, perturbed by δ. On the committed rungs
-`H/B` = 0.991–0.996.
+In a lumped two-node reduction, `B/S = C_FF·(C⁻¹)_FF = 1/(1−k²)`, but only if two
+conditions hold:
 
-**The harmonic moment is robust; the arithmetic one is not.** N2R's 9-mode band, which
-carries more high in-band modes, has `H/B` = 0.9912 against 0.996 for the 6-mode bands.
-High, weakly participating modes inflate `B` and barely touch `H` or `S`.
+- (i) the second node is DC-grounded through its own inductance;
+- (ii) every mode of the reduction lies in the band.
 
-**Corrections to how the executed static-anchor test was read** (its verdict,
-UNRESOLVED, stands):
+The meshed problem has only two conductors, ground (including the readout) and island. So
+`C_FF` and `(C⁻¹)_FF` are not quantities of this mesh, and `1 − k²_eff := H/B` is a
+definition, not a measured circuit parameter.
 
-1. **`r0 = S0/B0 = 0.997` was not a coincidence of shared discretisation error**, as
-   `static-anchor-hypothesis.md` §8 allowed. On one mesh it is what the identity
-   predicts: `S0 ≈ H·(1+δ)` and `H/B ≈ 0.996`. So its closeness to 1 was never
-   independent evidence for H1 over H0.
-2. **The "CONTRADICTS, favours H0" branch (`r0 > 20`) was mathematically unreachable**
-   for the lumped pencil, since `S ≤ B/N_B`. For Palace's pencil it was unreachable by a
-   wide margin. The pre-declaration had called that branch only "physically
-   implausible".
+**What this changes about the executed static-anchor test** (its verdict, UNRESOLVED,
+stands):
 
-## 3. Proof, measurement and prediction, kept apart
+1. `r0 = S0/B0 = 0.997` was what the identities predict on one mesh, not a coincidence.
+2. Its "CONTRADICTS, favours H0" branch was unreachable.
 
-| claim | kind | where |
+## 3. Was the paired test justified? — No, as designed
+
+The prepared test was to run Palace at box levels 0, 1 and 2 over the island–gap–port
+region, compute the static quantity on the mesh Palace refined, and decide on the
+identity residual δ and the ratio drift. The review (`review/red_team_findings.json`, 42
+findings from four independent read-only reviewers) and my own verification found:
+
+| | finding | verified by |
 |---|---|---|
-| `C ≤ C_h` for the meshed model | proof, conditions verified on the implementation | §1, `nesting_verification.json` |
-| `C_{h+1} ≤ C_h` under red refinement | proof, nesting verified (6.9e-15) | §1 |
-| static = harmonic moment, lumped port | proof, known answer 1e-12 | §2, `identities.json` |
-| Palace's sheet port perturbs it, δ > 0 | measured: synthetic +2.3%/+3.0%, L2 ≥ +6.6e-4 | §2 |
-| `S/B → 1 − k²_eff`, not 1 | derivation (lumped reduction) | §2 |
-| band and static co-move under refinement | **prediction, untested** | §4 |
-| the static error sits in the island–gap–port region | **prediction, untested** | §4 |
+| W1 | Co-movement and δ are **fixed by the identity in §2**. `S_h = (1+δ_h)·H_h`, with δ static, so SUPPORTS was close to predetermined once the static quantity moved | re-derived; reproduced to 1e-12 |
+| W2 | Palace saves the refined mesh with a `nodes` section, which the reader refused. The attempt would have failed at level 1 | source `geodata.cpp:1554-1570`; every log prints "Mesh curvature order: 1" |
+| W3 | The nesting check wrongly rejected MFEM bisection at level 1→2 | reviewer's MFEM emulation; consistent with bisection closure; not re-run by me |
+| W4 | Integrity demanded 6 modes, but Palace writes every converged pair | N2R: `N = 6`, 9 rows written |
+| W5 | The box missed the ground edge on three sides. The gap is 0.040 mm on x−, y− and y+, and 0.020 mm only on x+; I took the minimum distance for every side | mesh geometry |
+| W6 | A dispatch-only workflow must exist on `main`. The approval procedure omitted that separately approvable merge | `origin/main`; commit `30fca75` |
 
-## 4. The prepared test
+Smaller issues are listed in `WITHDRAWN.json`:
 
-**Question.** Under nested Palace box refinement of the island–gap–port region (levels
-0, 1, 2 of the committed L2 mesh), does Palace's band first moment move with the static
-quantity computed on the same meshes, as §2 predicts? And by how much do both move?
+- the commit-back step pushed without a rebase;
+- the refined meshes would have survived only as a 90-day artefact;
+- the one-attempt binding was weaker than the project's `run_authority`;
+- the drift was defined on the fragile `B` rather than `H`;
+- the `CONTRADICTS` reason string always said "decouple";
+- the level-3 DOF estimate was too high;
+- the claim "5% is a fifth of ×1.39" was wrong: a fifth is 7.8%.
 
-**Design.**
+**Withdrawn, not repaired.** Fixing W2–W6 would still leave a test whose decisive quantity
+an identity fixes. The dispatch workflow and the approval draft were removed; they remain
+in git history. `pairing_driver.py` stays as reviewed reference code, and its
+`require_approval()` refuses while `WITHDRAWN.json` exists. `predeclaration.json` is
+unchanged.
 
-- **Box.** One box, `[−0.700, −0.125, −0.020]` to `[−0.500, 0.100, 0.020]` mm. It covers
-  the 0.15 mm island, the whole 0.020 mm gap to ground, and the port face. The mesh
-  resolves that gap with about two elements (median edge 0.010 mm near the island), which
-  is the likely source of the 28% change in the static quantity under one uniform
-  refinement. Palace marks every tetrahedron with a vertex inside the box, 1,880 at
-  level 0, and splits each into 8 with conforming closure.
-- **Levels.** Palace runs the committed L2 eigenmode config at box levels 0, 1 and 2.
-  The deltas are only:
-  - `Save: 0`;
-  - `MGMaxLevels: 1`;
-  - at levels 1 and 2, the box and `SaveAdaptMesh: true`.
+**The alternative, proposed and NOT prepared** (it needs your approval, because it solves
+on the QMHP mesh): a **static-only** nested refinement study, with no Palace and no
+eigen-solves.
 
-  The configs' sha256s are frozen in `predeclaration.json`. `MGMaxLevels: 1` is what
-  makes pinned Palace write the refined mesh (`geodata.cpp` `RefineMesh` →
-  `RebalanceMesh`, with a single-mesh vector as `main.cpp` builds it).
-- **Pairing.** On each level's mesh, the static quantity is computed with the unchanged
-  `static_capacitance.py`. The level-0 mesh is the committed file; levels 1 and 2 use the
-  mesh Palace saved. Band quantities come from Palace's own CSVs.
-- **Nesting.** Each step is verified nested before anything is read: every new vertex
-  must be a coarse edge midpoint, and the Galerkin identity must hold.
+- **Levels.** Uniform red levels 0, 1 and 2 of the committed mesh; level 2 needs an
+  iterative solver, itself to be verified. At each level compute `C_h` and `C'_h`, hence
+  `S_h`, `δ_h`, and exactly (by §2) Palace's complete harmonic band moment
+  `H_h = S_h/(1+δ_h)` on those meshes.
+- **Its one sharp test.** At level 0, `S0/(1+δ_0)` must equal the committed L2 band's
+  `H = 2.13994 GHz²` to about 2e-5 plus eigen tolerance. That is where two independent
+  codes, the static solver and Palace's eigensolver, meet on the same mesh.
+- **What it would measure.** The convergence of both moments, and how far Palace's sheet
+  port departs from the declared lumped element as the mesh is refined (δ). Both bear
+  directly on Route A's inputs.
+- **What it could not give.** `B/H`, the band dispersion, still needs eigen data.
 
-**Outcome table** (frozen). Here `g = S₂/S₀`, `δ_h = S_h·Σ_B|p|/f² − 1`, and the drift is
-`max_h |S_h/B_h − S₀/B₀|`.
+## 4. The execution-time manifest (item 4)
 
-| condition | outcome |
-|---|---|
-| any integrity failure (DOF cap, eigen backward error, `N_B > 1`, static identities, nesting, `C` rising, level-0 static not reproducing `S0`, level-0 band not reproducing the L2 mode 1, any invalid value or digest) | UNQUALIFIED |
-| `g < 1.05` | UNRESOLVED: LOW POWER. The box did not move the static quantity, so the error lies elsewhere |
-| `g ≥ 1.05`, `max\|δ\| ≤ 0.01` and drift ≤ 0.01 | SUPPORTS: the band moves with the static quantity, and Palace's sheet port stays within 1% of the lumped element |
-| `g ≥ 1.05` and (`max\|δ\| > 0.03` or drift > 0.03) | CONTRADICTS: they decouple, or the sheet port departs from the lumped element by over 3% |
-| otherwise | UNRESOLVED |
+`orchestrator.manifest.write_verified(root)` writes `manifest.sha256` **at execution time**
+and re-verifies it at once. It raises if the tree does not match, so a driver cannot exit
+claiming an intact record it did not check.
 
-**Power.** SUPPORTS is only reachable if the static quantity actually moves. A box that
-misses the static error returns LOW POWER, not SUPPORTS. The 5% threshold is a fifth of
-the ×1.39 that one uniform refinement produced.
+It is tested on its own, including a negative control. It is also tested end to end
+through `pairing_driver.py`'s success and failure paths with a mock Palace: the record
+verifies, a second attempt is refused, and no refined mesh enters the record.
 
-**Not a target.** Co-movement is §2's prediction. The static quantity is computed without
-reading any band value, and the windows were fixed before any refined QMHP value existed.
-
-**Feasibility.**
-
-| level | DOFs | Palace eigen time |
-|---|---|---|
-| 0 | 79,944 (measured) | about 80 s |
-| 1 | 96k–119k | about 3 min |
-| 2 | 227k–433k | about 10–17 min |
-
-The level-2 range comes from 1,880 marked tetrahedra grown 8× per level, times the
-1.4–2.4× closure factor measured on the N1R/N2R box, with time scaled as `DOF^1.3` from
-N2R's 103k DOFs in 159 s. Static solves take seconds. Level 3 (1.3–2.9 M DOFs) is
-infeasible on the runner and is not part of the test.
-
-**Budget.**
-
-- a cap of 450,000 DOFs per level, enforced by the reviewed DOF probe, which kills a
-  breach;
-- 2,700 s per solve;
-- a 180-minute workflow;
-- one attempt, bound to the workflow's run number and attempt 1. The record directory is
-  created before any solve.
-
-**Execution.**
-
-- `.github/workflows/static-band-pairing.yml`:
-  - dispatch-only, with the confirmation string `run-the-approved-pairing-attempt`;
-  - builds the pinned image exactly as the ladder does;
-  - refuses a Palace commit other than `a61c8cbe`.
-- `pairing_driver.py --execute` is the one step that runs Palace, through the ladder's
-  reviewed `_run_palace`.
-- The refined meshes are uploaded as an artefact and never committed; their sha256s are
-  in the record.
-
-## 5. The evidence driver writes its own manifest (item 4)
-
-`pairing_driver.py` writes the record in this order:
-
-1. raw Palace outputs, as each level finishes;
-2. the static result;
-3. the nesting check;
-4. `summary.json`;
-5. **`manifest.sha256`, written by `orchestrator.manifest.write` at execution time, then
-   verified with `manifest.verify` before the process exits.**
-
-The failure path writes `failure.json` and then the same manifest. The workflow verifies
-it again (`cem verify-results`) and refuses unexpected file kinds before committing.
-
-The end-to-end synthetic tests prove both paths with a mock Palace: the record verifies,
-a second attempt is refused, and no refined mesh enters the record. The executed
+Any future evidence driver calls it as its last step on every path. The executed
 static-anchor record keeps its quarantine; it was not given a manifest after the fact.
 
-## 6. What this record does not establish, and what needs approval
+## 5. What this record does not establish
 
 It does not establish:
 
 - `E_C` or `g`;
 - that Route A is valid or invalid;
-- convergence, since three levels of *local* refinement are not a limit;
-- anything outside the box;
-- the physical device's capacitance.
+- the convergence of either moment;
+- `δ_0` exactly;
+- anything about the physical device.
 
-The co-movement is a prediction until the test runs.
+The static-only alternative is a proposal, not a prepared test.
 
-**Approval needed.** Executing the test means committing
-`experiments/static-band-pairing/PAIRING-APPROVAL.json` (the reviewed draft without its
-`DRAFT` and `how_to_grant_it` keys) and dispatching the workflow once. That is three
-consequential Palace solves.
-
-## 7. Files
+## 6. Files
 
 | file | role |
 |---|---|
-| `verify_nesting.py` | item 1: conformity, conductor consistency, red-refinement nesting and the Galerkin identity on a mesh; synthetic positive and negative controls |
-| `spectral.py` | the Whitney curl-curl, the lumped and sheet port terms, all eigenpairs and moments of small synthetic pencils |
-| `identities.py` | item 2: the known-answer identities, the L2 same-mesh check, the band moments of every committed rung |
-| `nesting_verification.json`, `identities.json` | their outputs, regenerated from committed inputs; no QMHP solve |
-| `pairing_driver.py` | the future evidence driver: gate, configs, Palace, the static solve on the saved meshes, nesting, decision, manifest |
-| `predeclaration.json` | the frozen question, theory, configuration, integrity, outcomes, feasibility and budget |
-| `PAIRING-APPROVAL.draft.json` | the approval to review; it authorises nothing |
+| `WITHDRAWN.json` | why the test was withdrawn, each reason's verification, what carries forward |
+| `review/red_team_findings.json` | the four reviewers' verbatim outputs (reviewer agreement is not evidence by itself) |
+| `verify_nesting.py`, `nesting_verification.json` | item 1: conformity, conductor consistency, nesting and the Galerkin identity; synthetic controls |
+| `spectral.py` | Whitney curl-curl, lumped and sheet port terms, all eigenpairs and moments of small pencils, the port-constrained static energy |
+| `identities.py`, `identities.json` | item 2: the known-answer identities (lumped and sheet), the L2 same-mesh check, the committed rungs' band moments |
+| `pairing_driver.py` | the withdrawn driver, kept as reviewed reference; it refuses to run |
+| `predeclaration.json` | the withdrawn test's frozen pre-declaration, unchanged |

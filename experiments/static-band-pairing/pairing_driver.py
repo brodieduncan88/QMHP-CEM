@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 Brodie Duncan. All rights reserved.
 # Proprietary QMHP-CEM source. No licence is granted except by explicit written agreement.
-"""THE PAIRED STATIC-VS-BAND REFINEMENT TEST - PREPARED, NOT EXECUTED WITHOUT APPROVAL.
+"""THE PAIRED STATIC-VS-BAND REFINEMENT TEST - WITHDRAWN BEFORE APPROVAL, NEVER EXECUTED.
+
+Withdrawn after an independent adversarial review (WITHDRAWN.json): its decisive comparison
+is fixed by an exact identity, and three defects would have spent the single attempt. The
+code is kept as the reviewed reference for the static solve on saved meshes, the decision
+plumbing and the execution-time manifest; require_approval() refuses unconditionally.
+
+Original description:
 
 What it does
 ------------
@@ -341,7 +348,13 @@ def integrity(levels: list[dict], nest: list[dict], pre: dict) -> list[str]:
 
 # --- gate, one attempt, execution ----------------------------------------------------------
 
+WITHDRAWN = HERE / "WITHDRAWN.json"
+
+
 def require_approval(pre: dict, env: dict) -> dict:
+    if WITHDRAWN.is_file():
+        raise Refusal("this test was WITHDRAWN before approval (WITHDRAWN.json): it is not "
+                      "to be executed; a replacement needs its own pre-declaration")
     if not APPROVAL.is_file():
         raise Refusal("no PAIRING-APPROVAL.json: the paired test is PREPARED, NOT APPROVED.")
     ap = json.loads(APPROVAL.read_text())
@@ -374,12 +387,9 @@ def _write(path: Path, obj) -> None:
 
 def _finish(rec: Path) -> dict:
     """Last step on every path: the manifest this driver writes at execution time, then
-    verified before the process exits."""
-    manifest.write(rec)
-    problems = manifest.verify(rec)
-    if problems:
-        raise RuntimeError(f"the manifest just written does not verify: {problems}")
-    return {"manifest_sha256": sha256(rec / "manifest.sha256")}
+    verified before the process exits (orchestrator.manifest.write_verified)."""
+    _, digest = manifest.write_verified(rec)
+    return {"manifest_sha256": digest}
 
 
 def execute(*, runtime: str, image: str, scratch: Path, env: dict | None = None,

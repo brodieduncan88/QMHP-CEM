@@ -97,16 +97,6 @@ WORKFLOW_TRIGGERS: dict[str, dict] = {
         "push_paths": [".github/workflows/palace-verify.yml",
                        "scripts/palace_verify_campaign.py", "solvers/palace/verification.py"],
     },
-    # The paired static-vs-band refinement test (2026-09-22, PREPARED, NOT APPROVED).
-    # workflow_dispatch ONLY - no push, no pull_request, no schedule and no workflow_run
-    # chaining - and inert besides: its driver refuses unless a committed human approval
-    # binds the pre-declaration, the code, the inputs, this workflow and the run number
-    # with attempt 1, and that approval is absent.
-    "static-band-pairing.yml": {
-        "events": ["workflow_dispatch"],
-        "push_branches": None,
-        "push_paths": None,
-    },
 }
 
 #: The workflows that can start a Palace solve. ci.yml cannot: it runs the mock solver
@@ -116,7 +106,7 @@ WORKFLOW_TRIGGERS: dict[str, dict] = {
 SOLVER_WORKFLOWS = frozenset({"first-moment-image.yml", "first-moment-n2r.yml",
                               "palace-coupled-pilot.yml",
                               "palace-golden.yml", "palace-order1-ladder.yml",
-                              "palace-verify.yml", "static-band-pairing.yml"})
+                              "palace-verify.yml"})
 
 #: The two workflows whose trigger IS a human approval record. Nothing else may put an
 #: approval file in a trigger path, and these may name nothing else.

@@ -134,6 +134,27 @@ def unexpected_files(root: Path, allowed: frozenset[str] | None = None) -> list[
     return offenders
 
 
+class ManifestVerificationError(RuntimeError):
+    """A manifest written at execution time did not verify against its own tree."""
+
+
+def write_verified(root: Path, filename: str = "manifest.sha256") -> tuple[Path, str]:
+    """Write the manifest for ``root`` AT EXECUTION TIME and re-verify it at once.
+
+    For evidence drivers: call it as the last step on every path, success and failure
+    alike, after every decision-relevant file has been written. It raises rather than
+    return if the tree does not verify against the manifest it has just written, so a
+    driver cannot exit claiming an intact record it did not check. A record without the
+    manifest its own driver wrote has to be quarantined by content afterwards
+    (tests/test_frozen_evidence.py), which is what this exists to prevent.
+    """
+    path, digest = write(root, filename)
+    problems = verify(root, filename)
+    if problems:
+        raise ManifestVerificationError(f"{root}: {problems}")
+    return path, digest
+
+
 def verify(root: Path, filename: str = "manifest.sha256") -> list[str]:
     """Re-hash a results tree against its manifest.
 

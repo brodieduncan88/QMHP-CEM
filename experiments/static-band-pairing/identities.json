@@ -15,7 +15,8 @@
     "N": 0.4999999999996797,
     "inv_moment_times_V2_over_L_C_minus_1": -0.7364120612814622,
     "parseval_rel": -1.1102230246251565e-16,
-    "min_over_k_B_k_over_N_k_S": 0.9775683060096515
+    "min_over_k_B_k_over_N_k_S": 0.9775683060096515,
+    "static_identity_Cprime_over_C_minus_1": null
    },
    "sheet_minus_lumped_port_psd_min_eig": -6.067455548005157e-17
   },
@@ -34,7 +35,8 @@
     "N": 0.9999999999995194,
     "inv_moment_times_V2_over_L_C_minus_1": 0.022957366734422502,
     "parseval_rel": -2.220446049250313e-16,
-    "min_over_k_B_k_over_N_k_S": 0.979061196761443
+    "min_over_k_B_k_over_N_k_S": 0.979061196761443,
+    "static_identity_Cprime_over_C_minus_1": 0.022957366735481655
    },
    "sheet_minus_lumped_port_psd_min_eig": -1.153607786205043e-16
   },
@@ -53,7 +55,8 @@
     "N": 1.0000000000005616,
     "inv_moment_times_V2_over_L_C_minus_1": 0.02993560210839763,
     "parseval_rel": 4.440892098500626e-16,
-    "min_over_k_B_k_over_N_k_S": 0.9731898157544022
+    "min_over_k_B_k_over_N_k_S": 0.9731898157544022,
+    "static_identity_Cprime_over_C_minus_1": 0.02993560210718238
    },
    "sheet_minus_lumped_port_psd_min_eig": -1.1936886355916004e-16
   }

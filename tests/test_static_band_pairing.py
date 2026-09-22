@@ -1,14 +1,13 @@
 # Copyright (c) 2026 Brodie Duncan. All rights reserved.
 # Proprietary QMHP-CEM source. No licence is granted except by explicit written agreement.
-"""The paired static-vs-band refinement test: PREPARED, NOT APPROVED, NOT EXECUTED.
+"""The paired static-vs-band refinement test: WITHDRAWN before approval, never executed.
 
-Covers the three verifications that justify it (the monotonicity/bound claim on the
-actual implementation, the spectral identities, the L2 same-mesh check), the driver's
-refinement-nesting check and MFEM reader, the frozen decision and integrity rules, the
-gate and one-attempt refusal, an end-to-end synthetic execution with a mock Palace that
-proves the driver writes a manifest that verifies (on success AND on failure), the
-dispatch-only workflow, and that no QMHP solve is run and the existing method is
-unchanged."""
+Covers the verifications that stand (the monotonicity/bound claim on the actual
+implementation, the lumped and sheet spectral identities, the L2 same-mesh check), the
+withdrawal (the driver refuses; no workflow or approval draft exists), the gate logic
+underneath it, orchestrator.manifest.write_verified with a negative control, and an
+end-to-end synthetic execution with a mock Palace proving the execution-time manifest on
+success AND failure. No QMHP solve is run and the existing method is unchanged."""
 from __future__ import annotations
 
 import ast
@@ -24,7 +23,6 @@ import yaml
 
 REPO = Path(__file__).resolve().parents[1]
 HERE = REPO / "experiments" / "static-band-pairing"
-WORKFLOW = REPO / ".github" / "workflows" / "static-band-pairing.yml"
 DOC = REPO / "docs" / "coupled-candidate" / "static-band-pairing.md"
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(REPO))
@@ -74,6 +72,7 @@ def test_the_real_mesh_is_conforming_and_its_red_refinement_is_verified_nested()
     c = vn.conformity(m)
     assert c["max_face_multiplicity"] == 2 and c["coincident_nodes"] == 0
     assert c["every_tagged_triangle_is_a_tet_face"] and c["nodes_in_no_tet"] == 0
+    assert c["every_single_faced_face_is_a_tagged_triangle"]
     assert vn.conductor_consistency(m)["every_conductor_triangle_in_one_conductor"]
     n = vn.nesting(m, af.refine_red(m))
     assert n["coarse_nodes_unchanged"] and n["midpoints_exact_rel"] == 0.0
@@ -81,6 +80,25 @@ def test_the_real_mesh_is_conforming_and_its_red_refinement_is_verified_nested()
     assert n["galerkin_identity_rel"] < 1e-13            # P^T K1 P = K0: the nesting proof
     assert n["constraint_sets_nested"] and n["coarse_conductor_nodes_kept"]
     assert n["fine"]["max_face_multiplicity"] == 2 and n["prolonged_indicator_admissible"]
+
+
+def test_the_conformity_check_rejects_a_hanging_node_mesh():
+    """Negative control: refine ONE interior tetrahedron of a box mesh into 8 without closure.
+    Every face is still shared by at most two tetrahedra, but its split faces and its
+    neighbours' whole faces are each single-faced and untagged, so the check must fail."""
+    box = af.box_mesh(2, 2, 2)
+    faces = np.sort(np.vstack([box["tets"][:, list(c)] for c in ((0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3))]), axis=1)
+    _, inv, cnt = np.unique(faces, axis=0, return_inverse=True, return_counts=True)
+    interior = np.flatnonzero((cnt[inv.ravel()].reshape(4, -1) == 2).all(0))[0]
+    one = af.refine_red({"xyz": box["xyz"], "tets": box["tets"][[interior]],
+                         "tet_attr": np.ones(1, int), "tris": np.zeros((0, 3), int), "tri_attr": np.zeros(0, int)})
+    hanging = {"xyz": one["xyz"], "tet_attr": np.ones(len(box["tets"]) - 1 + 8, int),
+               "tets": np.vstack([np.delete(box["tets"], interior, 0), one["tets"]]),
+               "tris": box["tris"], "tri_attr": box["tri_attr"]}
+    c = vn.conformity(hanging)
+    assert c["max_face_multiplicity"] <= 2                  # the old criterion alone would pass
+    assert not c["every_single_faced_face_is_a_tagged_triangle"]
+    assert vn.conformity(box)["every_single_faced_face_is_a_tagged_triangle"]
 
 
 def test_each_condition_of_the_monotonicity_proof_is_necessary():
@@ -115,6 +133,18 @@ def test_known_answer_the_static_quantity_is_the_exact_harmonic_moment_of_the_lu
     assert sh["inv_moment_times_V2_over_L_C_minus_1"] > 0.01           # the sheet perturbs the -1 moment
     assert sh["min_over_k_B_k_over_N_k_S"] < 1.0                       # and can break S <= B/N
     assert r["sheet_minus_lumped_port_psd_min_eig"] > -1e-12           # K_port >= f f^T / L
+
+
+@pytest.mark.parametrize("n", [3, 4])
+def test_known_answer_palaces_sheet_port_obeys_an_exact_static_identity(n):
+    """N = 1 and sum p/lambda = L C'_h for Palace's distributed sheet: delta is the static
+    ratio C'_h/C_h - 1, computed here with no eigen-solve and compared with the dense one."""
+    import identities
+    r = identities.synthetic(n)
+    sh = r["sheet"]
+    assert abs(sh["N"] - 1) < 1e-9
+    assert abs(sh["static_identity_Cprime_over_C_minus_1"] - sh["inv_moment_times_V2_over_L_C_minus_1"]) < 1e-9
+    assert sh["static_identity_Cprime_over_C_minus_1"] > 0
 
 
 def test_a_malformed_port_scales_the_identity_by_one_over_V_squared():
@@ -203,40 +233,72 @@ def test_an_invalid_decisive_value_is_unqualified(pre, bad):
 
 # --- gate and one attempt -----------------------------------------------------------------
 
-def test_no_approval_is_committed_and_the_driver_refuses_before_any_solve(tmp_path, monkeypatch):
-    assert not pd.APPROVAL.exists(), "prepared, not approved"
+def test_the_withdrawn_driver_refuses_before_any_solve_and_nothing_can_launch_it(tmp_path, monkeypatch):
+    assert (HERE / "WITHDRAWN.json").is_file()
+    assert not pd.APPROVAL.exists() and not (HERE / "PAIRING-APPROVAL.draft.json").exists()
+    assert not (REPO / ".github" / "workflows" / "static-band-pairing.yml").exists()
     calls = []
     monkeypatch.setattr(pd, "RESULTS_ROOT", tmp_path / "results")
-    with pytest.raises(pd.Refusal, match="PREPARED, NOT APPROVED"):
-        pd.execute(runtime="docker", image="x", scratch=tmp_path / "s", env={},
+    with pytest.raises(pd.Refusal, match="WITHDRAWN"):
+        pd.execute(runtime="docker", image="x", scratch=tmp_path / "s",
+                   env={"GITHUB_RUN_NUMBER": "1", "GITHUB_RUN_ATTEMPT": "1"},
                    run_palace=lambda *a, **k: calls.append(1))
     assert not calls and not (tmp_path / "results").exists()
+    w = json.loads((HERE / "WITHDRAWN.json").read_text())
+    assert {x["id"] for x in w["why"]} == {"W1", "W2", "W3", "W4", "W5", "W6"}
+    assert all(x["verification"] for x in w["why"])
 
 
-def test_a_wrong_run_number_or_a_rerun_attempt_is_refused(tmp_path, monkeypatch, pre):
-    good = json.loads((HERE / "PAIRING-APPROVAL.draft.json").read_text())
-    good = {k: v for k, v in good.items() if k not in ("DRAFT", "how_to_grant_it")}
-    ap = tmp_path / "PAIRING-APPROVAL.json"
-    ap.write_text(json.dumps(good))
-    monkeypatch.setattr(pd, "APPROVAL", ap)
+def test_underneath_the_withdrawal_the_gate_refuses_what_it_should(tmp_path, monkeypatch, pre):
+    monkeypatch.setattr(pd, "WITHDRAWN", tmp_path / "absent.json")
+    monkeypatch.setattr(pd, "APPROVAL", tmp_path / "PAIRING-APPROVAL.json")
+    with pytest.raises(pd.Refusal, match="PREPARED, NOT APPROVED"):
+        pd.require_approval(pre, {"GITHUB_RUN_NUMBER": "1", "GITHUB_RUN_ATTEMPT": "1"})
+    good = {"authorises": "one execution of the paired static-vs-band refinement test",
+            "predeclaration_sha256": _sha(pd.PREDECLARATION),
+            "code_sha256": {p: (_sha(REPO / p) if (REPO / p).is_file() else "absent") for p in pd.CODE_FILES},
+            "base_mesh_sha256": pre["configuration"]["base_mesh_sha256"],
+            "base_config_sha256": pre["configuration"]["base_config_sha256"], "github_run_number": 1}
+    monkeypatch.setattr(pd, "sha256", lambda p: _sha(p) if Path(p).is_file() else "absent")
+    (tmp_path / "PAIRING-APPROVAL.json").write_text(json.dumps(good))
     assert pd.require_approval(pre, {"GITHUB_RUN_NUMBER": "1", "GITHUB_RUN_ATTEMPT": "1"})
     for env in ({"GITHUB_RUN_NUMBER": "2", "GITHUB_RUN_ATTEMPT": "1"},
                 {"GITHUB_RUN_NUMBER": "1", "GITHUB_RUN_ATTEMPT": "2"}, {}):
         with pytest.raises(pd.Refusal, match="approved workflow run number"):
             pd.require_approval(pre, env)
-    stale = dict(good, code_sha256={k: "0" * 64 for k in good["code_sha256"]})
-    ap.write_text(json.dumps(stale))
+    (tmp_path / "PAIRING-APPROVAL.json").write_text(json.dumps(dict(good, code_sha256={k: "0" * 64 for k in good["code_sha256"]})))
     with pytest.raises(pd.Refusal, match="code_sha256 does not match"):
         pd.require_approval(pre, {"GITHUB_RUN_NUMBER": "1", "GITHUB_RUN_ATTEMPT": "1"})
 
 
-def test_the_draft_approval_binds_the_current_files_and_run_number_one(pre):
-    d = json.loads((HERE / "PAIRING-APPROVAL.draft.json").read_text())
-    assert "NOT AN APPROVAL" in d["DRAFT"]
-    assert d["predeclaration_sha256"] == PREDECLARATION_SHA256
-    assert d["code_sha256"] == {p: _sha(REPO / p) for p in pd.CODE_FILES}, "re-review the draft"
-    assert d["github_run_number"] == 1
-    assert d["base_mesh_sha256"] == pre["configuration"]["base_mesh_sha256"]
+# --- item 4: the execution-time manifest ---------------------------------------------------
+
+def test_write_verified_writes_a_manifest_that_verifies(tmp_path):
+    rec = tmp_path / "RECORD"
+    (rec / "a").mkdir(parents=True)
+    (rec / "summary.json").write_text('{"verdict": "X"}\n')
+    (rec / "a" / "raw.csv").write_text("m,f\n1,2\n")
+    path, digest = manifest.write_verified(rec)
+    assert path.name == "manifest.sha256" and manifest.verify(rec) == []
+    assert digest == _sha(path)
+
+
+def test_write_verified_refuses_when_the_tree_moves_under_it(tmp_path, monkeypatch):
+    """Negative control: a file lands after the manifest is written. verify() must see it
+    and write_verified must raise instead of returning an unverified manifest."""
+    rec = tmp_path / "RECORD"
+    rec.mkdir()
+    (rec / "summary.json").write_text("{}\n")
+    real_write = manifest.write
+
+    def racy_write(root, filename="manifest.sha256"):
+        out = real_write(root, filename)
+        (Path(root) / "late.json").write_text("{}\n")
+        return out
+
+    monkeypatch.setattr(manifest, "write", racy_write)
+    with pytest.raises(manifest.ManifestVerificationError, match="late.json"):
+        manifest.write_verified(rec)
 
 
 # --- end to end, synthetic, with a mock Palace: the manifest proof -------------------------
@@ -363,26 +425,6 @@ def test_the_predeclaration_is_frozen_and_the_configs_are_exactly_the_declared_d
         assert key in pre, key
 
 
-def test_the_workflow_is_dispatch_only_confirmed_and_commits_only_the_verified_record():
-    text = WORKFLOW.read_text()
-    data = yaml.safe_load(text)
-    on = data.get("on", data.get(True))
-    assert list(on) == ["workflow_dispatch"]
-    steps = data["jobs"]["pairing"]["steps"]
-    runs = [s.get("run", "") for s in steps]
-    assert not any("${{" in r for r in runs), "no expression expansion inside run scripts"
-    assert "run-the-approved-pairing-attempt" in text
-    names = [s.get("name", "") for s in steps]
-    i_attempt = names.index("THE ONE APPROVED ATTEMPT")
-    i_verify = names.index("Verify the record manifest")
-    i_kinds = names.index("Refuse unexpected file kinds in the evidence commit")
-    i_commit = names.index("Commit the record to the branch")
-    assert i_attempt < i_verify < i_kinds < i_commit
-    assert "cem verify-results" in steps[i_verify]["run"]
-    assert 'git add "$RECORD"' in steps[i_commit]["run"]
-    assert "--execute" in steps[i_attempt]["run"]
-
-
 def test_the_existing_method_and_the_executed_record_are_unchanged():
     for rel, digest in UNCHANGED.items():
         assert _sha(REPO / rel) == digest, rel
@@ -409,5 +451,6 @@ def test_the_report_keeps_proof_measurement_and_prediction_apart():
     text = DOC.read_text()
     for h in ("## 1.", "## 2.", "## 3.", "## 4.", "## 5.", "## 6."):
         assert h in text, h
-    assert "PREPARED, NOT APPROVED, NOT EXECUTED" in text
+    assert "WITHDRAWN" in text and "Never approved, never executed" in text
     assert "UNRESOLVED" in text and "UNAVAILABLE" in text
+    assert "write_verified" in text

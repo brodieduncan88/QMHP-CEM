@@ -45,8 +45,12 @@ def conformity(mesh: dict) -> dict:
     key = lambda a: a[:, 0].astype(np.int64) * 2**42 + a[:, 1].astype(np.int64) * 2**21 + a[:, 2]
     tri_in_mesh = np.isin(key(tri), key(uf))
     _, first = np.unique(np.round(mesh["xyz"], 12), axis=0, return_index=True)
+    single = uf[cnt == 1]
     return {"max_face_multiplicity": int(cnt.max()),
             "boundary_faces": int((cnt == 1).sum()),
+            # a hanging node leaves interior faces shared by ONE tetrahedron that no tagged
+            # boundary triangle covers; requiring every such face to be tagged excludes it
+            "every_single_faced_face_is_a_tagged_triangle": bool(np.isin(key(single), key(tri)).all()),
             "every_tagged_triangle_is_a_tet_face": bool(tri_in_mesh.all()),
             "coincident_nodes": int(len(mesh["xyz"]) - len(first)),
             "nodes_in_no_tet": int(len(mesh["xyz"]) - len(np.unique(t)))}

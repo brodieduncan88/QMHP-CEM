@@ -70,6 +70,8 @@ def synthetic(n: int) -> dict:
         out[name] = {"N": mo["N"], "inv_moment_times_V2_over_L_C_minus_1": mo["inv_moment"] * V * V / LE - 1,
                      "parseval_rel": mo["first_moment"] / A_direct - 1,
                      "min_over_k_B_k_over_N_k_S": worst}
+    out["sheet"]["static_identity_Cprime_over_C_minus_1"] = (
+        spc.port_constrained_energy(mesh, model) / st["energy_nd"] - 1 if abs(V - 1) < 1e-9 else None)
     out["sheet_minus_lumped_port_psd_min_eig"] = float(np.linalg.eigvalsh(
         spc.sheet_port(mesh, xyz, edges, model["port_attr"], L, s["port"]["w_nd"], s["port"]["l_nd"])
         [s["free"]][:, s["free"]].toarray() - np.outer(s["f_free"], s["f_free"]) / L).min())
