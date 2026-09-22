@@ -164,7 +164,7 @@ def test_a_failure_inside_the_attempt_is_recorded_beside_the_raw_levels(sc, tmp_
 def test_a_failure_after_both_levels_still_leaves_a_failure_record(sc, tmp_path, monkeypatch):
     _synthetic_gate(sc, tmp_path, monkeypatch)
 
-    def broken(levels, pre):
+    def broken(levels, pre, B0=None):
         raise RuntimeError("integrity evaluation crashed")
 
     monkeypatch.setattr(sc, "integrity", broken)
@@ -266,17 +266,182 @@ def test_the_decision_is_the_frozen_table(sc, pre, S0, S1, verdict):
     assert sc.decide(S0, S1, B0, pre)["verdict"] == verdict
 
 
-def test_integrity_failures_are_never_a_scientific_verdict(sc, pre):
-    good = {"level": 0, "C_F": 1.0, "S_GHz2": 2.0, "solve_relative_residual": 1e-14,
+def _level(i: int, C_F: float, S: float) -> dict:
+    """A complete, valid level record: every value integrity() and decide() read."""
+    return {"level": i, "C_F": C_F, "C_fF": C_F * 1e15, "S_GHz2": S, "energy_nd": 1.0,
+            "Lc_m": 4e-3, "solve_relative_residual": 1e-14,
             "identity": {"port_voltage_of_grad_phi": 1.0, "grad_phi_on_pec_edges_max_abs": 0.0,
-                         "edge_energy_vs_p1_energy_rel": 1e-15, "S_two_routes_rel": 1e-15}}
-    assert sc.integrity([good, {**good, "level": 1, "C_F": 0.99, "S_GHz2": 2.02}], pre) == []
-    increased = {**good, "level": 1, "C_F": 1.01}
-    assert any("Dirichlet" in m for m in sc.integrity([good, increased], pre))
-    broken = {**good, "identity": {**good["identity"], "port_voltage_of_grad_phi": 0.9}}
-    assert sc.integrity([broken], pre)
-    too_big = {**good, "S_GHz2": 400.0}
-    assert any("complete first moment" in m for m in sc.integrity([too_big], pre))
+                         "edge_energy_vs_p1_energy_rel": 1e-15, "S_edge_route_GHz2": S,
+                         "S_two_routes_rel": 1e-15}}
+
+
+def _valid_levels() -> list[dict]:
+    return [_level(0, 1.0e-13, 2.0), _level(1, 0.99e-13, 2.02)]
+
+
+def test_integrity_failures_are_never_a_scientific_verdict(sc, pre):
+    assert sc.integrity(_valid_levels(), pre) == []
+    increased = _valid_levels()
+    increased[1]["C_F"] = 1.01e-13
+    assert any("Dirichlet" in m for m in sc.integrity(increased, pre))
+    broken = _valid_levels()
+    broken[0]["identity"]["port_voltage_of_grad_phi"] = 0.9
+    assert any("port voltage" in m for m in sc.integrity(broken, pre))
+    too_big = _valid_levels()
+    too_big[0]["S_GHz2"] = 400.0
+    assert any("complete first moment" in m for m in sc.integrity(too_big, pre))
+    unresolved_solve = _valid_levels()
+    unresolved_solve[1]["solve_relative_residual"] = 1e-6
+    assert any("residual too large" in m for m in sc.integrity(unresolved_solve, pre))
+
+
+# --- numerical validity: invalid numbers are UNQUALIFIED, never a verdict ---------------
+# Pre-fix defect, reproduced on frozen 16937ad with that commit's own functions: every
+# integrity check is "value > tolerance", and a comparison with NaN is False, so a NaN
+# residual or port voltage passed and decide() returned SUPPORTS; all-NaN, +inf or a NaN
+# baseline fell through decide() to WEAKENS; zero or negative energy was never checked.
+
+_NAN, _INF = float("nan"), float("inf")
+
+
+def _poison(path: tuple, value):
+    def apply(levels):
+        target = levels[path[0]]
+        for key in path[1:-1]:
+            target = target[key]
+        if value is KeyError:
+            del target[path[-1]]
+        else:
+            target[path[-1]] = value
+    return apply
+
+
+_INVALID_CASES = {
+    "residual NaN": _poison((0, "solve_relative_residual"), _NAN),
+    "residual +inf": _poison((1, "solve_relative_residual"), _INF),
+    "residual negative": _poison((0, "solve_relative_residual"), -1e-14),
+    "port voltage NaN": _poison((1, "identity", "port_voltage_of_grad_phi"), _NAN),
+    "port voltage -inf": _poison((0, "identity", "port_voltage_of_grad_phi"), -_INF),
+    "PEC gradient NaN": _poison((0, "identity", "grad_phi_on_pec_edges_max_abs"), _NAN),
+    "energy identity NaN": _poison((1, "identity", "edge_energy_vs_p1_energy_rel"), _NAN),
+    "two routes NaN": _poison((1, "identity", "S_two_routes_rel"), _NAN),
+    "edge-route S NaN": _poison((0, "identity", "S_edge_route_GHz2"), _NAN),
+    "S0 NaN": _poison((0, "S_GHz2"), _NAN),
+    "S1 +inf": _poison((1, "S_GHz2"), _INF),
+    "S1 zero": _poison((1, "S_GHz2"), 0.0),
+    "C1 zero": _poison((1, "C_F"), 0.0),
+    "C0 negative": _poison((0, "C_F"), -1.0e-13),
+    "C_fF NaN": _poison((1, "C_fF"), _NAN),
+    "energy zero": _poison((1, "energy_nd"), 0.0),
+    "energy negative": _poison((0, "energy_nd"), -1.0),
+    "energy NaN": _poison((0, "energy_nd"), _NAN),
+    "unit scale zero": _poison((0, "Lc_m"), 0.0),
+    "residual missing": _poison((0, "solve_relative_residual"), KeyError),
+    "S1 missing": _poison((1, "S_GHz2"), KeyError),
+    "energy missing": _poison((1, "energy_nd"), KeyError),
+    "port voltage missing": _poison((0, "identity", "port_voltage_of_grad_phi"), KeyError),
+    "identity block missing": _poison((1, "identity"), KeyError),
+    "residual is a string": _poison((0, "solve_relative_residual"), "1e-14"),
+    "residual is None": _poison((0, "solve_relative_residual"), None),
+    "C is a bool": _poison((1, "C_F"), True),
+    "level label wrong": _poison((1, "level"), 0),
+}
+
+
+@pytest.mark.parametrize("case", sorted(_INVALID_CASES))
+def test_an_invalid_value_makes_integrity_fail_before_any_threshold(sc, pre, case):
+    levels = _valid_levels()
+    _INVALID_CASES[case](levels)
+    bad = sc.integrity(levels, pre)
+    assert bad, f"{case}: passed integrity, so a verdict would have been read"
+    assert bad == sc.numerical_validity(levels), "only validity failures, no threshold compared"
+
+
+def test_every_value_nan_is_unqualified_not_weakens(sc, pre):
+    levels = _valid_levels()
+    for r in levels:
+        for key in ("C_F", "C_fF", "S_GHz2", "energy_nd", "Lc_m", "solve_relative_residual"):
+            r[key] = _NAN
+        for key in r["identity"]:
+            r["identity"][key] = _NAN
+    assert len(sc.integrity(levels, pre)) >= 22
+
+
+@pytest.mark.parametrize("levels", [[], "levels", None])
+def test_a_missing_level_set_is_unqualified_not_an_exception(sc, pre, levels):
+    assert sc.integrity(levels, pre)
+
+
+@pytest.mark.parametrize("n", [1, 3])
+def test_anything_but_the_two_declared_levels_is_unqualified(sc, pre, n):
+    levels = [_level(i, 1.0e-13, 2.0) for i in range(n)]
+    assert sc.integrity(levels, pre) == [f"expected exactly the two declared levels, got {n}"]
+
+
+@pytest.mark.parametrize("B0", [_NAN, _INF, 0.0, -2.1, "2.1", True])
+def test_an_invalid_band_baseline_is_unqualified(sc, pre, B0):
+    assert any("band baseline" in m for m in sc.integrity(_valid_levels(), pre, B0))
+    assert sc.decide(2.0, 2.02, B0, pre)["verdict"] == "UNQUALIFIED"
+
+
+@pytest.mark.parametrize("S0, S1", [(_NAN, 2.0), (2.0, _NAN), (_NAN, _NAN), (2.0, _INF),
+                                    (_INF, 2.0), (0.0, 2.0), (2.0, 0.0), (-2.0, -2.02),
+                                    (None, 2.0), ("2.0", 2.0)])
+def test_decide_never_returns_a_scientific_verdict_for_invalid_numbers(sc, pre, S0, S1):
+    B0 = pre["baseline"]["band_estimate_same_mesh"]["value_GHz2"]
+    assert sc.decide(S0, S1, B0, pre)["verdict"] == "UNQUALIFIED"
+
+
+def test_the_positive_controls_still_reach_the_frozen_table(sc, pre):
+    B0 = pre["baseline"]["band_estimate_same_mesh"]["value_GHz2"]
+    levels = _valid_levels()
+    assert sc.numerical_validity(levels, B0) == [] and sc.integrity(levels, pre, B0) == []
+    assert sc.decide(levels[0]["S_GHz2"], levels[1]["S_GHz2"], B0, pre)["verdict"] == "SUPPORTS"
+    np_levels = _valid_levels()
+    np_levels[0]["S_GHz2"] = np.float64(2.0)       # numpy scalars are real numbers too
+    np_levels[1]["solve_relative_residual"] = np.float32(1e-14)
+    assert sc.integrity(np_levels, pre, np.float64(B0)) == []
+
+
+def _all_nan(r):
+    for key in ("C_F", "C_fF", "S_GHz2", "energy_nd", "solve_relative_residual"):
+        r[key] = _NAN
+    for key in r["identity"]:
+        r["identity"][key] = _NAN
+
+
+@pytest.mark.parametrize("label, poison", [
+    ("residual NaN", lambda r: r.__setitem__("solve_relative_residual", _NAN)),
+    ("all NaN", _all_nan),
+    ("energy zero", lambda r: r.__setitem__("energy_nd", 0.0)),
+    ("S +inf", lambda r: r.__setitem__("S_GHz2", _INF)),
+    ("residual missing", lambda r: r.pop("solve_relative_residual")),
+])
+def test_an_invalid_solve_through_execute_is_recorded_unqualified(sc, tmp_path, monkeypatch,
+                                                                  label, poison):
+    _synthetic_gate(sc, tmp_path, monkeypatch)
+    real = sc.static_capacitance
+
+    def poisoned(mesh, **model):
+        r = real(mesh, **model)
+        poison(r)
+        return r
+
+    monkeypatch.setattr(sc, "static_capacitance", poisoned)
+    rec = sc.execute()
+    assert sorted(p.name for p in rec.iterdir()) == ["level0.json", "level1.json",
+                                                     "summary.json"], "raw levels kept"
+    summary = json.loads((rec / "summary.json").read_text())
+    assert summary["outcome"]["verdict"] == "UNQUALIFIED", label
+    assert summary["integrity_failures"]
+
+
+def test_the_same_path_without_poison_still_reaches_a_verdict(sc, tmp_path, monkeypatch):
+    _synthetic_gate(sc, tmp_path, monkeypatch)
+    rec = sc.execute()
+    summary = json.loads((rec / "summary.json").read_text())
+    assert summary["integrity_failures"] == []
+    assert summary["outcome"]["verdict"] in ("SUPPORTS", "WEAKENS", "CONTRADICTS", "UNRESOLVED")
 
 
 # --- the machinery, on known answers ----------------------------------------------------

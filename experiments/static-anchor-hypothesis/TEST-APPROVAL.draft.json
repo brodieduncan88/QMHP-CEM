@@ -6,7 +6,7 @@
  "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
  "predeclaration_sha256": "6f31470a38a58cfbe33eb7bee61c6ec06eeea428bdfbd943b39e52e3e4868f29",
  "code_sha256": {
-  "static_capacitance.py": "631b5799971414363ffdc42335ff43032dfbda1fecea690668b0e1187ea50253",
+  "static_capacitance.py": "54dd810f93f8d7af967cdfffb9fac78d0a583c8003c104e0c00002e2b8e98aab",
   "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1"
  },
  "invocation": "from the repository root, locally, no workflow, no network: timeout --signal=KILL 1860 .venv/bin/python experiments/static-anchor-hypothesis/static_capacitance.py",

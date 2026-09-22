@@ -167,6 +167,32 @@ the L2 rung on the same mesh; `ρ = S1/S0`):
 Route A output until a circuit model is declared that consistently defines `C_FF`, the
 band modes, the DC-grounded distributed readout and `k²`.
 
+**Guard correction, made before any execution.** An external reproduction (ChatGPT, using
+copies of the functions from `16937ad`) reported that NaN could pass `integrity()` and
+`decide()`. I reproduced it independently on a frozen worktree of `16937ad`, using that
+commit's own functions and its real `execute()` on a synthetic slab:
+
+- a NaN residual, port voltage or route-agreement value passed every check and gave
+  **SUPPORTS**;
+- all-NaN values, `+inf` or a NaN baseline gave **WEAKENS**;
+- zero or negative energy was never checked;
+- a missing value or level raised an exception instead of giving UNQUALIFIED.
+
+**Cause.** Every check has the form `value > tolerance`, and any comparison with NaN is false.
+`decide()` then fell through to its last branch.
+
+**Fix.** `numerical_validity()` now runs before any threshold is compared, and `decide()`
+refuses invalid inputs itself. Every value either one reads must be present and a finite real
+number:
+
+- capacitance, energy, `S` and the unit scale must be strictly positive;
+- residuals and errors must be non-negative;
+- `B0` must be finite and positive.
+
+Such a record is UNQUALIFIED, and its raw levels are still written. No threshold, outcome
+window, hypothesis, mesh, budget or method changed. `predeclaration.json` is byte-identical
+(`6f31470a…`). Only the draft approval's code digest moved.
+
 ## 6. What this record does not establish, and does not change
 
 It does not establish:

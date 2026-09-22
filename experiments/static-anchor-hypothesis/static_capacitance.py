@@ -139,8 +139,65 @@ def band_baseline(pre: dict) -> float:
     return sum(pi * fi * fi for pi, fi in zip(p, f)) / sum(p)
 
 
-def integrity(levels: list[dict], pre: dict) -> list[str]:
+#: Every value an integrity check or the verdict reads. Each must be present and a finite
+#: real number before any threshold is compared with it: a comparison with NaN is always
+#: False, so an unchecked NaN would pass every "value > tolerance" test. Capacitance,
+#: energy, S and the unit scale must also be strictly positive; residuals, errors and
+#: magnitudes must be non-negative. None of this changes a threshold.
+_POSITIVE = ("C_F", "C_fF", "S_GHz2", "energy_nd", "Lc_m")
+_POSITIVE_IDENTITY = ("S_edge_route_GHz2",)
+_NONNEGATIVE = ("solve_relative_residual",)
+_NONNEGATIVE_IDENTITY = ("grad_phi_on_pec_edges_max_abs", "edge_energy_vs_p1_energy_rel",
+                         "S_two_routes_rel")
+_FINITE_IDENTITY = ("port_voltage_of_grad_phi",)
+
+
+def _finite_real(v) -> bool:
+    return (isinstance(v, (int, float, np.integer, np.floating)) and not isinstance(v, bool)
+            and math.isfinite(v))
+
+
+def numerical_validity(levels, B0=None) -> list[str]:
+    """Why the numbers cannot be read at all: missing, non-finite or non-physical values.
+    Empty means every required value is present, finite and of the admissible sign."""
+    if not isinstance(levels, list) or len(levels) != 2:
+        n = len(levels) if isinstance(levels, list) else type(levels).__name__
+        return [f"expected exactly the two declared levels, got {n}"]
+    bad = []
+    for i, r in enumerate(levels):
+        if not isinstance(r, dict):
+            bad.append(f"level {i}: not a record")
+            continue
+        if r.get("level") != i:
+            bad.append(f"level {i}: level label is {r.get('level')!r}")
+        idn = r.get("identity")
+        if not isinstance(idn, dict):
+            bad.append(f"level {i}: identity block is missing")
+            idn = {}
+        for block, keys, sign in ((r, _POSITIVE, "positive"),
+                                  (idn, _POSITIVE_IDENTITY, "positive"),
+                                  (r, _NONNEGATIVE, "non-negative"),
+                                  (idn, _NONNEGATIVE_IDENTITY, "non-negative"),
+                                  (idn, _FINITE_IDENTITY, None)):
+            for key in keys:
+                if key not in block:
+                    bad.append(f"level {i}: {key} is missing")
+                elif not _finite_real(block[key]):
+                    bad.append(f"level {i}: {key} = {block[key]!r} is not a finite number")
+                elif sign == "positive" and not block[key] > 0:
+                    bad.append(f"level {i}: {key} = {block[key]!r} is not positive")
+                elif sign == "non-negative" and not block[key] >= 0:
+                    bad.append(f"level {i}: {key} = {block[key]!r} is negative")
+    if B0 is not None and not (_finite_real(B0) and B0 > 0):
+        bad.append(f"band baseline B0 = {B0!r} is not a finite positive number")
+    return bad
+
+
+def integrity(levels: list[dict], pre: dict, B0=None) -> list[str]:
     """Every failure makes the record UNQUALIFIED. None of these is a scientific outcome."""
+    invalid = numerical_validity(levels, B0)
+    if invalid:
+        return invalid                      # no threshold is compared with an invalid number
     t = pre["integrity"]
     bad = []
     for r in levels:
@@ -165,6 +222,11 @@ def integrity(levels: list[dict], pre: dict) -> list[str]:
 def decide(S0: float, S1: float, B0: float, pre: dict) -> dict:
     """The frozen outcome table. Pure function of three numbers and the pre-declaration."""
     w = pre["outcomes"]
+    invalid = [f"{name} = {v!r} is not a finite positive number"
+               for name, v in (("S0", S0), ("S1", S1), ("B0", B0))
+               if not (_finite_real(v) and v > 0)]
+    if invalid:                             # never a scientific verdict from invalid numbers
+        return {"verdict": "UNQUALIFIED", "reason": "; ".join(invalid)}
     r0, rho = S0 / B0, S1 / S0
     if rho >= w["rho_weakens_at_or_above"]:
         verdict, why = "WEAKENS", "the static quantity grew like the divergent first moment"
@@ -391,15 +453,15 @@ def execute() -> Path:
             if level == 0:
                 mesh = af.refine_red(mesh)
         signal.alarm(0)
-        bad = integrity(levels, pre)
+        bad = integrity(levels, pre, B0)
         summary = {"predeclaration_sha256": af.sha256(PREDECLARATION),
                    "approval_sha256": af.sha256(APPROVAL),
                    "approval_run_label": approval.get("run_label"),
                    "mesh_sha256": pre["configuration"]["mesh_sha256"],
                    "band_baseline_B0_GHz2": B0,
                    "environment": _environment(), "limits": limits, "resources": _usage(t0),
-                   "S0_GHz2": levels[0]["S_GHz2"], "S1_GHz2": levels[1]["S_GHz2"],
-                   "C0_fF": levels[0]["C_fF"], "C1_fF": levels[1]["C_fF"],
+                   "S0_GHz2": levels[0].get("S_GHz2"), "S1_GHz2": levels[1].get("S_GHz2"),
+                   "C0_fF": levels[0].get("C_fF"), "C1_fF": levels[1].get("C_fF"),
                    "integrity_failures": bad,
                    "outcome": ({"verdict": "UNQUALIFIED", "reason": "; ".join(bad)} if bad
                                else decide(levels[0]["S_GHz2"], levels[1]["S_GHz2"], B0, pre)),
