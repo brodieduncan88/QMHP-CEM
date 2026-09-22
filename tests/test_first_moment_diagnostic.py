@@ -457,6 +457,58 @@ REGENERATED = {
 }
 
 
+#: CODE THAT HAS ADVANCED PAST THE PROPOSAL, declared file by file.
+#:
+#: proposal.json's `code_sha256` block records this diagnostic's code AS PREPARED, and the
+#: regeneration check otherwise requires that block to still describe the working tree.
+#: The image-approval binding advances two of those files: the launcher now validates the
+#: approval, requires it to NAME a full immutable image ID, resolves the local image by
+#: metadata inspection alone and compares the two before any container starts; the
+#: evaluator now takes the expected ID from the approval frozen beside the record instead
+#: of from the launcher's own provenance, which compared a field with itself.
+#:
+#: proposal.json is PREPARATION EVIDENCE. It is NOT regenerated to make its old digests
+#: look current - that would erase the fact that the code moved. The supersession is
+#: declared here instead, with BOTH digests, so the drift is a recorded revision.
+#:
+#: An entry is honoured ONLY when `prepared` equals what the committed proposal records
+#: AND `current` equals the file on disk. An undeclared file, a stale entry, or a file
+#: that drifts again all still fail - which
+#: test_undeclared_code_drift_still_fails_the_regeneration_check proves by mutation.
+SUPERSEDED_CODE = {
+    "run_diagnostic.py": {
+        "prepared": "9b0c312565273b70470a8e8ce81ba2787781c46ad9984100a483618713f5956d",
+        "current": "2acc7c8e39e10c68e5f0464521e13f5e0c08d98c4da6e7068569cffc1375d73a",
+        "revision": "approval read first; approval must name a full immutable image_id; "
+                    "image resolved by metadata inspection only and compared before any "
+                    "container starts; the accepted ID addresses every container; "
+                    "--pull=never; the approval is frozen beside the record",
+    },
+    "evaluate_record.py": {
+        "prepared": "a217d4c10a93ecfa626aaf92f4d6b5c0fe5305980c16cc0599062a53b6f74c35",
+        "current": "1ee8c824408d0719e57ad4f4d935a90ccfc005b401e3be389b9a74d2ac1f647b",
+        "revision": "the expected image ID comes from the frozen approval snapshot, never "
+                    "from launcher provenance and never from the live approval file; the "
+                    "approved, observed and launched identities must all agree",
+    },
+}
+
+
+def _superseded_code_paths(new: dict, old: dict) -> set[str]:
+    """The /code_sha256 paths whose drift is DECLARED, with both ends checked."""
+    allowed = set()
+    for name, entry in SUPERSEDED_CODE.items():
+        if (old.get("code_sha256", {}).get(name) == entry["prepared"]
+                and new.get("code_sha256", {}).get(name) == entry["current"]
+                and _sha256(FMD / name) == entry["current"]):
+            allowed.add(f"/code_sha256/{name}")
+    return allowed
+
+
+def _drop_declared(messages: list[str], allowed: set[str]) -> list[str]:
+    return [m for m in messages if m.split(":", 1)[0] not in allowed]
+
+
 def regeneration_mismatches(name: str, new_text: str, old_text: str, rm) -> list[str]:
     """Every failure for one regenerated document, each naming its path."""
     kind, float_rule, invariants = REGENERATED[name]
@@ -467,12 +519,13 @@ def regeneration_mismatches(name: str, new_text: str, old_text: str, rm) -> list
     def named(messages):
         return [f"{name}{m}" if m.startswith("/") else f"{name}: {m}" for m in messages]
 
-    shape = _compare(new, old)
+    declared = _superseded_code_paths(new, old) if name == "proposal.json" else set()
+    shape = _drop_declared(_compare(new, old), declared)
     if shape:
         return named(shape)
     if name == "fixture_evaluation.json":
         float_rule, invariants = _fixture_float_rule(new), _fixture_invariants
-    out = _compare(new, old, float_rule)
+    out = _drop_declared(_compare(new, old, float_rule), declared)
     if invariants:
         out += invariants(new, rm)
     return named(out)
@@ -2297,6 +2350,463 @@ def test_the_workflow_measures_the_topology_it_must_not_infer():
         assert needed in body, needed
     assert "/bin/true" in body, "the slot probe must not run a solver"
     assert "does not document --launcher-args" in body, "the assertion must fail closed"
+
+# --- 5g. the image-approval binding ---------------------------------------------------
+#
+# REPRODUCED FIRST, on the frozen snapshot cb39ad661dd7ee029b7664f4559676130202190c, with
+# every container call intercepted and no solver anywhere:
+#
+#   * an approval with NO image_id, and an approval naming a DIFFERENT image_id, were
+#     both accepted, and FIVE `docker run` invocations followed - four identity reads and
+#     the solve - all addressed by the MUTABLE TAG, with nothing ever compared;
+#   * evaluate_record.py:178 read `required["image_id"] = launcher.get("image_id")`, so
+#     the expected and the measured value were the same field of the same file. The check
+#     "image_id measured and matches the required value" passed for sha256:bbbb..., for
+#     sha256:ffff..., and for the string "any string at all".
+#
+# Everything below drives the real code with a recording stand-in for the runtime. No
+# image is loaded, no container starts and Palace is never invoked.
+
+#: The image the synthetic qualification actually qualified (runs 35691886143/35699653327).
+QUALIFIED_IMAGE_ID = "sha256:5df2170a204ea2926f63639848751cb3ec4207520430b8ecdd529c239731dcf1"
+IMPOSTOR_IMAGE_ID = "sha256:" + "b" * 64
+
+
+class RecordingRuntime:
+    """Stands in for the container runtime. Answers `image inspect` from a table and
+    records every argv it is handed; `run` NEVER executes anything."""
+
+    def __init__(self, *, ids: dict | None = None, inspect_rc: int = 0,
+                 inspect_out: str | None = None, on_second_inspect: str | None = None):
+        self.ids = dict(ids or {})
+        self.inspect_rc = inspect_rc
+        self.inspect_out = inspect_out
+        self.on_second_inspect = on_second_inspect
+        self.calls: list[list[str]] = []
+        self._inspections = 0
+
+    # -- the two subprocess entry points run_diagnostic uses --
+    def run(self, argv, **kw):
+        self.calls.append(list(argv))
+        if len(argv) > 2 and argv[1:3] == ["image", "inspect"]:
+            self._inspections += 1
+            if self.inspect_out is not None:
+                return SimpleCompleted(self.inspect_rc, self.inspect_out)
+            if self._inspections > 1 and self.on_second_inspect is not None:
+                return SimpleCompleted(self.inspect_rc, self.on_second_inspect)
+            return SimpleCompleted(self.inspect_rc, self.ids.get(argv[3], ""))
+        if argv and argv[0] == "git":
+            return SimpleCompleted(0, "0" * 40 if argv[-1] == "HEAD" else "")
+        return SimpleCompleted(0, "x")
+
+    def popen(self, argv, **kw):
+        self.calls.append(list(argv))
+        return SimplePopen()
+
+    # -- what the controls assert on --
+    @property
+    def containers(self) -> list[list[str]]:
+        return [c for c in self.calls if len(c) > 1 and c[1] == "run"]
+
+    @property
+    def inspections(self) -> list[list[str]]:
+        return [c for c in self.calls if len(c) > 2 and c[1:3] == ["image", "inspect"]]
+
+
+class SimpleCompleted:
+    def __init__(self, returncode, stdout):
+        self.returncode, self.stdout, self.stderr = returncode, stdout, ""
+
+
+class SimplePopen:
+    def __init__(self):
+        self.stdout = iter(["Assembling system matrices, number of global unknowns:\n",
+                            "ND (p = 1): 103411\n"])
+
+    def wait(self, timeout=None):
+        return 0
+
+    def kill(self):
+        pass
+
+
+class SubprocessShim:
+    """Replaces run_diagnostic's `subprocess` MODULE ATTRIBUTE, so the interception is
+    scoped to that module and the real subprocess is untouched everywhere else."""
+
+    def __init__(self, rt: "RecordingRuntime"):
+        self.run, self.Popen = rt.run, rt.popen
+        self.PIPE, self.STDOUT = subprocess.PIPE, subprocess.STDOUT
+        self.TimeoutExpired = subprocess.TimeoutExpired
+        self.SubprocessError = subprocess.SubprocessError
+
+
+@pytest.fixture
+def launcher():
+    """run_diagnostic, whose runtime the controls below intercept. Nothing it calls can
+    start a container, so every assertion is about argv, never about execution."""
+    return _load("run_diagnostic")
+
+
+def arm(tmp_path: Path, mod, **overrides) -> tuple[Path, Path, Path, dict]:
+    """A synthetic, correctly scoped approval beside a disposable record directory.
+
+    It is written into tmp_path and NEVER into the repository: the live
+    EXECUTION-APPROVAL.json stays absent, and a test that armed the real one would arm
+    the diagnostic."""
+    cfg = FMD / "config.candidate.json"
+    mesh = tmp_path / "n2r.msh"
+    mesh.write_bytes(b"not a mesh; only its digest is read")
+    digests = mod.input_digests(cfg, mesh)
+    body = {"diagnostic": "first-moment", "authorises": "one execution",
+            "config_sha256": digests["config_sha256"],
+            "mesh_sha256": digests["mesh_sha256"],
+            "patch_sha256": digests["patch_sha256"],
+            "image_id": QUALIFIED_IMAGE_ID}
+    body.update(overrides)
+    for key in [k for k, v in overrides.items() if v is _ABSENT]:
+        body.pop(key, None)
+    approval = tmp_path / "approval.json"
+    approval.write_text(json.dumps(body, indent=1))
+    return cfg, mesh, approval, body
+
+
+_ABSENT = object()
+
+
+def drive(mod, monkeypatch, runtime: RecordingRuntime, tmp_path: Path, record: str,
+          approval: Path, cfg: Path, mesh: Path, image: str | None = None):
+    monkeypatch.setattr(mod, "subprocess", SubprocessShim(runtime))
+    return mod.run(tmp_path / record, config=cfg, mesh=mesh, approval=approval,
+                   image=image or mod.IMAGE)
+
+
+def test_a_correctly_scoped_approval_and_a_matching_image_reach_the_launch_boundary(
+        launcher, monkeypatch, tmp_path):
+    """The positive control. Without it the refusals below would be indistinguishable
+    from a launcher that refuses everything."""
+    mod = launcher
+    cfg, mesh, approval, body = arm(tmp_path, mod)
+    rt = RecordingRuntime(ids={mod.IMAGE: QUALIFIED_IMAGE_ID,
+                               QUALIFIED_IMAGE_ID: QUALIFIED_IMAGE_ID})
+    prov = drive(mod, monkeypatch, rt, tmp_path, "rec", approval, cfg, mesh)
+    # it got as far as the solve, and the solve was addressed by the APPROVED ID
+    solves = [c for c in rt.containers if "stdbuf" in c]
+    assert len(solves) == 1, rt.containers
+    assert QUALIFIED_IMAGE_ID in solves[0]
+    assert mod.IMAGE not in solves[0], "the mutable tag must not reach the command"
+    assert "--pull=never" in solves[0]
+    assert prov["image_binding"]["approved_image_id"] == QUALIFIED_IMAGE_ID
+    assert prov["image_binding"]["launched_as"] == QUALIFIED_IMAGE_ID
+    # the approval is frozen beside the record, byte for byte
+    snap = tmp_path / "rec" / mod.APPROVAL_SNAPSHOT
+    assert snap.read_bytes() == approval.read_bytes()
+    assert prov["approval_sha256"] == _sha256(snap)
+    assert prov["approval_source_commit"] and prov["approval_source_path"]
+    # and the live approval was not created
+    assert not (FMD / "EXECUTION-APPROVAL.json").exists()
+
+
+def test_a_missing_approval_refuses_before_anything_is_inspected(launcher, monkeypatch,
+                                                                 tmp_path):
+    mod = launcher
+    cfg, mesh, approval, _ = arm(tmp_path, mod)
+    approval.unlink()
+    rt = RecordingRuntime(ids={mod.IMAGE: QUALIFIED_IMAGE_ID})
+    with pytest.raises(mod.Refusal, match="PREPARED, NOT ACTIVATED"):
+        drive(mod, monkeypatch, rt, tmp_path, "rec", approval, cfg, mesh)
+    assert rt.calls == [], "nothing may even be inspected without an approval"
+    assert not (tmp_path / "rec").exists(), "and no record directory is created"
+
+
+@pytest.mark.parametrize("image_id, why", [
+    (_ABSENT, "no image_id at all"),
+    (None, "a null image_id"),
+    ("", "an empty image_id"),
+    ("   ", "whitespace"),
+    ("qmhp-cem/palace-first-moment:0.13.0", "a tag is not an identity"),
+    ("sha256:5df2170a", "a short ID is not unique"),
+    ("5df2170a204ea2926f63639848751cb3ec4207520430b8ecdd529c239731dcf1", "no algorithm"),
+    ("sha256:" + "A" * 64, "upper-case hex"),
+    ("sha256:" + "b" * 63, "63 hex digits"),
+    (12345, "not a string"),
+])
+def test_an_approval_without_a_well_formed_full_image_id_refuses(launcher, monkeypatch,
+                                                                 tmp_path, image_id, why):
+    mod = launcher
+    cfg, mesh, approval, _ = arm(tmp_path, mod, image_id=image_id)
+    rt = RecordingRuntime(ids={mod.IMAGE: QUALIFIED_IMAGE_ID})
+    with pytest.raises(mod.Refusal):
+        drive(mod, monkeypatch, rt, tmp_path, "rec", approval, cfg, mesh)
+    assert rt.calls == [], why
+    assert not (tmp_path / "rec").exists(), why
+
+
+def test_the_wrong_image_refuses_before_any_container_starts(launcher, monkeypatch,
+                                                             tmp_path):
+    """The approval names the qualified image; the machine has a different one."""
+    mod = launcher
+    cfg, mesh, approval, _ = arm(tmp_path, mod)
+    rt = RecordingRuntime(ids={mod.IMAGE: IMPOSTOR_IMAGE_ID})
+    with pytest.raises(mod.Refusal, match="image mismatch"):
+        drive(mod, monkeypatch, rt, tmp_path, "rec", approval, cfg, mesh)
+    assert rt.containers == [], "a mismatch must refuse before anything runs"
+    assert len(rt.inspections) == 1, "metadata inspection is all that may happen"
+    assert not (tmp_path / "rec").exists()
+
+
+@pytest.mark.parametrize("rc, out, why", [
+    (1, "", "the image is absent"),
+    (125, "Error: No such image", "the runtime errored"),
+    (0, "", "empty output"),
+    (0, "<no value>", "the format produced nothing"),
+    (0, "sha256:not-hex-at-all", "malformed output"),
+    (0, "sha256:5df2170a", "a short ID"),
+])
+def test_an_inspection_failure_or_malformed_output_refuses(launcher, monkeypatch,
+                                                           tmp_path, rc, out, why):
+    mod = launcher
+    cfg, mesh, approval, _ = arm(tmp_path, mod)
+    rt = RecordingRuntime(inspect_rc=rc, inspect_out=out)
+    with pytest.raises(mod.Refusal):
+        drive(mod, monkeypatch, rt, tmp_path, "rec", approval, cfg, mesh)
+    assert rt.containers == [], why
+    assert not (tmp_path / "rec").exists(), why
+
+
+def test_moving_the_tag_after_the_check_cannot_redirect_the_launch(launcher, monkeypatch,
+                                                                   tmp_path):
+    """Time-of-check to time-of-use. The tag resolves to the approved image when it is
+    checked and to something else immediately afterwards; because everything is addressed
+    by the ID that was accepted, nothing the tag does later can reach the command."""
+    mod = launcher
+    cfg, mesh, approval, _ = arm(tmp_path, mod)
+    rt = RecordingRuntime(ids={mod.IMAGE: QUALIFIED_IMAGE_ID},
+                          on_second_inspect=IMPOSTOR_IMAGE_ID)
+    prov = drive(mod, monkeypatch, rt, tmp_path, "rec", approval, cfg, mesh)
+    for call in rt.containers:
+        assert mod.IMAGE not in call, call
+        assert QUALIFIED_IMAGE_ID in call, call
+    assert QUALIFIED_IMAGE_ID in prov["command"]
+    assert mod.IMAGE not in prov["command"]
+    assert prov["image_binding"]["launched_as"] == QUALIFIED_IMAGE_ID
+
+
+def test_the_identity_reader_refuses_a_tag_and_never_pulls(launcher, monkeypatch):
+    """capture_image_identity STARTS CONTAINERS, so it takes the accepted ID and nothing
+    else - it cannot be called with the tag, and it has no default to fall back on."""
+    mod = launcher
+    rt = RecordingRuntime()
+    monkeypatch.setattr(mod, "subprocess", SubprocessShim(rt))
+    for bad in (mod.IMAGE, "latest", "sha256:5df2170a", ""):
+        with pytest.raises(mod.Refusal):
+            mod.capture_image_identity(bad)
+    assert rt.calls == []
+    out = mod.capture_image_identity(QUALIFIED_IMAGE_ID)
+    assert out["image"] == QUALIFIED_IMAGE_ID
+    assert all("--pull=never" in c for c in rt.containers), rt.containers
+    # and no signature default: the caller must name what was approved
+    assert "image_id" in inspect.signature(mod.capture_image_identity).parameters
+    assert (inspect.signature(mod.capture_image_identity).parameters["image_id"].default
+            is inspect.Parameter.empty)
+
+
+def test_the_binding_runs_before_the_container_read_in_the_source(launcher):
+    """Structural, so the ordering does not rest on the mocks: in run(), the approval is
+    read and the image compared before capture_image_identity() is reached."""
+    mod = launcher
+    src = inspect.getsource(mod.run)
+    order = [src.index(t) for t in ("load_approval(", "require_approved_image(",
+                                    "capture_image_identity(", "_stream_with_caps(")]
+    assert order == sorted(order), order
+    # and the identity reader is not simply moved earlier: it still runs containers
+    assert "run" in inspect.getsource(mod.capture_image_identity)
+    assert "image inspect" not in inspect.getsource(mod.require_approved_image)
+    assert "image\", \"inspect" in inspect.getsource(mod.inspect_image_id)
+
+
+# --- the evaluator side ---------------------------------------------------------------
+
+def _record_with(tmp_path: Path, rm, prep, *, provenance: dict,
+                 snapshot: dict | None = None, snapshot_bytes: bytes | None = None) -> Path:
+    """A disposable record: a schema-complete first-moment record, a launcher
+    provenance.json, and optionally the frozen approval beside it."""
+    rec_dir = tmp_path / "record"
+    (rec_dir / "postpro").mkdir(parents=True, exist_ok=True)
+    fx = rm.Fixture(np.random.default_rng(rm.RNG_SEED))
+    record = rm.synthetic_record(fx, 4.0e-3, residual_scale=1e-13, seed=0,
+                                 provenance={"PALACE_PATCH_SHA256": prep.sha256(prep.PATCH)})
+    record["Scales"]["tc_ns"] = 0.011124          # the N2R scale the saved moments use
+    (rec_dir / "postpro" / "first-moment.json").write_text(json.dumps(record))
+    (rec_dir / "provenance.json").write_text(json.dumps(provenance))
+    if snapshot_bytes is not None:
+        (rec_dir / "approval-snapshot.json").write_bytes(snapshot_bytes)
+    elif snapshot is not None:
+        (rec_dir / "approval-snapshot.json").write_text(json.dumps(snapshot, indent=1))
+    return rec_dir
+
+
+def _launcher_provenance(*, image_id, command_image, approved=QUALIFIED_IMAGE_ID,
+                         snapshot_name="approval-snapshot.json", digest=None):
+    command = ["docker", "run", "--rm", "--pull=never", command_image, "palace", "-np",
+               "1", "config.json"] if command_image else ["docker", "run", "--rm"]
+    prov = {"image_id": image_id, "command": command,
+            "config_sha256": "0" * 64, "mesh_sha256": "0" * 64,
+            "patch_sha256": "0" * 64, "dockerfile_sha256": "0" * 64}
+    if snapshot_name is not None:
+        prov["approval_snapshot"] = snapshot_name
+    if digest is not None:
+        prov["approval_sha256"] = digest
+    return prov
+
+
+def _binding(result) -> dict:
+    return {c["check"]: c["passed"] for c in result["checks"]
+            if "approv" in c["check"] or "image" in c["check"]}
+
+
+def test_the_evaluator_takes_the_expected_image_id_from_the_frozen_approval(
+        tmp_path, rm, prep):
+    ev = _load("evaluate_record")
+    approval = {"diagnostic": "first-moment", "authorises": "one execution",
+                "image_id": QUALIFIED_IMAGE_ID}
+    raw = json.dumps(approval, indent=1).encode()
+    rec = _record_with(tmp_path, rm, prep, snapshot_bytes=raw,
+                       provenance=_launcher_provenance(
+                           image_id=QUALIFIED_IMAGE_ID, command_image=QUALIFIED_IMAGE_ID,
+                           digest=hashlib.sha256(raw).hexdigest()))
+    out = ev.record_evaluation(rec)
+    assert out["image_binding"]["approved_image_id"] == QUALIFIED_IMAGE_ID
+    assert out["image_binding"]["expected_id_source"].startswith("approval-snapshot.json")
+    for check, passed in _binding(out).items():
+        assert passed, check
+
+
+@pytest.mark.parametrize("observed, commanded, why", [
+    (IMPOSTOR_IMAGE_ID, QUALIFIED_IMAGE_ID, "the run observed a different image"),
+    (QUALIFIED_IMAGE_ID, IMPOSTOR_IMAGE_ID, "the command launched a different image"),
+    (IMPOSTOR_IMAGE_ID, IMPOSTOR_IMAGE_ID, "both disagree with the approval"),
+    (QUALIFIED_IMAGE_ID, "qmhp-cem/palace-first-moment:0.13.0", "the command used a tag"),
+    (QUALIFIED_IMAGE_ID, None, "the command names no image at all"),
+    ("any string at all", "any string at all", "the pre-fix self-comparison"),
+])
+def test_the_evaluator_refuses_when_the_three_identities_disagree(
+        tmp_path, rm, prep, observed, commanded, why):
+    ev = _load("evaluate_record")
+    approval = {"image_id": QUALIFIED_IMAGE_ID}
+    raw = json.dumps(approval).encode()
+    rec = _record_with(tmp_path, rm, prep, snapshot_bytes=raw,
+                       provenance=_launcher_provenance(
+                           image_id=observed, command_image=commanded,
+                           digest=hashlib.sha256(raw).hexdigest()))
+    out = ev.record_evaluation(rec)
+    assert out["verdict"] == "UNQUALIFIED", why
+    assert out["all_checks_passed"] is False, why
+    assert not all(_binding(out).values()), why
+
+
+def test_editing_the_live_approval_does_not_change_a_historical_evaluation(
+        tmp_path, rm, prep):
+    """The snapshot is what authorised the run. A live file written afterwards - the
+    file this task is forbidden to create, simulated here in a temporary directory -
+    cannot make a mismatched record qualify, nor a matching one fail."""
+    ev = _load("evaluate_record")
+    approval = {"image_id": QUALIFIED_IMAGE_ID}
+    raw = json.dumps(approval).encode()
+    rec = _record_with(tmp_path, rm, prep, snapshot_bytes=raw,
+                       provenance=_launcher_provenance(
+                           image_id=QUALIFIED_IMAGE_ID, command_image=QUALIFIED_IMAGE_ID,
+                           digest=hashlib.sha256(raw).hexdigest()))
+    before = ev.record_evaluation(rec)["image_binding"]
+    live = tmp_path / "EXECUTION-APPROVAL.json"
+    live.write_text(json.dumps({"image_id": IMPOSTOR_IMAGE_ID}))
+    after = ev.record_evaluation(rec)["image_binding"]
+    assert before == after
+    assert after["approved_image_id"] == QUALIFIED_IMAGE_ID
+    assert live.read_text()                      # the decoy exists and changed nothing
+    # structurally: the evaluator has no live-approval path to read
+    assert "APPROVAL_PATH" not in (FMD / "evaluate_record.py").read_text()
+
+
+@pytest.mark.parametrize("mutate, why", [
+    (lambda p: (p / "approval-snapshot.json").unlink(), "the snapshot is missing"),
+    (lambda p: (p / "approval-snapshot.json").write_bytes(b"{\"image_id\": \"" +
+                                                          IMPOSTOR_IMAGE_ID.encode() +
+                                                          b"\"}"), "it was altered"),
+    (lambda p: (p / "approval-snapshot.json").write_bytes(b"not json"), "it is not JSON"),
+    (lambda p: (p / "approval-snapshot.json").write_bytes(b"[]"), "it is not an object"),
+])
+def test_a_missing_or_altered_snapshot_is_never_replaced_with_launcher_data(
+        tmp_path, rm, prep, mutate, why):
+    ev = _load("evaluate_record")
+    raw = json.dumps({"image_id": QUALIFIED_IMAGE_ID}).encode()
+    rec = _record_with(tmp_path, rm, prep, snapshot_bytes=raw,
+                       provenance=_launcher_provenance(
+                           image_id=QUALIFIED_IMAGE_ID, command_image=QUALIFIED_IMAGE_ID,
+                           digest=hashlib.sha256(raw).hexdigest()))
+    mutate(rec)
+    out = ev.record_evaluation(rec)
+    assert out["verdict"] == "UNQUALIFIED", why
+    # the expected value is NEVER the observed one
+    assert out["image_binding"]["approved_image_id"] != QUALIFIED_IMAGE_ID or \
+        not all(_binding(out).values()), why
+    supplied = [c for c in out["checks"]
+                if c["check"] == "required value for image_id was supplied"]
+    if supplied:
+        assert supplied[0]["passed"] is False, why
+
+
+def test_a_record_without_any_snapshot_reference_refuses(tmp_path, rm, prep):
+    """A record written by the PRE-FIX launcher names no snapshot. It must not qualify by
+    falling back to what the launcher observed."""
+    ev = _load("evaluate_record")
+    rec = _record_with(tmp_path, rm, prep, provenance=_launcher_provenance(
+        image_id=QUALIFIED_IMAGE_ID, command_image=QUALIFIED_IMAGE_ID,
+        snapshot_name=None))
+    out = ev.record_evaluation(rec)
+    assert out["verdict"] == "UNQUALIFIED"
+    assert out["image_binding"]["approved_image_id"] is None
+    assert out["image_binding"]["expected_id_source"] == "UNAVAILABLE"
+    assert any("names no approval snapshot" in p
+               for p in out["image_binding"]["approval_snapshot_problems"])
+
+def test_the_superseded_code_registry_is_exact_and_current(proposal):
+    """Every declared entry must match BOTH ends: the digest the committed proposal
+    recorded, and the digest the file has now. A stale entry is a hole in the guard, so
+    it fails rather than being quietly ignored."""
+    for name, entry in SUPERSEDED_CODE.items():
+        assert proposal["code_sha256"][name] == entry["prepared"], name
+        assert _sha256(FMD / name) == entry["current"], name
+        assert entry["prepared"] != entry["current"], f"{name}: declared but unchanged"
+        assert len(entry["revision"]) > 40, f"{name}: say what changed"
+    assert set(SUPERSEDED_CODE) <= set(proposal["code_sha256"])
+    # the preparation record itself is NOT rewritten: it still carries the old digests
+    assert proposal["code_sha256"]["run_diagnostic.py"].startswith("9b0c3125")
+    assert proposal["code_sha256"]["evaluate_record.py"].startswith("a217d4c1")
+
+
+def test_undeclared_code_drift_still_fails_the_regeneration_check(proposal, rm):
+    """The declaration is not a general licence to drift. An UNDECLARED file that moves,
+    and a DECLARED file whose digest does not match the declaration, both still fail."""
+    committed = json.dumps(proposal)
+    for mutate, why in (
+            (lambda d: d["code_sha256"].__setitem__("prepare.py", "0" * 64),
+             "an undeclared file drifted"),
+            (lambda d: d["code_sha256"].__setitem__("run_diagnostic.py", "1" * 64),
+             "a declared file drifted to something else"),
+            (lambda d: d["code_sha256"].__setitem__("reference_model.py", "2" * 64),
+             "another undeclared file drifted")):
+        drifted = copy.deepcopy(proposal)
+        mutate(drifted)
+        assert regeneration_mismatches("proposal.json", json.dumps(drifted), committed,
+                                       rm) != [], why
+    # and the declared, correct values ARE accepted
+    current = copy.deepcopy(proposal)
+    for name, entry in SUPERSEDED_CODE.items():
+        current["code_sha256"][name] = entry["current"]
+    assert regeneration_mismatches("proposal.json", json.dumps(current), committed,
+                                   rm) == []
+
 
 def test_the_committed_native_qualification_record_is_untouched():
     """Historical evidence. The image qualification writes OUTSIDE the repository."""

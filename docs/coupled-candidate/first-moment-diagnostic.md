@@ -214,6 +214,54 @@ or `g`, no registered-definition change, no historical-record rewrite, no
 budget or cap increase and no merge of PR #7. Whatever the number,
 `E_C` stays UNAVAILABLE and `g` stays blocked.
 
+## 4a. The image-approval binding
+
+**Recording image identity is not comparing it with an approved one.** Until this
+revision the launcher passed only the config, mesh and patch digests to `load_approval()`
+and captured the image identity *afterwards*, and `evaluate_record.py` took the required
+`image_id` from the launcher's own provenance — so the expected and the measured value
+were the same field of the same file, and any string satisfied it. Reproduced on the
+frozen snapshot `cb39ad66`, every container call intercepted: an approval with **no**
+`image_id`, and one naming a **different** `image_id`, were both accepted and were both
+followed by five `docker run` invocations addressed by the mutable tag; the evaluator's
+`image_id` check passed for `sha256:bbbb…`, for `sha256:ffff…` and for the string
+`any string at all`.
+
+**The launcher now binds before it launches.**
+
+1. The approval is read and validated **first**, and must name the image it authorises as
+   a full immutable ID (`sha256:` + 64 hex). A tag can be moved and a short ID is not
+   unique; neither is an identity. No approval, no `image_id`, or a malformed one refuses.
+2. The local image is resolved by **metadata inspection only** — `docker image inspect
+   --format {{.Id}}`, which starts nothing. An absent image, a failed inspection or
+   output that is not a full ID refuses.
+3. The measured ID is compared with the approved one. A mismatch refuses, **before any
+   container starts** and before the record directory exists.
+4. Only then does anything run, and everything — the four identity-reading containers and
+   the solve — is addressed by that **accepted immutable ID**, never by the tag, so a tag
+   moved after the check cannot redirect the command. `--pull=never` means an absent image
+   refuses rather than being fetched. `capture_image_identity()` starts containers and so
+   takes the accepted ID and refuses a tag; it is deliberately *not* simply the old
+   function moved earlier.
+5. The approval bytes are frozen beside the record as `approval-snapshot.json`, with their
+   sha256 and the repository revision they came from. This is a **copy of a human
+   approval**, never a grant the launcher makes.
+
+**The evaluator no longer compares a field with itself.** The expected `image_id` comes
+from that frozen snapshot — not from launcher provenance, and not from the live
+`EXECUTION-APPROVAL.json`, which can be written, edited or deleted after a run. Three
+identities must agree: the one the approval **approved**, the one the run **observed**,
+and the one the recorded launch command **used**. A missing, undigested or altered
+snapshot prevents qualification, and a missing expected ID is **never** filled in from the
+observed one. `prepare.required_provenance()` still carries the placeholder `"SUPPLIED BY
+THE EXECUTION: the image ID the launcher records"` for that key; it is superseded here and
+is no longer used as an expected value. The preparation proposal is not rewritten — the
+two code digests it records are declared superseded in `SUPERSEDED_CODE`, with both the
+prepared and the current digest, so the revision is recorded rather than hidden.
+
+`EXECUTION-APPROVAL.json` remains **absent**: this revision fixes the binding and grants
+nothing.
+
 ## 5. Files
 
 | file | role |
