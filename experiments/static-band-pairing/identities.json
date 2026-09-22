@@ -1,0 +1,111 @@
+{
+ "synthetic_known_answer": [
+  {
+   "n": 2,
+   "free_edges": 140,
+   "port_voltage": 0.5,
+   "curl_grad_rel": 0.0,
+   "lumped": {
+    "N": 1.0000000000005989,
+    "inv_moment_times_V2_over_L_C_minus_1": 1.2081446953970953e-12,
+    "parseval_rel": -5.551115123125783e-16,
+    "min_over_k_B_k_over_N_k_S": 0.25001836966619406
+   },
+   "sheet": {
+    "N": 0.4999999999996797,
+    "inv_moment_times_V2_over_L_C_minus_1": -0.7364120612814622,
+    "parseval_rel": -1.1102230246251565e-16,
+    "min_over_k_B_k_over_N_k_S": 0.9775683060096515
+   },
+   "sheet_minus_lumped_port_psd_min_eig": -6.067455548005157e-17
+  },
+  {
+   "n": 3,
+   "free_edges": 449,
+   "port_voltage": 0.9999999999999999,
+   "curl_grad_rel": 1.8873791418627653e-16,
+   "lumped": {
+    "N": 0.999999999999266,
+    "inv_moment_times_V2_over_L_C_minus_1": -1.5790702079243601e-12,
+    "parseval_rel": 0.0,
+    "min_over_k_B_k_over_N_k_S": 1.0010591553892705
+   },
+   "sheet": {
+    "N": 0.9999999999995194,
+    "inv_moment_times_V2_over_L_C_minus_1": 0.022957366734422502,
+    "parseval_rel": -2.220446049250313e-16,
+    "min_over_k_B_k_over_N_k_S": 0.979061196761443
+   },
+   "sheet_minus_lumped_port_psd_min_eig": -1.153607786205043e-16
+  },
+  {
+   "n": 4,
+   "free_edges": 1014,
+   "port_voltage": 1.0,
+   "curl_grad_rel": 6.661338147750934e-17,
+   "lumped": {
+    "N": 0.9999999999995624,
+    "inv_moment_times_V2_over_L_C_minus_1": -9.332534744999066e-13,
+    "parseval_rel": 2.220446049250313e-16,
+    "min_over_k_B_k_over_N_k_S": 1.0009685757117759
+   },
+   "sheet": {
+    "N": 1.0000000000005616,
+    "inv_moment_times_V2_over_L_C_minus_1": 0.02993560210839763,
+    "parseval_rel": 4.440892098500626e-16,
+    "min_over_k_B_k_over_N_k_S": 0.9731898157544022
+   },
+   "sheet_minus_lumped_port_psd_min_eig": -1.1936886355916004e-16
+  }
+ ],
+ "committed_rungs": {
+  "L2": {
+   "modes": 6,
+   "N_B": 0.999373878899728,
+   "B_GHz2": 2.1483966577642706,
+   "H_GHz2": 2.139944249209271,
+   "H_over_B": 0.9960657132264413,
+   "sum_p_over_f2": 0.46730189366826225,
+   "f1_squared": 2.137112416640694,
+   "p1": 0.9985647137
+  },
+  "N1R": {
+   "modes": 6,
+   "N_B": 0.9992162018723272,
+   "B_GHz2": 2.309915243138872,
+   "H_GHz2": 2.301129683970656,
+   "H_over_B": 0.9961965880807482,
+   "sum_p_over_f2": 0.43456916268816076,
+   "f1_squared": 2.2975090031965246,
+   "p1": 0.9982861199
+  },
+  "N2R": {
+   "modes": 9,
+   "N_B": 0.999254583555896,
+   "B_GHz2": 2.3532661027450668,
+   "H_GHz2": 2.332539091566174,
+   "H_over_B": 0.991192236545321,
+   "sum_p_over_f2": 0.42871735938562733,
+   "f1_squared": 2.3287214414496824,
+   "p1": 0.9982168757
+  },
+  "L3": {
+   "modes": 6,
+   "N_B": 0.9992739405306552,
+   "B_GHz2": 2.941199594184302,
+   "H_GHz2": 2.9270560136115296,
+   "H_over_B": 0.9951912204119915,
+   "sum_p_over_f2": 0.3416401993503897,
+   "f1_squared": 2.9226009018049153,
+   "p1": 0.9983175827
+  }
+ },
+ "L2_same_mesh_check": {
+  "S0_static_GHz2": 2.1413534596006496,
+  "band_sum_p_over_f2": 0.46730189366826225,
+  "delta_band_lower_bound": 0.000658526684468308,
+  "S0_over_B0": 0.9967216490780848,
+  "B0_over_N_B_over_S0": 1.0039177079167907
+ },
+ "solves_on_qmhp_mesh": 0
+}

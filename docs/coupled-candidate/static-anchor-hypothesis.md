@@ -298,6 +298,10 @@ Either needs its own budget, and a level-2 solve (4.1 M tetrahedra) would probab
 iterative solver rather than the direct solve used here. This record does not authorise
 any of it.
 
+**Later clarification.** `static-band-pairing.md` §2 shows that `r0 = 0.997` is what the
+spectral-moment identity predicts on one mesh, not a coincidence, and that the "favours H0"
+branch was unreachable. The verdict above is unchanged.
+
 **What does not change.** Route A, the first-moment diagnostic, the registered
 definitions and every historical record are untouched. Nothing here makes Route A or
 QMHP-CoPro valid or invalid. `E_C,F1F1` and `g` stay UNAVAILABLE.

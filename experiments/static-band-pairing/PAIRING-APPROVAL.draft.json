@@ -1,0 +1,40 @@
+{
+ "DRAFT": "NOT AN APPROVAL. This is the reviewed draft of the one-attempt approval for the paired static-vs-band refinement test. pairing_driver.py reads only PAIRING-APPROVAL.json, so this file authorises nothing.",
+ "how_to_grant_it": "A human saves this file as experiments/static-band-pairing/PAIRING-APPROVAL.json with the DRAFT and how_to_grant_it keys removed and nothing else changed, commits it, then dispatches .github/workflows/static-band-pairing.yml ONCE with confirm = run-the-approved-pairing-attempt. The approval binds workflow run number 1, attempt 1: any other run refuses.",
+ "authorises": "one execution of the paired static-vs-band refinement test",
+ "predeclaration_sha256": "3f588d2e6bca206aa509d7a40585b2c5421f94944a2c2938b262b2e7c4ce80d5",
+ "code_sha256": {
+  "experiments/static-band-pairing/pairing_driver.py": "2ef47711aee9ae2aabce798c5125c8e7d84325a3ea5b4aa3b8e3c458ee0a448d",
+  "experiments/static-anchor-hypothesis/static_capacitance.py": "54dd810f93f8d7af967cdfffb9fac78d0a583c8003c104e0c00002e2b8e98aab",
+  "experiments/static-anchor-hypothesis/anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
+  "scripts/palace_order1_ladder.py": "51dfe5030c85b7e21d3f4f7c4da38f26d49f902cc041bc2a4ae5cb95584a9947",
+  "orchestrator/manifest.py": "735e7c04a8f53dc13ad257d7b5a2b1d0ef915528226ada231c693efad0ac80bc",
+  "docker/palace.Dockerfile": "ae61175a4237cfed043d0df47126080215fa06c42acd897a53107b2c99fc88a9",
+  ".github/workflows/static-band-pairing.yml": "9854a645aa8d6708233eaea1e51e3c45baae6c4e2a78bfd0582f37b590b073db"
+ },
+ "base_mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+ "base_config_sha256": "0ae6e3ac793e4348983719a36de8a940bd72c92049d446f5262c4608c8e4ea6f",
+ "config_sha256": {
+  "0": "4e7153ed186cf8583be63330a08405cacc72d2506791c27c445108744dfce453",
+  "1": "7908827a3a966bec91b37a126637c67ac8862ef47018bb9fb17bb0451a2b21b3",
+  "2": "9412f87e45ea3bfc754de0cd4f1b2203ba313efd48818ffad7e07163d8b50312"
+ },
+ "github_run_number": 1,
+ "palace_commit": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+ "budget": {
+  "per_level_solve_cap_s": 2700,
+  "workflow_timeout_min": 180,
+  "attempts": 1,
+  "retry": "none - a failure, a timeout, a DOF refusal or an integrity failure is the recorded outcome",
+  "one_attempt_mechanism": "the approval binds the workflow run number and attempt 1; the record directory is created before any solve",
+  "dof_cap_per_level": 450000
+ },
+ "does_not_authorise": [
+  "a second attempt, whatever the first one's outcome",
+  "a further level, another box, another mesh or any config change",
+  "any change to the outcome windows or integrity thresholds",
+  "combining any result with g, f_R or any Route A output",
+  "reporting any value as E_C,F1F1",
+  "any change to Route A or to the static-anchor record"
+ ]
+}
