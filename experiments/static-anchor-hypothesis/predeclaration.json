@@ -1,0 +1,137 @@
+{
+ "record": "static-anchor hypothesis - pre-declaration of the electrostatic comparison",
+ "status": "PREPARED. NOT APPROVED. NOT EXECUTED. No static capacitance has been computed on the QMHP mesh at the time this file was frozen.",
+ "question": "Does the first-moment band estimate a/N track the electrostatic (Maxwell) island capacitance - the kind of quantity the registered E_C is defined from - or is it a truncation of the complete first moment, which grows without limit under refinement?",
+ "hypotheses": {
+  "H1": "The complete first moment f^T M^-1 f / L is the port quotient over ALL fields and has no continuum limit for the sheet port; the registered E_C is the SAME quotient restricted to curl-free fields; the band estimate approximates the restricted (static) quantity. Prediction: S0 is of the same order as B0, and S changes little under refinement.",
+  "H0": "The existing reading (fem-spectral-mapping.md section 7, normalisation.md): E_C is fixed by the complete a/N, of which the band sum is a truncation. Under H0 the static quantity has no special relation to the band estimate, and the far-mode content belongs in E_C."
+ },
+ "configuration": {
+  "mesh": "results/COUPLED-LADDER-O1-L2-N2R-20260918T061455Z/L2/solver/coupled_chip_cell_L2.msh",
+  "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+  "eps_r": {
+   "1": 1.0,
+   "3": 11.45
+  },
+  "pec_attrs": [
+   2,
+   4
+  ],
+  "port_attr": 10,
+  "direction": [
+   0.0,
+   1.0,
+   0.0
+  ],
+  "L0_m": 0.001,
+  "L_H": 1.0345665367517793e-07,
+  "levels": [
+   "0: the committed mesh, unrefined",
+   "1: one uniform red refinement (1 -> 8, inner octahedron split along its shortest diagonal); nested, so the P1 spaces are nested"
+  ],
+  "conductors": "the connected components of the PEC surface (attributes 2 and 4). Exactly two are required (measured on the committed mesh: 9244 nodes = ground and outer walls, 189 nodes = the 0.15 x 0.15 mm island); the port face must touch both. With two conductors C is symmetric in which one is held at 1.",
+  "engine": "experiments/static-anchor-hypothesis/static_capacitance.py with anchor_fem.py; independent of Palace; direct sparse solve; no network, no container"
+ },
+ "measured_quantity": {
+  "C_h": "Discrete (P1) Maxwell self-capacitance of the island with every other conductor grounded: C_h = eps0 * min over P1 phi with phi = 1 on the island and 0 on ground of int eps_r |grad phi|^2 dV (Dirichlet principle).",
+  "S_h": "S_h = 1 / ((2 pi)^2 L_F C_h), in GHz^2: the first moment a single-node circuit with capacitance C_h and the declared L_F would have. Same units as a/N; no fitted parameter.",
+  "second_route": "S_h is recomputed as (f . G phi)^2 / ((G phi)^T M (G phi)) / L_nd with the Whitney M and port functional f of the first-moment diagnostic and the discrete gradient G. The two routes must agree (integrity), which is the check that S_h is the first-moment quotient restricted to curl-free fields.",
+  "S0": "S_h on level 0",
+  "S1": "S_h on level 1",
+  "decisive_ratios": {
+   "r0": "S0 / B0",
+   "rho": "S1 / S0"
+  }
+ },
+ "relation_to_registered_E_C": {
+  "registered": "coupling-definition.md section 2: E_C,F1F1 = e^2 (C^-1)_FF / 2, C the Maxwell capacitance matrix of the linear environment reduced to the declared nodes {F1, R1}.",
+  "what_C_h_is": "The island self-capacitance with the readout at ground potential. On this mesh every conductor other than the island is one connected, grounded surface, so the readout cannot float electrostatically. Under the assumption A-R that the lumped readout node R1 held at zero potential is represented by that grounded conductor, the continuum limit of C_h is the Maxwell diagonal entry C_FF.",
+  "chain": "e^2 / (2 C_h)  <=  e^2 / (2 C_FF)  <=  e^2 (C^-1)_FF / 2 = E_C,F1F1. The first inequality is the Dirichlet principle (C_h >= C for the discrete minimum; rigorous for this model). The equality C = C_FF needs assumption A-R. The second inequality is the Schur complement of a positive-definite 2 x 2 Maxwell matrix (rigorous algebra); equality only if the island-readout mutual capacitance vanishes.",
+  "consequence": "The test yields a lower bound on e^2/(2 C_FF) and, under A-R, on E_C,F1F1. It does NOT yield E_C,F1F1: the gap is 1/(1 - k^2) with k^2 = C_FR^2 / (C_FF C_RR), which this test does not measure and which must NOT be taken from the conditional Route A coupling. E_C,F1F1 stays UNAVAILABLE."
+ },
+ "baseline": {
+  "band_estimate_same_mesh": {
+   "postpro": "results/COUPLED-LADDER-O1-L2-20260916T080802Z/L2/solver/postpro",
+   "sha256": {
+    "eig.csv": "11c197844098d7fe0bad49cac00bf693dd8d498b695384aa5196d3668b9791c6",
+    "port-EPR.csv": "ed5dbf6000f8f7eac4e1c098c3a545aa721b8790b20482042fc0574018e6dec0"
+   },
+   "rule": "B0 = sum |p_m| f_m^2 / sum |p_m| over every saved mode of the L2 rung, which was solved on this same unrefined mesh (the records' variant-A rule).",
+   "value_GHz2": 2.14839665776427,
+   "same_space_verified": "The L2 rung's mesh is byte-identical to the test mesh (sha256 d8dc1a92...); its config differs from N2R only by the absent Refinement.Boxes and Solver.Linear.MGMaxLevels (a multigrid setting that does not change the discrete space). B0 and S0 are therefore on the same discrete space."
+  },
+  "context_only_never_decisive": {
+   "band_a_over_N_N1R_box1_GHz2": 2.309915243138872,
+   "band_a_over_N_N2R_box2_GHz2": 2.3532661027450668,
+   "band_a_over_N_L3_other_mesh_GHz2": 2.941199594184302,
+   "complete_first_moment_base_mesh_GHz2": 367.8795294186366,
+   "complete_first_moment_N2R_GHz2": 1422.6665
+  }
+ },
+ "independent_variable": "which fields the port quotient is maximised over (curl-free only, versus the band modes' span); and refinement level 0 -> 1",
+ "controlled_variables": [
+  "mesh and its digest",
+  "materials",
+  "PEC set and its two-conductor topology",
+  "port face, direction and width",
+  "declared L_F",
+  "unit scales (Lc = 4 mm)"
+ ],
+ "not_a_target": "Agreement with B0 is a PREDICTION of H1, not a target. The computation of C_h has no adjustable parameter and does not read B0; the windows below were fixed before any QMHP static value existed and may not be changed after one does.",
+ "no_combination": "C_h and S_h must not be combined with the conditional Route A coupling g, the readout frequency f_R, or any Route A output, until a circuit model is declared in which C_FF, the band modes, the readout representation (a DC-grounded distributed resonator) and k^2 are defined consistently. This test declares no such model.",
+ "integrity": {
+  "port_voltage_abs_tol": 1e-09,
+  "pec_edge_abs_tol": 1e-12,
+  "identity_rel_tol": 1e-09,
+  "solve_residual_tol": 1e-10,
+  "nested_monotone_rel_tol": 1e-12,
+  "S0_must_not_exceed_complete_moment_GHz2": 367.8795294186366,
+  "meaning": "Any failure makes the record UNQUALIFIED: no scientific verdict is read from it. Also UNQUALIFIED/REFUSED: a mesh, band-column, pre-declaration or code digest that does not match."
+ },
+ "outcomes": {
+  "rho_resolved_at_most": 1.25,
+  "rho_weakens_at_or_above": 1.9,
+  "support_r0_min": 0.5,
+  "support_r0_max": 2.0,
+  "contradicts_r0_above": 20.0,
+  "contradicts_r0_below": 0.05,
+  "table": [
+   "rho >= 1.9: WEAKENS H1 - the static quantity grew as fast as the divergent complete moment (x1.94 under the same refinement).",
+   "1.25 < rho < 1.9: UNRESOLVED - the static quantity is not resolved on the base mesh; r0 is not read.",
+   "rho <= 1.25 and 0.5 <= r0 <= 2: SUPPORTS H1.",
+   "rho <= 1.25 and (2 < r0 <= 20 or 0.05 <= r0 < 0.5): WEAKENS H1 - the band estimate does not track the static quantity; neither hypothesis predicted this.",
+   "rho <= 1.25 and r0 > 20: CONTRADICTS H1 and favours H0 - the static quantity is near the complete-moment scale (367.88 GHz^2 = 171 x B0 on this mesh).",
+   "rho <= 1.25 and r0 < 0.05: CONTRADICTS H1 - the static quantity is far below the band estimate; this does not favour H0."
+  ],
+  "why_these_windows": "The support window 0.5-2 covers the whole observed spread of band estimates relative to B0 (1.00 to 1.37 across L2, N1R, N2R, L3), the unmeasured k^2 loading, and the band's own discretisation. H1 and H0 differ by about two orders of magnitude here, so the decision does not rest on the window edges. rho <= 1.25 corresponds to a base-mesh error of roughly 2/3 or less under first-order convergence; 1.9 is the growth the complete moment showed under the same refinement.",
+  "secondary_diagnostic_never_decisive": "Under the lumped two-node reduction, S_true <= B_true (Schur complement). Whether S0 <= B0 is reported, but B0 carries its own discretisation bias, so it decides nothing."
+ },
+ "power_of_the_test": "Asymmetric, and stated before the result. The test mainly tests H1's prediction that the band estimate tracks the static quantity: it can SUPPORT or WEAKEN that. It is weak at favouring H0: on this mesh the complete moment is 171 x B0, and r0 > 20 would need an island capacitance below about 5.7 fF for a 0.15 x 0.15 mm pad, which is physically implausible. An outcome in the WEAKENS range would mean that NEITHER the band nor the complete spectral estimate matches the static quantity, not that H0 is right.",
+ "budget": {
+  "cpu_minutes": 10,
+  "memory_GB": 8,
+  "wall_cap_minutes": 30,
+  "attempts": 1,
+  "retry": "none - a failure, a timeout or an integrity failure is the recorded outcome",
+  "enforcement": "In the process, from the moment the record directory exists: RLIMIT_CPU soft 600 s (raises, and is recorded) with a kernel kill at 660 s; RLIMIT_AS 8 GiB (an allocation beyond it fails, and is recorded); SIGALRM at 1800 s (raises, and is recorded). Python handles signals between bytecodes, so the invocation below also carries an outer hard kill.",
+  "invocation": "from the repository root, locally, no workflow, no network: timeout --signal=KILL 1860 .venv/bin/python experiments/static-anchor-hypothesis/static_capacitance.py",
+  "dry_run_measured": "Synthetic stand-in (no QMHP data) under exactly these limits: 36x18x18 Kuhn box, 69,984 -> 559,872 tets, 96,499 unknowns at level 1: 103 s wall, 104 s CPU, 2.9 GB peak RSS, 4.2 GB peak address space. 40x20x20 box, 768,000 tets and 131,979 unknowns at level 1: 229 s, 241 s CPU, 4.2 GB RSS, 5.5 GB address space. The QMHP level 1 is smaller (515,472 tets, 60,608 unknowns). Its own cost is not measured until the test runs."
+ },
+ "stop_conditions": [
+  "any refusal or integrity failure: record it and stop",
+  "no further refinement level, no other mesh, no parameter change without a new pre-declaration and a new approval",
+  "no reinterpretation of the windows after the result"
+ ],
+ "expected_evidence": [
+  "results/STATIC-ANCHOR-TEST-<UTC>/level0.json and level1.json, written as each level completes",
+  "summary.json with S0, S1, C0, C1, r0, rho, the integrity list, the verdict, the approval and code digests, the library versions and the resources used",
+  "on any exception or budget limit: failure.json with the levels completed, the error and the resources used, beside whatever raw levels were already written"
+ ],
+ "cannot_establish": [
+  "E_C,F1F1 (k^2 is not measured)",
+  "that Route A is valid or invalid",
+  "convergence of the static quantity (one refinement is one step, not a limit)",
+  "anything about the Palace box-refined operator, which is not rebuilt here",
+  "any coupling"
+ ]
+}
