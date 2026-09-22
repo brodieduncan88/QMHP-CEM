@@ -1,0 +1,330 @@
+# First-moment diagnostic ON N2R: ONE AUTHORISED ATTEMPT.
+#
+# This is the ONLY workflow that runs a QMHP scientific input through the
+# first-moment diagnostic. It is separate from first-moment-image.yml, which
+# stays synthetic-only and is not modified by this.
+#
+# IT IS INERT UNTIL A HUMAN ARMS IT. The launcher refuses unless
+# experiments/first-moment-diagnostic/EXECUTION-APPROVAL.json exists, matches
+# the prepared config, mesh and patch digests, NAMES the image it authorises as
+# a full immutable ID, and binds this exact run. That file is deliberately
+# ABSENT; this workflow neither creates nor edits it, and a dispatch without it
+# refuses at the first step that looks.
+#
+# ONE ATTEMPT, AND WHAT MAKES IT ONE. The approval's one_attempt block binds the
+# repository, the workflow-and-ref, ONE run number and attempt 1, all read from
+# the metadata GitHub assigns - never from a dispatch input, because a caller
+# may not state its own run number. A duplicate dispatch has another run number
+# and refuses; a re-run, including "re-run failed jobs", has another attempt
+# number and refuses. The check lives in run_diagnostic.py, on the execution
+# path itself, so a partial re-run cannot skip past it in an earlier job. The
+# attempt is then SPENT by an atomic reservation written before the first
+# container starts: failure, timeout, cancellation or a crash afterwards do not
+# restore permission. run_authority.py states the limits of all of this.
+#
+# THE IMAGE IS RESTORED, NEVER REBUILT, from the artefact of run 35691886143 -
+# the image qualified on the synthetic fixtures by run 35699653327. Its archive
+# checksum is verified before it is loaded and its image ID after, and there is
+# no fallback: a retrieval or verification failure stops the job.
+#
+# BUDGETS. The SOLVER caps are unchanged and are enforced inside the launcher:
+# 250 000 DOF, measured on the actual run from Palace's own output, and 2 700 s
+# wall clock. The step and job timeouts below are a separate WORKFLOW budget for
+# restoring the image, syncing the environment and uploading evidence; they do
+# not enlarge the solver cap.
+#
+# FOUR DIFFERENT QUESTIONS, kept apart: did the execution complete, did the
+# solve converge, is the record provenance-qualified, and what is the scientific
+# verdict. The evaluator exiting 0 answers none of them by itself.
+#
+# TRIGGER. workflow_dispatch ONLY - no push, no pull_request, no schedule and no
+# workflow_run chaining - and the dispatch must type the confirmation string.
+# No ${{ }} expansion appears inside any run: script.
+
+name: First-moment diagnostic on N2R (one authorised attempt)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type exactly: run-the-approved-n2r-attempt'
+        required: true
+        default: ''
+      retention_days:
+        description: 'Artefact retention in days'
+        required: false
+        default: '90'
+
+permissions:
+  contents: read          # it must never write to the repository
+  actions: read           # to read the preserved image artefact
+
+concurrency:
+  group: first-moment-n2r        # supplementary only; NOT the one-use mechanism
+  cancel-in-progress: false
+
+env:
+  IMAGE_TAG: qmhp-cem/palace-first-moment:0.13.0
+  ARCHIVE_NAME: palace-first-moment-0.13.0.tar.gz
+  SOURCE_RUN_ID: "35691886143"
+  SOURCE_ARTIFACT: first-moment-image-35691886143
+  EXPECTED_ARCHIVE_SHA256: 7e09f5028f4bc028b9aae52cbde6bc837e97c4d11c22622b590f04e764062834
+  EXPECTED_IMAGE_ID: sha256:5df2170a204ea2926f63639848751cb3ec4207520430b8ecdd529c239731dcf1
+  APPROVAL: experiments/first-moment-diagnostic/EXECUTION-APPROVAL.json
+  CONFIG: experiments/first-moment-diagnostic/config.candidate.json
+  MESH: results/COUPLED-LADDER-O1-L2-N2R-20260918T061455Z/L2/solver/coupled_chip_cell_L2.msh
+
+jobs:
+  n2r-first-moment:
+    name: one authorised attempt at the first-moment diagnostic on N2R
+    runs-on: ubuntu-latest        # the approved runner class; no escalation
+    timeout-minutes: 90           # WORKFLOW budget, not the solver cap
+    steps:
+      - name: Refuse an unconfirmed dispatch
+        env:
+          CONFIRM: ${{ inputs.confirm }}      # DATA, not shell source
+        run: |
+          set -euo pipefail
+          if [ "$CONFIRM" != "run-the-approved-n2r-attempt" ]; then
+            echo "REFUSED: confirmation string not given; nothing was run." >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - name: Refuse unless the reviewed approval is committed
+        run: |
+          set -euo pipefail
+          # This workflow NEVER creates an approval. The file is a human's grant,
+          # reviewed in the repository; if it is absent the diagnostic is inert and
+          # that is the expected state.
+          if [ ! -f "$APPROVAL" ]; then
+            echo "REFUSED: $APPROVAL is absent. The first-moment diagnostic is" >&2
+            echo "PREPARED, NOT ACTIVATED. A dispatch does not arm it: a human must" >&2
+            echo "commit the reviewed approval, which binds this exact run." >&2
+            exit 1
+          fi
+          sha256sum "$APPROVAL"
+
+      - name: Record the reviewed identities, measured
+        env:
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Each digest is computed into a VARIABLE: an assignment carries its command
+          # substitution's exit status, so an unreadable file fails this step instead of
+          # recording an empty digest as a measured one.
+          sha() { sha256sum "$1" | cut -d' ' -f1; }
+          checked_out_sha=$(git rev-parse HEAD)
+          workflow_sha256=$(sha .github/workflows/first-moment-n2r.yml)
+          launcher_sha256=$(sha experiments/first-moment-diagnostic/run_diagnostic.py)
+          authority_sha256=$(sha experiments/first-moment-diagnostic/run_authority.py)
+          evaluator_sha256=$(sha experiments/first-moment-diagnostic/evaluate_record.py)
+          approval_sha256=$(sha "$APPROVAL")
+          config_sha256=$(sha "$CONFIG")
+          mesh_sha256=$(sha "$MESH")
+          patch_sha256=$(sha docker/patches/first-moment-diagnostic.patch)
+          {
+            echo "checked_out_sha=$checked_out_sha"
+            echo "repository=$REPOSITORY"
+            echo "workflow_ref=$WORKFLOW_REF"
+            echo "ref=$REF"
+            echo "ref_name=$REF_NAME"
+            echo "run_id=$RUN_ID"
+            echo "run_number=$RUN_NUMBER"
+            echo "run_attempt=$RUN_ATTEMPT"
+            echo "workflow_sha256=$workflow_sha256"
+            echo "launcher_sha256=$launcher_sha256"
+            echo "authority_sha256=$authority_sha256"
+            echo "evaluator_sha256=$evaluator_sha256"
+            echo "approval_sha256=$approval_sha256"
+            echo "config_sha256=$config_sha256"
+            echo "mesh_sha256=$mesh_sha256"
+            echo "patch_sha256=$patch_sha256"
+          } > "$RUNNER_TEMP/reviewed-identities.txt"
+          cat "$RUNNER_TEMP/reviewed-identities.txt"
+          # The approval is what must AGREE with these; the launcher does that comparison
+          # and refuses on any mismatch. This step only measures and records.
+
+      - name: Free runner disk
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: Download the preserved image archive
+        uses: actions/download-artifact@v4
+        with:
+          name: first-moment-image-35691886143
+          run-id: 35691886143
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/preserved
+
+      - name: Restore the preserved image - checksum first, then image ID
+        id: image
+        timeout-minutes: 20
+        run: |
+          set -euxo pipefail
+          # NO FALLBACK. Every failure exits; none of them builds or pulls anything.
+          archive="$RUNNER_TEMP/preserved/$ARCHIVE_NAME"
+          [ -f "$archive" ] || { echo "the preserved archive was not retrieved" >&2; exit 1; }
+          measured_archive=$(sha256sum "$archive" | cut -d' ' -f1)
+          [ "$measured_archive" = "$EXPECTED_ARCHIVE_SHA256" ] || {
+            echo "ARCHIVE CHECKSUM MISMATCH: measured $measured_archive" >&2; exit 1; }
+          gunzip -c "$archive" | docker load
+          loaded_id=$(docker image inspect "$IMAGE_TAG" --format '{{.Id}}')
+          [ "$loaded_id" = "$EXPECTED_IMAGE_ID" ] || {
+            echo "IMAGE ID MISMATCH: loaded $loaded_id" >&2; exit 1; }
+          {
+            echo "source_run_id=$SOURCE_RUN_ID"
+            echo "source_artifact=$SOURCE_ARTIFACT"
+            echo "archive_sha256_measured=$measured_archive"
+            echo "image_id_loaded=$loaded_id"
+            echo "rebuilt=false"
+          } > "$RUNNER_TEMP/restored_image.txt"
+          cat "$RUNNER_TEMP/restored_image.txt"
+          # the previous run's evidence is not this run's; it must not be re-uploaded
+          rm -rf "$RUNNER_TEMP/preserved"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.11"
+
+      - name: Sync locked environment
+        run: uv sync --locked --all-extras --dev
+
+      - name: THE ONE AUTHORISED ATTEMPT
+        id: launch
+        timeout-minutes: 55        # the 2700 s solver cap is enforced INSIDE the launcher
+        run: |
+          set -euxo pipefail
+          # Exactly one invocation. The launcher reads the approval, checks that THIS run
+          # is the one it authorises, compares the local image against the approved ID,
+          # spends the attempt atomically, and only then starts a container. It enforces
+          # the 250 000 DOF budget against Palace's own reported count and the 2 700 s
+          # wall clock itself, killing the container on either.
+          uv run python experiments/first-moment-diagnostic/run_diagnostic.py \
+            --record-dir "$RUNNER_TEMP/n2r-record" \
+            --config "$CONFIG" \
+            --mesh "$MESH" \
+            --image "$EXPECTED_IMAGE_ID" \
+            --reservation "$RUNNER_TEMP/attempt-spent.json" \
+            2>&1 | tee "$RUNNER_TEMP/launcher.log"
+
+      - name: Evaluate the record, and keep the four questions apart
+        if: always()
+        env:
+          LAUNCH_OUTCOME: ${{ steps.launch.outcome }}
+          IMAGE_OUTCOME: ${{ steps.image.outcome }}
+        run: |
+          set -uo pipefail
+          rec="$RUNNER_TEMP/n2r-record"
+          eval_rc=0
+          if [ -f "$rec/postpro/first-moment.json" ] || [ -f "$rec/solver/postpro/first-moment.json" ]; then
+            set +e
+            uv run python experiments/first-moment-diagnostic/evaluate_record.py \
+              --record "$rec" --out "$RUNNER_TEMP/first-moment-evaluation.json" \
+              2>&1 | tee "$RUNNER_TEMP/evaluation.log"
+            eval_rc=${PIPESTATUS[0]}
+            set -e
+          else
+            echo "no first-moment record was written; there is nothing to evaluate" \
+              | tee "$RUNNER_TEMP/evaluation.log"
+            eval_rc=127
+          fi
+          EVAL_RC="$eval_rc" python3 - > "$RUNNER_TEMP/execution-status.txt" <<'PY'
+          import json, os, pathlib
+          tmp = pathlib.Path(os.environ["RUNNER_TEMP"])
+          rec = tmp / "n2r-record"
+
+          def load(path):
+              try:
+                  return json.loads(pathlib.Path(path).read_text())
+              except Exception:
+                  return {}
+
+          prov = load(rec / "provenance.json")
+          moment = load(rec / "postpro" / "first-moment.json") or \
+              load(rec / "solver" / "postpro" / "first-moment.json")
+          ev = load(tmp / "first-moment-evaluation.json")
+          probe = prov.get("probe", {})
+          ls = moment.get("LinearSolve", {})
+          # FOUR DIFFERENT QUESTIONS. None of them is "the evaluator command exited 0".
+          print("launch_step_outcome=" + os.environ.get("LAUNCH_OUTCOME", "unknown"))
+          print("restore_step_outcome=" + os.environ.get("IMAGE_OUTCOME", "unknown"))
+          print("evaluator_exit_status=" + os.environ.get("EVAL_RC", "unknown"))
+          print("1_execution_completed=" + str(prov.get("status") == "COMPLETED"))
+          print("   recorded_status=" + str(prov.get("status")))
+          print("   timed_out=" + str(probe.get("timed_out")))
+          print("   refused_on_dof=" + str(probe.get("refused_on_dof")))
+          print("   wall_s=" + str(probe.get("wall_s")))
+          print("   wall_cap_s=" + str(probe.get("wall_cap_s")))
+          print("   dof_measured=" + str(probe.get("dof_reported")))
+          print("   dof_cap=" + str(probe.get("dof_cap")))
+          print("   dof_expected_from_baseline=103411   # an expectation, not the check")
+          print("2_solver_converged=" + str(ls.get("Converged")))
+          print("   relative_residual=" + str(ls.get("RelativeResidual")))
+          print("   iterations=" + str(ls.get("Iterations")))
+          print("3_provenance_qualified=" + str(ev.get("all_checks_passed")))
+          failed = [c["check"] for c in ev.get("checks", []) if not c.get("passed")]
+          for name in failed:
+              print("   failed_check=" + name)
+          print("4_scientific_verdict=" + str(ev.get("verdict")))
+          print("   interpretation=" + str(ev.get("interpretation"))[:400])
+          print("   E_C=" + str(ev.get("E_C")) + "  g=" + str(ev.get("g")))
+          print("note=a verdict is a reading of a QUALIFIED record; it is not a pass mark,")
+          print("     and NOT_RESOLVED is a legitimate scientific outcome")
+          PY
+          cat "$RUNNER_TEMP/execution-status.txt"
+
+      - name: Collect the evidence, whatever the outcome
+        if: always()
+        run: |
+          set -uo pipefail
+          mkdir -p "$RUNNER_TEMP/n2r-record"
+          ( cd "$RUNNER_TEMP" && find . -maxdepth 4 -type f \
+              \( -name '*.json' -o -name '*.txt' -o -name '*.log' -o -name '*.csv' \) \
+              -printf '%s\t%p\n' | sort -k2 ) > "$RUNNER_TEMP/evidence-manifest.txt"
+          cat "$RUNNER_TEMP/evidence-manifest.txt"
+
+      - name: Upload every artefact of the attempt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: first-moment-n2r-${{ github.run_id }}
+          retention-days: ${{ inputs.retention_days }}
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/n2r-record
+            ${{ runner.temp }}/first-moment-evaluation.json
+            ${{ runner.temp }}/execution-status.txt
+            ${{ runner.temp }}/evaluation.log
+            ${{ runner.temp }}/launcher.log
+            ${{ runner.temp }}/attempt-spent.json
+            ${{ runner.temp }}/reviewed-identities.txt
+            ${{ runner.temp }}/restored_image.txt
+            ${{ runner.temp }}/evidence-manifest.txt
+
+      - name: Report the outcome, and fail on anything but a qualified execution
+        if: always()
+        run: |
+          set -uo pipefail
+          status="$RUNNER_TEMP/execution-status.txt"
+          [ -f "$status" ] || { echo "no status was produced" >&2; exit 1; }
+          cat "$status"
+          grep -q '^1_execution_completed=True' "$status" || {
+            echo "the execution did not complete; that IS the recorded outcome, and the" >&2
+            echo "attempt is spent. A further attempt needs a separate human approval." >&2
+            exit 1; }
+          grep -q '^3_provenance_qualified=True' "$status" || {
+            echo "the record is NOT provenance-qualified" >&2; exit 1; }
+          echo "execution completed and the record is qualified; the scientific verdict"
+          echo "above is a reading of it, not a pass mark."
