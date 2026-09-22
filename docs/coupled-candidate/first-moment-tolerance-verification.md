@@ -31,7 +31,12 @@ criterion after seeing the result is forbidden by CLAUDE.md §1 and was not done
 ## 2. The risk that had to be excluded
 
 Tightening a tolerance is not automatically safe. In floating point the attainable true
-relative residual has a **floor** of roughly `C · ε · ‖M‖‖x‖/‖f‖`, with ε = 2.22e-16. If
+relative residual has a **floor** of a few multiples of ε = 2.22e-16. (A tempting closed
+form, `C · ε · ‖M‖‖x‖/‖f‖`, was tested over 25 controlled cases and **refuted**: against a
+139× variation in that predictor the floor moved 1.55×, regression slope +0.012, R² =
+0.022, and `C` spread 118×. The componentwise bound `C · ε · ‖|M||x|‖₂/‖f‖₂` with C ≈ 0.89
+does hold, as the standard `|fl(Mx) − Mx| ≤ γₙ|M||x|` result predicts. Nothing below
+extrapolates through the refuted form — the floor is measured directly at every size.) If
 `1e-14` lay *below* that floor, PCG would never meet it, would run to `MaxIts = 2000`, and
 would record `Converged = false` — failing a *different* check and wasting a second
 approved attempt.
@@ -56,46 +61,119 @@ fixture it reaches 1e-12 in **33** iterations where compiled Palace reported **3
 
 | quantity | measured |
 |---|---|
-| κ(D⁻¹ᐟ²MD⁻¹ᐟ²) | 148.7 |
-| alignment factor ‖M‖‖x‖/‖f‖ | 1.19e+02 |
-| **floor of the recomputed residual** | **1.020e-15** (iteration 148) |
-| iterations at RelTol 1e-14 | 126 (recurrence) / 133 (preconditioned) |
-| recomputed residual at RelTol 1e-14 | **9.36e-15** / 1.54e-15 |
+| κ(D⁻¹ᐟ²MD⁻¹ᐟ²) | 148.73 (two eigensolver routes agree to 13 digits) |
+| ‖M‖₂ / ‖x‖ / ‖f‖ | 0.9121 / 69.47 / 1.0431 |
+| alignment factor ‖M‖‖x‖/‖f‖ | 60.74 |
+| **floor of the recomputed residual** | **7.19e-16** = 3.24 ε, first attained at iteration 159 |
+| post-floor behaviour | stagnates flat: max/min = 1.00007 over iterations 159–3000 |
+| true residual first below 1e-14 | iteration 126 |
 
-No stagnation or breakdown out to 1851 iterations at any tolerance tested.
+Run for 3000 iterations with **no stopping test at all**, recomputing `‖Mx − f‖/‖f‖`
+explicitly every iteration. Two independent assemblies were built (one by me, one by a
+separate agent) and agree on the edge count, κ, the iteration-126 crossing and the
+norm-mismatch ratio.
 
-### Mesh-size dependence (same geometry, four resolutions)
+### Refinement, measured directly on the N2R mesh — and a correction
 
-| h (mm) | n_free | κ | floor | iters@1e-14 |
-|---|---|---|---|---|
-| 0.50 | 276 | 4.65 | 3.14e-16 | 33 |
-| 0.40 | 510 | 5.81 | 3.84e-16 | 37 |
-| 0.30 | 1033 | 7.81 | 4.64e-16 | 41 |
-| 0.25 | 1063 | 7.83 | 3.99e-16 | 41 |
+An earlier draft of this record claimed that κ and the floor are *mesh-size independent*
+for this element family, generalising from a 4× sweep on the **synthetic** geometry where
+κ appeared to plateau at ≈ 7.8. **That claim is wrong and is withdrawn.** Applying uniform
+red (1→8) refinement to the actual N2R mesh and measuring directly:
 
-κ and the floor **plateau** under refinement, as theory predicts for Whitney mass
-matrices: both are governed by element shape quality and material contrast, not by h. The
-config's 2-level box refinement takes N2R from 79 944 to 103 411 dofs — **+29 %**, local to
-a small box — so it cannot move them materially.
+| level | n_tets | n_free | κ | floor | iters@1e-14 | residual delivered at Tol 1e-14 |
+|---|---|---|---|---|---|---|
+| 0 (base) | 64 434 | 56 050 | 148.73 | 9.18e-16 | 125 | 1.43e-14 |
+| 1 | 515 472 | 524 306 | 294.40 | 1.13e-15 | 189 | 1.62e-14 |
+| 2 | 4 123 776 | 4 501 588 | ≥321.85 (Ritz bound) | 1.43e-15 | 241 | 1.49e-14 |
 
-### Why the solve converges rather than stagnating
+κ is **not** h-independent: it nearly doubles on the first refinement (+98 %), then
+decelerates sharply (+15.6 % like-for-like on the second), which is what red refinement's
+bounded set of similarity classes predicts — not h-independence. Element shape quality
+does degrade, once: minimum radius ratio 0.0500 → 0.0126 → 0.0091.
 
-The measured floor, **1.02e-15**, lies an order of magnitude **below** 1e-14. Separately,
-the iteration's own residual measure keeps falling well past the true floor (the classic
-CG residual gap: on the fixture the recurrence residual reaches 1.8e-20 while the true
-residual has flattened at 5.18e-16). Both facts point the same way: the stopping test at
-1e-14 is met with room to spare.
+**The conclusion survives, on stronger evidence than the withdrawn claim.** What matters is
+the floor, and the floor is far flatter than κ: over an **80× increase in free dofs** it
+moves by only **1.55×** (9.18e-16 → 1.43e-15), fitting `n^0.100` and `κ^0.499`. The real
+operator, at 103 411 dofs, is **bracketed** by levels 0 and 1 — and at *every* level,
+including one 43× larger than the real operator, `Tol = 1e-14` delivers a recomputed
+residual of 1.4–1.6e-14, comfortably inside the unchanged 1e-12 limit.
+
+For the floor to reach 1e-14 it would have to rise a further 7×, which on the measured
+`n^0.100` slope needs ~1.2e15 dofs, or on the `κ^0.499` slope needs κ ≈ 1.6e4 — 50× the
+largest value measured.
+
+### Size-matched control: the L3 mesh (a different geometry at the relevant scale)
+
+`results/COUPLED-LADDER-O1-L3-20260916T091212Z/L3/solver/coupled_chip_cell_L3.msh` has
+**111 505 free dofs**, close to the refined operator's 103 411, and is the same geometry
+family. Independently assembled and measured:
+
+| | L2 base | L3 |
+|---|---|---|
+| n_free | 56 050 | 111 505 |
+| κ(D⁻¹ᐟ²MD⁻¹ᐟ²) | 148.7 | **48.0** |
+| alignment factor | 60.7 | 99.7 |
+| floor | 7.19e-16 (3.24 ε) | 6.92e-16 (3.12 ε) |
+| recomputed residual at RelTol 1e-14 | 1.33e-14 | 1.28e-14 |
+| margin under the 1e-12 limit | 75× | 78× |
+
+Between these two operators the dof count differs by 2×, κ by 3.1× and the alignment
+factor by 1.6× — yet **the floor moves by 4 %**. Here the *finer* mesh has the *lower* κ,
+which is a property of these two particular meshes and **not** evidence of h-independence:
+refining one mesh does raise κ, as the table above shows. What both lines of evidence
+agree on is the thing the verdict rests on — the floor is far less sensitive than κ, and
+stays within a small multiple of machine epsilon across every operator measured.
+
+### Why the solve converges rather than stagnating — verified from Palace's source
+
+`CgSolver<OperType>::Mult` in `palace/linalg/iterative.cpp` at the pinned commit
+`a61c8cbe0cacf496cde3c62e93085fae0d6299ac` stops on
+
+    res = sqrt(|rᵀz|),  z = D⁻¹r,  r the RECURRENCE residual (r -= alpha*Ap)
+
+compared against `max(rel_tol · sqrt(fᵀD⁻¹f), abs_tol)`. The preconditioner is confirmed
+as `JacobiSmoother` with `omega = 1.0`, i.e. `B = D⁻¹` exactly.
+
+The recurrence residual is never recomputed, so **it has no floor**. Measured on the base
+mesh: it falls to 5.3e-163 by iteration 1853 and its 2-norm underflows to exactly 0.0 at
+iteration 1848. Non-convergence at `MaxIts = 2000` is therefore not a realistic failure
+mode for any tolerance above ~1e-160.
+
+`abs_tol` does not pre-empt the relative test either: 2.22e-16 against an initial
+preconditioned norm of 7.254 is a ratio of 3.1e-17, far below 1e-14.
+
+This is also the exact explanation of the original refusal: **the stopping test is in the
+D⁻¹ norm, the acceptance check is in the 2-norm.** The ratio between them was measured at
+**1.33–1.68 across three different operators**, matching the 1.3313e-12 that a 1e-12
+tolerance produced.
+
+### Simulating Palace's own stopping rule
+
+Applying that exact predicate to the independently assembled base mesh:
+
+| RelTol | stops at | recomputed residual | passes the 1e-12 limit? |
+|---|---|---|---|
+| 1e-12 | iteration 106 | 1.66e-12 | **no** — reproduces the observed failure |
+| 1e-14 | iteration 125 | **1.33e-14** | yes, ~75× inside |
+
+The 1e-12 row independently reproduces the failure of run 35721700281 without using that
+run's numbers as an input.
 
 ## 4. Margins
 
-* floor 1.02e-15 vs the 1e-12 acceptance limit → **980×**
-* recomputed residual at 1e-14, 9.36e-15, vs 1e-12 → **107×**
-* ~126–133 iterations measured on the base mesh; scaling by Palace's own refined-to-base
-  ratio gives ≈ 220 against `MaxIts = 2000` → **~9×**
-* wall clock was 5.88 s against a 2700 s cap; a ~20 % iteration increase is immaterial
+* floor 7.2e-16 … 1.43e-15 across an 80× dof range vs the 1e-12 limit → **700–1400×**
+* recomputed residual at 1e-14: 1.33e-14 (base), 1.62e-14 (level 1), 1.49e-14 (level 2),
+  1.28e-14 (L3) vs the 1e-12 limit → **~62–78×** at every size measured
+* floor vs the 1e-14 stopping tolerance → **7–14×** of headroom
+* iterations at 1e-14: 125 (base), 189 (level 1), 241 (level 2); the real operator's 186
+  at 1e-12 extrapolates to ≈ 214–220, against `MaxIts = 2000` → **~9×**
+* wall clock was 5.88 s against a 2700 s cap; ≈ +1.1 s is immaterial
 
-For 1e-14 to fail the acceptance limit, the refined operator would have to be ~100× worse
-than measured; for it to stagnate, the floor would have to rise ~1000×.
+**Stagnation is not a failure mode at all.** Palace tests the *recurrence* residual, which
+is never recomputed and has no floor; it reaches 5.3e-163 by iteration 1853. And if a
+solve did exhaust `MaxIts`, `ksp.cpp` only issues `Mpi::Warning` — print-only, no throw,
+no abort — so the outcome would be a recorded `Converged = false` failing the
+"linear solve converged" check, not a crash.
 
 ## 5. No other check is traded away
 
@@ -114,11 +192,14 @@ exactly two checks: "linear solve converged" and the 1e-12 limit itself.
   sweeps of the synthetic geometry. The 103 411-dof **2-level-refined** operator was
   **not** assembled locally; its behaviour is extrapolated from the measured
   mesh-independence of κ and the floor. That extrapolation is the one inferential step.
-* Palace's exact `CgSolver` stopping predicate was **not** read from upstream source: the
-  session's GitHub access is scoped to this repository and the image artefact is behind an
-  egress policy that returns 403. Both candidate predicates (recurrence and preconditioned
-  residual) were therefore measured, and **both** clear the limit — so the verdict does not
-  depend on which one Palace uses.
+* The refined mesh's **tetrahedral shape quality was not measured**. κ(D⁻¹M) depends on
+  shape regularity, and MFEM's bisection refinement can degrade aspect ratios relative to
+  the Gmsh base mesh. This is the one uncontrolled variable. Its effect would show up as a
+  higher iteration count, against ~9× of `MaxIts` headroom; for it to break the *floor*
+  argument the floor would have to be ~14× worse than both independent measurements.
+* The measurement PCG is serial NumPy. The approved run uses `np_processes = 1`, so the
+  summation order is close but not identical; the orders of magnitude reproduce, the
+  round-off-level digits of the floor need not.
 * Nothing here re-runs or re-interprets run 35721700281. That record stands as
   UNQUALIFIED and is preserved.
 
