@@ -98,6 +98,25 @@ UNMANIFESTED_DIGESTS = {
     "summary.json": "c84549b80ccd8b5336c0f1289780b7ca44771a50730b8f4d220a8320a340b720",
 }
 
+#: A SECOND QUARANTINE, on the same terms and for the same reason. The static-anchor
+#: test's driver (experiments/static-anchor-hypothesis/static_capacitance.py) did not
+#: write a manifest.sha256. That is a defect in its preparation, found by this guard after
+#: its one approved run. No manifest is written now: the record must stay exactly as
+#: produced, and a manifest written by the operator after the run is not one its driver
+#: wrote at execution time. The digests below are the ones captured at completion,
+#: committed in experiments/static-anchor-hypothesis/EXECUTION-LOG.json in the same commit
+#: as the record, and pinned again in tests/test_static_anchor_hypothesis.py.
+STATIC_ANCHOR_RECORD = "STATIC-ANCHOR-TEST-20260922T192243Z"
+STATIC_ANCHOR_DIGESTS = {
+    "level0.json": "55f1f657dfb5cc476845b1cd4e283e4786206881db5b7d3860ae8e0714a0d3b9",
+    "level1.json": "0fc3e70a569734ae71dec6967aa98f37515f469dd567e4acb35c2321d84e7ec6",
+    "summary.json": "93db9bc22003c137adfeb8399445a9f6958e4ea4bd6c882b46262338167381d6",
+}
+
+#: Every quarantined record, pinned by content because it has no register to be pinned by.
+QUARANTINED = {UNMANIFESTED_RECORD: UNMANIFESTED_DIGESTS,
+               STATIC_ANCHOR_RECORD: STATIC_ANCHOR_DIGESTS}
+
 #: sha256 over the canonical {record: sha256(its manifest.sha256)} map. Per-record
 #: verification cannot catch a file that was mutated AND its manifest rewritten to
 #: agree; this can, because the manifest's own bytes change.
@@ -135,7 +154,7 @@ def evidence_mismatches(root: Path = RESULTS, *,
     expect = MANIFESTED_RECORDS if expect_manifested is None else expect_manifested
     out: list[str] = []
     present = {r.name for r in records(root)}
-    for name in sorted(present - expect - {UNMANIFESTED_RECORD}):
+    for name in sorted(present - expect - set(QUARANTINED)):
         out.append(f"{name}: a record not incorporated into the integrity record")
     for name in sorted(expect - present):
         out.append(f"{name}: incorporated but absent from disk")
@@ -157,10 +176,10 @@ def test_every_committed_record_verifies_against_its_own_manifest():
 
 def test_the_record_set_is_exactly_the_pinned_one():
     present = {r.name for r in records()}
-    assert present == MANIFESTED_RECORDS | {UNMANIFESTED_RECORD}, {
-        "unincorporated": sorted(present - MANIFESTED_RECORDS - {UNMANIFESTED_RECORD}),
-        "missing": sorted((MANIFESTED_RECORDS | {UNMANIFESTED_RECORD}) - present)}
-    assert len(MANIFESTED_RECORDS) == 32
+    assert present == MANIFESTED_RECORDS | set(QUARANTINED), {
+        "unincorporated": sorted(present - MANIFESTED_RECORDS - set(QUARANTINED)),
+        "missing": sorted((MANIFESTED_RECORDS | set(QUARANTINED)) - present)}
+    assert len(MANIFESTED_RECORDS) == 32 and len(QUARANTINED) == 2
 
 
 def test_the_manifests_themselves_cannot_be_rewritten():
@@ -171,10 +190,11 @@ def test_the_manifests_themselves_cannot_be_rewritten():
     assert index_digest(index) == MANIFEST_INDEX_DIGEST
 
 
-def test_the_record_without_a_manifest_is_quarantined_not_ignored():
+@pytest.mark.parametrize("name", sorted(QUARANTINED))
+def test_the_record_without_a_manifest_is_quarantined_not_ignored(name):
     """Pinned by content, since it has no register to be pinned by. The claim that it
     lacks a manifest is checked, not assumed."""
-    record = RESULTS / UNMANIFESTED_RECORD
+    record = RESULTS / name
     assert record.is_dir()
     assert not (record / "manifest.sha256").exists(), \
         "it now has a manifest; move it into MANIFESTED_RECORDS"
@@ -182,7 +202,7 @@ def test_the_record_without_a_manifest_is_quarantined_not_ignored():
     found = {p.relative_to(record).as_posix(): manifest.file_digest(p)
              for p in sorted(record.rglob("*"))
              if p.is_file() and manifest.is_decision_relevant(p, record)}
-    assert found == UNMANIFESTED_DIGESTS
+    assert found == QUARANTINED[name]
 
 
 def test_documentation_beside_the_records_is_not_treated_as_evidence():
