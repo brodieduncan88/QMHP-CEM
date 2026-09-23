@@ -9,8 +9,14 @@ solver_verification.json. Each check states what would make it fail.
       reproduces; direct and two-grid (also from a zero start) must return the continuum
       energy to 1e-12. The difference includes assembly round-off, which the certificate
       does not cover, so this row does not test the certificate.
-  V1b the certificate against TRUTH for the discrete problem: the exact rational minimum of
-      the assembled quadratic form, with non-linear boundary data; direct and two-grid.
+  V1b the total bound against TRUTH for the discrete problem: the exact rational minimum of
+      the assembled quadratic form, with non-linear boundary data; direct and two-grid. At
+      these converged solutions the total is dominated by the evaluation bound (reported
+      separately), so V1b does NOT test the residual certificate; V1c does.
+  V1c the RESIDUAL certificate against the exact rational energy excess: (i) at every PCG
+      iterate from a zero start and (ii) at a perturbation along the lowest mode of
+      (A_s, D_m), where the certificate is tightest; with the margin, and a negative control
+      (the constant c inflated beyond the margin) that must fail.
   V2  discrete known answer at level 2 on QMHP-like cells: two-grid against the direct
       solve of the same system, for C and C'; the certificate must reach 1e-9.
   V3  the certificate is an upper bound at EVERY iterate, not only at convergence, and
@@ -29,9 +35,17 @@ solver_verification.json. Each check states what would make it fail.
       (e) a zero initial guess still certifies the same energy; (f) a perturbed solution
       has a higher energy and the certificate covers the increase; (g) a FOLDED mesh that
       passes conformity, tagging and constrained-boundary checks is caught by the tiling
-      checks, and the formula would understate its error; (h) the stagnation rule ignores
-      infinite certificates and stops on finite non-improving ones.
-  V6  the evaluation-error bound against the exact rational value of phi^T K phi.
+      checks, and the formula would understate its error; (h) the stagnation rule: finite
+      certificates without a 10 % improvement stop it, infinite ones with a decreasing true
+      residual do not, infinite ones with a flat true residual do.
+  V6  the evaluation-error bound against the exact rational value of phi^T K phi: the
+      extended-precision value against its ANALYTIC terms alone (matrix-vector and dot),
+      with a negative control (the same evaluation in float64 violates them), and the
+      float64 energy against the total.
+  V7  the uncertified assembly round-off: an extended-precision re-assembly, the Gershgorin
+      estimate of rho/c (Poincare step), the first-order energy effect against its
+      max|phi|^2 sum|dK| estimate, and on the layered box the known-answer discrepancy of V1
+      explained by it.
 
 Usage: verify_solver.py --out solver_verification.json
 """
@@ -128,11 +142,9 @@ def _exact_quadratic(K, phi) -> Fraction:
     return sum(Fraction(float(v)) * p[i] * p[j] for i, j, v in zip(Kc.row, Kc.col, Kc.data))
 
 
-def v1b_certificate_against_exact_discrete_minimum() -> dict:
-    """The certificate against TRUTH for the discrete problem: the exact rational minimum of
-    the assembled quadratic form. A layered 2x2x2 box, non-linear boundary data (so the
-    discrete solution is not trivially exact), levels 0 (1 unknown) and 1 (27 unknowns);
-    direct and two-grid from zero."""
+def _v1b_cell():
+    """A layered 2x2x2 box with non-linear boundary data (so the discrete solution is not
+    trivially exact) at levels 0 (1 unknown) and 1 (27 unknowns)."""
     xs = np.linspace(0.0, 1.0, 3)
     tm = syn.tensor_mesh(xs, xs, xs)
     mesh = {"xyz": tm["xyz"], "tets": tm["tets"],
@@ -155,6 +167,14 @@ def v1b_certificate_against_exact_discrete_minimum() -> dict:
     fine = af.refine_red(mesh)
     L1 = ns.Level(fine, model, kinds=())
     L1.dd["g"] = data(fine)
+    return L0, L1
+
+
+def v1b_certificate_against_exact_discrete_minimum() -> dict:
+    """The total bound against TRUTH for the discrete problem: the exact rational minimum of
+    the assembled quadratic form, on _v1b_cell; direct and two-grid from zero. The residual
+    and evaluation parts are reported separately."""
+    L0, L1 = _v1b_cell()
     _, p0 = ns.solve(L0, "g", "direct")
     rows = {}
     for name, (L, method, kw) in {"level0_direct": (L0, "direct", {}),
@@ -168,33 +188,138 @@ def v1b_certificate_against_exact_discrete_minimum() -> dict:
                       "n_unknowns": r["n_unknowns"], "energy_nd": r["energy_nd"],
                       "exact_discrete_minimum": float(Eh), "abs_error": float(err),
                       "total_bound_nd": r["total_error_bound_nd"],
+                      "residual_certificate_nd": r["certificate"]["error_bound_nd"],
+                      "evaluation_bound_nd": r["evaluation_error_bound_nd"],
+                      "evaluation_float64_vs_extended_nd": r["evaluation_bound_terms_nd"]["float64_vs_extended"],
                       "within_certificate": bool(err <= Fraction(r["total_error_bound_nd"])),
                       "at_or_above_minimum_up_to_evaluation": bool(
                           Fraction(r["energy_nd"]) >= Eh - Fraction(r["evaluation_error_bound_nd"]))}
     return rows
 
 
+def _frac(x) -> Fraction:
+    return Fraction(*x.as_integer_ratio())
+
+
+def v1c_residual_certificate_against_exact_excess(inflate: float = 1.0) -> dict:
+    """The RESIDUAL certificate alone against the exact energy excess E(x) - E_h (both in
+    rational arithmetic from the float data) on the 27-unknown level of _v1b_cell. ``inflate``
+    multiplies c: 1 is the certificate; a value above the reported margin is the negative
+    control and must fail."""
+    L0, L1 = _v1b_cell()
+    dd = L1.dd["g"]
+    f = dd["free"]
+    Eh = _exact_min_energy(L1.K, dd["phi"], dd["fixed"])
+    sysm = ns.system(L1.K, dd)
+    m, c = L1.m[f], inflate * L1.poincare["c"]
+
+    def check(x):
+        phi = dd["phi"].copy()
+        phi[f] = x
+        excess = _exact_quadratic(L1.K, phi) - Eh
+        bound = ns.certificate(sysm, x, m, c)["error_bound_nd"]
+        return float(excess), bound, bool(Fraction(bound) >= excess)
+
+    # (i) every PCG iterate from zero with the two-grid preconditioner
+    Pfull = ns.prolongation(L0.mesh, L1.mesh)
+    P = Pfull[f][:, L0.dd["g"]["free"]].tocsr()
+    tg = ns.TwoGrid(sysm["A"], P, ns.SOLVER["nu"])
+    rows = []
+    ns.pcg(sysm["A"], sysm["b"], np.zeros(len(f)), tg, maxiter=12, check_every=1,
+           target_rel=0.0, stagnation_checks=100,
+           certify=lambda x: (rows.append(check(x)), (math.inf, 0.0))[1])
+    iterates = [r for r in rows if r[0] > 0]
+    # (ii) the direct solution plus a perturbation along the lowest mode of (A_s, D_m)
+    A = sysm["A"].toarray()
+    _, vec = sla.eigh(0.5 * (A + A.T), np.diag(m), subset_by_index=[0, 0])
+    xd = ns.solve_direct(sysm)
+    low = check(xd + 1e-3 * vec[:, 0] / np.abs(vec[:, 0]).max())
+    return {"c_inflated_by": inflate, "n_unknowns": int(len(f)),
+            "iterates_audited": len(iterates),
+            "bound_covers_exact_excess_at_every_iterate": all(r[2] for r in iterates),
+            "bound_over_exact_excess_iterates_min_max": [min(r[1] / r[0] for r in iterates),
+                                                         max(r[1] / r[0] for r in iterates)],
+            "lowest_mode": {"exact_excess_nd": low[0], "certificate_nd": low[1],
+                            "margin": low[1] / low[0], "bound_covers_exact_excess": low[2]}}
+
+
 def v6_evaluation_bound() -> dict:
     """The evaluation-error bound against the EXACT rational value of phi^T K phi for the
-    float64 data, on the small cell at levels 0 and 1, and its size against the worst-case
-    bound it replaces (gamma_{n+k} |phi|^T|K||phi| in extended precision)."""
+    float64 data, on the small cell at levels 0 and 1: at the solution, and at the solution
+    shifted by 1e3 (heavy cancellation: 1^T K 1 vanishes up to round-off, so terms of size
+    1e6 |K| cancel). Two claims are checked separately: the float64 energy's total bound,
+    and the extended value against the ANALYTIC terms alone (matrix-vector and dot). The
+    negative control evaluates in float64 against the same analytic terms; on the shifted
+    rows it must violate them. Also the size against the worst-case bound it replaces."""
     mesh, model = syn.chip_cell(**SMALL)
     lv = _ladder(mesh, model, 1)
     out = {}
     for h, L in enumerate(lv):
         for kind in ns.KINDS:
-            r, phi = ns.solve(L, kind, "direct")
-            exact = _exact_quadratic(L.K, phi)
-            err = abs(Fraction(r["energy_nd"]) - exact)
-            k = int(np.diff(L.K.tocsr().indptr).max())
-            old = ns.gamma(len(phi) + k, ns.ULD) * float(np.abs(phi) @ (abs(L.K) @ np.abs(phi)))
-            out[f"level{h}_{kind}"] = {
-                "float64_abs_error_vs_exact": float(err),
-                "evaluation_bound_nd": r["evaluation_error_bound_nd"],
-                "bound_covers_error": bool(err <= Fraction(r["evaluation_error_bound_nd"])),
-                "terms_nd": r["evaluation_bound_terms_nd"],
-                "previous_worst_case_bound_nd": old,
-                "tightening_factor": old / r["evaluation_error_bound_nd"]}
+            r, phi0 = ns.solve(L, kind, "direct")
+            for tag, phi in (("", phi0), ("_shifted_1e3", phi0 + 1e3)):
+                en = ns.energy(L.K, phi)
+                exact = _exact_quadratic(L.K, phi)
+                err = abs(Fraction(en["energy_nd"]) - exact)
+                k = int(np.diff(L.K.tocsr().indptr).max())
+                old = ns.gamma(len(phi) + k, ns.ULD) * float(np.abs(phi) @ (abs(L.K) @ np.abs(phi)))
+                s_ld, t_mv, t_dot = ns.extended_energy(L.K, phi)
+                ext_err = abs(_frac(s_ld) - exact)
+                s_64, _, _ = ns.extended_energy(L.K, phi, dtype=np.float64)   # negative control
+                f64_err = abs(_frac(s_64) - exact)
+                analytic = Fraction(t_mv) + Fraction(t_dot)
+                out[f"level{h}_{kind}{tag}"] = {
+                    "float64_abs_error_vs_exact": float(err),
+                    "evaluation_bound_nd": en["evaluation_error_bound_nd"],
+                    "bound_covers_error": bool(err <= Fraction(en["evaluation_error_bound_nd"])),
+                    "terms_nd": en["evaluation_bound_terms_nd"],
+                    "extended_abs_error_vs_exact": float(ext_err),
+                    "analytic_terms_nd": float(analytic),
+                    "analytic_terms_cover_extended_error": bool(ext_err <= analytic),
+                    "negative_control_float64_evaluation_abs_error": float(f64_err),
+                    "negative_control_violates_the_analytic_terms": bool(f64_err > analytic),
+                    "previous_worst_case_bound_nd": old,
+                    "tightening_factor_total": old / en["evaluation_error_bound_nd"],
+                    "tightening_factor_analytic_terms": old / float(analytic)}
+    return out
+
+
+def v7_assembly_term() -> dict:
+    """The uncertified assembly round-off on synthetic ladders (module docstring)."""
+    out = {}
+    mesh, model, profile, E_exact = syn.layered_box(4)
+    cells = [("layered_box", mesh, model, profile, E_exact),
+             ("chip_small", *syn.chip_cell(**SMALL), None, None)]
+    for name, mesh, model, profile, E_exact in cells:
+        rows = []
+        for level in range(3):
+            if profile is not None:
+                L = ns.Level(mesh, model, kinds=())
+                L.dd["x"] = syn.exact_dirichlet(mesh, profile)
+                kinds = ("x",)
+            else:
+                L = ns.Level(mesh, model)
+                kinds = ns.KINDS
+            gap = ns.assembly_gap(L)
+            Kl = ns.stiffness_extended(L.mesh, L.xyz, model["eps_r"])
+            dK = L.K.astype(np.longdouble) - Kl
+            row = {"level": level, "n_tets": int(len(mesh["tets"])), "gap": gap, "problems": {}}
+            for kind in kinds:
+                r, phi = ns.solve(L, kind, "direct")
+                pl = phi.astype(np.longdouble)
+                first = float(pl @ (dK @ pl)) / r["energy_nd"]
+                est = r["phi_abs_max"] ** 2 * gap["abs_sum_nd"] / r["energy_nd"]
+                q = {"first_order_effect_rel": first, "estimate_rel": est,
+                     "estimate_covers_first_order_effect": bool(abs(first) <= est),
+                     "certified_total_rel": r["total_error_bound_rel"]}
+                if E_exact is not None:
+                    q["direct_rel_err_vs_continuum"] = (r["energy_nd"] - E_exact) / E_exact
+                    q["continuum_minus_first_order_effect_rel"] = (
+                        (r["energy_nd"] - E_exact) / E_exact - first)
+                row["problems"][kind] = q
+            rows.append(row)
+            mesh = af.refine_red(mesh)
+        out[name] = rows
     return out
 
 
@@ -464,18 +589,44 @@ def v5_negative() -> dict:
         "min_eig_A_over_Dm": float(lam[0]), "c": Lf.poincare["c"],
         "lowest_mode_perturbation_excess_nd": excess, "certificate_nd": bnd_f,
         "certificate_covers_excess": bool(bnd_f >= excess)}
-    # (h) the stagnation rule: infinite certificates never count; finite non-improving do
+    # (h) the stagnation rule: finite checks against the best finite certificate, infinite
+    # ones against the best true residual among infinite checks
     n = 3000
     Aq = sp.diags(np.linspace(1.0, 50.0, n)).tocsr()
     bq = np.ones(n)
     runs = {}
-    for name, seq in (("inf_30_then_converging", [math.inf] * 30 + [1e-3, 1e-6, 1e-13]),
-                      ("finite_flat", [1e-3] * 40)):
+    for name, seq in (("inf_30_residual_falling_then_converging",
+                       [(math.inf, 0.8 ** i) for i in range(30)] + [(1e-3, 1e-4), (1e-6, 1e-7), (1e-13, 1e-9)]),
+                      ("inf_flat_residual", [(math.inf, 0.5)] * 40),
+                      ("finite_flat", [(1e-3, 0.5)] * 40)):
         it_seq = iter(seq)
         _, it = ns.pcg(Aq, bq, np.zeros(n), lambda r: r, maxiter=500, check_every=1,
                        target_rel=1e-12, stagnation_checks=20,
-                       certify=lambda x: (next(it_seq, 1e-3), 0.0))
+                       certify=lambda x: next(it_seq, (1e-3, 0.5)))
         runs[name] = {"status": it["status"], "iterations": it["iterations"]}
+    # a real stuck solve: a semidefinite preconditioner that never updates 30 % of the
+    # unknowns, so the certificate stays infinite and the true residual flat
+    dd1 = lv[1].dd["C"]
+    sysm1 = ns.system(lv[1].K, dd1)
+    P1 = ns.prolongation(lv[0].mesh, lv[1].mesh)[dd1["free"]][:, lv[0].dd["C"]["free"]].tocsr()
+    tg1 = ns.TwoGrid(sysm1["A"], P1, ns.SOLVER["nu"])
+    mask = (rng.uniform(size=len(dd1["free"])) > 0.3).astype(float)
+    m1, c1 = lv[1].m[dd1["free"]], lv[1].poincare["c"]
+    w1 = dd1["phi"].copy()
+
+    def certify1(x):
+        w1[dd1["free"]] = x
+        E = float(w1 @ (lv[1].K @ w1))
+        ce = ns.certificate(sysm1, x, m1, c1)
+        b = ce["error_bound_nd"]
+        return (b / (E - b) if E > b else math.inf), ce["residual_2norm"]
+
+    _, it = ns.pcg(sysm1["A"], sysm1["b"], np.zeros(len(dd1["free"])), lambda r: mask * tg1(mask * r),
+                   **{k: ns.SOLVER[k] for k in ("maxiter", "check_every", "target_rel", "stagnation_checks")},
+                   certify=certify1)
+    runs["stuck_solve_masked_preconditioner"] = {
+        "status": it["status"], "iterations": it["iterations"],
+        "finite_checks": sum(e["rel_certificate"] is not None for e in it["history"])}
     out["h_stagnation_rule"] = runs
     return out
 
@@ -486,7 +637,11 @@ def run() -> dict:
     res = {"record": "solver verification on synthetic cases only; no QMHP data read",
            "solver_settings": ns.SOLVER, "V1_exact_known_answer": v1_exact(),
            "V1b_certificate_against_exact_discrete_minimum": v1b_certificate_against_exact_discrete_minimum(),
+           "V1c_residual_certificate_against_exact_excess": {
+               "certificate": v1c_residual_certificate_against_exact_excess(),
+               "negative_control_c_times_10": v1c_residual_certificate_against_exact_excess(10.0)},
            "V6_evaluation_bound_against_exact_arithmetic": v6_evaluation_bound(),
+           "V7_assembly_term": v7_assembly_term(),
            "V2_level2_small": v2_level2(SMALL), "V2_level2_medium": v2_level2(MEDIUM),
            "V3_every_iterate": v3_every_iterate(MEDIUM), "V4_consistency": v4_consistency(),
            "V5_negative_controls": v5_negative(), "qmhp_data_read": False}

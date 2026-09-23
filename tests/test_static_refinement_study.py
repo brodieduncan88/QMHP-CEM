@@ -7,8 +7,10 @@ Tested here on synthetic data only: no test solves anything on the QMHP mesh.
 - the solver and its certificate against known answers and negative controls;
 - the frozen classification and consistency rules;
 - every integrity failure reaching UNQUALIFIED rather than a class;
-- the approval gate and the one-attempt ledger;
-- per-solve raw writes and write_verified on success and failure paths;
+- the approval gate, the invocation check and the one-attempt ledger (including a real
+  checkout-like removal of the tracked entries);
+- per-solve atomic raw writes and write_verified on success and failure paths, including
+  stop signals delivered twice to a real process group under `timeout`;
 - the budget binding a real process;
 - the committed verification, preflight and dry-run evidence;
 - the pre-declaration's agreement with the code;
@@ -45,7 +47,7 @@ manifest = sd.manifest
 
 #: frozen before any level-2, C' or delta value existed on the QMHP mesh; changing it
 #: needs a new pre-declaration revision, not an edit
-PREDECLARATION_SHA256 = "b09f524104daa42a8d7cfecf1729842f0854fda4d97efab3c5b9fcc432c44e21"
+PREDECLARATION_SHA256 = "c1d1430c5da0da3655542679aadf9e07ede74b09ecf2287da031c15f9abfc563"
 
 #: the withdrawn paired test and its report, preserved unchanged
 WITHDRAWN_UNCHANGED = {
@@ -255,19 +257,48 @@ def test_an_indefinite_preconditioner_breaks_down_and_is_never_certified(small_l
     assert it["status"] == "BREAKDOWN"
 
 
-@pytest.mark.parametrize("seq, status", [
-    ([math.inf] * 30 + [1e-3, 1e-6, 1e-13], "CERTIFIED"),     # infinite checks never count
-    ([1e-3] * 40, "STAGNATED"),                                 # 20 finite, no 10 % gain
-    ([1e-3 * 0.8 ** i for i in range(60)] + [1e-13], "CERTIFIED"),
+@pytest.mark.parametrize("seq, status, iterations", [
+    # infinite checks whose true residual keeps falling do not stop a solve that certifies late
+    ([(math.inf, 0.8 ** i) for i in range(30)] + [(1e-3, 1e-4), (1e-6, 1e-7), (1e-13, 1e-9)], "CERTIFIED", 32),
+    ([(math.inf, 0.5)] * 40, "STAGNATED", 21),                 # infinite, flat residual
+    ([(1e-3, 0.5)] * 40, "STAGNATED", 21),                     # 20 finite, no 10 % gain
+    ([(1e-3 * 0.8 ** i, 0.5) for i in range(60)] + [(1e-13, 0.5)], "CERTIFIED", 60),
+    # an infinite phase does not count toward the finite count, nor the reverse
+    ([(1e-3, 0.5)] * 15 + [(math.inf, 0.5)] * 15 + [(1e-13, 0.5)], "CERTIFIED", 30),
 ])
-def test_the_stagnation_rule(seq, status):
+def test_the_stagnation_rule(seq, status, iterations):
     n = 3000
     import scipy.sparse as sp
     A = sp.diags(np.linspace(1.0, 50.0, n)).tocsr()
     it_seq = iter(seq)
     _, it = ns.pcg(A, np.ones(n), np.zeros(n), lambda r: r, maxiter=500, check_every=1,
-                   target_rel=1e-12, stagnation_checks=20, certify=lambda x: (next(it_seq, 1e-3), 0.0))
-    assert it["status"] == status
+                   target_rel=1e-12, stagnation_checks=20, certify=lambda x: next(it_seq, (1e-3, 0.5)))
+    assert (it["status"], it["iterations"]) == (status, iterations)
+
+
+def test_a_stuck_solve_whose_certificate_stays_infinite_stops(small_ladder):
+    """Revision 2 ran such a solve to maxiter: a semidefinite preconditioner that never
+    updates 30 % of the unknowns keeps the certificate infinite and the residual flat."""
+    lv, _ = small_ladder
+    dd = lv[1].dd["C"]
+    sysm = ns.system(lv[1].K, dd)
+    P = ns.prolongation(lv[0].mesh, lv[1].mesh)[dd["free"]][:, lv[0].dd["C"]["free"]].tocsr()
+    tg = ns.TwoGrid(sysm["A"], P, 1)
+    mask = (np.random.default_rng(5).uniform(size=len(dd["free"])) > 0.3).astype(float)
+    m, c, w = lv[1].m[dd["free"]], lv[1].poincare["c"], dd["phi"].copy()
+
+    def certify(x):
+        w[dd["free"]] = x
+        E = float(w @ (lv[1].K @ w))
+        ce = ns.certificate(sysm, x, m, c)
+        return (ce["error_bound_nd"] / (E - ce["error_bound_nd"]) if E > ce["error_bound_nd"] else math.inf,
+                ce["residual_2norm"])
+
+    _, it = ns.pcg(sysm["A"], sysm["b"], np.zeros(len(dd["free"])), lambda r: mask * tg(mask * r),
+                   **{k: ns.SOLVER[k] for k in ("maxiter", "check_every", "target_rel", "stagnation_checks")},
+                   certify=certify)
+    assert it["status"] == "STAGNATED" and it["iterations"] < 200
+    assert all(e["rel_certificate"] is None for e in it["history"])
 
 
 def test_the_problems_are_the_reviewed_ones_bit_for_bit():
@@ -306,10 +337,105 @@ def test_a_malformed_port_is_a_precondition_failure():
 
 def test_require_extended_precision_is_a_real_check(monkeypatch):
     ns.require_extended_precision()
-    real_finfo = np.finfo
-    monkeypatch.setattr(ns.np, "finfo", lambda t: real_finfo(np.float64))
-    with pytest.raises(ns.Refusal, match="no extended"):
+    assert ns.extended_precision_probe() == {"scalar": True, "csr_matvec": True, "dot": True}
+    with monkeypatch.context() as mp:
+        real_finfo = np.finfo
+        mp.setattr(ns.np, "finfo", lambda t: real_finfo(np.float64))
+        with pytest.raises(ns.Refusal, match="no extended"):
+            ns.require_extended_precision()
+    # the storage format passes but the arithmetic does not (a 53-bit x87 control word)
+    monkeypatch.setattr(ns, "extended_precision_probe", lambda: {"scalar": False, "csr_matvec": True, "dot": True})
+    with pytest.raises(ns.Refusal, match="arithmetic is not extended"):
         ns.require_extended_precision()
+    mesh, model = syn.chip_cell(**SMALL)
+    assert ns.solve(ns.Level(mesh, model), "C", "direct")[0]["extended_precision_probe_ok"] is False
+
+
+def test_the_extended_precision_probe_detects_float64_arithmetic(monkeypatch):
+    """The probe itself: with long double replaced by float64 every operation fails it."""
+    monkeypatch.setattr(ns.np, "longdouble", np.float64)
+    assert ns.extended_precision_probe() == {"scalar": False, "csr_matvec": False, "dot": False}
+
+
+def test_the_poincare_constant_is_the_box_eigenvalue():
+    mesh = syn.tensor_mesh(np.linspace(0, 2, 3), np.linspace(0, 1, 2), np.linspace(0, 0.5, 2))
+    xyz = mesh["xyz"]
+    attr = np.where(xyz[mesh["tets"]][:, :, 0].mean(1) < 1, 1, 3)
+    pc = ns.poincare_constant({"tet_attr": attr}, xyz, {1: 2.5, 3: 11.45})
+    assert pc["eps_min"] == 2.5
+    assert pc["c"] == pytest.approx(2.5 * math.pi ** 2 * (1 / 4 + 1 + 4), rel=1e-15)
+
+
+def test_each_half_of_the_asymmetry_term_enters_the_certificate(small_ladder):
+    lv, sol = small_ladder
+    dd = lv[1].dd["C"]
+    sysm = ns.system(lv[1].K, dd)
+    assert sysm["A_asym_abs"].nnz > 0 and sysm["D_asym_abs"].nnz > 0
+    x = sol[(1, "C")][1][dd["free"]]
+    args = (x, lv[1].m[dd["free"]], lv[1].poincare["c"])
+    full = ns.certificate(sysm, *args)["error_bound_nd"]
+    no_a = ns.certificate(dict(sysm, A_asym_abs=sysm["A_asym_abs"] * 0), *args)["error_bound_nd"]
+    no_d = ns.certificate(dict(sysm, D_asym_abs=sysm["D_asym_abs"] * 0), *args)["error_bound_nd"]
+    assert full > no_a and full > no_d
+
+
+def test_the_rounding_term_covers_a_residual_that_rounds_to_zero():
+    """One unknown, A = 3, b = 1, x = fl(1/3): the computed residual 1 - fl(3 x) is exactly
+    0, but the true residual 1 - 3 x is not. Only the rounding term g covers the excess."""
+    import scipy.sparse as sp
+    from fractions import Fraction
+    x = np.array([1.0 / 3.0])
+    A = sp.csr_matrix(np.array([[3.0]]))
+    sysm = {"A": A, "b": np.array([1.0]), "KfD": sp.csr_matrix(np.array([[-1.0]])), "phiD": np.array([1.0]),
+            "A_asym_abs": sp.csr_matrix((1, 1)), "D_asym_abs": sp.csr_matrix((1, 1))}
+    assert float(sysm["b"][0] - (A @ x)[0]) == 0.0
+    excess = (1 - 3 * Fraction(float(x[0]))) ** 2 / 3          # exact: (b - A x)^2 / A
+    assert excess > 0
+    ce = ns.certificate(sysm, x, np.array([1.0]), 1.0)
+    assert ce["residual_2norm"] == 0.0 and Fraction(ce["error_bound_nd"]) >= excess
+
+
+def test_a_genuinely_leaking_prolongation_is_counted_and_fails_integrity(small_ladder, pre):
+    """A coarse space in which the fine port nodes are free (problem C's) leaks into the
+    fine C' problem's constrained nodes."""
+    lv, sol = small_ladder
+    coarse = copy.copy(lv[0])
+    coarse.dd = {**lv[0].dd, "Cprime": lv[0].dd["C"]}
+    r, _ = ns.solve(lv[1], "Cprime", "twogrid", coarse=coarse, coarse_phi=sol[(0, "C")][1])
+    assert r["solver"]["fixed_rows_from_free_coarse_nnz"] > 0
+    assert any("leaks" in b for b in sd._solver_problems("x", r["solver"], pre["integrity"]))
+
+
+def test_a_boundary_face_off_the_box_surface_is_a_precondition_failure():
+    """An L-shaped domain: conforming, every boundary face tagged, but the re-entrant faces
+    lie inside the bounding box, where the zero extension would not be valid."""
+    tm = syn.tensor_mesh(np.linspace(0, 2, 5), np.linspace(0, 2, 5), np.linspace(0, 1, 3))
+    cen = tm["xyz"][tm["tets"]].mean(1)
+    keep = ~((cen[:, 0] > 1) & (cen[:, 1] > 1))
+    tets = tm["tets"][keep]
+    loc = ((0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3))
+    faces = np.sort(np.vstack([tets[:, list(f)] for f in loc]), axis=1)
+    uniq, cnt = np.unique(faces, axis=0, return_counts=True)
+    mesh = {"xyz": tm["xyz"], "tets": tets, "tet_attr": np.ones(len(tets), dtype=int),
+            "tris": uniq[cnt == 1], "tri_attr": np.full(int((cnt == 1).sum()), 2)}
+    L = ns.Level(mesh, {"eps_r": {1: 1.0}, "pec_attrs": (2,), "port_attr": 10, "direction": (1.0, 0.0, 0.0),
+                        "L0_m": 1.0e-3, "L_H": 1.0e-8}, kinds=())
+    bf = ns.boundary_facts(mesh, L.xyz)
+    assert bf["max_face_multiplicity"] == 2 and bf["every_boundary_face_is_tagged"]
+    assert bf["every_interior_face_separates_its_tetrahedra"]
+    assert not bf["every_boundary_face_on_the_box_surface"]
+    problems = ns.certificate_preconditions(L, bf)
+    assert any("off the bounding-box surface" in q for q in problems)
+
+
+def test_bound_safety_covers_its_declared_budget_on_the_measured_ladder():
+    """BOUND_SAFETY must cover the bound's own evaluation (< 1e-9) and 1/(1 - rho/c) for the
+    rho/c the preflight estimated on every level of the QMHP ladder."""
+    p = _strict_json(HERE / "preflight.json")
+    rhos = [q["rho_gershgorin_over_c"] for lv in p["levels"].values()
+            for q in lv["assembly_gap_estimate"]["problems"].values()]
+    assert len(rhos) == 6 and max(rhos) <= ns.RHO_OVER_C_COVERED
+    assert (1 + 1e-9) / (1 - ns.RHO_OVER_C_COVERED) <= ns.BOUND_SAFETY
 
 
 # --- the frozen rules -------------------------------------------------------------------
@@ -326,6 +452,8 @@ def _seq(X, err=1e-12):
     ([10.0, 8.0, 7.8], "UNRESOLVED", "observed order above 2"),
     ([10.0, 8.0, 5.9], "NON-CONVERGENT", "do not shrink"),    # R = 0.95
     ([10.0, 8.0, 5.0], "NON-CONVERGENT", "do not shrink"),
+    # order 1 with a negative next term: positive, monotone errors, yet R = 0.8
+    ([5 + h - 0.5 * h * h for h in (1.0, 0.5, 0.25)], "NON-CONVERGENT", "negative next term"),
     ([10.0, 8.0, 8.0], "UNRESOLVED", "within its certified error of zero"),
     ([10.0, 8.0, 8.1], "UNQUALIFIED", "nesting forbids"),
 ])
@@ -363,20 +491,29 @@ def test_the_declared_C2_intervals_are_what_the_rule_gives(pre):
     assert cls(66.13) == "UNRESOLVED" and cls(66.14) == "CONVERGING"
     assert cls(74.16) == "CONVERGING" and cls(74.17) == "UNRESOLVED"
     assert cls(82.2) == "UNRESOLVED" and cls(82.21) == "UNQUALIFIED"
+    # the declared minimum remaining error inside the window, at R = 4 (C_2 = C_1 - d1/4)
+    c = sd.classify(*_seq([C0, C1, C1 - (C0 - C1) / 4 - 1e-7], 1e-12), w)      # R just below 4
+    assert c["cls"] == "CONVERGING" and 0.1214 <= c["remaining_rel_error_at_level2_bracket"][1] < 0.1215
+    assert "0.1214" in iv["CONVERGED"]
     classes = {cls(c2) for c2 in np.linspace(1.0, C1 + 1.0, 4001)}
     assert "CONVERGED" not in classes, "declared unreachable for C"
     assert classes == {"NON-CONVERGENT", "UNRESOLVED", "CONVERGING", "UNQUALIFIED"}
 
 
 def test_converged_is_unreachable_for_cprime_below_the_declared_delta1(pre):
+    """Declared: CONVERGED for C' needs delta_1 >= 0.1777 with delta_0 inside the window
+    (exact threshold 0.17773-0.17775). Swept where CONVERGED is most reachable, R near 4."""
     w = pre["classification"]
     C0, C1 = pre["baseline"]["C0_fF"], pre["baseline"]["C1_fF"]
-    Cp0 = C0 * (1 + pre["consistency_check"]["window_at_freeze_with_the_record_S0"][1])
-    for d1, reachable in ((0.001, False), (0.17, False), (0.18, True)):
-        Cp1 = C1 * (1 + d1)
-        got = {sd.classify(*_seq([Cp0, Cp1, c2], 1e-12), w)["cls"]
-               for c2 in np.linspace(Cp1 - (Cp0 - Cp1), Cp1, 4001)}
-        assert ("CONVERGED" in got) == reachable, d1
+    assert "delta_1 >= 0.1777" in pre["classification"]["why_tau_0_05"]
+    for d0 in pre["consistency_check"]["window_at_freeze_with_the_record_S0"]:
+        Cp0 = C0 * (1 + d0)
+        for d1, reachable in ((0.001, False), (0.17, False), (0.1777, False), (0.1778, True), (0.18, True)):
+            Cp1 = C1 * (1 + d1)
+            dd = Cp0 - Cp1
+            got = {sd.classify(*_seq([Cp0, Cp1, c2], 1e-12), w)["cls"]
+                   for c2 in np.linspace(Cp1 - dd / 3.9, Cp1 - dd / 4, 20001)}
+            assert ("CONVERGED" in got) == reachable, (d0, d1)
 
 
 def test_the_model_bracket_is_what_the_two_term_model_gives(pre):
@@ -401,7 +538,8 @@ def _fake_levels(E, Ep, bound=1e-15):
     for h in range(3):
         mk = lambda e: {"energy_nd": e, "C_fF": e * 30.0, "S_GHz2": 7.0 / e,
                         "total_error_bound_nd": bound, "total_error_bound_rel": bound / e,
-                        "port_voltage": 1.0, "C_F": e * 3e-14,
+                        "port_voltage": 1.0, "C_F": e * 3e-14, "phi_abs_max": 1.0,
+                        "extended_precision_probe_ok": True,
                         "solver": {"method": "direct" if h < 2 else "twogrid", "status": "CERTIFIED",
                                    "galerkin_identity_rel": 1e-15, "fixed_rows_from_free_coarse_nnz": 0}}
         probs = {"C": mk(E[h]), "Cprime": mk(Ep[h])}
@@ -409,7 +547,8 @@ def _fake_levels(E, Ep, bound=1e-15):
             for k in ns.KINDS:
                 probs[k]["twogrid_cross_check"] = {**{kk: probs[k][kk] for kk in
                                                       ("energy_nd", "total_error_bound_nd",
-                                                       "total_error_bound_rel", "C_fF", "port_voltage")},
+                                                       "total_error_bound_rel", "C_fF", "port_voltage",
+                                                       "extended_precision_probe_ok")},
                                                    "solver": {"method": "twogrid", "status": "CERTIFIED",
                                                               "galerkin_identity_rel": 1e-15,
                                                               "fixed_rows_from_free_coarse_nnz": 0}}
@@ -433,6 +572,13 @@ def test_a_clean_synthetic_record_is_qualified_and_classified(pre):
     assert out["classes"]["C"]["cls"] == "CONVERGING"                 # R = 0.9/0.4 = 2.25
     assert out["outcome"]["second_moment_name"] == "Sprime_static_identity_not_tested"
     assert "H" not in out["classes"] and "not independent" in out["outcome"]["note"]
+    # every block with a model-based bracket carries its assumption; the bound basis says
+    # which value it covers; the assembly-term estimate sits beside every bound
+    for name in ("C", "Cprime", "S", "Sprime_static_identity_not_tested"):
+        b = out["classes"][name]
+        assert b["bracket_assumption"].startswith("two terms") and "ONLY" in b["bound_basis"]
+        gap = pre["configuration"]["assembly_gap_preflight"]["abs_sum_nd"]["2"]
+        assert b["assembly_term_estimate_rel_at_level2"] == pytest.approx(gap / (1.9 if name in ("C", "S") else 1.91))
 
 
 @pytest.mark.parametrize("poison, needle", [
@@ -452,6 +598,9 @@ def test_a_clean_synthetic_record_is_qualified_and_classified(pre):
     (lambda lv: (lv[2]["problems"]["C"].__setitem__("energy_nd", 2.5),
                  lv[2]["problems"]["Cprime"].__setitem__("energy_nd", 2.51)), "nesting forbids"),
     (lambda lv: lv[1]["problems"]["C"].__setitem__("C_F", 2.3 * 3e-14 * (1 + 1e-9)), "does not reproduce"),
+    (lambda lv: lv[0]["problems"]["C"].__setitem__("C_F", 3.2 * 3e-14 * (1 + 1e-9)), "does not reproduce"),
+    (lambda lv: lv[2]["problems"]["Cprime"].__setitem__("extended_precision_probe_ok", False), "arithmetic probe"),
+    (lambda lv: lv[1]["problems"]["C"]["twogrid_cross_check"].pop("extended_precision_probe_ok"), "arithmetic probe"),
     (lambda lv: lv.pop(), "declared levels"),
 ])
 def test_every_integrity_failure_is_unqualified_never_a_class(pre, poison, needle):
@@ -510,9 +659,44 @@ def test_a_failure_at_level_2_does_not_forfeit_the_level0_verdict(pre):
     lv[2]["problems"]["C"]["total_error_bound_rel"] = 1e-6
     out = sd.analyse(lv, _fake_pre(pre), _band(pre), anchor)
     assert out["outcome"]["verdict"] == "UNQUALIFIED"
-    assert out["consistency_check_level0"]["verdict"] == "CONSISTENT"
+    v = out["consistency_check_level0"]
+    assert v["verdict"] == "CONSISTENT" and v["nesting_0_to_1"]["status"] == "PASSED"
+    # the UNQUALIFIED record says it reports no H, whatever the level-0 verdict
+    assert v["in_this_record"] == pre["consistency_check"]["in_an_unqualified_record"]
+    assert "no second-moment value is reported" in v["in_this_record"]
     lv[0]["problems"]["C"]["port_voltage"] = 0.5          # a level-0 failure does forfeit it
     assert sd.analyse(lv, _fake_pre(pre), _band(pre), anchor)["consistency_check_level0"]["verdict"] == "UNQUALIFIED"
+
+
+def test_a_level0_to_1_nesting_failure_unqualifies_the_level0_verdict(pre):
+    anchor = {"C0_F": 3.0 * 3e-14, "C1_F": 2.3 * 3e-14}
+    lv = _levels_with_delta0(pre, 6.60e-4)
+    lv[1]["problems"]["Cprime"]["energy_nd"] = 3.5        # E'_1 > E'_0: nesting forbids it
+    for k in ("energy_nd",):
+        lv[1]["problems"]["Cprime"]["twogrid_cross_check"][k] = 3.5
+    out = sd.analyse(lv, _fake_pre(pre), _band(pre), anchor)
+    v = out["consistency_check_level0"]
+    assert out["outcome"]["verdict"] == "UNQUALIFIED"
+    assert v["verdict"] == "UNQUALIFIED" and v["verdict_before_the_nesting_check"] == "CONSISTENT"
+    assert v["nesting_0_to_1"]["status"] == "FAILED"
+    # a level-1 failure of its own leaves the check NOT CHECKED and the verdict standing
+    lv[1]["problems"]["C"]["port_voltage"] = 0.5
+    v = sd.analyse(lv, _fake_pre(pre), _band(pre), anchor)["consistency_check_level0"]
+    assert v["verdict"] == "CONSISTENT" and v["nesting_0_to_1"]["status"] == "NOT CHECKED"
+
+
+def test_an_unresolved_level0_check_does_not_name_the_moment_H(pre):
+    anchor = {"C0_F": 3.0 * 3e-14, "C1_F": 2.3 * 3e-14}
+    lo = pre["consistency_check"]["window_at_freeze_with_the_record_S0"][0]
+    lv = _levels_with_delta0(pre, lo, E=3.0)
+    for kind in ("C", "Cprime"):                        # a certified range straddling the edge
+        lv[0]["problems"][kind]["total_error_bound_nd"] = 3e-6
+        lv[0]["problems"][kind]["total_error_bound_rel"] = 1e-6
+    fake = _fake_pre(pre)
+    fake["integrity"]["certificate_rel_tol"] = 1e-5
+    out = sd.analyse(lv, fake, _band(pre), anchor)
+    assert out["consistency_check_level0"]["verdict"] == "UNRESOLVED"
+    assert out["outcome"]["second_moment_name"] == "Sprime_static_identity_not_confirmed" and "H" not in out["classes"]
 
 
 def test_the_consistency_window_is_recomputed_from_the_pinned_band(pre):
@@ -547,12 +731,17 @@ def _synthetic_gate(tmp_path, monkeypatch, pre):
     approval = tmp_path / "STUDY-APPROVAL.json"
     approval.write_text("{}")
     monkeypatch.setattr(sd, "APPROVAL", approval)
+    monkeypatch.setattr(sd, "APPROVAL_CONSUMED", tmp_path / "STUDY-APPROVAL.consumed.json")
     monkeypatch.setattr(sd, "ATTEMPT_MARKER", tmp_path / "ATTEMPT-SPENT.json")
     monkeypatch.setattr(sd, "RESULTS_ROOT", tmp_path / "results")
-    monkeypatch.setattr(sd, "require_approval", lambda p: {"run_label": "synthetic"})
+    monkeypatch.setattr(sd, "common_ledger_path", lambda repo=None: tmp_path / "gitcommon" / sd.COMMON_LEDGER)
+    (tmp_path / "gitcommon").mkdir()
+    monkeypatch.setattr(sd, "require_approval", lambda p, now=None, **k: {"run_label": "synthetic"})
     monkeypatch.setattr(sd, "unbound_repo_modules", lambda: [])
     monkeypatch.setattr(sd, "environment_problems", lambda p: [])
+    monkeypatch.setattr(sd, "invocation_problems", lambda p, m=None: [])
     monkeypatch.setattr(sd, "load_pre", lambda: fake)
+    monkeypatch.setattr(sd, "_read_pre", lambda: (fake, "f" * 64))
     monkeypatch.setattr(sd, "qmhp_mesh", lambda cfg=None: mesh)
     monkeypatch.setattr(sd, "_model", lambda cfg=None: model)
     monkeypatch.setattr(sd, "band_baseline", lambda p: fake["consistency_check"]["band"]["values_at_freeze"])
@@ -569,17 +758,22 @@ RAW = ["level0.json", "level0-C.json", "level0-Cprime.json", "consistency-level0
 
 def test_without_an_approval_the_study_refuses_and_writes_nothing(tmp_path, monkeypatch):
     monkeypatch.setattr(sd, "APPROVAL", tmp_path / "STUDY-APPROVAL.json")
+    monkeypatch.setattr(sd, "APPROVAL_CONSUMED", tmp_path / "STUDY-APPROVAL.consumed.json")
     monkeypatch.setattr(sd, "ATTEMPT_MARKER", tmp_path / "ATTEMPT-SPENT.json")
     monkeypatch.setattr(sd, "RESULTS_ROOT", tmp_path / "results")
+    monkeypatch.setattr(sd, "common_ledger_path", lambda repo=None: tmp_path / "gitcommon" / sd.COMMON_LEDGER)
     with pytest.raises(sd.Refusal, match="PREPARED, NOT APPROVED"):
         sd.execute()
-    assert not (tmp_path / "results").exists() and not (tmp_path / "ATTEMPT-SPENT.json").exists()
+    assert sorted(p.name for p in tmp_path.iterdir()) == []
 
 
 def test_the_real_invocation_refuses_today():
     assert not sd.APPROVAL.exists(), "an approval exists: this study is no longer NOT APPROVED"
+    assert not sd.APPROVAL_CONSUMED.exists(), "an approval has been consumed: the attempt was spent"
     assert not sd.ATTEMPT_MARKER.exists(), "the attempt has been spent"
+    assert not sd.common_ledger_path().exists(), "the attempt has been spent (git common directory)"
     assert not list((REPO / "results").glob(sd.RECORD_PREFIX + "*")), "the attempt has been spent"
+    assert sd.spent_state() == []
     assert sd.main([]) == 2
 
 
@@ -598,10 +792,85 @@ def test_a_granted_attempt_writes_every_solve_then_a_summary_and_a_verified_mani
     prov = _strict_json(rec / "provenance.json")
     assert prov["environment"]["code_sha256"] == {n: _sha(p) for n, p in sd.CODE_FILES.items()}
     assert prov["source_commit_measured"] == sd.git_head(REPO)
-    marker = _strict_json(sd.ATTEMPT_MARKER)
-    assert marker["record"] == rec.name
-    with pytest.raises(sd.Refusal, match="ATTEMPT-SPENT.json exists"):
+    assert prov["approval_sha256"] == hashlib.sha256(b"{}").hexdigest()
+    assert set(prov["invocation"]) >= {"cwd", "argv", "parent_argv", "prefix", "optimize", "pycache_prefix"}
+    assert all(prov["environment"]["extended_precision_probe"].values())
+    # the three ledger entries: the common-directory entry, the marker, the consumed approval
+    for entry in (sd.common_ledger_path(), sd.ATTEMPT_MARKER):
+        assert _strict_json(entry)["record"] == rec.name
+    assert not sd.APPROVAL.exists() and sd.APPROVAL_CONSUMED.read_text() == "{}"
+    assert s["signals_received"] == [] and not list(rec.glob("*.partial"))
+    with pytest.raises(sd.Refusal, match="the one attempt is spent"):
         sd.execute()
+
+
+def test_a_checkout_that_removes_the_tracked_ledger_does_not_reopen_the_attempt(tmp_path, monkeypatch, pre):
+    """Revision 2: after the record and marker were committed, `git checkout <approved
+    commit>` removed both from the working tree while the untracked approval survived, and
+    a second attempt ran. Now the git-common-directory entry survives, and the approval was
+    consumed."""
+    _synthetic_gate(tmp_path, monkeypatch, pre)
+    rec = sd.execute()
+    import shutil
+    shutil.rmtree(rec.parent)                              # what a checkout of C1 removes
+    sd.ATTEMPT_MARKER.unlink()
+    sd.APPROVAL.write_text("{}")                          # even a re-supplied approval
+    with pytest.raises(sd.Refusal, match="the one attempt is spent"):
+        sd.execute()
+    sd.APPROVAL_CONSUMED.unlink()                         # and even without the consumed copy
+    with pytest.raises(sd.Refusal, match="git common dir"):
+        sd.execute()
+    assert not (tmp_path / "results").exists()
+
+
+def test_the_ledger_entries_are_created_exclusively(tmp_path, monkeypatch, pre):
+    """A ledger entry created between the pre-check and the exclusive create: the common
+    entry refuses with nothing of ours created; the marker (after the common entry) spends
+    the attempt, and the failure goes into the entry this process created, never into one
+    it did not create."""
+    _synthetic_gate(tmp_path, monkeypatch, pre)
+    monkeypatch.setattr(sd, "spent_state", lambda root=None: [])
+    common = sd.common_ledger_path()
+    common.parent.mkdir(parents=True)
+    common.write_text('{"someone": "else"}')
+    with pytest.raises(sd.Refusal, match="git common directory: the one attempt is spent"):
+        sd.execute()
+    assert common.read_text() == '{"someone": "else"}' and sd.APPROVAL.exists()
+    assert not sd.ATTEMPT_MARKER.exists() and not (tmp_path / "results").exists()
+    common.unlink()
+    sd.ATTEMPT_MARKER.write_text('{"someone": "else"}')
+    with pytest.raises(sd.AttemptFailed, match="no record could be created"):
+        sd.execute()
+    assert sd.ATTEMPT_MARKER.read_text() == '{"someone": "else"}'
+    note = _strict_json(common)
+    assert note["record_created"] is False and "FileExistsError" in note["error"]
+    assert sd.APPROVAL_CONSUMED.exists() and not sd.APPROVAL.exists()
+
+
+def test_a_failure_before_the_record_exists_is_written_into_the_ledger(tmp_path, monkeypatch, pre, capsys):
+    """Revision 2 spent the attempt with no record, no failure.json and a raw traceback when
+    the record directory could not be created."""
+    _synthetic_gate(tmp_path, monkeypatch, pre)
+    (tmp_path / "results").write_text("not a directory")
+    assert sd.main([]) == 3
+    assert "no record could be created" in capsys.readouterr().err
+    for entry in (sd.common_ledger_path(), sd.ATTEMPT_MARKER):
+        note = _strict_json(entry)
+        assert note["record_created"] is False and "Error" in note["error"] and note["traceback"]
+    assert sd.APPROVAL_CONSUMED.exists()
+    assert sd.main([]) == 2                               # spent: refused, nothing more
+
+
+def test_a_failure_before_the_first_ledger_entry_spends_nothing(tmp_path, monkeypatch, pre):
+    _synthetic_gate(tmp_path, monkeypatch, pre)
+
+    def broken(p):
+        raise OSError("setrlimit failed")
+
+    monkeypatch.setattr(sd, "_enforce_budget", broken)
+    with pytest.raises(sd.Refusal, match="nothing was spent"):
+        sd.execute()
+    assert sd.spent_state() == [] and sd.APPROVAL.exists()
 
 
 def test_the_attempt_marker_alone_refuses_even_without_a_record(tmp_path, monkeypatch, pre):
@@ -633,10 +902,58 @@ def test_a_failure_in_the_last_solve_keeps_every_completed_solve(tmp_path, monke
     assert "level2-C.json" in names and "level2-Cprime.json" not in names
     assert manifest.verify(rec) == []
     f = _strict_json(rec / "failure.json")
-    assert f["levels_completed"] == [0, 1] and "level2-C.json" in f["files_written"]
-    assert f["consistency_check_level0"]["verdict"] != "UNQUALIFIED" or f["consistency_check_level0"]["level0_integrity_failures"]
+    assert f["levels_completed"] == [0, 1] and f["files_written"] == ["provenance.json"] + RAW[:-1]
+    assert f["consistency_check_level0"] == _strict_json(rec / "consistency-level0.json")   # read back
+    assert f["nesting_0_to_1"]["status"] in ("PASSED", "NOT CHECKED")
     assert f["provenance"]["mesh_sha256"] == sd.CONFIG["mesh_sha256"]
+    assert f["summary_json_superseded"] is False and f["partial_files"] == []
     assert _strict_json(rec / "level2-C.json")["solver"]["status"] == "CERTIFIED"
+
+
+@pytest.mark.parametrize("fail_at, written", [
+    (1, ["provenance.json", "level0.json"]),                         # the first level-0 solve
+    (3, ["provenance.json", "level0.json", "level0-C.json", "level0-Cprime.json",
+         "consistency-level0.json", "level1.json"]),                 # the first level-1 solve
+])
+def test_the_write_order_is_the_declared_one(tmp_path, monkeypatch, pre, fail_at, written):
+    """provenance.json first, each level's facts before its solves, consistency-level0.json
+    as soon as level 0 completes; the marker and the common entry exist on a failed attempt."""
+    _synthetic_gate(tmp_path, monkeypatch, pre)
+    real, calls = ns.solve, []
+
+    def fails(level, kind, method, **kw):
+        calls.append(1)
+        if len(calls) == fail_at:
+            raise RuntimeError("injected")
+        return real(level, kind, method, **kw)
+
+    monkeypatch.setattr(sd.ns, "solve", fails)
+    with pytest.raises(sd.AttemptFailed, match="injected"):
+        sd.execute()
+    (rec,) = (tmp_path / "results").glob(sd.RECORD_PREFIX + "*")
+    assert _strict_json(rec / "failure.json")["files_written"] == written
+    assert manifest.verify(rec) == []
+    for entry in (sd.common_ledger_path(), sd.ATTEMPT_MARKER):
+        assert _strict_json(entry)["record"] == rec.name
+
+
+def test_an_analysis_fault_after_level0_does_not_stop_the_solves(tmp_path, monkeypatch, pre):
+    """Revision 2: an exception in the level-0 analysis ended run_levels, and the failure
+    path re-ran the same analysis while writing failure.json, losing it and the manifest."""
+    _synthetic_gate(tmp_path, monkeypatch, pre)
+
+    def broken(*a, **k):
+        raise ZeroDivisionError("latent defect in the consistency code")
+
+    monkeypatch.setattr(sd, "consistency", broken)
+    with pytest.raises(sd.AttemptFailed, match="latent defect"):
+        sd.execute()                                  # analyse() at the end raises too
+    (rec,) = (tmp_path / "results").glob(sd.RECORD_PREFIX + "*")
+    raw = [n for n in RAW if n != "consistency-level0.json"] + ["consistency-level0.error.json"]
+    assert sorted(p.name for p in rec.iterdir()) == sorted(raw + ["provenance.json", "failure.json", "manifest.sha256"])
+    assert manifest.verify(rec) == []
+    f = _strict_json(rec / "failure.json")
+    assert f["levels_completed"] == [0, 1, 2] and f["consistency_check_level0"] is None
 
 
 def test_a_crash_in_the_analysis_still_leaves_every_raw_file_and_a_verified_manifest(
@@ -771,10 +1088,51 @@ def test_a_stale_foreign_or_misdirected_approval_is_refused(tmp_path, monkeypatc
         sd.require_approval(pre)
 
 
+def test_an_approval_window_longer_than_seven_days_is_refused(tmp_path, monkeypatch, pre):
+    now = datetime.now(timezone.utc)
+    ap = tmp_path / "STUDY-APPROVAL.json"
+    monkeypatch.setattr(sd, "APPROVAL", ap)
+    for days, ok in ((6.9, True), (7.0, True), (7.01, False), (8.0, False), (30.0, False)):
+        ap.write_text(json.dumps(_granted(pre, not_before_utc=(now - timedelta(hours=1)).isoformat(),
+                                          not_after_utc=(now - timedelta(hours=1) + timedelta(days=days)).isoformat())))
+        if ok:
+            assert sd.require_approval(pre)["attempt"] == 1
+        else:
+            with pytest.raises(sd.Refusal, match="longer than 7 days"):
+                sd.require_approval(pre)
+
+
+def test_the_approval_is_parsed_from_the_bytes_that_are_hashed(tmp_path, monkeypatch, pre):
+    ap = tmp_path / "STUDY-APPROVAL.json"
+    ap.write_text(json.dumps(_granted(pre)))
+    monkeypatch.setattr(sd, "APPROVAL", ap)
+    raw = ap.read_bytes()
+    ap.write_text("{}")                                   # the file changes after the read
+    assert sd.require_approval(pre, raw=raw)["attempt"] == 1
+    with pytest.raises(sd.Refusal, match="predeclaration_sha256 does not match"):
+        sd.require_approval(pre, raw=raw, pre_sha256="0" * 64)
+
+
 def test_git_head_is_read_correctly_without_running_git():
     want = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"], capture_output=True,
                           text=True, check=True).stdout.strip()
     assert sd.git_head(REPO) == want
+
+
+def test_the_common_ledger_is_shared_by_every_worktree_of_a_clone(tmp_path):
+    git = lambda *a, cwd=tmp_path / "main": subprocess.run(
+        ["git", "-c", "user.email=t@example.invalid", "-c", "user.name=t", *a], cwd=cwd,
+        capture_output=True, text=True, check=True).stdout.strip()
+    (tmp_path / "main").mkdir()
+    git("init", "-q")
+    (tmp_path / "main" / "f").write_text("x")
+    git("add", "f")
+    git("commit", "-q", "-m", "c1")
+    git("worktree", "add", "-q", str(tmp_path / "wt"))
+    common = Path(git("rev-parse", "--path-format=absolute", "--git-common-dir"))
+    for tree in (tmp_path / "main", tmp_path / "wt"):
+        assert sd.common_ledger_path(tree) == common / sd.COMMON_LEDGER
+        assert sd.git_head(tree) == git("rev-parse", "HEAD", cwd=tree)
 
 
 # --- process-level checks, each in a fresh interpreter ----------------------------------------
@@ -800,16 +1158,107 @@ def test_the_execution_path_loads_only_bound_repository_code():
     assert "orchestrator/__init__.py" in second, "the negative control must be detected"
 
 
-def test_the_environment_check_requires_the_verified_versions_and_single_threads(pre):
-    code = f"""
+def test_the_environment_check_requires_the_verified_versions_and_single_threads(pre, monkeypatch):
+    """Hermetic: the check itself, against a declared environment equal to THIS interpreter
+    (push CI runs another patch release; revision 2's test required the host to be the
+    verified one and turned CI red), then each difference as a negative control."""
+    import platform
+    import scipy
+    here = copy.deepcopy(pre)
+    here["environment"].update(python=platform.python_version(), numpy=np.__version__, scipy=scipy.__version__)
+    for k, v in THREADS.items():
+        monkeypatch.setenv(k, v)
+    assert sd.environment_problems(here) == []
+    for key, value in (("python", "3.11.0"), ("numpy", "0.0"), ("scipy", "0.0")):
+        other = copy.deepcopy(here)
+        other["environment"][key] = value
+        assert any(p.startswith(f"{key} is ") for p in sd.environment_problems(other)), key
+    monkeypatch.setenv("OPENBLAS_NUM_THREADS", "4")
+    assert any("OPENBLAS_NUM_THREADS" in p for p in sd.environment_problems(here))
+    monkeypatch.setenv("OPENBLAS_NUM_THREADS", "1")
+    monkeypatch.delenv("MKL_NUM_THREADS")
+    assert any("MKL_NUM_THREADS" in p for p in sd.environment_problems(here))
+    monkeypatch.setenv("MKL_NUM_THREADS", "1")
+    real_finfo = np.finfo
+    with monkeypatch.context() as mp:
+        mp.setattr(sd.np, "finfo", lambda t: real_finfo(np.float64))
+        assert "no extended-precision long double" in sd.environment_problems(here)
+    monkeypatch.setattr(sd.ns, "extended_precision_probe", lambda: {"scalar": True, "csr_matvec": False, "dot": True})
+    assert any("arithmetic is not extended" in p for p in sd.environment_problems(here))
+
+
+def test_this_host_matches_the_verified_environment_where_it_is_the_execution_host(pre):
+    """The host-identity assertion, skipped with its reason on any host that is not the
+    verified one (push CI resolves its own Python patch release)."""
+    import platform
+    import scipy
+    have = (platform.python_version(), np.__version__, scipy.__version__)
+    want = tuple(pre["environment"][k] for k in ("python", "numpy", "scipy"))
+    if have != want or Path(sys.prefix).resolve() != (REPO / ".venv").resolve():
+        pytest.skip(f"not the verified execution host: {have} with prefix {sys.prefix}, verified {want} in .venv")
+    out = _python(f"""
         import sys, json; sys.path.insert(0, {str(HERE)!r})
         import study_driver as sd
         print(json.dumps(sd.environment_problems(sd.load_pre())))
-    """
-    ok = _python(code, THREADS)
-    assert ok.returncode == 0 and json.loads(ok.stdout) == [], ok.stdout + ok.stderr[-300:]
-    bad = _python(code, {**THREADS, "OPENBLAS_NUM_THREADS": "4"})
-    assert "OPENBLAS_NUM_THREADS" in bad.stdout
+    """, THREADS)
+    assert out.returncode == 0 and json.loads(out.stdout) == [], out.stdout + out.stderr[-300:]
+
+
+def _measured(**over):
+    m = {"cwd": str(REPO), "argv": ["experiments/static-refinement-study/study_driver.py"],
+         "parent_argv": ["/usr/bin/timeout", "--signal=KILL", "3660", ".venv/bin/python",
+                         "experiments/static-refinement-study/study_driver.py"],
+         "executable": str(REPO / ".venv" / "bin" / "python"), "prefix": str(REPO / ".venv"),
+         "optimize": 0, "dont_write_bytecode": True, "pycache_prefix": sd.NO_BYTECODE_CACHE,
+         "bytecode_cache_paths": {"nested_solver.py": sd.NO_BYTECODE_CACHE + "/x.pyc"}}
+    m.update(over)
+    return m
+
+
+@pytest.mark.parametrize("over, needle", [
+    ({"cwd": "/"}, "working directory"),
+    ({"argv": ["study_driver.py"]}, "argv"),
+    ({"parent_argv": ["bash"]}, "parent process"),
+    ({"parent_argv": None}, "parent process"),
+    ({"parent_argv": ["timeout", "--signal=KILL", "99999", ".venv/bin/python",
+                      "experiments/static-refinement-study/study_driver.py"]}, "parent process"),
+    ({"prefix": "/usr"}, "interpreter prefix"),
+    ({"optimize": 1}, "optimisation"),
+    ({"dont_write_bytecode": False}, "bytecode"),
+    ({"pycache_prefix": None}, "bytecode"),
+    ({"bytecode_cache_paths": {"nested_solver.py": "/repo/__pycache__/nested_solver.cpython-311.pyc"}}, "bytecode"),
+])
+def test_the_invocation_is_measured_and_compared_not_just_its_text(pre, over, needle):
+    assert sd.invocation_problems(pre, _measured()) == []
+    got = sd.invocation_problems(pre, _measured(**over))
+    assert len(got) == 1 and needle in got[0], got
+
+
+def test_the_declared_invocation_text_and_its_measured_form_agree(pre):
+    b = pre["budget"]
+    m = b["invocation_measured_as"]
+    assert b["invocation"].endswith("env " + " ".join(f"{k}={v}" for k, v in pre["environment"]["threads_env"].items())
+                                    + " " + " ".join(m["parent_argv"]))
+    assert m["parent_argv"][-1:] == m["argv"] and m["parent_argv"][2] == str(int(b["wall_cap_minutes"] * 60) + 60)
+
+
+def test_the_study_process_measures_its_real_invocation_and_bypasses_bytecode_caches():
+    """The real driver, started as the study is (from the repository root under timeout),
+    in its read-only --show-invocation mode."""
+    out = subprocess.run(["timeout", "--signal=KILL", "120", sys.executable,
+                          "experiments/static-refinement-study/study_driver.py", "--show-invocation"],
+                         cwd=str(REPO), capture_output=True, text=True, timeout=180,
+                         env={**os.environ, **THREADS})
+    assert out.returncode == 0, out.stderr[-500:]
+    r = json.loads(out.stdout)
+    m = r["measured"]
+    assert Path(m["parent_argv"][0]).name == "timeout" and m["parent_argv"][1:3] == ["--signal=KILL", "120"]
+    assert m["dont_write_bytecode"] and m["pycache_prefix"] == sd.NO_BYTECODE_CACHE
+    assert set(m["bytecode_cache_paths"]) == {"nested_solver.py", "anchor_fem.py", "orchestrator/manifest.py"}
+    assert all(c.startswith(sd.NO_BYTECODE_CACHE) for c in m["bytecode_cache_paths"].values())
+    diffs = r["differences_from_declared"]
+    assert any(d.startswith("argv") for d in diffs) and any("parent process" in d for d in diffs)
+    assert not any("bytecode" in d or "optimisation" in d or "working directory" in d for d in diffs)
 
 
 @pytest.mark.parametrize("budget, work, expect", [
@@ -820,12 +1269,115 @@ def test_the_environment_check_requires_the_verified_versions_and_single_threads
      "import numpy\nnumpy.ones(6 * 1024**3 // 8)", "MemoryError"),
     ({"cpu_minutes": 10, "memory_GB": 8, "wall_cap_minutes": 1},
      "import os, signal, time\nos.kill(os.getpid(), signal.SIGTERM)\ntime.sleep(5)", "SIGTERM"),
+    ({"cpu_minutes": 10, "memory_GB": 8, "wall_cap_minutes": 1},
+     "import os, signal, time\nos.kill(os.getpid(), signal.SIGHUP)\ntime.sleep(5)", "SIGHUP"),
+    ({"cpu_minutes": 10, "memory_GB": 8, "wall_cap_minutes": 1},
+     "import os, signal, time\nos.kill(os.getpid(), signal.SIGINT)\ntime.sleep(5)", "BudgetExceeded: SIGINT"),
 ])
 def test_the_declared_budget_binds_a_real_process(budget, work, expect):
     code = (f"import sys\nsys.path.insert(0, {str(HERE)!r})\nimport study_driver as sd\n"
             f"sd._enforce_budget({{'budget': {budget!r}}})\n{work}\n")
     proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=60)
     assert proc.returncode != 0 and expect in proc.stderr, proc.stderr[-400:]
+
+
+def test_disarm_ignores_every_stop_signal_cancels_the_alarm_and_lifts_the_soft_limits():
+    """Each step of _disarm, checked on its own in a fresh process."""
+    out = _python(f"""
+        import sys, json, signal, resource
+        sys.path.insert(0, {str(HERE)!r})
+        import study_driver as sd
+        sd._enforce_budget({{"budget": {{"cpu_minutes": 10, "memory_GB": 8, "wall_cap_minutes": 5}}}})
+        armed = [signal.getsignal(s) is sd._on_limit for s in sd.STOP_SIGNALS]
+        sd._disarm()
+        print(json.dumps({{"armed": armed, "stopping": sd._SIGNALS["stopping"],
+                          "ignored": [signal.getsignal(s) == signal.SIG_IGN for s in sd.STOP_SIGNALS],
+                          "alarm_left": signal.alarm(0),
+                          "soft_eq_hard": [resource.getrlimit(r)[0] == resource.getrlimit(r)[1]
+                                           for r in (resource.RLIMIT_CPU, resource.RLIMIT_AS)]}}))
+    """)
+    assert out.returncode == 0, out.stderr[-500:]
+    r = json.loads(out.stdout)
+    assert r == {"armed": [True] * 5, "stopping": True, "ignored": [True] * 5, "alarm_left": 0,
+                 "soft_eq_hard": [True, True]}
+    assert {s.name for s in sd.STOP_SIGNALS} == {"SIGXCPU", "SIGALRM", "SIGTERM", "SIGHUP", "SIGINT"}
+
+
+_SIGNAL_CHILD = """
+import sys, json, time
+sys.path.insert(0, {here!r})
+import study_driver as sd, synthetic_cells as syn, nested_solver as ns
+from pathlib import Path
+tmp = Path({tmp!r})
+sd.APPROVAL = tmp / "STUDY-APPROVAL.json"; sd.APPROVAL.write_text("{{}}")
+sd.APPROVAL_CONSUMED = tmp / "STUDY-APPROVAL.consumed.json"
+sd.ATTEMPT_MARKER = tmp / "ATTEMPT-SPENT.json"
+sd.RESULTS_ROOT = tmp / "results"
+sd.common_ledger_path = lambda repo=None: tmp / "gitcommon" / sd.COMMON_LEDGER
+(tmp / "gitcommon").mkdir()
+pre = sd.load_pre()
+mesh, model = syn.chip_cell(h0=0.1, q=3.0, hmax=1.0, split_port=True)
+sd.ladder = lambda m: [m, m, m]
+pre["configuration"]["level_mesh_digests"] = {{str(h): ns.mesh_digest(mesh) for h in range(3)}}
+sd._read_pre = lambda: (pre, "f" * 64)
+sd.require_approval = lambda p, now=None, **k: {{}}
+sd.unbound_repo_modules = lambda: []
+sd.environment_problems = lambda p: []
+sd.invocation_problems = lambda p, m=None: []
+sd.qmhp_mesh = lambda cfg=None: mesh
+sd._model = lambda cfg=None: model
+sd.band_baseline = lambda p: pre["consistency_check"]["band"]["values_at_freeze"]
+sd.anchor_values = lambda p: {{"C0_F": 1.0, "C1_F": 1.0}}
+def busy(meshes, model, write, t0, levels, after_level=None):
+    write("level0.json", {{"level": 0}})
+    print("READY", flush=True)
+    while True:                     # a bytecode loop: the handler runs between bytecodes
+        pass
+sd.run_levels = busy
+sys.exit(sd.main([]))
+"""
+
+
+@pytest.mark.parametrize("sig", ["SIGINT", "SIGTERM", "SIGHUP"])
+def test_a_stop_signal_delivered_twice_to_the_process_group_still_leaves_a_sealed_record(tmp_path, sig):
+    """Revision 2 lost failure.json and the manifest when GNU timeout forwarded a group
+    signal a second time (Ctrl-C: 8 of 8 trials on a bytecode loop). The real
+    _enforce_budget, _on_limit, _disarm and failure path, under the declared wrapper."""
+    import signal as sg
+    import time
+    for trial in range(4):
+        d = tmp_path / f"t{trial}"
+        d.mkdir()
+        code = _SIGNAL_CHILD.format(here=str(HERE), tmp=str(d))
+        proc = subprocess.Popen(["timeout", "--signal=KILL", "120", sys.executable, "-c", code],
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                start_new_session=True, env={**os.environ, **THREADS}, cwd=str(REPO))
+        assert proc.stdout.readline().strip() == "READY", proc.stderr.read()[-800:]
+        time.sleep(0.05 * trial)
+        os.killpg(proc.pid, getattr(sg, sig))
+        _, err = proc.communicate(timeout=120)
+        assert proc.returncode == 3, (trial, proc.returncode, err[-1500:])
+        (rec,) = (d / "results").glob(sd.RECORD_PREFIX + "*")
+        assert manifest.verify(rec) == [], trial
+        f = _strict_json(rec / "failure.json")
+        got = [e["signal"] for e in f["signals_received"]]
+        # two deliveries (timeout forwards the group signal) unless the kernel merged them
+        assert sig in f["error"] and got in ([sig], [sig, sig]), (trial, got)
+
+
+def test_the_evidence_writes_are_atomic_and_strict(tmp_path, monkeypatch):
+    target = tmp_path / "x.json"
+    sd._dump(target, {"nan": float("nan"), "inf": [np.inf, -np.inf], "np": np.float64(2.5), "i": np.int64(3), "b": np.bool_(True)})
+    assert _strict_json(target) == {"nan": None, "inf": [None, None], "np": 2.5, "i": 3, "b": True}
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["x.json"]
+
+    def interrupted(src, dst):
+        raise sd.BudgetExceeded("SIGTERM")
+
+    monkeypatch.setattr(sd.os, "replace", interrupted)
+    with pytest.raises(sd.BudgetExceeded):
+        sd._dump(tmp_path / "y.json", {"a": 1})
+    assert not (tmp_path / "y.json").exists() and (tmp_path / "y.json.partial").is_file()
 
 
 def test_the_failure_path_survives_memory_exhaustion_by_small_allocations(tmp_path):
@@ -838,16 +1390,21 @@ def test_the_failure_path_survives_memory_exhaustion_by_small_allocations(tmp_pa
         from pathlib import Path
         tmp = Path({str(tmp_path)!r})
         sd.APPROVAL = tmp / "STUDY-APPROVAL.json"; sd.APPROVAL.write_text("{{}}")
+        sd.APPROVAL_CONSUMED = tmp / "STUDY-APPROVAL.consumed.json"
         sd.ATTEMPT_MARKER = tmp / "ATTEMPT-SPENT.json"
         sd.RESULTS_ROOT = tmp / "results"
+        sd.common_ledger_path = lambda repo=None: tmp / "gitcommon" / sd.COMMON_LEDGER
+        (tmp / "gitcommon").mkdir()
         pre = sd.load_pre()
         mesh, model = syn.chip_cell(h0=0.1, q=3.0, hmax=1.0, split_port=True)
         pre["configuration"]["level_mesh_digests"] = {{str(h): ns.mesh_digest(m) for h, m in enumerate(sd.ladder(mesh))}}
         pre["budget"]["memory_GB"] = 1.5
         sd.load_pre = lambda: pre
-        sd.require_approval = lambda p: {{}}
+        sd._read_pre = lambda: (pre, "f" * 64)
+        sd.require_approval = lambda p, now=None, **k: {{}}
         sd.unbound_repo_modules = lambda: []
         sd.environment_problems = lambda p: []
+        sd.invocation_problems = lambda p, m=None: []
         sd.qmhp_mesh = lambda cfg=None: mesh
         sd._model = lambda cfg=None: model
         sd.band_baseline = lambda p: pre["consistency_check"]["band"]["values_at_freeze"]
@@ -895,8 +1452,23 @@ def test_the_committed_solver_verification_passes_every_check():
                 assert t["status"] == "CERTIFIED" and t["rel_err_vs_continuum"] < 1e-12
     for name, row in v["V1b_certificate_against_exact_discrete_minimum"].items():
         assert row["within_certificate"] and row["at_or_above_minimum_up_to_evaluation"], name
-    for name, row in v["V6_evaluation_bound_against_exact_arithmetic"].items():
-        assert row["bound_covers_error"], name
+        assert row["total_bound_nd"] >= row["residual_certificate_nd"] + row["evaluation_bound_nd"] * (1 - 1e-12)
+    c = v["V1c_residual_certificate_against_exact_excess"]
+    good, bad = c["certificate"], c["negative_control_c_times_10"]
+    assert good["bound_covers_exact_excess_at_every_iterate"] and good["lowest_mode"]["bound_covers_exact_excess"]
+    assert good["iterates_audited"] >= 10 and 1 < good["lowest_mode"]["margin"] < 10
+    assert not bad["lowest_mode"]["bound_covers_exact_excess"], "the negative control must fail"
+    v6 = v["V6_evaluation_bound_against_exact_arithmetic"]
+    for name, row in v6.items():
+        assert row["bound_covers_error"] and row["analytic_terms_cover_extended_error"], name
+    assert any(row["negative_control_violates_the_analytic_terms"] for n, row in v6.items() if "shifted" in n)
+    for cell, rows in v["V7_assembly_term"].items():
+        for row in rows:
+            for q in row["problems"].values():
+                assert q["estimate_covers_first_order_effect"], (cell, row["level"])
+            assert all(r["rho_gershgorin_over_c"] <= ns.RHO_OVER_C_COVERED for r in row["gap"]["problems"].values())
+    lb = v["V7_assembly_term"]["layered_box"][2]["problems"]["x"]      # V1's discrepancy, explained
+    assert abs(lb["continuum_minus_first_order_effect_rel"]) <= 2 * lb["certified_total_rel"] < abs(lb["direct_rel_err_vs_continuum"])
     for cell in ("V2_level2_small", "V2_level2_medium"):
         c = v[cell]
         assert c["preconditions_failed"] == [[], [], []]
@@ -924,8 +1496,12 @@ def test_the_committed_solver_verification_passes_every_check():
     assert n["e_zero_initial_guess"]["status"] == "CERTIFIED"
     assert n["f_perturbed"]["increase_positive"] and n["f_perturbed"]["bound_covers_increase"]
     assert n["g_folded_mesh"]["preconditions_failed"] and not n["g_folded_mesh"]["certificate_covers_excess"]
-    assert n["h_stagnation_rule"] == {"inf_30_then_converging": {"status": "CERTIFIED", "iterations": 32},
-                                      "finite_flat": {"status": "STAGNATED", "iterations": 21}}
+    h = n["h_stagnation_rule"]
+    assert h["inf_30_residual_falling_then_converging"] == {"status": "CERTIFIED", "iterations": 32}
+    assert h["inf_flat_residual"] == {"status": "STAGNATED", "iterations": 21}
+    assert h["finite_flat"] == {"status": "STAGNATED", "iterations": 21}
+    assert h["stuck_solve_masked_preconditioner"]["status"] == "STAGNATED"
+    assert h["stuck_solve_masked_preconditioner"]["finite_checks"] == 0 and h["stuck_solve_masked_preconditioner"]["iterations"] < 200
 
 
 def test_the_committed_preflight_solved_nothing_and_found_the_study_well_posed(pre):
@@ -941,7 +1517,11 @@ def test_the_committed_preflight_solved_nothing_and_found_the_study_well_posed(p
         sizes = pre["configuration"]["level_sizes_tets_nodes_unknownsC_unknownsCprime_nnzA"][h]
         assert sizes == [lv["n_tets"], lv["n_nodes"], lv["problems"]["C"]["n_unknowns"],
                          lv["problems"]["Cprime"]["n_unknowns"], lv["problems"]["C"]["nnz_A"]]
+        g = lv["assembly_gap_estimate"]
+        assert g == pre["configuration"]["assembly_gap_preflight"]["levels"][h], "the pre-declaration quotes it exactly"
+        assert pre["configuration"]["assembly_gap_preflight"]["abs_sum_nd"][h] == g["abs_sum_nd"]
         for kind in ns.KINDS:
+            assert g["problems"][kind]["rho_gershgorin_over_c"] <= ns.RHO_OVER_C_COVERED
             q = lv["problems"][kind]
             assert q["certificate_floor_proxy_nd"] < 1e-3 * t["certificate_rel_tol"]
             # a margin of at least 100 to the tolerance for any energy >= 1 (E_1 = 2.32 on record)
@@ -972,6 +1552,9 @@ def test_the_committed_dry_run_fits_the_budget_and_matches_the_stated_estimate(p
                                   "setup_wall_s": round(t["setup_wall_s"], 2),
                                   "wall_s_per_iteration": round(t["wall_s_per_iteration"], 4)}
     assert set(d["pcg_histories"]) == {"level2-C", "level2-Cprime", "level1-C-crosscheck", "level1-Cprime-crosscheck"}
+    w = d["evidence_writes"]                              # the per-solve writes, at full size
+    assert w["files"] == [n for n in RAW if n != "consistency-level0.json"]
+    assert w["manifest_verify"] == [] and w["unexpected_files"] == [] and w["strict_json"] is True
 
 
 # --- the pre-declaration and the code agree -------------------------------------------------
@@ -985,8 +1568,9 @@ def test_the_predeclaration_is_frozen_and_complete(pre):
                 "no_combination", "budget", "stop_conditions", "expected_evidence",
                 "cannot_establish", "revision", "synthetic_expectations"):
         assert key in pre, key
-    assert pre["status"].startswith("PREPARED. NOT APPROVED. NOT EXECUTED.")
-    assert pre["revision"]["number"] == 2 and "864c0ba" in pre["revision"]["previous"]
+    assert pre["status"].startswith("PREPARED. NOT APPROVED. NOT EXECUTED. Revision 3.")
+    assert pre["revision"]["number"] == 3 and "9aa951f" in pre["revision"]["previous"]
+    assert "864c0ba" in pre["revision"]["previous"]
 
 
 def test_the_predeclaration_states_exactly_what_the_code_does(pre):
@@ -1005,12 +1589,27 @@ def test_the_predeclaration_states_exactly_what_the_code_does(pre):
                                              for n in pre["reproduction"]["sha256"]}
     assert set(pre["consistency_check"]["consequence"]) == {"CONSISTENT", "INCONSISTENT-LOW",
                                                             "INCONSISTENT-HIGH", "UNRESOLVED", "UNQUALIFIED"}
+    cons = pre["consistency_check"]["consequence"]
+    for cause in ("static C' implementation", "N != 1", "p definition", "weak-mode p", "identity as applied"):
+        assert cause in cons["INCONSISTENT-LOW"] and cause in cons["INCONSISTENT-HIGH"], cause
+    assert ns.RHO_OVER_C_COVERED == 5e-4 and "RHO_OVER_C_COVERED = 5e-4" in pre["method"]["certificate"]
+    assert f"BOUND_SAFETY = {ns.BOUND_SAFETY}" in pre["method"]["certificate"]
+    current = json.dumps({k: v for k, v in pre.items() if k != "revision"})   # the history may quote it
+    assert "about 1e-14" not in current, "the assembly term is estimated, not asserted"
+    assert "SIGINT" in b["enforcement"] and "FIRST stop signal raises" in b["enforcement"]
 
 
-def test_the_review_record_is_kept():
+def test_the_review_records_are_kept():
     r = _strict_json(HERE / "review" / "review_864c0ba.json")
     assert r["snapshot"].startswith("864c0baef389bbe0a45345b7b27cf74f8afd17c4")
     assert r["summary_counts"] == {"blocking": 0, "major_confirmed": 10, "minor": 25}
+    r = _strict_json(HERE / "review" / "review_9aa951f.json")
+    assert r["snapshot"].startswith("9aa951fae23c413c47518e2c4f3bfed8096c4f4d")
+    assert r["summary_counts"] == {"blocking": 0, "major_new_confirmed": 3, "major_revision1_partly_fixed_confirmed": 2,
+                                   "minor_new": 21, "minor_revision1_partly_fixed_confirmed": 3,
+                                   "revision1_fixed": 30, "revision1_partly_fixed": 5}
+    found = sorted(f["id"] for lens in r["lenses"] for f in lens["review"]["findings"])
+    assert len(found) == 24 and {"R2-1", "R2-2", "R2-CC-1"} <= set(found)
 
 
 def test_the_withdrawn_paired_test_is_preserved_unchanged():
@@ -1049,5 +1648,8 @@ def test_the_report_states_the_status_and_keeps_proof_and_model_apart():
     for h in ("## 1.", "## 2.", "## 3.", "## 4.", "## 5.", "## 6.", "## 7.", "## 8."):
         assert h in text, h
     for phrase in ("model-based", "relative to the assembled operator", "UNAVAILABLE",
-                   "Sprime_static_identity_not_confirmed", "revision 2", "SIGKILL"):
+                   "Sprime_static_identity_not_confirmed", "revision 3", "SIGKILL", "git common directory",
+                   "STUDY-APPROVAL.consumed.json", "not conservative for the certificate"):
         assert phrase in text, phrase
+    for stale in ("about 1e-14", "exact execution path", "10^2-10^4", "four certificates", "so it is tight"):
+        assert stale not in text, stale

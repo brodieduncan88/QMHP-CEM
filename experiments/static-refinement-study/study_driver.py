@@ -32,24 +32,30 @@ Modes
 ``--preflight``  QMHP mesh, GEOMETRY AND ASSEMBLY ONLY: digests of levels 0-2, topology, the
                  tiling, certificate and identity preconditions, Galerkin identities, sizes,
                  round-off proxies. No linear solve, no capacitance.
-``--dry-run``    the exact execution path on the QMHP-sized synthetic cell, under the
-                 declared budget. No QMHP data.
+``--dry-run``    the solve path (run_levels) and its per-solve evidence writes on the
+                 QMHP-sized synthetic cell, under the declared budget, into a scratch
+                 directory sealed by write_verified. The approval, the ledger, provenance,
+                 the level-0 check and the summary are not exercised. No QMHP data.
 (default)        THE STUDY. Refuses unless STUDY-APPROVAL.json binds the mesh, the
-                 pre-declaration, every executed code file, the environment, the approved
-                 commit, this checkout and a validity window. One attempt: ATTEMPT-SPENT.json
-                 and the record directory are created before any solve and spend it.
-                 provenance.json is written first, then each solve's raw result as it
-                 completes, then summary.json (or failure.json), then manifest.sha256 by
-                 orchestrator/manifest.py's write_verified. A kernel or outer SIGKILL (the
-                 hard CPU limit, the outer timeout, the OOM killer) cannot be caught: it
-                 leaves the spent record with no failure.json and no manifest, to be
-                 quarantined by content.
+                 pre-declaration, every executed code file, the environment, the declared
+                 invocation, the approved commit, this checkout and a validity window. One
+                 attempt, spent before any solve by three ledger entries: a marker in the
+                 git common directory (which no checkout touches), ATTEMPT-SPENT.json, and
+                 the approval itself, renamed to STUDY-APPROVAL.consumed.json. Then
+                 provenance.json, each solve's raw result as it completes, summary.json (or
+                 failure.json), and manifest.sha256 by orchestrator/manifest.py's
+                 write_verified. A signal raises once; every later one is recorded and
+                 ignored, so the failure path completes. A kernel or outer SIGKILL (the hard
+                 CPU limit, the outer timeout, the OOM killer) cannot be caught: it leaves the
+                 spent record with no failure.json and no manifest, to be quarantined by
+                 content.
 """
 from __future__ import annotations
 
 import argparse
 import csv
 import gc
+import hashlib
 import importlib.util
 import json
 import math
@@ -68,6 +74,13 @@ import numpy as np
 import scipy
 
 _T_START = time.monotonic()
+#: As the study, every repository module is compiled from its source: bytecode caches are
+#: neither read (the prefix cannot exist) nor written, so the digests the approval binds
+#: are of the code that runs. invocation_problems() checks that this is in force.
+NO_BYTECODE_CACHE = "/dev/null/qmhp-no-bytecode-cache"
+if __name__ == "__main__":
+    sys.dont_write_bytecode = True
+    sys.pycache_prefix = NO_BYTECODE_CACHE
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 sys.path.insert(0, str(HERE))
@@ -90,7 +103,11 @@ manifest = _load_by_path("qmhp_orchestrator_manifest", REPO / "orchestrator" / "
 
 PREDECLARATION = HERE / "predeclaration.json"
 APPROVAL = HERE / "STUDY-APPROVAL.json"
+#: the approval, renamed when the attempt is spent, so no later checkout holds a usable one
+APPROVAL_CONSUMED = HERE / "STUDY-APPROVAL.consumed.json"
 ATTEMPT_MARKER = HERE / "ATTEMPT-SPENT.json"
+#: the ledger entry in the git common directory, relative to it
+COMMON_LEDGER = Path("qmhp-attempts") / "STATIC-REFINEMENT-STUDY.json"
 RESULTS_ROOT = REPO / "results"
 RECORD_PREFIX = "STATIC-REFINEMENT-STUDY-"
 #: every repository file this process executes on the execution path; a test and
@@ -100,6 +117,8 @@ CODE_FILES = {"study_driver.py": HERE / "study_driver.py",
               "anchor_fem.py": HERE.parent / "static-anchor-hypothesis" / "anchor_fem.py",
               "orchestrator/manifest.py": REPO / "orchestrator" / "manifest.py"}
 LEVELS = (0, 1, 2)
+#: the signals that end the attempt: each raises BudgetExceeded once (see _on_limit)
+STOP_SIGNALS = (signal.SIGXCPU, signal.SIGALRM, signal.SIGTERM, signal.SIGHUP, signal.SIGINT)
 #: RLIMIT_AS hard limit above the soft one, so the failure path can raise its own soft limit
 AS_HEADROOM_BYTES = 1024 ** 3
 MAX_APPROVAL_WINDOW = timedelta(days=7)
@@ -163,7 +182,16 @@ def _clean(o):
 
 
 def _dump(path: Path, obj) -> None:
-    path.write_text(json.dumps(_clean(obj), indent=1, allow_nan=False) + "\n")
+    """Strict JSON, written atomically: to <name>.partial, flushed and fsynced, then renamed.
+    An interruption leaves either the complete file or a .partial one, never an empty or
+    truncated file under the final name."""
+    text = json.dumps(_clean(obj), indent=1, allow_nan=False) + "\n"
+    part = path.with_name(path.name + ".partial")
+    with open(part, "w") as fh:
+        fh.write(text)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(part, path)
 
 
 # --- the execution path (shared by the study and the dry run) ----------------------------
@@ -177,7 +205,7 @@ def ladder(mesh0: dict) -> list[dict]:
 
 
 _CROSS_KEYS = ("energy_nd", "total_error_bound_nd", "total_error_bound_rel", "C_fF",
-               "port_voltage", "cpu_s", "wall_s")
+               "port_voltage", "extended_precision_probe_ok", "phi_abs_max", "cpu_s", "wall_s")
 _FACT_KEYS = ("max_face_multiplicity", "boundary_faces", "every_boundary_face_is_tagged",
               "every_boundary_face_on_the_box_surface",
               "every_interior_face_separates_its_tetrahedra", "volume_sum_over_box_minus_1")
@@ -305,6 +333,9 @@ def level_integrity(lv, h: int, pre: dict, anchor: dict | None) -> list[str]:
                            f"{t['certificate_rel_tol']}")
             if abs(b["port_voltage"] - 1.0) > t["port_voltage_abs_tol"]:
                 bad.append(f"{tag}: port voltage {b['port_voltage']!r} is not 1")
+            if b.get("extended_precision_probe_ok") is not True:
+                bad.append(f"{tag}: the long-double arithmetic probe failed or is missing, so "
+                           "the evaluation bound is invalid")
             bad += _solver_problems(tag, b["solver"], t)
         if h == 1:
             x = r["twogrid_cross_check"]
@@ -321,6 +352,17 @@ def level_integrity(lv, h: int, pre: dict, anchor: dict | None) -> list[str]:
     return bad
 
 
+def nesting_failures(levels, pairs) -> list[str]:
+    """Nested refinement cannot raise the energy: E_b <= E_a within the two bounds."""
+    bad = []
+    for kind in ns.KINDS:
+        for ha, hb in pairs:
+            a, b = levels[ha]["problems"][kind], levels[hb]["problems"][kind]
+            if b["energy_nd"] > a["energy_nd"] + a["total_error_bound_nd"] + b["total_error_bound_nd"]:
+                bad.append(f"{kind}: energy rose from level {ha} to {hb}, which nesting forbids")
+    return bad
+
+
 def integrity(levels, pre: dict, anchor: dict | None) -> list[str]:
     """Every failure makes the record UNQUALIFIED. None of these is a scientific outcome."""
     if not isinstance(levels, list) or len(levels) != len(LEVELS):
@@ -331,12 +373,7 @@ def integrity(levels, pre: dict, anchor: dict | None) -> list[str]:
         bad += level_integrity(lv, h, pre, anchor)
     if bad:
         return bad
-    for kind in ns.KINDS:                      # nested refinement cannot raise the energy
-        for h in LEVELS[1:]:
-            a, b = levels[h - 1]["problems"][kind], levels[h]["problems"][kind]
-            if b["energy_nd"] > a["energy_nd"] + a["total_error_bound_nd"] + b["total_error_bound_nd"]:
-                bad.append(f"{kind}: energy rose from level {h - 1} to {h}, which nesting forbids")
-    return bad
+    return nesting_failures(levels, [(h - 1, h) for h in LEVELS[1:]])
 
 
 def _interval(lv: dict, kind: str) -> tuple[float, float, float]:
@@ -378,7 +415,11 @@ def classify(values, lows, highs, w: dict) -> dict:
     if any(Rs[0] <= e <= Rs[1] for e in (1.0, w["R_min"], w["R_max"])):
         return {**out, "cls": "UNRESOLVED", "reason": "R is within its certified error of a class edge"}
     if R < 1.0:
-        return {**out, "cls": "NON-CONVERGENT", "reason": "the differences do not shrink"}
+        return {**out, "cls": "NON-CONVERGENT",
+                "reason": "the differences do not shrink at levels 0-2: no evidence of "
+                          "convergence at these levels. Also consistent with a leading order "
+                          "of 1 and a negative next term (h - 0.5 h^2 gives R = 0.8), or "
+                          "pre-asymptotic; not evidence against the order-1 theory"}
     if R < w["R_min"]:
         return {**out, "cls": "UNRESOLVED",
                 "reason": "observed order below 1: consistent with a leading order of 1 and a "
@@ -477,22 +518,63 @@ def consistency(levels, pre: dict, band: dict) -> dict:
 
 def level0_consistency(levels, pre: dict, band: dict | None, anchor: dict | None) -> dict:
     """The consistency verdict with its own scope: it needs level 0 only, so it is qualified
-    by the level-0 integrity items alone and survives any failure at levels 1-2."""
+    by the level-0 integrity items alone and survives any failure at levels 1-2 (but see
+    nesting_0_to_1). This is what consistency-level0.json holds, written after level 0."""
     if band is None:
         return {"verdict": "NOT APPLICABLE", "reason": "synthetic run: no Palace band"}
     if not levels:
         return {"verdict": "UNQUALIFIED", "reason": "level 0 did not complete"}
     bad = level_integrity(levels[0], 0, pre, anchor)
     if bad:
-        return {"verdict": "UNQUALIFIED", "level0_integrity_failures": bad}
+        return {"verdict": "UNQUALIFIED", "level0_integrity_failures": bad,
+                "meaning": pre["consistency_check"]["consequence"]["UNQUALIFIED"]}
     return {**consistency(levels, pre, band), "level0_integrity_failures": []}
 
 
+def nesting_0_to_1(levels, pre: dict, anchor: dict | None) -> dict:
+    """The one cross-level check that can implicate level 0: an energy that rises from level
+    0 to level 1 beyond both bounds means an energy or a certificate at level 0 or level 1
+    is wrong, and which one cannot be told. Checked only when both levels pass their own
+    integrity items."""
+    if not isinstance(levels, list) or len(levels) < 2:
+        return {"status": "NOT CHECKED", "reason": "level 1 did not complete"}
+    if level_integrity(levels[0], 0, pre, anchor) or level_integrity(levels[1], 1, pre, anchor):
+        return {"status": "NOT CHECKED", "reason": "level 0 or level 1 failed its own integrity items"}
+    bad = nesting_failures(levels, [(0, 1)])
+    return {"status": "FAILED" if bad else "PASSED", "failures": bad}
+
+
+def level0_verdict(levels, pre: dict, band: dict | None, anchor: dict | None) -> dict:
+    """The level-0 verdict as the summary reads it: level0_consistency, made UNQUALIFIED if
+    the 0-to-1 nesting check fails (fail-closed: it may implicate level 0)."""
+    v = level0_consistency(levels[:1], pre, band, anchor)
+    n = nesting_0_to_1(levels, pre, anchor)
+    v = {**v, "nesting_0_to_1": n}
+    if n["status"] == "FAILED" and v["verdict"] not in ("NOT APPLICABLE", "UNQUALIFIED"):
+        v = {**v, "verdict": "UNQUALIFIED", "verdict_before_the_nesting_check": v["verdict"],
+             "reason": "an energy rose from level 0 to level 1 beyond the bounds: an energy or "
+                       "a certificate at level 0 or level 1 is wrong",
+             "meaning": pre["consistency_check"]["consequence"]["UNQUALIFIED"]}
+    return v
+
+
+def _assembly_term(pre: dict, lv: dict, kind: str):
+    """max|phi|^2 sum|K - K_ld| / E at this level: the estimated first-order effect of the
+    uncertified assembly round-off, relative (None where the preflight did not measure it)."""
+    gap = pre.get("configuration", {}).get("assembly_gap_preflight", {}).get("abs_sum_nd")
+    r = lv["problems"][kind]
+    if not gap or str(lv["level"]) not in gap or not _finite_real(r.get("phi_abs_max")):
+        return None
+    return r["phi_abs_max"] ** 2 * gap[str(lv["level"])] / r["energy_nd"]
+
+
 def analyse(levels, pre: dict, band: dict | None, anchor: dict | None) -> dict:
-    level0 = level0_consistency(levels, pre, band, anchor)
+    level0 = level0_verdict(levels, pre, band, anchor)
     bad = integrity(levels, pre, anchor)
     out = {"consistency_check_level0": level0, "integrity_failures": bad}
     if bad:
+        out["consistency_check_level0"] = {
+            **level0, "in_this_record": pre["consistency_check"]["in_an_unqualified_record"]}
         out["outcome"] = {"verdict": "UNQUALIFIED", "reason": "; ".join(bad),
                           "consistency_check_level0": level0["verdict"]}
         return out
@@ -518,13 +600,17 @@ def analyse(levels, pre: dict, band: dict | None, anchor: dict | None) -> dict:
         c = cls[kind]
         cls[name] = {"cls": c["cls"], "values_GHz2": [lv["problems"][kind]["S_GHz2"] for lv in levels],
                      "lower_bound_GHz2": r2["S_GHz2"] / (1.0 + r2["total_error_bound_rel"]),
-                     "bound_basis": pre["classification"]["bound_basis"]}
+                     "bound_basis": pre["classification"]["bound_basis"],
+                     "assembly_term_estimate_rel_at_level2": _assembly_term(pre, levels[2], kind)}
         if "limit_bracket_model_based" in c:
             cls[name]["limit_bracket_model_based_GHz2"] = sorted(k / e for e in c["limit_bracket_model_based"])
+            cls[name]["bracket_assumption"] = c["bracket_assumption"]
+            cls[name]["remaining_rel_error_at_level2_bracket"] = c["remaining_rel_error_at_level2_bracket"]
     for kind in ns.KINDS:                      # C <= C_2 (Dirichlet principle)
         r2 = levels[2]["problems"][kind]
         cls[kind]["upper_bound_fF"] = r2["C_fF"] * (1.0 + r2["total_error_bound_rel"])
         cls[kind]["bound_basis"] = pre["classification"]["bound_basis"]
+        cls[kind]["assembly_term_estimate_rel_at_level2"] = _assembly_term(pre, levels[2], kind)
     out["classes"] = cls
     out["outcome"] = {"verdict": "QUALIFIED", "C": cls["C"]["cls"], "Cprime": cls["Cprime"]["cls"],
                       "delta": cls["delta"]["cls"], "consistency_check_level0": level0["verdict"],
@@ -539,6 +625,12 @@ def load_pre() -> dict:
     return json.loads(PREDECLARATION.read_text())
 
 
+def _read_pre() -> tuple[dict, str]:
+    """The pre-declaration and its digest from ONE read of the file."""
+    raw = PREDECLARATION.read_bytes()
+    return json.loads(raw), hashlib.sha256(raw).hexdigest()
+
+
 def qmhp_mesh(cfg: dict = CONFIG) -> dict:
     path = REPO / cfg["mesh"]
     if af.sha256(path) != cfg["mesh_sha256"]:
@@ -546,21 +638,34 @@ def qmhp_mesh(cfg: dict = CONFIG) -> dict:
     return af.read_gmsh22(path)
 
 
-def git_head(repo: Path = REPO) -> str:
-    """The commit this checkout has checked out, read from .git without running git."""
+def _git_dirs(repo: Path = REPO) -> tuple[Path, Path]:
+    """This checkout's git directory and the common directory it shares with every other
+    worktree of the same clone, read without running git."""
     g = repo / ".git"
     if g.is_file():                                        # a linked worktree
         gitdir = Path(g.read_text().split("gitdir:", 1)[1].strip())
         gitdir = gitdir if gitdir.is_absolute() else (repo / gitdir).resolve()
     else:
         gitdir = g
+    common = gitdir
+    if (gitdir / "commondir").is_file():
+        common = (gitdir / (gitdir / "commondir").read_text().strip()).resolve()
+    return gitdir, common
+
+
+def common_ledger_path(repo: Path = REPO) -> Path:
+    """The ledger entry that survives any checkout, reset or clean of this clone and of
+    every worktree that shares its git directory. It is never committed."""
+    return _git_dirs(repo)[1] / COMMON_LEDGER
+
+
+def git_head(repo: Path = REPO) -> str:
+    """The commit this checkout has checked out, read from .git without running git."""
+    gitdir, common = _git_dirs(repo)
     head = (gitdir / "HEAD").read_text().strip()
     if not head.startswith("ref:"):
         return head
     ref = head[4:].strip()
-    common = gitdir
-    if (gitdir / "commondir").is_file():
-        common = (gitdir / (gitdir / "commondir").read_text().strip()).resolve()
     for base in (gitdir, common):
         if (base / ref).is_file():
             return (base / ref).read_text().strip()
@@ -603,6 +708,57 @@ def environment_problems(pre: dict) -> list[str]:
             bad.append(f"environment variable {var} is {os.environ.get(var)!r}, required {val!r}")
     if not float(np.finfo(np.longdouble).eps) < want["longdouble_eps_below"]:
         bad.append("no extended-precision long double")
+    probe = ns.extended_precision_probe()
+    if not all(probe.values()):
+        bad.append(f"long-double arithmetic is not extended: {probe}")
+    return bad
+
+
+def _parent_argv() -> list[str] | None:
+    try:
+        raw = Path(f"/proc/{os.getppid()}/cmdline").read_bytes()
+    except OSError:
+        return None
+    return [a.decode(errors="replace") for a in raw.split(b"\0") if a]
+
+
+def measure_invocation() -> dict:
+    """How this process was started, as far as it can see: recorded in provenance.json and
+    compared with the declared invocation before the attempt is spent."""
+    bound = {name: getattr(sys.modules.get(mod), "__cached__", None)
+             for name, mod in (("nested_solver.py", "nested_solver"),
+                               ("anchor_fem.py", "anchor_fem"),
+                               ("orchestrator/manifest.py", "qmhp_orchestrator_manifest"))}
+    return {"cwd": os.getcwd(), "argv": list(sys.argv), "parent_argv": _parent_argv(),
+            "executable": sys.executable, "prefix": sys.prefix,
+            "optimize": sys.flags.optimize, "dont_write_bytecode": bool(sys.dont_write_bytecode),
+            "pycache_prefix": sys.pycache_prefix, "bytecode_cache_paths": bound,
+            "threads_env": {v: os.environ.get(v) for v in
+                            ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")}}
+
+
+def invocation_problems(pre: dict, measured: dict | None = None) -> list[str]:
+    """Differences between the measured invocation and the declared one
+    (predeclaration budget.invocation_measured_as)."""
+    want = pre["budget"]["invocation_measured_as"]
+    m = measure_invocation() if measured is None else measured
+    bad = []
+    if Path(m["cwd"]).resolve() != REPO:
+        bad.append(f"working directory {m['cwd']} is not the repository root {REPO}")
+    if m["argv"] != want["argv"]:
+        bad.append(f"argv {m['argv']} is not {want['argv']}")
+    pa = m["parent_argv"]
+    if not pa or Path(pa[0]).name != want["parent_argv"][0] or pa[1:] != want["parent_argv"][1:]:
+        bad.append(f"the parent process {pa} is not the declared {want['parent_argv']}")
+    if Path(m["prefix"]).resolve() != (REPO / want["interpreter_prefix"]).resolve():
+        bad.append(f"interpreter prefix {m['prefix']} is not the repository's {want['interpreter_prefix']}")
+    if m["optimize"] != 0:
+        bad.append(f"python optimisation level {m['optimize']} (asserts removed)")
+    if not (m["dont_write_bytecode"] and m["pycache_prefix"] == NO_BYTECODE_CACHE
+            and all(c is None or str(c).startswith(NO_BYTECODE_CACHE)
+                    for c in m["bytecode_cache_paths"].values())):
+        bad.append("repository modules were not compiled from their source "
+                   "(bytecode caches not bypassed)")
     return bad
 
 
@@ -616,18 +772,25 @@ def _parse_utc(s) -> datetime:
     return t.astimezone(timezone.utc)
 
 
-def require_approval(pre: dict, now: datetime | None = None) -> dict:
+def _read_approval() -> bytes:
     if not APPROVAL.is_file():
         raise Refusal("no STUDY-APPROVAL.json: the static-only nested refinement study is "
                       "PREPARED, NOT APPROVED. A human grants it by writing the approval that "
                       "binds the mesh, the pre-declaration, the code, the environment, the "
                       "approved commit, this checkout and a validity window.")
-    ap = json.loads(APPROVAL.read_text())
+    return APPROVAL.read_bytes()
+
+
+def require_approval(pre: dict, now: datetime | None = None, *, raw: bytes | None = None,
+                     pre_sha256: str | None = None) -> dict:
+    """The approval, from ``raw`` (one read of STUDY-APPROVAL.json) if given. The
+    pre-declaration digest is ``pre_sha256`` (from the same read as ``pre``) if given."""
+    ap = json.loads(_read_approval() if raw is None else raw)
     b = pre["budget"]
     want = {"authorises": "one execution of the static-only nested refinement study",
             "attempt": 1, "prior_records": [],
             "mesh_sha256": CONFIG["mesh_sha256"],
-            "predeclaration_sha256": af.sha256(PREDECLARATION),
+            "predeclaration_sha256": af.sha256(PREDECLARATION) if pre_sha256 is None else pre_sha256,
             "code_sha256": {name: af.sha256(path) for name, path in CODE_FILES.items()},
             "environment": pre["environment"], "invocation": b["invocation"],
             "budget": {k: b[k] for k in ("cpu_minutes", "memory_GB", "wall_cap_minutes",
@@ -650,9 +813,20 @@ def require_approval(pre: dict, now: datetime | None = None) -> dict:
     return ap
 
 
+#: signal state of the attempt: the first stop signal raises, every later one is recorded
+_SIGNALS = {"stopping": False, "received": []}
+
+
 def _on_limit(signum, _frame):
-    raise BudgetExceeded(f"{signal.Signals(signum).name}: a declared budget limit or a "
-                         "termination signal was reached")
+    """Raise BudgetExceeded for the FIRST stop signal only. Every later delivery - a second
+    SIGINT or SIGTERM forwarded by the outer timeout, a signal arriving while the failure
+    path runs - is recorded and returns, so nothing can interrupt the evidence writes."""
+    name = signal.Signals(signum).name
+    _SIGNALS["received"].append({"signal": name, "at_s": time.monotonic() - _T_START})
+    if _SIGNALS["stopping"]:
+        return
+    _SIGNALS["stopping"] = True
+    raise BudgetExceeded(f"{name}: a declared budget limit or a termination signal was reached")
 
 
 def _require_enforceable_budget(pre: dict) -> None:
@@ -671,27 +845,31 @@ def _enforce_budget(pre: dict) -> dict:
     Memory: RLIMIT_AS soft limit (an allocation beyond it fails), with a hard limit 1 GiB
     above so the failure path can raise its own soft limit. Wall: SIGALRM at the wall cap
     measured from module import, so the outer kill 60 s beyond the cap really is 60 s
-    later. SIGTERM and SIGHUP also raise, so they reach the failure path."""
+    later. SIGTERM, SIGHUP and SIGINT also raise, once (_on_limit)."""
     b = pre["budget"]
     cpu_s = int(b["cpu_minutes"] * 60)
     wall_s = max(1, int(b["wall_cap_minutes"] * 60 - (time.monotonic() - _T_START)))
     mem = int(b["memory_GB"] * 1024 ** 3)
+    _SIGNALS.update(stopping=False, received=[])
+    for sig in STOP_SIGNALS:
+        signal.signal(sig, _on_limit)
     resource.setrlimit(resource.RLIMIT_CPU, (cpu_s, cpu_s + 60))
     resource.setrlimit(resource.RLIMIT_AS, (mem, mem + AS_HEADROOM_BYTES))
-    for sig in (signal.SIGXCPU, signal.SIGALRM, signal.SIGTERM, signal.SIGHUP):
-        signal.signal(sig, _on_limit)
     signal.alarm(wall_s)
     return {"cpu_s": cpu_s, "cpu_hard_kill_s": cpu_s + 60, "address_space_bytes": mem,
             "address_space_hard_bytes": mem + AS_HEADROOM_BYTES, "wall_alarm_s": wall_s,
-            "wall_cap_from_start_s": int(b["wall_cap_minutes"] * 60)}
+            "wall_cap_from_start_s": int(b["wall_cap_minutes"] * 60),
+            "stop_signals": [sig.name for sig in STOP_SIGNALS]}
 
 
 def _disarm() -> None:
-    """First thing on the way out: no further signal can interrupt the evidence writes,
-    and the soft limits rise to the hard ones so the writes can allocate and run."""
-    signal.alarm(0)
-    for sig in (signal.SIGXCPU, signal.SIGALRM, signal.SIGTERM, signal.SIGHUP):
+    """On the way out: no further signal can interrupt the evidence writes (the stop flag
+    first, then every stop signal ignored and the alarm cancelled), and the soft limits rise
+    to the hard ones so the writes can allocate and run."""
+    _SIGNALS["stopping"] = True
+    for sig in STOP_SIGNALS:
         signal.signal(sig, signal.SIG_IGN)
+    signal.alarm(0)
     for rlim in (resource.RLIMIT_CPU, resource.RLIMIT_AS):
         try:
             hard = resource.getrlimit(rlim)[1]
@@ -700,31 +878,73 @@ def _disarm() -> None:
             pass
 
 
+def _shutdown() -> None:
+    """_disarm, retried: a first stop signal landing in the few bytecodes before the flag
+    is set raises here once, and the retry then completes (the flag is set by then)."""
+    for _ in range(3):
+        try:
+            _disarm()
+            return
+        except BaseException:              # noqa: BLE001 - a signal raised once; retry
+            _SIGNALS["stopping"] = True
+
+
 def _environment(files: dict = CODE_FILES) -> dict:
     return {"python": platform.python_version(), "numpy": np.__version__,
             "scipy": scipy.__version__, "platform": platform.platform(),
             "longdouble_eps": float(np.finfo(np.longdouble).eps),
+            "extended_precision_probe": ns.extended_precision_probe(),
             "threads_env": {v: os.environ.get(v) for v in
                             ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")},
             "code_sha256": {name: af.sha256(path) for name, path in files.items()}}
 
 
+def _guarded(fn):
+    """A failure-path extra: never lets its own failure stop the evidence writes."""
+    try:
+        return fn()
+    except BaseException as exc:            # noqa: BLE001
+        return {"could_not_be_computed": repr(exc)}
+
+
+def _create_exclusive(path: Path, obj) -> None:
+    """Create a ledger entry that must not exist (O_EXCL), with its content."""
+    fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+    with os.fdopen(fd, "w") as fh:
+        fh.write(json.dumps(_clean(obj), indent=1, allow_nan=False) + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+
+
+def spent_state(results_root: Path | None = None) -> list[str]:
+    """Every ledger entry that shows the one attempt has been spent."""
+    results_root = RESULTS_ROOT if results_root is None else results_root
+    found = [p.name for p in (ATTEMPT_MARKER, APPROVAL_CONSUMED) if p.exists()]
+    if common_ledger_path().exists():
+        found.append(f"<git common dir>/{COMMON_LEDGER}")
+    if results_root.exists():
+        found += sorted(p.name for p in results_root.glob(RECORD_PREFIX + "*"))
+    return found
+
+
 def execute(results_root: Path | None = None) -> Path:
     t0 = time.monotonic()
     results_root = RESULTS_ROOT if results_root is None else results_root
-    pre = load_pre()
-    if ATTEMPT_MARKER.exists():
-        raise Refusal(f"{ATTEMPT_MARKER.name} exists: the one attempt is spent")
-    existing = sorted(p.name for p in results_root.glob(RECORD_PREFIX + "*")) if results_root.exists() else []
-    if existing:
-        raise Refusal(f"{existing[0]} exists: the one attempt is spent")
-    approval = require_approval(pre)
+    pre, pre_sha = _read_pre()
+    spent = spent_state(results_root)
+    if spent:
+        raise Refusal(f"{spent[0]} exists: the one attempt is spent")
+    raw = _read_approval()
+    approval = require_approval(pre, raw=raw, pre_sha256=pre_sha)
     unbound = unbound_repo_modules()
     if unbound:
         raise Refusal(f"repository code the approval does not bind is loaded: {unbound}")
     env_bad = environment_problems(pre)
     if env_bad:
         raise Refusal(f"the environment differs from the verified one: {env_bad}")
+    inv_bad = invocation_problems(pre)
+    if inv_bad:
+        raise Refusal(f"the invocation differs from the declared one: {inv_bad}")
     band = band_baseline(pre)                  # digests checked before anything is spent
     anchor = anchor_values(pre)
     meshes = ladder(qmhp_mesh())
@@ -732,67 +952,123 @@ def execute(results_root: Path | None = None) -> Path:
     if digests != pre["configuration"]["level_mesh_digests"]:
         raise Refusal("a refined mesh differs from the pre-declared one")
     _require_enforceable_budget(pre)
-    provenance = {"predeclaration_sha256": af.sha256(PREDECLARATION),
-                  "approval_sha256": af.sha256(APPROVAL), "approval": approval,
+    common = common_ledger_path()
+    provenance = {"predeclaration_sha256": pre_sha,
+                  "approval_sha256": hashlib.sha256(raw).hexdigest(), "approval": approval,
                   "source_commit_measured": git_head(REPO), "repository_path": str(REPO),
                   "mesh_sha256": CONFIG["mesh_sha256"], "level_mesh_digests": digests,
                   "band_baseline": band, "static_anchor_values": anchor,
-                  "environment": _environment(),
+                  "environment": _environment(), "invocation": measure_invocation(),
                   "started_utc": datetime.now(timezone.utc).isoformat()}
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     rec = results_root / f"{RECORD_PREFIX}{stamp}"
-    try:                                       # the marker spends the attempt, fail-closed
-        fd = os.open(ATTEMPT_MARKER, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
-        raise Refusal(f"{ATTEMPT_MARKER.name} exists: the one attempt is spent") from None
-    with os.fdopen(fd, "w") as fh:
-        fh.write(json.dumps({"record": rec.name, "approval_sha256": provenance["approval_sha256"],
-                             "source_commit": provenance["source_commit_measured"],
-                             "spent_utc": provenance["started_utc"]}, indent=1) + "\n")
-    results_root.mkdir(exist_ok=True)
-    rec.mkdir(exist_ok=False)
-    levels, written, limits = [], [], None
+    ledger = {"record": rec.name, "approval_sha256": provenance["approval_sha256"],
+              "source_commit": provenance["source_commit_measured"],
+              "repository_path": str(REPO), "spent_utc": provenance["started_utc"]}
+    levels, written, created, limits, refused_exists = [], [], [], None, False
 
     def write(name, obj):
         _dump(rec / name, obj)
         written.append(name)
 
     def after_level(h, lv):
-        if h == 0:
-            write("consistency-level0.json", level0_consistency([lv], pre, band, anchor))
+        if h != 0:
+            return
+        try:                                   # an analysis fault must not end the solves
+            verdict = level0_consistency([lv], pre, band, anchor)
+        except (BudgetExceeded, MemoryError):
+            raise
+        except Exception as exc:               # noqa: BLE001
+            write("consistency-level0.error.json", {"error": repr(exc),
+                                                    "traceback": traceback.format_exc()})
+            return
+        write("consistency-level0.json", verdict)
 
     try:
-        limits = _enforce_budget(pre)
+        limits = _enforce_budget(pre)          # from here a stop signal raises, once
+        common.parent.mkdir(exist_ok=True)
+        try:                                   # the first ledger entry spends the attempt
+            _create_exclusive(common, ledger)
+        except FileExistsError:
+            refused_exists = True
+            raise
+        created.append(common)
+        _create_exclusive(ATTEMPT_MARKER, ledger)
+        created.append(ATTEMPT_MARKER)
+        os.rename(APPROVAL, APPROVAL_CONSUMED)  # the approval cannot be used again
+        results_root.mkdir(exist_ok=True)
+        rec.mkdir(exist_ok=False)
         write("provenance.json", {**provenance, "limits": limits})
         run_levels(meshes, _model(), write, t0, levels, after_level)
-        _disarm()
+        _shutdown()
         write("summary.json", {"provenance": "provenance.json", "resources": _usage(t0),
                                "C_fF": [lv["problems"]["C"]["C_fF"] for lv in levels],
                                "Cprime_fF": [lv["problems"]["Cprime"]["C_fF"] for lv in levels],
                                **analyse(levels, pre, band, anchor),
+                               "signals_received": _SIGNALS["received"],
                                "not_reported": "E_C,F1F1 and g; no coupling, readout frequency "
                                                "or Route A output is read or combined"})
         manifest.write_verified(rec)
     except BaseException as exc:               # the failure is the recorded outcome
-        _disarm()
-        tb = traceback.format_exc()
-        traceback.clear_frames(exc.__traceback__)
-        gc.collect()
-        try:
-            _dump(rec / "failure.json", {
-                "verdict": "FAILED - the one attempt is spent; no retry",
-                "levels_completed": [lv["level"] for lv in levels], "files_written": written,
-                "consistency_check_level0": (level0_consistency(levels[:1], pre, band, anchor)
-                                             if levels else None),
-                "error": repr(exc), "traceback": tb, "limits": limits, "resources": _usage(t0),
-                "provenance": provenance})
-            manifest.write_verified(rec)
-        except BaseException as exc2:
-            raise AttemptFailed(f"{rec.name}: {exc!r}; the failure record could not be "
-                                f"completed: {exc2!r}") from exc
-        raise AttemptFailed(f"{rec.name}: {exc!r} (recorded in failure.json; the one attempt "
-                            "is spent; no retry)") from exc
+        _shutdown()
+        if refused_exists:
+            raise Refusal(f"{COMMON_LEDGER} exists in the git common directory: the one "
+                          "attempt is spent") from None
+        if not common.exists():
+            raise Refusal(f"the attempt could not be started and nothing was spent: {exc!r}") from exc
+        _record_failure(exc, rec, ledger, created, pre, band, anchor, levels, written, limits,
+                        provenance, t0)
     return rec
+
+
+def _record_failure(exc, rec: Path, ledger: dict, created: list, pre, band, anchor, levels,
+                    written, limits, provenance, t0) -> None:
+    """The failure path of a spent attempt. Signals can no longer raise (_shutdown). Every
+    extra is guarded, so failure.json and the manifest are written whatever else fails; the
+    level-0 verdict is READ BACK from consistency-level0.json, never recomputed."""
+    tb = _guarded(traceback.format_exc)
+    _guarded(lambda: traceback.clear_frames(exc.__traceback__))
+    _guarded(gc.collect)
+    if APPROVAL.exists() and not APPROVAL_CONSUMED.exists():   # spent before the rename
+        _guarded(lambda: os.rename(APPROVAL, APPROVAL_CONSUMED))
+    if not rec.is_dir():                       # spent before the record existed
+        note = {**ledger, "record_created": False, "error": repr(exc), "traceback": tb,
+                "verdict": "FAILED - the one attempt is spent; no record could be created; no retry"}
+        where = created or [common_ledger_path()]     # only entries this process created
+        errs = [_guarded(lambda p=p: _dump(p, note)) for p in where]
+        raise AttemptFailed(f"{rec.name}: {exc!r}; no record could be created; the error is "
+                            f"in {[str(p) for p in where]} {[e for e in errs if e]}") from exc
+    level0_file = rec / "consistency-level0.json"
+    failure = {
+        "verdict": "FAILED - the one attempt is spent; no retry",
+        "error": repr(exc), "traceback": tb,
+        "levels_completed": _guarded(lambda: [lv["level"] for lv in levels]),
+        "files_written": list(written),
+        "partial_files": _guarded(lambda: sorted(p.name for p in rec.glob("*.partial"))),
+        "consistency_check_level0": _guarded(
+            lambda: json.loads(level0_file.read_text()) if level0_file.is_file() else None),
+        "consistency_check_level0_status": (
+            "as written after level 0 (consistency-level0.json); provisional: in a failed "
+            "record the 0-to-1 nesting check below is the only cross-level check applied"),
+        "nesting_0_to_1": _guarded(lambda: nesting_0_to_1(levels, pre, anchor)),
+        "summary_json_superseded": (rec / "summary.json").is_file(),
+        "signals_received": list(_SIGNALS["received"]),
+        "limits": limits, "resources": _guarded(lambda: _usage(t0)), "provenance": provenance}
+    err = None
+    try:
+        _dump(rec / "failure.json", failure)
+    except BaseException as exc1:              # noqa: BLE001 - still seal what exists
+        err = exc1
+    try:
+        manifest.write_verified(rec)
+    except BaseException as exc2:              # noqa: BLE001
+        raise AttemptFailed(f"{rec.name}: {exc!r}; the failure record could not be "
+                            f"completed: {err!r} {exc2!r}") from exc
+    if err is not None:
+        raise AttemptFailed(f"{rec.name}: {exc!r}; failure.json could not be written "
+                            f"({err!r}); the record is sealed by its manifest") from exc
+    raise AttemptFailed(f"{rec.name}: {exc!r} (recorded in failure.json; the one attempt "
+                        "is spent; no retry)") from exc
 
 
 # --- preflight and dry run -----------------------------------------------------------------
@@ -843,7 +1119,8 @@ def _preflight_level(L: "ns.Level", bf: dict, prev: "ns.Level | None", Pfull) ->
 
 
 def preflight() -> dict:
-    """Geometry and assembly only. No linear solve; no capacitance is computed."""
+    """Geometry and assembly only. No linear solve; no capacitance is computed. Includes the
+    assembly-gap estimate (an extended-precision re-assembly of K, compared entry by entry)."""
     t0 = time.monotonic()
     ns.require_extended_precision()
     model = _model()
@@ -855,20 +1132,41 @@ def preflight() -> dict:
         bf = ns.boundary_facts(mesh, L.xyz)
         Pfull = ns.prolongation(meshes[h - 1], mesh) if h else None
         out["levels"][str(h)] = _preflight_level(L, bf, prev, Pfull)
+        del bf, Pfull
+        out["levels"][str(h)]["assembly_gap_estimate"] = ns.assembly_gap(L)
         prev = L
     out["resources"] = _usage(t0)
     out["environment"] = _environment(EVIDENCE_CODE)
     return out
 
 
-def dry_run(budget: dict | None = None) -> dict:
-    """The execution path on the QMHP-sized synthetic cell, optionally under a budget."""
+def dry_run(budget: dict | None = None, evidence_dir: Path | None = None) -> dict:
+    """The solve path (run_levels) on the QMHP-sized synthetic cell, optionally under a
+    budget, with its per-solve evidence writes (_dump, strict JSON) into ``evidence_dir``
+    (a fresh temporary directory if None), sealed and verified by write_verified. Not
+    exercised: the approval, the ledger, provenance, the level-0 check and the summary."""
     import synthetic_cells as syn  # noqa: PLC0415 - synthetic only
+    import tempfile  # noqa: PLC0415
     t0 = time.monotonic()
     limits = _enforce_budget({"budget": budget}) if budget else None
+    evidence_dir = Path(tempfile.mkdtemp(prefix="qmhp-dry-run-")) if evidence_dir is None else evidence_dir
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    if any(evidence_dir.iterdir()):
+        raise Refusal(f"the dry-run evidence directory {evidence_dir} is not empty")
+    written = []
+
+    def write(name, obj):
+        _dump(evidence_dir / name, obj)
+        written.append(name)
+
     mesh, model = syn.chip_cell(**DRY_RUN_CELL)
     quality = ns.element_quality(mesh, af.scales(mesh, model["L0_m"], model["L_H"])["xyz_nd"])
-    levels = run_levels(ladder(mesh), model, lambda name, obj: None, t0)
+    levels = run_levels(ladder(mesh), model, write, t0)
+    manifest.write_verified(evidence_dir)
+    writes = {"files": written, "bytes": sum((evidence_dir / n).stat().st_size for n in written),
+              "manifest_verify": manifest.verify(evidence_dir),
+              "unexpected_files": manifest.unexpected_files(evidence_dir),
+              "strict_json": all(_strict_parse_ok(evidence_dir / n) for n in written)}
     _disarm()
     pre = load_pre()
     fake = {"integrity": pre["integrity"], "classification": pre["classification"],
@@ -901,7 +1199,18 @@ def dry_run(budget: dict | None = None) -> dict:
                                         for k, r in lv["problems"].items()}}
                           for lv in levels],
             "analysis_of_the_synthetic_levels": analyse(levels, fake, None, None),
+            "evidence_writes": writes,
             "environment": _environment(EVIDENCE_CODE), "qmhp_data_read": False}
+
+
+def _strict_parse_ok(path: Path) -> bool:
+    def bad(token):
+        raise ValueError(token)
+    try:
+        json.loads(path.read_text(), parse_constant=bad)
+        return True
+    except ValueError:
+        return False
 
 
 def main(argv=None) -> int:
@@ -911,12 +1220,19 @@ def main(argv=None) -> int:
     g.add_argument("--preflight", action="store_true")
     g.add_argument("--dry-run", action="store_true")
     ap.add_argument("--out")
+    g.add_argument("--show-invocation", action="store_true",
+                   help="print the measured invocation and its differences from the declared "
+                        "one, then exit; reads nothing else and computes nothing")
+    ap.add_argument("--evidence-dir", help="dry run only: where its per-solve files are written")
     args = ap.parse_args(argv)
     try:
-        if args.preflight:
+        if args.show_invocation:
+            m = measure_invocation()
+            res = {"measured": m, "differences_from_declared": invocation_problems(load_pre(), m)}
+        elif args.preflight:
             res = preflight()
         elif args.dry_run:
-            res = dry_run(load_pre()["budget"])
+            res = dry_run(load_pre()["budget"], Path(args.evidence_dir) if args.evidence_dir else None)
         else:
             print(execute())
             return 0

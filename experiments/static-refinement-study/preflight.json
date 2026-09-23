@@ -68,6 +68,18 @@
      "evaluation_matvec_term_proxy_nd": 1.339204623576969e-13,
      "evaluation_dot_term_factor": 7.584536297622352e-16
     }
+   },
+   "assembly_gap_estimate": {
+    "abs_sum_nd": 8.802962354085882e-12,
+    "max_entry_rel": 5.225515473673909e-16,
+    "problems": {
+     "C": {
+      "rho_gershgorin_over_c": 1.0336255263085188e-08
+     },
+     "Cprime": {
+      "rho_gershgorin_over_c": 1.0336255263085188e-08
+     }
+    }
    }
   },
   "1": {
@@ -139,6 +151,18 @@
      "evaluation_dot_term_factor": 5.092226553621319e-15,
      "galerkin_identity_rel": 6.594853697671926e-15,
      "fixed_rows_from_free_coarse_nnz": 0
+    }
+   },
+   "assembly_gap_estimate": {
+    "abs_sum_nd": 4.1446188075090105e-11,
+    "max_entry_rel": 1.1774377107680733e-15,
+    "problems": {
+     "C": {
+      "rho_gershgorin_over_c": 5.349564469462018e-08
+     },
+     "Cprime": {
+      "rho_gershgorin_over_c": 5.349564469462018e-08
+     }
     }
    }
   },
@@ -212,14 +236,26 @@
      "galerkin_identity_rel": 2.2686723185240468e-14,
      "fixed_rows_from_free_coarse_nnz": 0
     }
+   },
+   "assembly_gap_estimate": {
+    "abs_sum_nd": 1.8344275788099228e-10,
+    "max_entry_rel": 1.3701028137413803e-15,
+    "problems": {
+     "C": {
+      "rho_gershgorin_over_c": 4.941411353766304e-07
+     },
+     "Cprime": {
+      "rho_gershgorin_over_c": 4.941411353766304e-07
+     }
+    }
    }
   }
  },
  "resources": {
-  "wall_s": 71.43945144600002,
-  "cpu_s": 71.256185,
-  "max_rss_MB": 3679.26171875,
-  "peak_address_space_MB": 3851.58203125
+  "wall_s": 95.09838517099979,
+  "cpu_s": 94.990415,
+  "max_rss_MB": 3682.4921875,
+  "peak_address_space_MB": 3854.421875
  },
  "environment": {
   "python": "3.11.15",
@@ -227,18 +263,23 @@
   "scipy": "1.17.1",
   "platform": "Linux-6.18.44-fc-v37-x86_64-with-glibc2.39",
   "longdouble_eps": 1.0842021724855044e-19,
+  "extended_precision_probe": {
+   "scalar": true,
+   "csr_matvec": true,
+   "dot": true
+  },
   "threads_env": {
    "OPENBLAS_NUM_THREADS": "1",
    "OMP_NUM_THREADS": "1",
    "MKL_NUM_THREADS": "1"
   },
   "code_sha256": {
-   "study_driver.py": "75c04e729176e386460f89342f65f3f6676aaaecba2279da733eb81a240d6727",
-   "nested_solver.py": "4b4e233ef993ced8b71bfed00335dabcfc21b2c3de4399c418c78464654f0180",
+   "study_driver.py": "ee36a09369abb00c3a9435e625e39617a5105a3b9ff20fd293eada333432fbb3",
+   "nested_solver.py": "75ee657917ac86f0fc346cc086b44ecc0b24f5081ca914b478c84ae74b1cc03f",
    "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
    "orchestrator/manifest.py": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f",
    "synthetic_cells.py": "c3ac1e73a774b405fe7d9382d35ee2cc935e90ebe67d9ff0aa7a8167895f4d6b",
-   "verify_solver.py": "f5160578a65c444a60291d0fc5b7e0ef32fbe1a321d37881445dd2926055453a"
+   "verify_solver.py": "648d65661a24461477d5506e0565e1af47f4e0015b00a1282ab15b286cefb00e"
   }
  }
 }

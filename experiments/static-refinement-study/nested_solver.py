@@ -8,9 +8,12 @@ Problems (P1, eps-weighted, on anchor_fem's nondimensional mesh; anchor_fem is u
   "C"       phi = 1 on the island, 0 on ground. C_h = eps0 Lc E_h: the static-anchor quantity.
   "Cprime"  the same, and phi on every port-face node is also held at the linear function
             of the coordinate along the port direction (0 on the ground end line, 1 on the
-            island end line). More constraints, so C'_h >= C_h. For Palace's distributed
-            sheet port S_h = (1 + delta_h) H_h exactly, delta_h = C'_h / C_h - 1
-            (docs/coupled-candidate/static-band-pairing.md section 2).
+            island end line). More constraints, so C'_h >= C_h. UNDER the sheet-port
+            identity, S_h = (1 + delta_h) H_h with delta_h = C'_h / C_h - 1 and H_h Palace's
+            complete harmonic moment (docs/coupled-candidate/static-band-pairing.md
+            section 2). That identity is verified only against the project's own dense
+            model of Palace's port, not against Palace; the study's level-0 consistency
+            check is its first test against Palace's eigensolver.
 
 Solvers:
 
@@ -35,13 +38,22 @@ Certificate (both solvers, the same code):
   sum |vol| = vol(B)) and every node of every boundary face is constrained, a homogeneous
   discrete function extends by zero into H1_0(B), and
 
-      x^T A_s x >= eps_min int |grad v|^2 >= eps_min lambda_1(B) int v^2
-                >= eps_min lambda_1(B) sum_i m_i x_i^2,   m_i = sum_{K contains i} vol_K / 20
+      x^T A_ex x = eps-weighted int |grad v|^2 >= eps_min lambda_1(B) int v^2
+                 >= eps_min lambda_1(B) sum_i m_i x_i^2,   m_i = sum_{K contains i} vol_K / 20
 
   (Dirichlet eigenvalue monotonicity under domain inclusion; the P1 element mass
-  vol/20 (I + 1 1^T) dominates vol/20 I). So A_s >= c D_m with c = eps_min lambda_1(B), and
+  vol/20 (I + 1 1^T) dominates vol/20 I). A_ex is the EXACT Galerkin matrix of the float
+  coordinates. The assembled A_s differs from it by assembly round-off:
+  A_s >= (c - rho) D_m with c = eps_min lambda_1(B) and
+  rho = ||D_m^-1/2 (A_s - A_ex) D_m^-1/2||_2. Hence
 
-      0 <= E(phi~) - E_h <= sum_i r_s,i^2 / m_i / c.
+      0 <= E(phi~) - E_h <= sum_i r_s,i^2 / m_i / (c - rho).
+
+  The code divides by c and multiplies by BOUND_SAFETY = 1.001, which covers
+  1 / (1 - rho/c) for rho/c up to about 1e-3 together with the floating-point evaluation
+  of the bound itself (< 1e-9). rho is not certified: assembly_gap() estimates it by a
+  Gershgorin bound against an extended-precision re-assembly, and the preflight records
+  that estimate on every level of the ladder.
 
   |r_s,i| is bounded by the computed residual, the computed asymmetry terms and the
   floating-point error of computing r and b (gamma_n = n u / (1 - n u)).
@@ -54,8 +66,13 @@ Certificate (both solvers, the same code):
   bound plus |e64 - s| and the rounding of s to float64.
 
   Relative to the assembled operator: the round-off of assembling K from the coordinates
-  (about 1e-14 relative) is common to every solver and is NOT certified. "Rigorous" in this
-  study always means rigorous relative to the assembled operator.
+  is common to every solver and is NOT certified. Its first-order effect on an energy is
+  phi^T (K - K_ex) phi. It is problem-dependent: 5e-17 to 3e-15 relative on the QMHP-like
+  chip cells of the solver verification, but 1.3e-13 on its layered box (V7). The preflight
+  bounds it, under |phi| <= max|phi| as each solve records, by an extended-precision
+  re-assembly: max|phi|^2 sum_ij |K - K_ld|_ij (assembly_gap; an estimate, not a
+  certificate). "Rigorous" in this study always means rigorous relative to the assembled
+  operator, up to the rho of the Poincare step above.
 
 Nothing here reads the QMHP mesh, launches anything or writes anything.
 """
@@ -78,8 +95,12 @@ import anchor_fem as af  # noqa: E402
 KINDS = ("C", "Cprime")
 U64 = float(np.finfo(np.float64).eps) / 2.0
 ULD = float(np.finfo(np.longdouble).eps) / 2.0
-#: covers the floating-point evaluation of the bound itself (relative error < n u < 1e-9)
+#: covers (i) the floating-point evaluation of the bound itself (relative error < n u < 1e-9)
+#: and (ii) the assembled-vs-exact gap in the Poincare step, 1 / (1 - rho/c), for rho/c up to
+#: about 1e-3 (module docstring); the preflight records the estimated rho/c on every level
 BOUND_SAFETY = 1.001
+#: the largest estimated rho/c that BOUND_SAFETY is declared to cover
+RHO_OVER_C_COVERED = 5e-4
 
 
 class Refusal(RuntimeError):
@@ -90,11 +111,30 @@ def gamma(n: int, u: float = U64) -> float:
     return n * u / (1.0 - n * u)
 
 
+def extended_precision_probe() -> dict:
+    """Whether long-double ARITHMETIC (not only its storage format) has a mantissa wider
+    than float64's, through the three operations energy() uses: scalar addition, a
+    long-double CSR matrix-vector product and a long-double dot product. Each computes
+    (1 + 2^-60) - 1, which is 2^-60 with a 64-bit mantissa and 0 with 53 bits (an x87
+    precision-control word set to double, for example)."""
+    ld = np.longdouble
+    t = ld(2.0) ** -60
+    x = np.array([1.0, t, 1.0], dtype=ld)
+    a = np.array([1.0, 1.0, -1.0], dtype=ld)
+    row = sp.csr_matrix((a, np.array([0, 1, 2]), np.array([0, 3])), shape=(1, 3))
+    got = {"scalar": (ld(1.0) + t) - ld(1.0), "csr_matvec": (row @ x)[0], "dot": a @ x}
+    return {k: bool(v == t) for k, v in got.items()}
+
+
 def require_extended_precision() -> None:
-    """The evaluation-error bound needs a long double wider than float64."""
+    """The evaluation-error bound needs long-double arithmetic wider than float64."""
     if not np.finfo(np.longdouble).eps < 1e-18:
         raise Refusal(f"np.longdouble has eps {np.finfo(np.longdouble).eps}: no extended "
                       "precision on this platform, so the evaluation-error bound is unavailable")
+    probe = extended_precision_probe()
+    if not all(probe.values()):
+        raise Refusal(f"long-double arithmetic is not extended in {probe}: the evaluation-"
+                      "error bound is unavailable (x87 precision control?)")
 
 
 # --- mesh facts -----------------------------------------------------------------------
@@ -371,42 +411,58 @@ def certificate(sysm: dict, x: np.ndarray, m_free: np.ndarray, c: float) -> dict
             "roundoff_floor_nd": BOUND_SAFETY * float(((g + asym) ** 2 / m_free).sum()) / c}
 
 
-def energy(K, phi: np.ndarray) -> dict:
-    """phi^T K phi in float64 exactly as static_capacitance computes it, and a rigorous
-    bound on its evaluation error from an extended-precision re-evaluation (module
-    docstring): gamma_k |phi|^T|K||phi| for the matrix-vector product, gamma_n sum|phi_i y_i|
-    for the dot product, plus the float64-to-extended difference and its rounding."""
-    e64 = float(phi @ (K @ phi))
+def extended_energy(K, phi: np.ndarray, dtype=np.longdouble) -> tuple:
+    """s = phi . (K phi) evaluated in ``dtype`` and the analytic bound on |s - phi^T K phi|
+    for that evaluation: gamma_k |phi|^T|K||phi| (matrix-vector product) and
+    gamma_n sum|phi_i y_i| (dot product), with u of the extended format. ``dtype`` is a
+    parameter only so a negative control can evaluate in float64 against the same bound."""
     Kc = K.tocsr()
-    pl = phi.astype(np.longdouble)
-    y = Kc.astype(np.longdouble) @ pl
-    s_ld = pl @ y
+    pl = phi.astype(dtype)
+    y = Kc.astype(dtype) @ pl
+    s = pl @ y
     k = int(np.diff(Kc.indptr).max())
     t_matvec = gamma(k, ULD) * float(np.abs(phi) @ (abs(Kc) @ np.abs(phi)))
     t_dot = gamma(len(phi), ULD) * float(np.abs(pl * y).sum())
+    return s, t_matvec, t_dot
+
+
+def energy(K, phi: np.ndarray) -> dict:
+    """phi^T K phi in float64 exactly as static_capacitance computes it, and a rigorous
+    bound on its evaluation error from an extended-precision re-evaluation (module
+    docstring): the analytic terms of extended_energy, plus the float64-to-extended
+    difference and its rounding. The arithmetic probe is re-run with every evaluation and
+    recorded; the integrity checks require it."""
+    e64 = float(phi @ (K @ phi))
+    s_ld, t_matvec, t_dot = extended_energy(K, phi)
     s64 = float(s_ld)
     t_diff = abs(e64 - s64) + U64 * abs(s64)
     return {"energy_nd": e64, "energy_nd_extended": s64,
             "evaluation_error_bound_nd": BOUND_SAFETY * (t_matvec + t_dot + t_diff),
             "evaluation_bound_terms_nd": {"matvec": t_matvec, "dot": t_dot,
-                                          "float64_vs_extended": t_diff}}
+                                          "float64_vs_extended": t_diff},
+            "extended_precision_probe_ok": all(extended_precision_probe().values())}
 
 
 def pcg(A, b, x0, precond, *, maxiter: int, check_every: int, target_rel: float,
         stagnation_checks: int, certify) -> tuple[np.ndarray, dict]:
     """Preconditioned conjugate gradients. Every ``check_every`` iterations ``certify(x)``
     returns (relative certificate, TRUE residual norm). It stops when the relative
-    certificate reaches ``target_rel`` (CERTIFIED), after ``stagnation_checks`` FINITE
-    checks without a 10 % improvement on the best finite one (STAGNATED; an infinite
-    certificate - the bound still above the energy - never counts toward stagnation), on
-    breakdown, or at ``maxiter``. The status is a recorded diagnostic, not a verdict."""
+    certificate reaches ``target_rel`` (CERTIFIED); on breakdown; at ``maxiter``; or
+    (STAGNATED) after ``stagnation_checks`` checks of one kind without a 10 % improvement:
+    FINITE certificates are measured against the best finite certificate, and INFINITE
+    ones (the bound still above the energy) against the best true residual among the
+    infinite checks. The two counts are separate, so a solve whose certificate turns finite
+    late is not stopped by its infinite phase, and a solve whose residual is flat is stopped
+    even if its certificate never becomes finite. The status is a recorded diagnostic, not
+    a verdict."""
     w0 = time.monotonic()
     x = x0.copy()
     r = b - A @ x
     z = precond(r)
     p = z.copy()
     rz = float(r @ z)
-    hist, best, since, status, k = [], math.inf, 0, "MAXITER", 0
+    hist, status, k = [], "MAXITER", 0
+    best, since, best_true, since_inf = math.inf, 0, math.inf, 0
 
     def record(k_, rel_, true_):
         hist.append({"k": k_, "recursive_residual": float(np.linalg.norm(r)),
@@ -437,9 +493,13 @@ def pcg(A, b, x0, precond, *, maxiter: int, check_every: int, target_rel: float,
                     best, since = rel, 0
                 else:
                     since += 1
-                    if since >= stagnation_checks:
-                        status = "STAGNATED"
-                        break
+            elif true < 0.9 * best_true:
+                best_true, since_inf = true, 0
+            else:
+                since_inf += 1
+            if since >= stagnation_checks or since_inf >= stagnation_checks:
+                status = "STAGNATED"
+                break
         z = precond(r)
         rz_new = float(r @ z)
         if not (math.isfinite(rz_new) and rz_new > 0):
@@ -492,6 +552,51 @@ def certificate_preconditions(level: Level, bfacts: dict) -> list[str]:
         if dd.get("geo") is not None:
             bad += [f"{kind}: {p}" for p in port_geometry_problems(dd["geo"])]
     return bad
+
+
+def stiffness_extended(mesh: dict, xyz_nd, eps_r: dict, chunk: int = 400_000) -> sp.csr_matrix:
+    """anchor_fem.p1_stiffness re-assembled in long double from the same float coordinates:
+    barycentric gradients by the adjugate formula instead of np.linalg.inv, and the element
+    matrices summed in long double. A reference about 2000 times more accurate than the
+    float64 assembly, NOT an exact matrix; used only to estimate the assembly gap."""
+    ld = np.longdouble
+    t, n = mesh["tets"], len(xyz_nd)
+    eps = np.array([eps_r[int(a)] for a in mesh["tet_attr"]], dtype=ld)
+    out = sp.csr_matrix((n, n), dtype=ld)
+    for s0 in range(0, len(t), chunk):
+        tc = t[s0:s0 + chunk]
+        p = xyz_nd.astype(ld)[tc]
+        e1, e2, e3 = p[:, 1] - p[:, 0], p[:, 2] - p[:, 0], p[:, 3] - p[:, 0]
+        c1, c2, c3 = np.cross(e2, e3), np.cross(e3, e1), np.cross(e1, e2)
+        det = np.einsum("ij,ij->i", e1, c1)
+        g = np.stack([-(c1 + c2 + c3), c1, c2, c3], 1) / det[:, None, None]
+        loc = np.einsum("tik,tjk->tij", g, g) * (eps[s0:s0 + chunk] * np.abs(det) / 6)[:, None, None]
+        rows = np.repeat(tc, 4, axis=1).ravel()
+        cols = np.tile(tc, (1, 4)).ravel()
+        out = out + sp.coo_matrix((loc.ravel(), (rows, cols)), shape=(n, n)).tocsr()
+    return out.tocsr()
+
+
+def assembly_gap(level: Level) -> dict:
+    """Estimates of the uncertified assembly round-off, against stiffness_extended (an
+    estimate, not a certificate). Per level: sum_ij |K - K_ld|_ij, which bounds the
+    first-order energy effect |phi^T (K - K_ld) phi| for |phi| <= 1 (scale by max|phi|^2),
+    and the largest entry relative to max|K|. Per problem: a Gershgorin bound on
+    rho = ||D_m^-1/2 sym(A - A_ld) D_m^-1/2||_2, divided by c (the Poincare step)."""
+    Kl = stiffness_extended(level.mesh, level.xyz, level.model["eps_r"])
+    dK = (level.K.astype(np.longdouble) - Kl).astype(np.float64).tocsr()
+    del Kl
+    adK = abs(dK)
+    out = {"abs_sum_nd": float(adK.sum()),
+           "max_entry_rel": float(adK.max() / abs(level.K).max()), "problems": {}}
+    for kind, dd in level.dd.items():
+        f = dd["free"]
+        aA = adK[f][:, f]
+        S = 0.5 * (aA + aA.T)
+        w = 1.0 / np.sqrt(level.m[f])
+        rho = float((w * (S @ w)).max())
+        out["problems"][kind] = {"rho_gershgorin_over_c": rho / level.poincare["c"]}
+    return out
 
 
 def solve(level: Level, kind: str, method: str, *, coarse: Level | None = None,
@@ -552,6 +657,7 @@ def solve(level: Level, kind: str, method: str, *, coarse: Level | None = None,
            "S_GHz2": 1.0 / ((2.0 * math.pi) ** 2 * level.model["L_H"] * C) * 1e-18,
            "port_voltage": (port_voltage(level.mesh, level.xyz, dd["geo"], level.model, phi)
                             if dd.get("geo") is not None else None),
+           "phi_abs_max": float(np.abs(phi).max()),
            "solution_sha256": hashlib.sha256(np.ascontiguousarray(phi, "<f8").tobytes()).hexdigest(),
            "solver": info, "cpu_s": time.process_time() - t0, "wall_s": time.monotonic() - w0}
     return out, phi
