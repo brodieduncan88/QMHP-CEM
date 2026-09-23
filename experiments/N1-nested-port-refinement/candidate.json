@@ -1,0 +1,84 @@
+{
+ "schema": "qmhp-cem.nested-refinement-candidate/0.1.0",
+ "id": "N1",
+ "mechanism": "Palace Model.Refinement.Boxes on the EXISTING mesh; no gmsh, no new mesh file",
+ "baseline_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+ "baseline_mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+ "candidate_mesh_sha256": "identical to baseline; the mesh file is an input, not regenerated",
+ "baseline_config_sha256": "0ae6e3ac793e4348983719a36de8a940bd72c92049d446f5262c4608c8e4ea6f",
+ "refinement_region": {
+  "BoundingBoxMin": [
+   -0.62,
+   -0.125,
+   -0.01
+  ],
+  "BoundingBoxMax": [
+   -0.58,
+   -0.065,
+   0.01
+  ],
+  "Levels": 1,
+  "units": "mesh length units (mm; Model.L0 = 0.001)",
+  "justification": "the lumped-port face (attribute 10) bounding box padded by 0.010 mm, the same pad R1 declared. NOTE: the same pad does NOT make the perturbation comparable in size -- R1 added 818 DOF, while this candidate's LOWER bound alone is +1920, at least 2.3x, before any green closure. The pad is shared for continuity of the declared region, not to match the perturbation magnitude."
+ },
+ "baseline_topology": {
+  "V": 13991,
+  "E_is_order1_dof": 79944,
+  "F": 130388,
+  "T": 64434
+ },
+ "marking": {
+  "criterion": "any vertex of the element inside the closed box (geodata.cpp:282-306)",
+  "marked_tets": 221,
+  "marked_fraction": 0.00343,
+  "marked_submesh": {
+   "E": 307,
+   "F": 464,
+   "T": 221
+  },
+  "material_attributes_touched": [
+   1,
+   3
+  ],
+  "accounting_gap": "boundary elements are bisected too, and Palace adds 9449 interface boundary elements at load; neither appears in the 221/64434 element count. Edge count is unaffected."
+ },
+ "dof": {
+  "measured": null,
+  "why_not_measured": "the refined mesh exists only inside Palace at load time. MFEM has no Python binding in this environment and Palace's --dry-run parses the config only (main.cpp:246-254), so no offline measurement is possible without reimplementing MFEM's bisection.",
+  "rigorous_lower_bound": 81864,
+  "lower_bound_derivation": "marked submesh refines uniformly (octasection): E' = 2E+3F+T. Green closure only ADDS elements (mesh.cpp:10123), so E_total >= E_baseline + E(M) + 3F(M) + T(M).",
+  "budget": 250000,
+  "rigorous_upper_bound": 615486,
+  "upper_bound_note": "uniform refinement of the whole mesh; 2.46x the budget. There is no tighter upper bound available offline, so the honest offline statement is the interval [81864, 615486].",
+  "breach_argument": "breaching 250000 from 79944 needs 170056 added edges; the marked octasection supplies 1920 and a full uniform refinement supplies 535542, so a breach requires the green closure to deliver 31.8% of a uniform refinement -- an 89x expansion of the 221 marked elements. Computable offline; still not a measurement.",
+  "enforcement": "Palace prints 'ND (p = 1)' at palace_log.txt line 49, before the eigensolver is configured at line 54. The gate is enforceable by a probe that reads that line and kills the job, with seconds of exposure -- NOT by degrading the rule to a post-hoc check."
+ },
+ "invariants_by_construction": {
+  "mesh_file": "byte-identical; refinement is a config block",
+  "existing_vertex_coordinates": "never moved; new vertices are edge midpoints only (mesh.cpp:10834-10841)",
+  "element_attributes": "inherited by children (mesh.cpp:10890,10896)",
+  "boundary_attributes": "inherited by children (BdrBisection, mesh.cpp:10959)",
+  "port_connectivity_and_L_s": "w and l come from mesh::GetBoundingBox on the port attribute (lumpedelement.cpp:22-69). That box is ORIENTED, not axis-aligned (geodata.hpp:124-128). Midpoints are convex combinations so no inserted vertex can become a new extremum; the extremal-point selection is tie-broken by list order and refinement reorders the cloud, but axes are re-sorted by descending length (geodata.cpp:1013-1014), so Lengths() is permutation-invariant. Safe for THIS rectangular planar port; not a general guarantee.",
+  "Lc": "computed from the PRE-refinement bounding box: main.cpp:311-313 orders ReadMesh -> NondimensionalizeInputs -> RefineMesh, and iodata.cpp:448-463 runs under MFEM_VERIFY(!init). Lc cannot see the refinement at all.",
+  "parent_child": "tracked by MFEM as CoarseFineTr.embeddings[i].parent (mesh.cpp:10908)"
+ },
+ "propagation": {
+  "conforming": true,
+  "why": "GeneralRefinement forces nonconforming=0 for 3D simplex meshes (mesh.cpp:10565-10567)",
+  "beyond_the_region": "YES. ParMesh::LocalRefinement (pmesh.cpp:3385) restores conformity by bisecting ANY element needing it, marked or not (pmesh.cpp:3467-3477), with an MPI face exchange (3489-3560) and boundary elements (3568-3580). This is NOT a face-only or box-only change, and its extent is not computable offline.",
+  "MaxNCLevels_and_Nonconformal": "inert for tets; the conforming branch is taken first"
+ },
+ "quality": {
+  "port_face_mean_edge_mm": 0.008453,
+  "port_face_mean_edge_after_one_level_mm": 0.004227,
+  "radius_ratio_all_tets": {
+   "min": 0.05,
+   "mean": 0.37
+  },
+  "radius_ratio_marked_tets": {
+   "min": 0.0913,
+   "mean": 0.2197
+  },
+  "note": "octasection of a tet is not quality-preserving in general; bisection quality is bounded by MFEM's marked-edge scheme but is not measured here"
+ }
+}

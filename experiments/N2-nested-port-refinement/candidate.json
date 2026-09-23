@@ -1,0 +1,129 @@
+{
+ "schema": "qmhp-cem.nested-refinement-candidate/0.2.0",
+ "id": "N2",
+ "purpose": "determine whether the tracked frequencies and participation estimates begin STABILISING along L2 -> N1 -> N2. Local stabilisation would NOT establish global mesh convergence.",
+ "not_this": "N2 is NOT the prepared gmsh R2 experiment, which regenerates the mesh and is unapproved.",
+ "mechanism": "Palace Model.Refinement.Boxes, TWO total levels from the ORIGINAL L2 mesh",
+ "pinned": {
+  "original_L2_mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+  "original_L2_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+  "n1_reference_record": "COUPLED-LADDER-O1-L2-N1-20260917T001735Z",
+  "n1_config_sha256": "85c93c2db2c0e3e9323132aba2dc8e7d53ec2acf6e9ddcb878dd1c20bcf110c0",
+  "palace_commit": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+  "mfem_commit": "c444b17c973cc301590a6ac186fb33587b5881e6",
+  "n1_config_sha256_is": "the sha256 of results/<n1_reference_record>/L2/solver/config.json, the config N1 actually SOLVED - not experiments/N1-nested-port-refinement/config.candidate.json, which differs."
+ },
+ "refinement_region": {
+  "BoundingBoxMin": [
+   -0.62,
+   -0.125,
+   -0.01
+  ],
+  "BoundingBoxMax": [
+   -0.58,
+   -0.065,
+   0.01
+  ],
+  "Levels": 2,
+  "unchanged_from_N1": "the box is byte-identical to N1's; only Levels differs (1 -> 2)",
+  "total_not_additional": "TWO TOTAL levels from the original mesh, i.e. ONE beyond N1."
+ },
+ "first_stage_reproduces_N1": {
+  "verified": true,
+  "how": "read from the pinned source, not assumed. geodata.cpp:251 loops 'while (region_ref_level < max_region_ref_levels)'. On iteration 0, mesh.back() is the ORIGINAL loaded mesh and the per-box test is 'region_ref_level < box.ref_levels', i.e. 0 < Levels, true for Levels 1 and 2 alike. Same input mesh, same box, same marking criterion, same GeneralRefinement call -> iteration 0 of Levels:2 IS N1's single stage. N1 is therefore a genuine intermediate point of this sequence, not a parallel run.",
+  "second_stage": "iteration 1 marks on the ONCE-REFINED mesh using the same box, so it refines the children of stage 1 plus any closure element that now has a vertex in the box."
+ },
+ "dof": {
+  "original_L2_measured": 79944,
+  "n1_measured": 84485,
+  "n1_added": 4541,
+  "n2_measured": null,
+  "why_no_n2_number": "stage 2 marks on the stage-1 mesh, which does not exist offline: MFEM has no Python binding here and Palace's --dry-run does not load a mesh. So the stage-1 METHOD that produced 81 864 cannot be reapplied - it needs the stage-1 submesh counts. Any N2 DOF figure before the run would be invented.",
+  "rigorous_offline_statement": "84485 < N2 <= 4857516. The lower bound is trivial (stage 2 only adds). The upper bound is real and COMPUTABLE - the uniform-refinement identity E' = 2E+3F+T composes, so two uniform levels of the original mesh bound any two-level local refinement - but at 19.4x the 250 000 budget it is useless for gating. An earlier draft said 'no upper bound is available'; that was wrong, and the honest statement is that the available bound is computable and useless.",
+  "budget": 250000,
+  "enforcement": "the DOF probe. Palace prints 'ND (p = 1)' ONCE per run from the FINEST space (spaceoperator.cpp:303 -> GetNDSpace() = GetFinestFESpace(); one-shot print_hdr at :175/:202), so a multi-level hierarchy does not produce a coarse count for the probe to read by mistake. The multigrid hierarchy lines use a different format the pattern cannot match. The probe additionally enforces on the LARGEST count seen and flags any ambiguity, and a probe that never fires is REFUSED-DOF-PROBE-SILENT rather than a pass.",
+  "composed_upper_bound": {
+   "value": 4857516,
+   "times_budget": 19.4,
+   "derivation": "one uniform level of the original mesh: V=93935 E=615486 F=1037024 T=515472 (Euler 1); a second: E = 2E'+3F'+T' = 4857516."
+  }
+ },
+ "resource_uncertainty": {
+  "n1_wall_clock_s": 923.523767673,
+  "cap_s": 2700,
+  "n1_cap_fraction": 0.34204583987888887,
+  "do_not_extrapolate": "N1 took 11.4x the baseline's wall clock for 5.7 % more DOF, so runtime is NOT proportional to DOF here and an N2 estimate from DOF alone would be meaningless. 69 % of N1 was preconditioner application over 622 coarse solves.",
+  "hierarchy_change_disclosed": "AUTOMATIC, not chosen: Model.Refinement makes Palace reserve 1 + levels meshes (geodata.cpp:204-206) and push a copy before each refinement (:346-349). The baseline ran ONE multigrid level, N1 ran TWO (log lines 74-75), and N2 will run THREE. No solver setting is changed to make N2 fit; the preconditioner is the pinned default.",
+  "primary_risk": "EXCEEDING THE 45-MINUTE CAP, not the DOF budget. N1 used 34.2 % of the cap with a 2-level hierarchy. A 3-level hierarchy on a larger problem could plausibly exceed it. That is a recorded TIMEOUT, not a silent overrun."
+ },
+ "comparisons": {
+  "primary": "N1 -> N2",
+  "alongside": "original L2 -> N1",
+  "mechanism": "refinement_sequence(), which calls compare_against_baseline per consecutive step",
+  "rules_unchanged": "the same matching rule, magnitude convention and frozen tolerances. An ambiguous correspondence is reported as UNAVAILABLE and is never repaired by changing the criteria.",
+  "excluded_from": "the gmsh L1/L2/L3 convergence fit, by earlier_rungs()",
+  "no_extrapolation": "no order is fitted and no continuum limit is inferred from three points. The refinement is LOCAL: stabilisation here would be local stabilisation, NOT global mesh convergence."
+ },
+ "approval_must_carry": {
+  "baseline_record": "COUPLED-LADDER-O1-L2-N1-20260917T001735Z",
+  "sequence_records": [
+   "COUPLED-LADDER-O1-L2-20260916T080802Z",
+   "COUPLED-LADDER-O1-L2-N1-20260917T001735Z"
+  ],
+  "baseline_mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+  "note": "sequence_records is a top-level approval key read by the driver. Without it the L2 -> N1 step is never computed and only the primary comparison appears. It is validated to end at baseline_record."
+ },
+ "invariants_by_construction": {
+  "mesh_file": "byte-identical; refinement is a config block",
+  "existing_vertex_coordinates": "never moved; new vertices are edge midpoints only (mesh.cpp:10834-10841)",
+  "element_attributes": "inherited by children (mesh.cpp:10890,10896)",
+  "boundary_attributes": "inherited by children (BdrBisection, mesh.cpp:10959)",
+  "port_connectivity_and_L_s": "w and l come from mesh::GetBoundingBox on the port attribute (lumpedelement.cpp:22-69). That box is ORIENTED, not axis-aligned (geodata.hpp:124-128). Midpoints are convex combinations so no inserted vertex can become a new extremum; the extremal-point selection is tie-broken by list order and refinement reorders the cloud, but axes are re-sorted by descending length (geodata.cpp:1013-1014), so Lengths() is permutation-invariant. Safe for THIS rectangular planar port; not a general guarantee.",
+  "Lc": "computed from the PRE-refinement bounding box: main.cpp:311-313 orders ReadMesh -> NondimensionalizeInputs -> RefineMesh, and iodata.cpp:448-463 runs under MFEM_VERIFY(!init). Lc cannot see the refinement at all.",
+  "parent_child": "tracked by MFEM as CoarseFineTr.embeddings[i].parent (mesh.cpp:10908)",
+  "holds_at_depth_2": "the arguments are per-refinement and compose: every level inserts only edge midpoints, so no level can extend the port's point cloud, and Lc is computed before ANY refinement (main.cpp:311-313). The participation columns this run compares depend on these surviving a SECOND level, which is why they are restated here rather than assumed."
+ },
+ "marking": {
+  "stage_1": {
+   "criterion": "any vertex of the element inside the closed box (geodata.cpp:282-306)",
+   "marked_tets": 221,
+   "marked_fraction": 0.00343,
+   "marked_submesh": {
+    "E": 307,
+    "F": 464,
+    "T": 221
+   },
+   "material_attributes_touched": [
+    1,
+    3
+   ],
+   "accounting_gap": "boundary elements are bisected too, and Palace adds 9449 interface boundary elements at load; neither appears in the 221/64434 element count. Edge count is unaffected.",
+   "note": "measured offline on the ORIGINAL mesh; unchanged for N2's first stage"
+  },
+  "stage_2": {
+   "marked_tets": null,
+   "why_unknown": "stage 2 marks on the stage-1 mesh, which does not exist offline. The stage-1 in-box vertices survive bisection, so the stage-2 marked set is non-empty, but its size and submesh counts are not computable here."
+  }
+ },
+ "propagation": {
+  "conforming": true,
+  "why": "GeneralRefinement forces nonconforming=0 for 3D simplex meshes (mesh.cpp:10565-10567)",
+  "beyond_the_region": "YES. ParMesh::LocalRefinement (pmesh.cpp:3385) restores conformity by bisecting ANY element needing it, marked or not (pmesh.cpp:3467-3477), with an MPI face exchange (3489-3560) and boundary elements (3568-3580). This is NOT a face-only or box-only change, and its extent is not computable offline.",
+  "MaxNCLevels_and_Nonconformal": "inert for tets; the conforming branch is taken first",
+  "at_depth_2": "the closure runs again on the second level, so propagation outside the box compounds. N1 added 2 621 DOF beyond its marked set; the equivalent figure for stage 2 is not computable offline."
+ },
+ "quality": {
+  "port_face_mean_edge_mm": 0.008453,
+  "port_face_mean_edge_after_one_level_mm": 0.004227,
+  "radius_ratio_all_tets": {
+   "min": 0.05,
+   "mean": 0.37
+  },
+  "radius_ratio_marked_tets": {
+   "min": 0.0913,
+   "mean": 0.2197
+  },
+  "note": "octasection of a tet is not quality-preserving in general; bisection quality is bounded by MFEM's marked-edge scheme but is not measured here",
+  "at_depth_2": "stage 2 refines the CHILDREN of the already worst-shaped elements (marked mean radius-ratio 0.2197 against the mesh's 0.3700). Their quality after one octasection is not knowable offline, so element quality remains an unseparated alternative explanation and may be worse than at depth 1."
+ }
+}

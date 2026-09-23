@@ -1,0 +1,37 @@
+--- N2R solved config.json (canonical)
++++ first-moment config.candidate.json (canonical)
+@@ -1,6 +1,6 @@
+ {
+   "Problem": {
+-    "Type": "Eigenmode",
++    "Type": "FirstMoment",
+     "Verbose": 2,
+     "Output": "postpro"
+   },
+@@ -91,18 +91,20 @@
+   "Solver": {
+     "Order": 1,
+     "Device": "CPU",
+-    "Eigenmode": {
+-      "N": 6,
+-      "Tol": 1e-06,
+-      "Target": 0.5,
+-      "Save": 6
+-    },
+     "Linear": {
+       "Type": "Default",
+       "KSPType": "GMRES",
+       "Tol": 1e-08,
+       "MaxIts": 400,
+       "MGMaxLevels": 1
++    },
++    "FirstMoment": {
++      "Tol": 1e-14,
++      "MaxIts": 2000,
++      "CheckFunctional": true,
++      "CheckNullSpace": true,
++      "NullSpaceSamples": 4,
++      "Seed": 20260920
+     }
+   }
+ }

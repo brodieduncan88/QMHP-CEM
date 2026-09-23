@@ -1,0 +1,34 @@
+{
+ "kind": "C",
+ "n_unknowns": 60608,
+ "energy_nd": 2.320997120851734,
+ "energy_nd_extended": 2.320997120851734,
+ "evaluation_error_bound_nd": 1.6898907984987946e-14,
+ "evaluation_bound_terms_nd": {
+  "matvec": 4.5749780278954765e-15,
+  "dot": 1.2049365486767614e-14,
+  "float64_vs_extended": 2.5768244436582923e-16
+ },
+ "extended_precision_probe_ok": true,
+ "certificate": {
+  "residual_2norm": 3.1001559025209255e-15,
+  "rhs_2norm": 1.4346544657056484,
+  "relative_residual": 2.160907714455191e-15,
+  "asymmetry_max": 7.460099748101938e-17,
+  "error_bound_nd": 4.944491253863651e-19,
+  "roundoff_floor_nd": 4.886559054875377e-19
+ },
+ "total_error_bound_nd": 1.6899402434113333e-14,
+ "total_error_bound_rel": 7.28109581967594e-15,
+ "C_F": 8.22021777287097e-14,
+ "C_fF": 82.2021777287097,
+ "S_GHz2": 2.9785062321795324,
+ "port_voltage": 0.9999999999999998,
+ "phi_abs_max": 1.0,
+ "solution_sha256": "9b0d06ed2307cd3a14ba33f2b52e3792e53428c1b65ee74746eb3c4968694cb5",
+ "solver": {
+  "method": "direct"
+ },
+ "cpu_s": 3.828077916,
+ "wall_s": 3.860124495000008
+}

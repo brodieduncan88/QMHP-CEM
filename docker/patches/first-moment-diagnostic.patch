@@ -1,0 +1,705 @@
+diff --git a/palace/drivers/CMakeLists.txt b/palace/drivers/CMakeLists.txt
+index 6489d56..9d635cf 100644
+--- a/palace/drivers/CMakeLists.txt
++++ b/palace/drivers/CMakeLists.txt
+@@ -11,6 +11,7 @@ target_sources(${LIB_TARGET_NAME}
+   ${CMAKE_CURRENT_SOURCE_DIR}/drivensolver.cpp
+   ${CMAKE_CURRENT_SOURCE_DIR}/eigensolver.cpp
+   ${CMAKE_CURRENT_SOURCE_DIR}/electrostaticsolver.cpp
++  ${CMAKE_CURRENT_SOURCE_DIR}/firstmomentsolver.cpp
+   ${CMAKE_CURRENT_SOURCE_DIR}/magnetostaticsolver.cpp
+   ${CMAKE_CURRENT_SOURCE_DIR}/transientsolver.cpp
+ )
+diff --git a/palace/drivers/firstmomentsolver.cpp b/palace/drivers/firstmomentsolver.cpp
+new file mode 100644
+index 0000000..085aa73
+--- /dev/null
++++ b/palace/drivers/firstmomentsolver.cpp
+@@ -0,0 +1,413 @@
++// Copyright (c) 2026 Brodie Duncan. All rights reserved.
++// Proprietary. No licence is granted except by explicit written agreement.
++//
++// QMHP-CEM first-moment diagnostic. This file is original QMHP-CEM source, not part of
++// upstream Palace. It is built against Palace v0.13.0 (a61c8cbe), which is licensed
++// Apache-2.0 by Amazon.com, Inc. or its affiliates; the files this patch MODIFIES keep
++// their upstream Apache-2.0 headers, which are not altered here.
++
++#include "firstmomentsolver.hpp"
++
++#include <algorithm>
++#include <cmath>
++#include <complex>
++#include <cstdlib>
++#include <fstream>
++#include <limits>
++#include <string>
++#include <sys/resource.h>
++#include <mfem.hpp>
++#include <nlohmann/json.hpp>
++#include "fem/errorindicator.hpp"
++#include "fem/fespace.hpp"
++#include "fem/gridfunction.hpp"
++#include "fem/mesh.hpp"
++#include "linalg/iterative.hpp"
++#include "linalg/jacobi.hpp"
++#include "linalg/ksp.hpp"
++#include "linalg/operator.hpp"
++#include "linalg/vector.hpp"
++#include "models/lumpedportoperator.hpp"
++#include "models/spaceoperator.hpp"
++#include "utils/communication.hpp"
++#include "utils/iodata.hpp"
++#include "utils/timer.hpp"
++
++namespace palace
++{
++
++using json = nlohmann::json;
++
++namespace
++{
++
++double GlobalMaxRSSMB(MPI_Comm comm)
++{
++  struct rusage ru;
++  getrusage(RUSAGE_SELF, &ru);
++  double mb = static_cast<double>(ru.ru_maxrss) / 1024.0;  // Linux reports ru_maxrss in kB
++  Mpi::GlobalMax(1, &mb, comm);
++  return mb;
++}
++
++// Read a one-line identity file written into the image by its Dockerfile. Returns an empty
++// string when the file is absent, which the record reports as "unavailable" so that
++// evaluation fails closed rather than silently accepting an unidentified binary.
++std::string ReadImageInfoFile(const std::string &dir, const std::string &name)
++{
++  std::ifstream fi(dir + "/" + name);
++  if (!fi.is_open())
++  {
++    return {};
++  }
++  std::string line;
++  std::getline(fi, line);
++  while (!line.empty() && (line.back() == '\n' || line.back() == '\r' || line.back() == ' '))
++  {
++    line.pop_back();
++  }
++  return line;
++}
++
++}  // namespace
++
++std::pair<ErrorIndicator, long long int>
++FirstMomentSolver::Solve(const std::vector<std::unique_ptr<Mesh>> &mesh) const
++{
++  // The first spectral moment of the lumped-port voltage functional,
++  //     A = Σ_m λ_m p_m = Re(fᴴ M⁻¹ f) / L ,
++  // evaluated on the PEC-constrained (free) true dofs. M is SpaceOperator::GetMassMatrix
++  // with DIAG_ONE, which acts as [[M_free, 0], [0, I]] on the true dofs (ParOperator::Mult
++  // zeros x on the essential dofs before prolongation and sets y = x there afterwards), so
++  // with f zeroed on the essential dofs the padded solve is exactly M_free x = f_free with
++  // x = 0 on the essential dofs and fᵀx = f_freeᵀ M_free⁻¹ f_free: no artificial boundary
++  // contribution. The functional f = Pᵀ v is the exact GetVoltage linear form.
++  const auto t_start = Timer::Now();
++  BlockTimer bt0(Timer::CONSTRUCT);
++  SpaceOperator space_op(iodata, mesh);
++  auto &nd_fespace = space_op.GetNDSpace();
++  MPI_Comm comm = space_op.GetComm();
++  const auto &dbc_tdof_list = space_op.GetNDDbcTDofLists().back();
++  const auto &opts = iodata.solver.firstmoment;
++  SaveMetadata(space_op.GetNDSpaces());
++
++  // Provenance: what binary, built from what source and what patch, is producing this
++  // record. The identity files are written into the image by its Dockerfile; the directory
++  // is overridable only so that a non-image (developer) build can be run and, because the
++  // record states the directory it read, such a run is distinguishable from an image run.
++  const char *info_env = std::getenv("PALACE_IMAGE_INFO_DIR");
++  const std::string info_dir = info_env ? std::string(info_env) : std::string("/opt/palace");
++  json prov;
++  prov["ImageInfoDir"] = info_dir;
++  prov["ImageInfoDirIsDefault"] = (info_dir == "/opt/palace");
++  for (const char *name :
++       {"PALACE_VERSION", "PALACE_COMMIT", "PALACE_PATCH", "PALACE_PATCH_SHA256"})
++  {
++    const auto value = ReadImageInfoFile(info_dir, name);
++    prov[name] = value.empty() ? std::string("unavailable") : value;
++  }
++  prov["ConfigMesh"] = iodata.model.mesh;
++  prov["MpiSize"] = Mpi::Size(comm);
++  Mpi::Print("\nFirst-moment diagnostic provenance:\n source = {}, commit = {}, patch = {} "
++             "({})\n",
++             info_dir, prov["PALACE_COMMIT"].get<std::string>(),
++             prov["PALACE_PATCH"].get<std::string>(),
++             prov["PALACE_PATCH_SHA256"].get<std::string>());
++
++  // Structured failure evidence: a failed check writes first-moment-FAILED.json and aborts.
++  // It never writes first-moment.json, so a failed run cannot be mistaken for a result.
++  auto WriteFailure = [&](const std::string &reason, const json &details)
++  {
++    if (root && post_dir.length() > 0)
++    {
++      json out;
++      out["Diagnostic"] = "FirstMoment";
++      out["Status"] = "FAILED";
++      out["Reason"] = reason;
++      out["Details"] = details;
++      out["Provenance"] = prov;
++      std::ofstream fo(post_dir + "first-moment-FAILED.json");
++      if (fo.is_open())
++      {
++        fo << out.dump(2) << '\n';
++      }
++    }
++    Mpi::Barrier(comm);
++  };
++
++  // Exactly one active lumped port with nonzero inductance defines the functional.
++  const LumpedPortData *port = nullptr;
++  int port_idx = -1;
++  for (const auto &[idx, data] : space_op.GetLumpedPortOp())
++  {
++    if (data.active && std::abs(data.L) > 0.0)
++    {
++      if (port)
++      {
++        WriteFailure("multiple active lumped ports with nonzero inductance",
++                     {{"first", port_idx}, {"second", idx}});
++        MFEM_ABORT("The first-moment diagnostic requires exactly one active lumped port "
++                   "with nonzero inductance!");
++      }
++      port = &data;
++      port_idx = idx;
++    }
++  }
++  if (!port)
++  {
++    WriteFailure("no active lumped port with nonzero inductance",
++                 {{"num_ports", space_op.GetLumpedPortOp().Size()}});
++    MFEM_ABORT("The first-moment diagnostic requires an active lumped port with nonzero "
++               "inductance!");
++  }
++  const double L_nd = port->L;
++
++  // Dof counts: total true dofs, essential (PEC) true dofs and free true dofs.
++  const HYPRE_BigInt n_true = nd_fespace.GlobalTrueVSize();
++  HYPRE_BigInt n_dbc = dbc_tdof_list.Size();
++  Mpi::GlobalSum(1, &n_dbc, comm);
++  const HYPRE_BigInt n_free = n_true - n_dbc;
++  Mpi::Print("\nFirst-moment diagnostic on lumped port {:d}: {:d} true dofs, {:d} essential, "
++             "{:d} free\n",
++             port_idx, n_true, n_dbc, n_free);
++
++  // The voltage functional on the true dofs, f = Pᵀ v, restricted to the free dofs.
++  Vector f(nd_fespace.GetTrueVSize());
++  f.UseDevice(true);
++  port->GetVoltageFunctional(nd_fespace.Get(), f);
++  const double f_norm2_full = linalg::Dot(comm, f, f);
++  linalg::SetSubVector(f, dbc_tdof_list, 0.0);
++  const double f_norm2_free = linalg::Dot(comm, f, f);
++  if (!(f_norm2_free > 0.0))
++  {
++    WriteFailure("the lumped port voltage functional vanishes on the free dofs",
++                 {{"norm2_full", f_norm2_full}, {"norm2_free", f_norm2_free}});
++    MFEM_ABORT("The lumped port voltage functional vanishes on the free dofs!");
++  }
++
++  // Check 1: the extracted true-dof functional reproduces GetVoltage on a random complex
++  // field that satisfies the PEC constraint (both parts vanish on the essential dofs).
++  constexpr double check_functional_tol = 1.0e-10;
++  json check_f;
++  check_f["Enabled"] = opts.check_functional;
++  if (opts.check_functional)
++  {
++    ComplexVector Et(nd_fespace.GetTrueVSize());
++    Et.UseDevice(true);
++    linalg::SetRandom(comm, Et, opts.seed);
++    linalg::SetSubVector(Et, dbc_tdof_list, 0.0);
++    GridFunction E(nd_fespace, true);
++    E.Real().SetFromTrueDofs(Et.Real());
++    E.Imag().SetFromTrueDofs(Et.Imag());
++    const std::complex<double> V_ref = port->GetVoltage(E);
++    const std::complex<double> V_f(linalg::Dot(comm, f, Et.Real()),
++                                   linalg::Dot(comm, f, Et.Imag()));
++    const double denom = std::max(std::abs(V_ref), std::numeric_limits<double>::min());
++    const double rel = std::abs(V_f - V_ref) / denom;
++    check_f["Seed"] = opts.seed;
++    check_f["V_GetVoltage"] = {V_ref.real(), V_ref.imag()};
++    check_f["V_Functional"] = {V_f.real(), V_f.imag()};
++    check_f["RelativeError"] = rel;
++    check_f["Tolerance"] = check_functional_tol;
++    check_f["Passed"] = (rel < check_functional_tol);
++    Mpi::Print(" Functional check: |V_f - V_GetVoltage| / |V_GetVoltage| = {:.3e}\n", rel);
++    if (!(rel < check_functional_tol))
++    {
++      WriteFailure("the true-dof voltage functional does not reproduce GetVoltage",
++                   check_f);
++      MFEM_ABORT("The true-dof voltage functional does not reproduce GetVoltage!");
++    }
++  }
++
++  // The SPD mass solve: Jacobi-preconditioned CG on M(DIAG_ONE) = [[M_free, 0], [0, I]].
++  auto M = space_op.GetMassMatrix<Operator>(Operator::DIAG_ONE);
++  if (!M)
++  {
++    WriteFailure("the mass matrix is empty", {});
++    MFEM_ABORT("The first-moment diagnostic requires a nonzero mass matrix!");
++  }
++  auto pcg = std::make_unique<CgSolver<Operator>>(comm, iodata.problem.verbose);
++  pcg->SetInitialGuess(false);
++  pcg->SetRelTol(opts.tol);
++  pcg->SetAbsTol(std::numeric_limits<double>::epsilon());
++  pcg->SetMaxIter(opts.max_it);
++  const CgSolver<Operator> *cg = pcg.get();
++  auto pc = std::make_unique<JacobiSmoother<Operator>>(comm);
++  KspSolver ksp(std::move(pcg), std::move(pc));
++  ksp.SetOperators(*M, *M);
++
++  Vector x(f.Size()), r(f.Size());
++  x.UseDevice(true);
++  r.UseDevice(true);
++  x = 0.0;
++  Mpi::Print("\nSolving M x = f (mass matrix, free dofs) with PCG + Jacobi\n");
++  ksp.Mult(f, x);
++
++  // Independent residual r = M x - f, and the part of x on the essential dofs (must be 0).
++  M->Mult(x, r);
++  r.Add(-1.0, f);
++  const double r_norm = linalg::Norml2(comm, r);
++  const double f_norm = std::sqrt(f_norm2_free);
++  const double x_norm = linalg::Norml2(comm, x);
++  const double xr = linalg::Dot(comm, x, r);
++  const double fx = linalg::Dot(comm, f, x);
++  Vector xd(x.Size());
++  xd.UseDevice(true);
++  xd = 0.0;
++  linalg::SetSubVector(xd, dbc_tdof_list, x);
++  const double x_dbc_norm = linalg::Norml2(comm, xd);
++
++  // The moment, in nondimensional units and in GHz². With λ = ω² in units of 1/tc²,
++  // f_GHz = ω_nd / (2π tc) (IoData::ValueType::FREQUENCY), so A_GHz² = A_nd / (2π tc)².
++  //
++  // ERROR QUALIFICATION. With x* = M⁻¹f exact and r = M x - f, substituting f = M x - r
++  // into both quadratic forms gives the EXACT identity
++  //     fᵀx - fᵀM⁻¹f = (xᵀMx - rᵀx) - (xᵀMx - 2xᵀr + rᵀM⁻¹r) = xᵀr - rᵀM⁻¹r ,
++  // i.e.  A_computed - A_exact = (Re(xᴴr) - rᴴM⁻¹r) / L .
++  // M is SPD, so rᴴM⁻¹r ≥ 0 and therefore
++  //     A_computed - A_exact ≤ Re(xᴴr)/L    (a CERTIFIED one-sided bound, no conditioning
++  //                                          information required),
++  // equivalently A_exact ≥ A_computed - Re(xᴴr)/L. The same number is the variational
++  // lower bound 2fᵀx - xᵀMx over L. A certified UPPER bound on A_exact needs rᴴM⁻¹r, hence
++  // a lower bound on λ_min(M_free) or a second solve; neither is computed here, so none is
++  // reported. ‖x‖‖r‖/L is an ESTIMATE of the error, not a bound: the rᴴM⁻¹r term can
++  // exceed it when M is ill conditioned.
++  const double freq_scale = iodata.DimensionalizeValue(IoData::ValueType::FREQUENCY, 1.0);
++  const double ghz2_per_nd = freq_scale * freq_scale;
++  const double A_nd = fx / L_nd;
++  const double A_GHz2 = A_nd * ghz2_per_nd;
++  const double err_ub_nd = xr / L_nd;
++  const double A_lower_nd = A_nd - err_ub_nd;
++  const double est_nd = x_norm * r_norm / L_nd;
++  Mpi::Print(" A_nd = {:.12e}, A_GHz2 = {:.12e}\n ‖r‖/‖f‖ = {:.3e}, iterations = {:d}, "
++             "converged = {}\n certified lower bound on A_nd = {:.12e}\n",
++             A_nd, A_GHz2, r_norm / f_norm, cg->GetNumIterations(), cg->GetConverged(),
++             A_lower_nd);
++
++  // Check 2: the inequality uᵀ K u ≥ (fᵀu)² / L = (qᵀu)² on the actual constrained
++  // assembly, for the solution x and random constrained fields. It is a RUNTIME SANITY
++  // CHECK on sampled vectors, not a proof for every vector: the proof that K ≥ q qᴴ is the
++  // quadrature-parity argument made against the source, kept separate from this sampling.
++  json check_k;
++  check_k["Enabled"] = opts.check_null_space;
++  check_k["IsSampledNotProof"] = true;
++  if (opts.check_null_space)
++  {
++    auto K = space_op.GetStiffnessMatrix<Operator>(Operator::DIAG_ONE);
++    if (!K)
++    {
++      WriteFailure("the stiffness matrix is empty", {});
++      MFEM_ABORT("The first-moment diagnostic requires a nonzero stiffness matrix!");
++    }
++    Vector u(f.Size()), Ku(f.Size());
++    u.UseDevice(true);
++    Ku.UseDevice(true);
++    double min_gap = std::numeric_limits<double>::infinity();
++    json samples = json::array();
++    for (int k = 0; k <= opts.num_null_space_samples; k++)
++    {
++      if (k == 0)
++      {
++        u = x;
++      }
++      else
++      {
++        linalg::SetRandom(comm, u, opts.seed + k);
++      }
++      linalg::SetSubVector(u, dbc_tdof_list, 0.0);
++      K->Mult(u, Ku);
++      const double uKu = linalg::Dot(comm, u, Ku);
++      const double fu = linalg::Dot(comm, f, u);
++      const double qu2 = fu * fu / L_nd;
++      const double gap = (uKu - qu2) / std::max(uKu, std::numeric_limits<double>::min());
++      min_gap = std::min(min_gap, gap);
++      samples.push_back({{"Sample", (k == 0) ? "solution" : "random"},
++                         {"uKu", uKu},
++                         {"qu2", qu2},
++                         {"RelativeGap", gap}});
++    }
++    check_k["Samples"] = samples;
++    check_k["NumSamples"] = static_cast<int>(samples.size());
++    check_k["MinRelativeGap"] = min_gap;
++    check_k["Tolerance"] = -1.0e-10;
++    check_k["Passed"] = (min_gap >= -1.0e-10);
++    Mpi::Print(" Null-space check (sampled): min (uᵀKu - (qᵀu)²) / uᵀKu = {:.3e}\n",
++               min_gap);
++    if (!(min_gap >= -1.0e-10))
++    {
++      WriteFailure("K >= q q^H violated on the constrained assembly", check_k);
++      MFEM_ABORT("K ≥ q qᴴ violated on the constrained assembly!");
++    }
++  }
++
++  // Outputs.
++  BlockTimer bt1(Timer::POSTPRO);
++  SaveMetadata(ksp);
++  const double wall_s = Timer::Duration(Timer::Now() - t_start).count();
++  const double rss_mb = GlobalMaxRSSMB(comm);
++  if (root && post_dir.length() > 0)
++  {
++    json out;
++    out["Diagnostic"] = "FirstMoment";
++    out["Status"] = "COMPLETED";
++    out["Provenance"] = prov;
++    out["Port"] = {{"Index", port_idx},
++                   {"L_nd", L_nd},
++                   {"L_H", iodata.DimensionalizeValue(IoData::ValueType::INDUCTANCE, L_nd)},
++                   {"NumElements", static_cast<int>(port->elems.size())}};
++    out["Dofs"] = {{"True", n_true}, {"Essential", n_dbc}, {"Free", n_free}};
++    out["Scales"] = {
++        {"Lc_m", iodata.DimensionalizeValue(IoData::ValueType::LENGTH, 1.0)},
++        {"tc_ns", iodata.DimensionalizeValue(IoData::ValueType::TIME, 1.0)},
++        {"FrequencyScale_GHz", freq_scale},
++        {"InductanceScale_H", iodata.DimensionalizeValue(IoData::ValueType::INDUCTANCE, 1.0)},
++        {"A_GHz2_per_nd", ghz2_per_nd}};
++    out["Functional"] = {{"NormSquaredFull", f_norm2_full},
++                         {"NormSquaredFree", f_norm2_free},
++                         {"NormSquaredEssential", f_norm2_full - f_norm2_free},
++                         {"Check", check_f}};
++    out["LinearSolve"] = {{"Type", "PCG+Jacobi on M(DIAG_ONE)"},
++                          {"RelTol", opts.tol},
++                          {"MaxIts", opts.max_it},
++                          {"Iterations", cg->GetNumIterations()},
++                          {"Converged", cg->GetConverged()},
++                          {"SolverFinalRes", cg->GetFinalRes()},
++                          {"ResidualNorm", r_norm},
++                          {"RhsNorm", f_norm},
++                          {"RelativeResidual", r_norm / f_norm},
++                          {"SolutionNorm", x_norm},
++                          {"SolutionEssentialNorm", x_dbc_norm}};
++    out["A"] = {
++        {"A_nd", A_nd},
++        {"A_GHz2", A_GHz2},
++        {"ErrorIdentity",
++         "A_computed - A_exact = (Re(x^H r) - r^H M^-1 r) / L, with r = M x - f"},
++        {"XDotR_nd", xr},
++        {"CertifiedErrorUpperBound_nd", err_ub_nd},
++        {"CertifiedErrorUpperBound_GHz2", err_ub_nd * ghz2_per_nd},
++        {"CertifiedLowerBound_A_nd", A_lower_nd},
++        {"CertifiedLowerBound_A_GHz2", A_lower_nd * ghz2_per_nd},
++        {"CertifiedLowerBoundJustification",
++         "r^H M^-1 r >= 0 because M is SPD, so A_computed - A_exact <= Re(x^H r)/L; the "
++         "same number is the variational lower bound (2 f^T x - x^T M x)/L"},
++        {"UncertifiedErrorEstimate_nd", est_nd},
++        {"UncertifiedErrorEstimate_GHz2", est_nd * ghz2_per_nd},
++        {"UncertifiedErrorEstimateNote",
++         "||x|| ||r|| / L is an ESTIMATE, not a bound: the r^H M^-1 r term of the identity "
++         "can exceed it when M is ill conditioned"},
++        {"CertifiedUpperBound", "UNAVAILABLE"},
++        {"CertifiedUpperBoundRequires",
++         "a lower bound on lambda_min(M_free), or a second solve for r^H M^-1 r; neither "
++         "is computed by this diagnostic"}};
++    out["NullSpaceCheck"] = check_k;
++    out["Resources"] = {{"WallTime_s", wall_s}, {"MaxRSS_MB", rss_mb}};
++    const std::string path = post_dir + "first-moment.json";
++    std::ofstream fo(path);
++    MFEM_VERIFY(fo.is_open(), "Unable to open first-moment output file \"" << path << "\"!");
++    fo << out.dump(2) << '\n';
++  }
++  Mpi::Print(" Wall time = {:.2f} s, max RSS = {:.1f} MB\n", wall_s, rss_mb);
++  return {ErrorIndicator(), space_op.GlobalTrueVSize()};
++}
++
++}  // namespace palace
+diff --git a/palace/drivers/firstmomentsolver.hpp b/palace/drivers/firstmomentsolver.hpp
+new file mode 100644
+index 0000000..6ee67aa
+--- /dev/null
++++ b/palace/drivers/firstmomentsolver.hpp
+@@ -0,0 +1,41 @@
++// Copyright (c) 2026 Brodie Duncan. All rights reserved.
++// Proprietary. No licence is granted except by explicit written agreement.
++//
++// QMHP-CEM first-moment diagnostic. This file is original QMHP-CEM source, not part of
++// upstream Palace. It is built against Palace v0.13.0 (a61c8cbe), which is licensed
++// Apache-2.0 by Amazon.com, Inc. or its affiliates; the files this patch MODIFIES keep
++// their upstream Apache-2.0 headers, which are not altered here.
++
++#ifndef PALACE_DRIVERS_FIRST_MOMENT_SOLVER_HPP
++#define PALACE_DRIVERS_FIRST_MOMENT_SOLVER_HPP
++
++#include <memory>
++#include <vector>
++#include "drivers/basesolver.hpp"
++
++namespace palace
++{
++
++class ErrorIndicator;
++class Mesh;
++
++//
++// Diagnostic driver: the first spectral moment of the lumped-port voltage functional,
++//     A = Σ_m λ_m p_m = Re(f_freeᴴ M_free⁻¹ f_free) / L ,
++// on the PEC-constrained (free) true dofs of the same Nédélec space, material model and
++// mass matrix as the eigenmode driver. One SPD linear solve; no eigenproblem, no driven
++// sweep, no fields written. Writes postpro/first-moment.json.
++//
++class FirstMomentSolver : public BaseSolver
++{
++private:
++  std::pair<ErrorIndicator, long long int>
++  Solve(const std::vector<std::unique_ptr<Mesh>> &mesh) const override;
++
++public:
++  using BaseSolver::BaseSolver;
++};
++
++}  // namespace palace
++
++#endif  // PALACE_DRIVERS_FIRST_MOMENT_SOLVER_HPP
+diff --git a/palace/main.cpp b/palace/main.cpp
+index ac3cfeb..0a0bdf5 100644
+--- a/palace/main.cpp
++++ b/palace/main.cpp
+@@ -10,6 +10,7 @@
+ #include "drivers/drivensolver.hpp"
+ #include "drivers/eigensolver.hpp"
+ #include "drivers/electrostaticsolver.hpp"
++#include "drivers/firstmomentsolver.hpp"
+ #include "drivers/magnetostaticsolver.hpp"
+ #include "drivers/transientsolver.hpp"
+ #include "fem/errorindicator.hpp"
+@@ -299,6 +300,9 @@ int main(int argc, char *argv[])
+       case config::ProblemData::Type::TRANSIENT:
+         return std::make_unique<TransientSolver>(iodata, world_root, world_size,
+                                                  omp_threads, GetPalaceGitTag());
++      case config::ProblemData::Type::FIRSTMOMENT:
++        return std::make_unique<FirstMomentSolver>(iodata, world_root, world_size,
++                                                   omp_threads, GetPalaceGitTag());
+     }
+     return nullptr;
+   }();
+diff --git a/palace/models/lumpedportoperator.cpp b/palace/models/lumpedportoperator.cpp
+index 7d74e9c..54d678c 100644
+--- a/palace/models/lumpedportoperator.cpp
++++ b/palace/models/lumpedportoperator.cpp
+@@ -306,6 +306,17 @@ std::complex<double> LumpedPortData::GetVoltage(GridFunction &E) const
+   return dot;
+ }
+ 
++void LumpedPortData::GetVoltageFunctional(mfem::ParFiniteElementSpace &nd_fespace,
++                                          mfem::Vector &f) const
++{
++  // The true-dof functional is the Pᵀ (dual) assembly of the local linear form v: the
++  // rank-local dot products v ⋅ (P E_true) summed over ranks in GetVoltage equal
++  // (Pᵀ v) ⋅ E_true, which is what mfem::ParLinearForm::ParallelAssemble computes.
++  InitializeLinearForms(nd_fespace);
++  f.SetSize(nd_fespace.GetTrueVSize());
++  nd_fespace.GetProlongationMatrix()->MultTranspose(*v, f);
++}
++
+ LumpedPortOperator::LumpedPortOperator(const IoData &iodata, const MaterialOperator &mat_op,
+                                        const mfem::ParMesh &mesh)
+ {
+diff --git a/palace/models/lumpedportoperator.hpp b/palace/models/lumpedportoperator.hpp
+index 8871e1b..3128fd3 100644
+--- a/palace/models/lumpedportoperator.hpp
++++ b/palace/models/lumpedportoperator.hpp
+@@ -75,6 +75,14 @@ public:
+   std::complex<double> GetPower(GridFunction &E, GridFunction &B) const;
+   std::complex<double> GetSParameter(GridFunction &E) const;
+   std::complex<double> GetVoltage(GridFunction &E) const;
++
++  // Diagnostic access to the voltage functional on the true dofs of the given space:
++  // f = Pᵀ v, with v the same lazily assembled local linear form GetVoltage uses, so that
++  // for any field with local representation E = P E_true,
++  //     GetVoltage(E) = f ⋅ Re(E_true) + i f ⋅ Im(E_true).
++  // This is the dual assembly of mfem::ParLinearForm::ParallelAssemble (Pᵀ, not R). No
++  // essential-dof restriction is applied here; the caller restricts f to the free dofs.
++  void GetVoltageFunctional(mfem::ParFiniteElementSpace &nd_fespace, mfem::Vector &f) const;
+ };
+ 
+ //
+diff --git a/palace/utils/configfile.cpp b/palace/utils/configfile.cpp
+index dfc64ce..a21ecb3 100644
+--- a/palace/utils/configfile.cpp
++++ b/palace/utils/configfile.cpp
+@@ -240,7 +240,8 @@ PALACE_JSON_SERIALIZE_ENUM(ProblemData::Type,
+                             {ProblemData::Type::EIGENMODE, "Eigenmode"},
+                             {ProblemData::Type::ELECTROSTATIC, "Electrostatic"},
+                             {ProblemData::Type::MAGNETOSTATIC, "Magnetostatic"},
+-                            {ProblemData::Type::TRANSIENT, "Transient"}})
++                            {ProblemData::Type::TRANSIENT, "Transient"},
++                            {ProblemData::Type::FIRSTMOMENT, "FirstMoment"}})
+ 
+ void ProblemData::SetUp(json &config)
+ {
+@@ -288,6 +289,10 @@ void ProblemData::SetUp(json &config)
+                 "config[\"Problem\"][\"Type\"] == \"Transient\" should be accompanied by a "
+                 "config[\"Solver\"][\"Transient\"] configuration!");
+   }
++  else if (type == ProblemData::Type::FIRSTMOMENT)
++  {
++    // config["Solver"]["FirstMoment"] is optional: defaults can be used for every option.
++  }
+ 
+   // Cleanup
+   problem->erase("Type");
+@@ -1570,6 +1575,43 @@ PALACE_JSON_SERIALIZE_ENUM(
+      {TransientSolverData::ExcitationType::RAMP_STEP, "Ramp"},
+      {TransientSolverData::ExcitationType::SMOOTH_STEP, "SmoothStep"}})
+ 
++void FirstMomentSolverData::SetUp(json &solver)
++{
++  auto firstmoment = solver.find("FirstMoment");
++  if (firstmoment == solver.end())
++  {
++    return;
++  }
++  tol = firstmoment->value("Tol", tol);
++  max_it = firstmoment->value("MaxIts", max_it);
++  check_functional = firstmoment->value("CheckFunctional", check_functional);
++  check_null_space = firstmoment->value("CheckNullSpace", check_null_space);
++  num_null_space_samples = firstmoment->value("NullSpaceSamples", num_null_space_samples);
++  seed = firstmoment->value("Seed", seed);
++
++  // Cleanup
++  firstmoment->erase("Tol");
++  firstmoment->erase("MaxIts");
++  firstmoment->erase("CheckFunctional");
++  firstmoment->erase("CheckNullSpace");
++  firstmoment->erase("NullSpaceSamples");
++  firstmoment->erase("Seed");
++  MFEM_VERIFY(firstmoment->empty(),
++              "Found an unsupported configuration file keyword under \"FirstMoment\"!\n"
++                  << firstmoment->dump(2));
++
++  // Debug
++  if constexpr (JSON_DEBUG)
++  {
++    std::cout << "Tol: " << tol << '\n';
++    std::cout << "MaxIts: " << max_it << '\n';
++    std::cout << "CheckFunctional: " << check_functional << '\n';
++    std::cout << "CheckNullSpace: " << check_null_space << '\n';
++    std::cout << "NullSpaceSamples: " << num_null_space_samples << '\n';
++    std::cout << "Seed: " << seed << '\n';
++  }
++}
++
+ void TransientSolverData::SetUp(json &solver)
+ {
+   auto transient = solver.find("Transient");
+@@ -1819,6 +1861,7 @@ void SolverData::SetUp(json &config)
+   eigenmode.SetUp(*solver);
+   electrostatic.SetUp(*solver);
+   magnetostatic.SetUp(*solver);
++  firstmoment.SetUp(*solver);
+   transient.SetUp(*solver);
+   linear.SetUp(*solver);
+ 
+@@ -1834,6 +1877,7 @@ void SolverData::SetUp(json &config)
+   solver->erase("Eigenmode");
+   solver->erase("Electrostatic");
+   solver->erase("Magnetostatic");
++  solver->erase("FirstMoment");
+   solver->erase("Transient");
+   solver->erase("Linear");
+   MFEM_VERIFY(solver->empty(),
+diff --git a/palace/utils/configfile.hpp b/palace/utils/configfile.hpp
+index bbd7836..e44c64d 100644
+--- a/palace/utils/configfile.hpp
++++ b/palace/utils/configfile.hpp
+@@ -99,7 +99,8 @@ public:
+     EIGENMODE,
+     ELECTROSTATIC,
+     MAGNETOSTATIC,
+-    TRANSIENT
++    TRANSIENT,
++    FIRSTMOMENT
+   };
+   Type type = Type::DRIVEN;
+ 
+@@ -691,6 +692,27 @@ public:
+   void SetUp(json &solver);
+ };
+ 
++struct FirstMomentSolverData
++{
++public:
++  // Diagnostic: first spectral moment A = Re(fᴴ M⁻¹ f) / L of the lumped-port voltage
++  // functional on the PEC-constrained true dofs (one SPD mass solve, no eigenproblem).
++  // Relative tolerance and iteration limit for the Jacobi-preconditioned CG mass solve.
++  double tol = 1.0e-12;
++  int max_it = 2000;
++
++  // Built-in checks: the true-dof functional against GetVoltage on a random constrained
++  // complex field, and the inequality K ≥ q qᴴ (q = f/√L) on random constrained fields.
++  bool check_functional = true;
++  bool check_null_space = true;
++  int num_null_space_samples = 4;
++
++  // Seed for the random check fields (0: rank-dependent default).
++  int seed = 0;
++
++  void SetUp(json &solver);
++};
++
+ struct TransientSolverData
+ {
+ public:
+@@ -928,6 +950,7 @@ public:
+   EigenSolverData eigenmode = {};
+   ElectrostaticSolverData electrostatic = {};
+   MagnetostaticSolverData magnetostatic = {};
++  FirstMomentSolverData firstmoment = {};
+   TransientSolverData transient = {};
+   LinearSolverData linear = {};
+ 
+diff --git a/palace/utils/iodata.cpp b/palace/utils/iodata.cpp
+index c4da2cd..07d9781 100644
+--- a/palace/utils/iodata.cpp
++++ b/palace/utils/iodata.cpp
+@@ -320,6 +320,24 @@ void IoData::CheckConfiguration()
+           "Transient problem type does not support wave port boundary conditions!\n");
+     }
+   }
++  else if (problem.type == config::ProblemData::Type::FIRSTMOMENT)
++  {
++    if (!boundaries.conductivity.empty())
++    {
++      Mpi::Warning("FirstMoment problem type does not support surface conductivity "
++                   "boundary conditions!\n");
++    }
++    if (!boundaries.auxpec.empty() || !boundaries.waveport.empty())
++    {
++      Mpi::Warning(
++          "FirstMoment problem type does not support wave port boundary conditions!\n");
++    }
++    if (boundaries.lumpedport.empty())
++    {
++      Mpi::Warning("FirstMoment problem type requires a lumped port boundary condition to "
++                   "define the voltage functional!\n");
++    }
++  }
+ 
+   // Resolve default values in configuration file.
+   if (solver.linear.type == config::LinearSolverData::Type::DEFAULT)

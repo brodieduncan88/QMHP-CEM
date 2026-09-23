@@ -1,0 +1,1349 @@
+{
+ "label": "CONDITIONAL SPECTRAL CALCULATION - EM MAPPING UNVERIFIED",
+ "not": [
+  "not a Route A result",
+  "not VERIFIED-COMPUTATIONAL coupling evidence",
+  "not gate input",
+  "no Palace run",
+  "no Route B",
+  "participations never renormalised"
+ ],
+ "withdrawn_claims": {
+  "rank_implies_N_below_one": "WITHDRAWN. K_port != f f^T/L does NOT imply N < 1. The exact statement is N - N^2 = u^T K_curl u + u^T (K_port - Q) u with u = K^+ q, so N <= 1 always and N = 1 exactly when the static solution is curl-free AND its port trace is the uniform mode. A rank-2 port term with N = 1 is exhibited in review_checks_reconstructed.json.",
+  "readout_zero_error_bound_2p3e_7": "WITHDRAWN. The mode's diagonal participation in DeltaK = K_port - Q is only the first-order term and does not bound the finite shift after removing DeltaK. The operator-mapping error is UNBOUNDED BY THE CURRENT EVIDENCE, which is not a claim that it is large."
+ },
+ "units": {
+  "mode_frequencies": "GHz from eig.csv; w_m = f_m^2 in GHz^2",
+  "conversion_to_angular_squared": "multiply a GHz^2 quantity by W0 = (2*pi*1e9)^2 = 3.947841760e+19 to obtain (rad/s)^2, which is what models.route_a_inversion.coupling_GHz expects for both k and b",
+  "ctilde": "the self-energy residue ctilde^2 is in GHz^4; ctilde = sqrt(residue) is in GHz^2 and is multiplied by W0 before it is passed as k",
+  "L_F_H": 1.0345665367517793e-07
+ },
+ "records": {
+  "N1R": {
+   "record": "results/COUPLED-LADDER-O1-L2-N1R-20260919T110053Z",
+   "saved_eigenpairs": 6,
+   "modes": [
+    {
+     "m": 1,
+     "f_GHz": 1.515753609,
+     "backward_error": 1.273129969e-17,
+     "p_reported_signed": -0.9982861199,
+     "p_reported_abs": 0.9982861199,
+     "E_elec_J": 0.006671281904,
+     "E_mag_J": 1.135797385e-05,
+     "E_cap_J": 0.0,
+     "E_ind_J": 0.006659848127,
+     "E_mag_over_total": 0.0017025174491861798,
+     "equipartition_ratio_R": 0.9999886373936687,
+     "equipartition_defect_1_minus_R": 1.1362606331277725e-05,
+     "p_assembled_operator": 0.9982974825508139,
+     "in_declared_band": true,
+     "group": "field-resonant (equipartition holds)",
+     "included_in_variant_B": true
+    },
+    {
+     "m": 2,
+     "f_GHz": 3.887131643,
+     "backward_error": 3.383823152e-17,
+     "p_reported_signed": -0.0009219973622,
+     "p_reported_abs": 0.0009219973622,
+     "E_elec_J": 0.006671281904,
+     "E_mag_J": 0.006665129495,
+     "E_cap_J": 0.0,
+     "E_ind_J": 6.150904318e-06,
+     "E_mag_over_total": 0.9990777770916394,
+     "equipartition_ratio_R": 0.9999997744538422,
+     "equipartition_defect_1_minus_R": 2.2554615775050024e-07,
+     "p_assembled_operator": 0.000922222908360637,
+     "in_declared_band": true,
+     "group": "field-resonant (equipartition holds)",
+     "included_in_variant_B": true
+    },
+    {
+     "m": 3,
+     "f_GHz": 7.232784563,
+     "backward_error": 1.080466703e-13,
+     "p_reported_signed": -6.81276867e-08,
+     "p_reported_abs": 6.81276867e-08,
+     "E_elec_J": 0.006671281904,
+     "E_mag_J": 1.281070647e-07,
+     "E_cap_J": 0.0,
+     "E_ind_J": 4.544990034e-10,
+     "E_mag_over_total": 1.9202765906682633e-05,
+     "equipartition_ratio_R": 1.9270893593376178e-05,
+     "equipartition_defect_1_minus_R": 0.9999807291064067,
+     "p_assembled_operator": 0.9999807972340933,
+     "in_declared_band": true,
+     "group": "port-operator-localised (equipartition fails; E_mag is ~1e-5 of E_elec)",
+     "included_in_variant_B": false
+    },
+    {
+     "m": 4,
+     "f_GHz": 7.87881469,
+     "backward_error": 2.531814443e-11,
+     "p_reported_signed": 2.555278548e-07,
+     "p_reported_abs": 2.555278548e-07,
+     "E_elec_J": 0.006671281904,
+     "E_mag_J": 1.370368387e-07,
+     "E_cap_J": 0.0,
+     "E_ind_J": 1.704698354e-09,
+     "E_mag_over_total": 2.054130535509746e-05,
+     "equipartition_ratio_R": 2.0796833209943154e-05,
+     "equipartition_defect_1_minus_R": 0.99997920316679,
+     "p_assembled_operator": 0.9999794586946449,
+     "in_declared_band": true,
+     "group": "port-operator-localised (equipartition fails; E_mag is ~1e-5 of E_elec)",
+     "included_in_variant_B": false
+    },
+    {
+     "m": 5,
+     "f_GHz": 8.632726897,
+     "backward_error": 5.974678684e-12,
+     "p_reported_signed": -7.488664719e-06,
+     "p_reported_abs": 7.488664719e-06,
+     "E_elec_J": 0.006671281904,
+     "E_mag_J": 4.14961843e-07,
+     "E_cap_J": 0.0,
+     "E_ind_J": 4.995899342e-08,
+     "E_mag_over_total": 6.220121544424545e-05,
+     "equipartition_ratio_R": 6.968988016249778e-05,
+     "equipartition_defect_1_minus_R": 0.9999303101198375,
+     "p_assembled_operator": 0.9999377987845558,
+     "in_declared_band": true,
+     "group": "port-operator-localised (equipartition fails; E_mag is ~1e-5 of E_elec)",
+     "included_in_variant_B": false
+    },
+    {
+     "m": 6,
+     "f_GHz": 9.521942411,
+     "backward_error": 7.069264284e-12,
+     "p_reported_signed": -2.722898666e-07,
+     "p_reported_abs": 2.722898666e-07,
+     "E_elec_J": 0.006671281904,
+     "E_mag_J": 1.773270458e-07,
+     "E_cap_J": 0.0,
+     "E_ind_J": 1.81652246e-09,
+     "E_mag_over_total": 2.658065546498303e-05,
+     "equipartition_ratio_R": 2.6852945331629325e-05,
+     "equipartition_defect_1_minus_R": 0.9999731470546683,
+     "p_assembled_operator": 0.999973419344535,
+     "in_declared_band": false,
+     "group": "port-operator-localised (equipartition fails; E_mag is ~1e-5 of E_elec)",
+     "included_in_variant_B": false
+    }
+   ],
+   "sum_abs_p_over_saved_modes": 0.9992162018723272,
+   "delta_saved": 0.000783798127672819,
+   "delta_saved_definition": "1 - sum(|p_mF|) over the modes saved in this record; NOT renamed delta_far: see the decomposition below",
+   "decomposition_of_the_saved_sum": {
+    "field_resonant_in_declared_band": 0.9992081172622,
+    "field_resonant_above_declared_band": 0,
+    "port_operator_localised": 8.0846101271e-06
+   },
+   "rank_one_premise_test": {
+    "statement": "if the assembled port term were the rank-one circuit term f f^T / L, then p_assembled_operator would equal |p_reported| for EVERY mode",
+    "max_abs_difference_over_modes": 0.9999807291064066,
+    "worst_mode": 3,
+    "difference_on_field_resonant_modes": {
+     "1": 1.1362650813806496e-05,
+     "2": 2.255461606370801e-07
+    },
+    "sum_p_assembled_over_saved_modes": 4.999091179517004
+   },
+   "spectral_variants": {
+    "A_all_saved_modes": {
+     "included_modes": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "excluded_modes": [],
+     "normalisation_N_equals_sum_abs_p": {
+      "a_GHz2_unnormalised": 2.3081047358962166,
+      "a_over_N_GHz2": 2.309915243138872,
+      "N_used": 0.9992162018723272,
+      "zeros": [
+       {
+        "beta_GHz2": 15.097970135936688,
+        "f_GHz": 3.885610651614066,
+        "ctilde2_GHz4": 0.1513320493015134,
+        "residue_term_shares": {
+         "2": 0.999077268356067,
+         "1": 0.0009227312905649485,
+         "5": 3.211609868763847e-10,
+         "4": 1.753578675657291e-11,
+         "3": 7.449966465763163e-12,
+         "6": 7.221223385427235e-12
+        },
+        "largest_term_mode": 2,
+        "term_ratio_largest_to_next": 1082.7391230488945,
+        "derived_CONDITIONAL": {
+         "f_R_GHz": 3.885610651614066,
+         "g_MHz": 111.01771257049882,
+         "how": "f_R = sqrt(beta); g = coupling_GHz(sqrt(residue)*W0, beta*W0, L_F), the registered algebra applied to the normal-mode coordinate"
+        },
+        "is_readout_candidate_by_interlacing_only": true
+       },
+       {
+        "beta_GHz2": 52.313169125638,
+        "f_GHz": 7.232784327327755,
+        "ctilde2_GHz4": 0.00017046048113907104,
+        "residue_term_shares": {
+         "3": 0.9999999318052071,
+         "1": 6.807807470480974e-08,
+         "2": 1.1363947050502473e-10,
+         "5": 2.5896438990192854e-12,
+         "4": 4.573785461303932e-13,
+         "6": 3.1576897220930916e-14
+        },
+        "largest_term_mode": 3,
+        "term_ratio_largest_to_next": 14689016.047255471
+       },
+       {
+        "beta_GHz2": 62.07570563556058,
+        "f_GHz": 7.87881372006983,
+        "ctilde2_GHz4": 0.0009134478420937822,
+        "residue_term_shares": {
+         "4": 0.999999744188744,
+         "1": 2.553840095120616e-07,
+         "2": 3.8211001683574653e-10,
+         "5": 4.4178484252737094e-11,
+         "3": 6.534658413213992e-13,
+         "6": 3.044923367026449e-13
+        },
+        "largest_term_mode": 4,
+        "term_ratio_largest_to_next": 3915670.938440313
+       },
+       {
+        "beta_GHz2": 74.52343248175643,
+        "f_GHz": 8.632695551318628,
+        "ctilde2_GHz4": 0.03908064051013445,
+        "residue_term_shares": {
+         "5": 0.9999925050317521,
+         "1": 7.484641986363655e-06,
+         "2": 1.0215498451592065e-08,
+         "4": 6.450025357102132e-11,
+         "6": 4.0861454254341295e-11,
+         "3": 5.401552047297104e-12
+        },
+        "largest_term_mode": 5,
+        "term_ratio_largest_to_next": 133605.92355033793
+       },
+       {
+        "beta_GHz2": 90.6673632018966,
+        "f_GHz": 9.521941146735607,
+        "ctilde2_GHz4": 0.0021272313132059094,
+        "residue_term_shares": {
+         "6": 0.9999997274482118,
+         "1": 2.721460315454481e-07,
+         "2": 3.438182734097619e-10,
+         "5": 6.117446569311577e-11,
+         "4": 6.654497951120998e-13,
+         "3": 9.85946266330254e-14
+        },
+        "largest_term_mode": 6,
+        "term_ratio_largest_to_next": 3674496.819848769
+       }
+      ]
+     },
+     "normalisation_N_equals_one": {
+      "a_GHz2_unnormalised": 2.3081047358962166,
+      "a_over_N_GHz2": 2.3081047358962166,
+      "N_used": 1.0,
+      "zeros": [
+       {
+        "beta_GHz2": 15.097970135936688,
+        "f_GHz": 3.885610651614066,
+        "ctilde2_GHz4": 0.15145075612059533,
+        "residue_term_shares": {
+         "2": 0.999077268356067,
+         "1": 0.0009227312905649485,
+         "5": 3.211609868763847e-10,
+         "4": 1.753578675657291e-11,
+         "3": 7.449966465763163e-12,
+         "6": 7.221223385427235e-12
+        },
+        "largest_term_mode": 2,
+        "term_ratio_largest_to_next": 1082.7391230488945,
+        "derived_CONDITIONAL": {
+         "f_R_GHz": 3.885610651614066,
+         "g_MHz": 111.06124590080371,
+         "how": "f_R = sqrt(beta); g = coupling_GHz(sqrt(residue)*W0, beta*W0, L_F), the registered algebra applied to the normal-mode coordinate"
+        },
+        "is_readout_candidate_by_interlacing_only": true
+       },
+       {
+        "beta_GHz2": 52.313169125638,
+        "f_GHz": 7.232784327327755,
+        "ctilde2_GHz4": 0.00017059419254778185,
+        "residue_term_shares": {
+         "3": 0.9999999318052071,
+         "1": 6.807807470480974e-08,
+         "2": 1.1363947050502473e-10,
+         "5": 2.5896438990192854e-12,
+         "4": 4.573785461303932e-13,
+         "6": 3.1576897220930916e-14
+        },
+        "largest_term_mode": 3,
+        "term_ratio_largest_to_next": 14689016.047255471
+       },
+       {
+        "beta_GHz2": 62.07570563556058,
+        "f_GHz": 7.87881372006983,
+        "ctilde2_GHz4": 0.000914164362409424,
+        "residue_term_shares": {
+         "4": 0.999999744188744,
+         "1": 2.553840095120616e-07,
+         "2": 3.8211001683574653e-10,
+         "5": 4.4178484252737094e-11,
+         "3": 6.534658413213992e-13,
+         "6": 3.044923367026449e-13
+        },
+        "largest_term_mode": 4,
+        "term_ratio_largest_to_next": 3915670.938440313
+       },
+       {
+        "beta_GHz2": 74.52343248175643,
+        "f_GHz": 8.632695551318628,
+        "ctilde2_GHz4": 0.03911129587060869,
+        "residue_term_shares": {
+         "5": 0.9999925050317521,
+         "1": 7.484641986363655e-06,
+         "2": 1.0215498451592065e-08,
+         "4": 6.450025357102132e-11,
+         "6": 4.0861454254341295e-11,
+         "3": 5.401552047297104e-12
+        },
+        "largest_term_mode": 5,
+        "term_ratio_largest_to_next": 133605.92355033793
+       },
+       {
+        "beta_GHz2": 90.6673632018966,
+        "f_GHz": 9.521941146735607,
+        "ctilde2_GHz4": 0.002128899940993663,
+        "residue_term_shares": {
+         "6": 0.9999997274482118,
+         "1": 2.721460315454481e-07,
+         "2": 3.438182734097619e-10,
+         "5": 6.117446569311577e-11,
+         "4": 6.654497951120998e-13,
+         "3": 9.85946266330254e-14
+        },
+        "largest_term_mode": 6,
+        "term_ratio_largest_to_next": 3674496.819848769
+       }
+      ]
+     },
+     "rank_one_removal_Q_versus_Q_over_N": {
+      "identity": "det(zM - K + Q)/det(zM - K) = z G(z) + 1 - N",
+      "zeros_of_G_are": "the nonzero eigenvalues of (K - Q/N, M), the NORMALISED removal",
+      "roots_of_zG_plus_1_minus_N_are": "the eigenvalues of (K - Q, M), the DECLARED removal",
+      "N_used": 0.9992162018723272,
+      "declared_removal_roots_GHz2": [
+       0.0018022065143336887,
+       15.097977993147632,
+       52.313169128195035,
+       62.07570564708049,
+       74.52343289281652,
+       90.6673632202766
+      ],
+      "readout_root_declared_removal_GHz2": 15.097977993147632,
+      "readout_zero_normalised_removal_GHz2": 15.097970135936688,
+      "relative_difference_readout": 5.204150540338885e-07,
+      "extra_low_root_GHz2": 0.0018022065143336887,
+      "extra_low_root_note": "the declared removal frees the island, so its pencil carries a zero mode; on this truncation that mode appears as a small positive root rather than exactly zero",
+      "caveat": "both root sets are rank-one removals. Neither is the removal of the assembled K_port, and that difference is not bounded by the committed evidence"
+     }
+    },
+    "B_field_resonant_only": {
+     "included_modes": [
+      1,
+      2
+     ],
+     "excluded_modes": [
+      {
+       "m": 3,
+       "f_GHz": 7.232784563,
+       "reason": "equipartition defect 1-R = 1.000e+00: the mode's magnetic field energy is ~1e-5 of its electric energy, so it is not a field resonance of the modelled environment"
+      },
+      {
+       "m": 4,
+       "f_GHz": 7.87881469,
+       "reason": "equipartition defect 1-R = 1.000e+00: the mode's magnetic field energy is ~1e-5 of its electric energy, so it is not a field resonance of the modelled environment"
+      },
+      {
+       "m": 5,
+       "f_GHz": 8.632726897,
+       "reason": "equipartition defect 1-R = 9.999e-01: the mode's magnetic field energy is ~1e-5 of its electric energy, so it is not a field resonance of the modelled environment"
+      },
+      {
+       "m": 6,
+       "f_GHz": 9.521942411,
+       "reason": "equipartition defect 1-R = 1.000e+00: the mode's magnetic field energy is ~1e-5 of its electric energy, so it is not a field resonance of the modelled environment"
+      }
+     ],
+     "normalisation_N_equals_sum_abs_p": {
+      "a_GHz2_unnormalised": 2.307502536981796,
+      "a_over_N_GHz2": 2.3093312565397115,
+      "N_used": 0.9992081172622,
+      "zeros": [
+       {
+        "beta_GHz2": 15.097970156668692,
+        "f_GHz": 3.8856106542818587,
+        "ctilde2_GHz4": 0.15133029466596898,
+        "residue_term_shares": {
+         "2": 0.9990772719453819,
+         "1": 0.0009227280546181232
+        },
+        "largest_term_mode": 2,
+        "term_ratio_largest_to_next": 1082.7429240339466,
+        "derived_CONDITIONAL": {
+         "f_R_GHz": 3.8856106542818587,
+         "g_MHz": 111.0170689271828,
+         "how": "f_R = sqrt(beta); g = coupling_GHz(sqrt(residue)*W0, beta*W0, L_F), the registered algebra applied to the normal-mode coordinate"
+        },
+        "is_readout_candidate_by_interlacing_only": true
+       }
+      ]
+     },
+     "normalisation_N_equals_one": {
+      "a_GHz2_unnormalised": 2.307502536981796,
+      "a_over_N_GHz2": 2.307502536981796,
+      "N_used": 1.0,
+      "zeros": [
+       {
+        "beta_GHz2": 15.097970156668692,
+        "f_GHz": 3.8856106542818587,
+        "ctilde2_GHz4": 0.1514502254851666,
+        "residue_term_shares": {
+         "2": 0.9990772719453819,
+         "1": 0.0009227280546181232
+        },
+        "largest_term_mode": 2,
+        "term_ratio_largest_to_next": 1082.7429240339466,
+        "derived_CONDITIONAL": {
+         "f_R_GHz": 3.8856106542818587,
+         "g_MHz": 111.06105130081139,
+         "how": "f_R = sqrt(beta); g = coupling_GHz(sqrt(residue)*W0, beta*W0, L_F), the registered algebra applied to the normal-mode coordinate"
+        },
+        "is_readout_candidate_by_interlacing_only": true
+       }
+      ]
+     },
+     "rank_one_removal_Q_versus_Q_over_N": {
+      "identity": "det(zM - K + Q)/det(zM - K) = z G(z) + 1 - N",
+      "zeros_of_G_are": "the nonzero eigenvalues of (K - Q/N, M), the NORMALISED removal",
+      "roots_of_zG_plus_1_minus_N_are": "the eigenvalues of (K - Q, M), the DECLARED removal",
+      "N_used": 0.9992081172622,
+      "declared_removal_roots_GHz2": [
+       0.001820781384738323,
+       15.09797809484187
+      ],
+      "readout_root_declared_removal_GHz2": 15.09797809484187,
+      "readout_zero_normalised_removal_GHz2": 15.097970156668692,
+      "relative_difference_readout": 5.25777511544452e-07,
+      "extra_low_root_GHz2": 0.001820781384738323,
+      "extra_low_root_note": "the declared removal frees the island, so its pencil carries a zero mode; on this truncation that mode appears as a small positive root rather than exactly zero",
+      "caveat": "both root sets are rank-one removals. Neither is the removal of the assembled K_port, and that difference is not bounded by the committed evidence"
+     }
+    }
+   },
+   "conditional_far_mode_sensitivity": {
+    "condition": "assumes, without evidence, that the whole of delta_saved is spectral weight of a single omitted mode at f_far; the deficit's actual origin is unresolved and includes a strictly positive normalisation term (see the note)",
+    "delta_saved_placed": 0.000783798127672819,
+    "rows": [
+     {
+      "f_far_GHz": null,
+      "f_R_GHz": 3.8856106542818587,
+      "g_MHz": 111.0170689271828,
+      "a_over_N_GHz2": 2.3093312565397115
+     },
+     {
+      "f_far_GHz": 12.0,
+      "f_R_GHz": 3.8856105357707893,
+      "g_MHz": 111.06924749210538,
+      "a_over_N_GHz2": 2.420389035268388,
+      "shift_f_R_rel": 3.049998570284427e-08,
+      "shift_g_rel": 0.0004700048868773053,
+      "shift_a_over_N_rel": 0.048090882767110994
+     },
+     {
+      "f_far_GHz": 15.0,
+      "f_R_GHz": 3.885610581505723,
+      "g_MHz": 111.06591131854098,
+      "a_over_N_GHz2": 2.4838771968869207,
+      "shift_f_R_rel": 1.8729652108654436e-08,
+      "shift_g_rel": 0.0004399538902456033,
+      "shift_a_over_N_rel": 0.07558289433485077
+     },
+     {
+      "f_far_GHz": 20.0,
+      "f_R_GHz": 3.8856106145950675,
+      "g_MHz": 111.0634975143243,
+      "a_over_N_GHz2": 2.6210429781615283,
+      "shift_f_R_rel": 1.0213784837906108e-08,
+      "shift_g_rel": 0.0004182112497668672,
+      "shift_a_over_N_rel": 0.13497921562317736
+     },
+     {
+      "f_far_GHz": 30.0,
+      "f_R_GHz": 3.88561063701972,
+      "g_MHz": 111.06186164369716,
+      "a_over_N_GHz2": 3.0129452103746934,
+      "shift_f_R_rel": 4.4425806817374535e-09,
+      "shift_g_rel": 0.0004034759424582819,
+      "shift_a_over_N_rel": 0.30468299073268207
+     },
+     {
+      "f_far_GHz": 50.0,
+      "f_R_GHz": 3.8856106481346586,
+      "g_MHz": 111.06105080219493,
+      "a_over_N_GHz2": 4.2670323534568215,
+      "shift_f_R_rel": 1.5820422140138734e-09,
+      "shift_g_rel": 0.0003961721871883509,
+      "shift_a_over_N_rel": 0.847735071083097
+     }
+    ]
+   }
+  },
+  "N2R": {
+   "record": "results/COUPLED-LADDER-O1-L2-N2R-20260918T061455Z",
+   "saved_eigenpairs": 9,
+   "modes": [
+    {
+     "m": 1,
+     "f_GHz": 1.526014889,
+     "backward_error": 2.118832308e-17,
+     "p_reported_signed": -0.9982168757,
+     "p_reported_abs": 0.9982168757,
+     "E_elec_J": 0.006671281904,
+     "E_mag_J": 1.184775005e-05,
+     "E_cap_J": 0.0,
+     "E_ind_J": 0.006659386179,
+     "E_mag_over_total": 0.0017759330546197225,
+     "equipartition_ratio_R": 0.9999928087359087,
+     "equipartition_defect_1_minus_R": 7.1912640913218695e-06,
+     "p_assembled_operator": 0.9982240669453802,
+     "in_declared_band": true,
+     "group": "field-resonant (equipartition holds)",
+     "included_in_variant_B": true
+    },
+    {
+     "m": 2,
+     "f_GHz": 3.887370723,
+     "backward_error": 4.190047529e-17,
+     "p_reported_signed": 0.000938532088,
+     "p_reported_abs": 0.000938532088,
+     "E_elec_J": 0.006671281904,
+     "E_mag_J": 0.006665019951,
+     "E_cap_J": 0.0,
+     "E_ind_J": 6.261212135e-06,
+     "E_mag_over_total": 0.99906135685913,
+     "equipartition_ratio_R": 0.9999998889471303,
+     "equipartition_defect_1_minus_R": 1.1105286967794115e-07,
+     "p_assembled_operator": 0.0009386431408699991,
+     "in_declared_band": true,
+     "group": "field-resonant (equipartition holds)",
+     "included_in_variant_B": true
+    },
+    {
+     "m": 3,
+     "f_GHz": 10.21399772,
+     "backward_error": 4.52178736e-13,
+     "p_reported_signed": -1.695794496e-07,
+     "p_reported_abs": 1.695794496e-07,
+     "E_elec_J": 0.006671281904,
+     "E_mag_J": 1.047293222e-07,
+     "E_cap_J": 0.0,
+     "E_ind_J": 1.131312313e-09,
+     "E_mag_over_total": 1.5698530463419014e-05,
+     "equipartition_ratio_R": 1.5868109912958043e-05,
+     "equipartition_defect_1_minus_R": 0.9999841318900871,
+     "p_assembled_operator": 0.9999843014695365,
+     "in_declared_band": false,
+     "group": "port-operator-localised (equipartition fails; E_mag is ~1e-5 of E_elec)",
+     "included_in_variant_B": false
+    },
+    {
+     "m": 4,
+     "f_GHz": 10.43786163,
+     "backward_error": 9.529963581e-12,
+     "p_reported_signed": 2.94212949e-08,
+     "p_reported_abs": 2.94212949e-08,
+     "E_elec_J": 0.006671281904,
+     "E_mag_J": 6.199622641e-08,
+     "E_cap_J": 0.0,
+     "E_ind_J": 1.962777522e-10,
+     "E_mag_over_total": 9.293000551037725e-06,
+     "equipartition_ratio_R": 9.322421845928938e-06,
+     "equipartition_defect_1_minus_R": 0.9999906775781541,
+     "p_assembled_operator": 0.9999907069994489,
+     "in_declared_band": false,
+     "group": "port-operator-localised (equipartition fails; E_mag is ~1e-5 of E_elec)",
+     "included_in_variant_B": false
+    },
+    {
+     "m": 5,
+     "f_GHz": 10.84152451,
+     "backward_error": 2.519230684e-14,
+     "p_reported_signed": 3.187837728e-05,
+     "p_reported_abs": 3.187837728e-05,
+     "E_elec_J": 0.006671281904,
+     "E_mag_J": 0.00667100456,
+     "E_cap_J": 0.0,
+     "E_ind_J": 2.126696415e-07,
+     "E_mag_over_total": 0.9999584271802644,
+     "equipartition_ratio_R": 0.9999903055575479,
+     "equipartition_defect_1_minus_R": 9.694442452135021e-06,
+     "p_assembled_operator": 4.157281973560245e-05,
+     "in_declared_band": false,
+     "group": "field-resonant (equipartition holds)",
+     "included_in_variant_B": true
+    },
+    {
+     "m": 6,
+     "f_GHz": 10.99752823,
+     "backward_error": 2.217141543e-12,
+     "p_reported_signed": 3.213212399e-06,
+     "p_reported_abs": 3.213212399e-06,
+     "E_elec_J": 0.006671281904,
+     "E_mag_J": 5.628076389e-07,
+     "E_cap_J": 0.0,
+     "E_ind_J": 2.143624573e-08,
+     "E_mag_over_total": 8.436274272303634e-05,
+     "equipartition_ratio_R": 8.75759551218629e-05,
+     "equipartition_defect_1_minus_R": 0.9999124240448781,
+     "p_assembled_operator": 0.999915637257277,
+     "in_declared_band": false,
+     "group": "port-operator-localised (equipartition fails; E_mag is ~1e-5 of E_elec)",
+     "included_in_variant_B": false
+    },
+    {
+     "m": 7,
+     "f_GHz": 11.2175922,
+     "backward_error": 3.364439685e-12,
+     "p_reported_signed": -1.015989182e-06,
+     "p_reported_abs": 1.015989182e-06,
+     "E_elec_J": 0.006671281904,
+     "E_mag_J": 2.624589684e-07,
+     "E_cap_J": 0.0,
+     "E_ind_J": 6.777950245e-09,
+     "E_mag_over_total": 3.9341609630172205e-05,
+     "equipartition_ratio_R": 4.03575988122417e-05,
+     "equipartition_defect_1_minus_R": 0.9999596424011877,
+     "p_assembled_operator": 0.9999606583903698,
+     "in_declared_band": false,
+     "group": "port-operator-localised (equipartition fails; E_mag is ~1e-5 of E_elec)",
+     "included_in_variant_B": false
+    },
+    {
+     "m": 8,
+     "f_GHz": 11.60935606,
+     "backward_error": 1.683360668e-11,
+     "p_reported_signed": 6.223816571e-05,
+     "p_reported_abs": 6.223816571e-05,
+     "E_elec_J": 0.006671281904,
+     "E_mag_J": 0.006670452269,
+     "E_cap_J": 0.0,
+     "E_ind_J": 4.152083486e-07,
+     "E_mag_over_total": 0.9998756408420542,
+     "equipartition_ratio_R": 0.9999378790077583,
+     "equipartition_defect_1_minus_R": 6.212099224167655e-05,
+     "p_assembled_operator": 0.0001243591579458414,
+     "in_declared_band": false,
+     "group": "field-resonant (equipartition holds)",
+     "included_in_variant_B": true
+    },
+    {
+     "m": 9,
+     "f_GHz": 11.77805216,
+     "backward_error": 5.311352841e-11,
+     "p_reported_signed": 6.310225805e-07,
+     "p_reported_abs": 6.310225805e-07,
+     "E_elec_J": 0.006671281904,
+     "E_mag_J": 4.760060284e-07,
+     "E_cap_J": 0.0,
+     "E_ind_J": 4.209729522e-09,
+     "E_mag_over_total": 7.135150863803161e-05,
+     "equipartition_ratio_R": 7.198253121848588e-05,
+     "equipartition_defect_1_minus_R": 0.9999280174687815,
+     "p_assembled_operator": 0.999928648491362,
+     "in_declared_band": false,
+     "group": "port-operator-localised (equipartition fails; E_mag is ~1e-5 of E_elec)",
+     "included_in_variant_B": false
+    }
+   ],
+   "sum_abs_p_over_saved_modes": 0.999254583555896,
+   "delta_saved": 0.0007454164441039746,
+   "delta_saved_definition": "1 - sum(|p_mF|) over the modes saved in this record; NOT renamed delta_far: see the decomposition below",
+   "decomposition_of_the_saved_sum": {
+    "field_resonant_in_declared_band": 0.9991554077879999,
+    "field_resonant_above_declared_band": 9.411654299e-05,
+    "port_operator_localised": 5.059224906e-06
+   },
+   "rank_one_premise_test": {
+    "statement": "if the assembled port term were the rank-one circuit term f f^T / L, then p_assembled_operator would equal |p_reported| for EVERY mode",
+    "max_abs_difference_over_modes": 0.9999906775781541,
+    "worst_mode": 4,
+    "difference_on_field_resonant_modes": {
+     "1": 7.191245380289146e-06,
+     "2": 1.1105286999908183e-07,
+     "5": 9.694442455602449e-06,
+     "8": 6.21209922358414e-05
+    },
+    "sum_p_assembled_over_saved_modes": 5.999108594671926
+   },
+   "spectral_variants": {
+    "A_all_saved_modes": {
+     "included_modes": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+     ],
+     "excluded_modes": [],
+     "normalisation_N_equals_sum_abs_p": {
+      "a_GHz2_unnormalised": 2.351511939494728,
+      "a_over_N_GHz2": 2.3532661027450668,
+      "N_used": 0.999254583555896,
+      "zeros": [
+       {
+        "beta_GHz2": 15.099643672274043,
+        "f_GHz": 3.885825996139565,
+        "ctilde2_GHz4": 0.15336335203709192,
+        "residue_term_shares": {
+         "2": 0.9990606522806781,
+         "1": 0.0009393465193011628,
+         "8": 6.669252782246464e-10,
+         "5": 4.662414748108048e-10,
+         "6": 4.401858847363536e-11,
+         "7": 1.2716477179822609e-11,
+         "9": 6.337131319774667e-12,
+         "3": 3.269149541801981e-12,
+         "4": 5.12678426151994e-13
+        },
+        "largest_term_mode": 2,
+        "term_ratio_largest_to_next": 1063.5698666600056,
+        "derived_CONDITIONAL": {
+         "f_R_GHz": 3.885825996139565,
+         "g_MHz": 111.7572174595696,
+         "how": "f_R = sqrt(beta); g = coupling_GHz(sqrt(residue)*W0, beta*W0, L_F), the registered algebra applied to the normal-mode coordinate"
+        },
+        "is_readout_candidate_by_interlacing_only": true
+       },
+       {
+        "beta_GHz2": 104.32573219570853,
+        "f_GHz": 10.21399687662516,
+        "ctilde2_GHz4": 0.0017490233375846004,
+        "residue_term_shares": {
+         "3": 0.9999998313830416,
+         "1": 1.6794592669747396e-07,
+         "5": 3.1960822827057634e-10,
+         "2": 2.0639623369872502e-10,
+         "8": 1.17479274911908e-10,
+         "6": 2.0361151692317128e-11,
+         "7": 3.8439925210153635e-12,
+         "4": 2.409303517792747e-12,
+         "9": 9.33531046705803e-13
+        },
+        "largest_term_mode": 3,
+        "term_ratio_largest_to_next": 5954296.4277089685
+       },
+       {
+        "beta_GHz2": 108.94895188538693,
+        "f_GHz": 10.437861461304559,
+        "ctilde2_GHz4": 0.0004212152635693431,
+        "residue_term_shares": {
+         "4": 0.9999999627044133,
+         "1": 3.701464813453225e-08,
+         "5": 1.821243361005596e-10,
+         "2": 4.492892871792894e-11,
+         "8": 3.932752183500916e-11,
+         "6": 9.411212455683768e-12,
+         "3": 3.344377918544678e-12,
+         "7": 1.502080304972777e-12,
+         "9": 3.0006220499253774e-13
+        },
+        "largest_term_mode": 4,
+        "term_ratio_largest_to_next": 27016330.374662638
+       },
+       {
+        "beta_GHz2": 117.53497906276509,
+        "f_GHz": 10.841355038129002,
+        "ctilde2_GHz4": 0.4232482406564261,
+        "residue_term_shares": {
+         "5": 0.9999678929699478,
+         "1": 3.185603955025233e-05,
+         "6": 1.1699966539608878e-07,
+         "8": 8.867312187215816e-08,
+         "2": 3.789399317048582e-08,
+         "7": 6.247627861963505e-09,
+         "9": 5.953921486952957e-10,
+         "3": 4.116586573047878e-10,
+         "4": 1.6904278308607665e-10
+        },
+        "largest_term_mode": 5,
+        "term_ratio_largest_to_next": 31390.213820915073
+       },
+       {
+        "beta_GHz2": 120.94524181196381,
+        "f_GHz": 10.997510709790822,
+        "ctilde2_GHz4": 0.04618099343266869,
+        "residue_term_shares": {
+         "6": 0.9999965731946768,
+         "1": 3.2788509138089514e-06,
+         "5": 1.2695332371713628e-07,
+         "8": 1.5034182889781634e-08,
+         "2": 3.872480020641752e-09,
+         "7": 1.9643212316191916e-09,
+         "9": 9.227877970573148e-11,
+         "3": 2.8374278922851232e-11,
+         "4": 9.448334357347232e-12
+        },
+        "largest_term_mode": 6,
+        "term_ratio_largest_to_next": 304983.8493672188
+       },
+       {
+        "beta_GHz2": 125.8342514581476,
+        "f_GHz": 11.217586703839093,
+        "ctilde2_GHz4": 0.01495424812348604,
+        "residue_term_shares": {
+         "7": 0.9999989988436222,
+         "1": 9.79355876060862e-07,
+         "8": 1.164632197118189e-08,
+         "5": 6.932490264953933e-09,
+         "6": 2.0121230909147263e-09,
+         "2": 1.1456844154485054e-09,
+         "9": 5.6851859430722325e-11,
+         "3": 5.485817111706592e-12,
+         "4": 1.5443042165634393e-12
+        },
+        "largest_term_mode": 7,
+        "term_ratio_largest_to_next": 1021078.2650999047
+       },
+       {
+        "beta_GHz2": 134.76890062601018,
+        "f_GHz": 11.609000845292853,
+        "ctilde2_GHz4": 1.0920363153974042,
+        "residue_term_shares": {
+         "8": 0.9999375406740079,
+         "1": 6.219368938621941e-05,
+         "5": 1.1734757937211696e-07,
+         "2": 7.163611519142021e-08,
+         "9": 4.411819410497708e-08,
+         "6": 1.8377167220334164e-08,
+         "7": 1.3909355119067593e-08,
+         "3": 1.9996544036946677e-10,
+         "4": 4.82294247586129e-11
+        },
+        "largest_term_mode": 8,
+        "term_ratio_largest_to_next": 16077.797450870788
+       },
+       {
+        "beta_GHz2": 138.72242704329506,
+        "f_GHz": 11.778048524407389,
+        "ctilde2_GHz4": 0.01161417017331579,
+        "residue_term_shares": {
+         "9": 0.9999993281341697,
+         "1": 6.236605688678504e-07,
+         "8": 4.6474357844124495e-08,
+         "5": 8.256606749388712e-10,
+         "2": 7.139182707032165e-10,
+         "6": 1.1818008653935512e-10,
+         "7": 7.109295099404616e-11,
+         "3": 1.6659128011523003e-12,
+         "4": 3.857579322282331e-13
+        },
+        "largest_term_mode": 9,
+        "term_ratio_largest_to_next": 1603435.2307209326
+       }
+      ]
+     },
+     "normalisation_N_equals_one": {
+      "a_GHz2_unnormalised": 2.351511939494728,
+      "a_over_N_GHz2": 2.351511939494728,
+      "N_used": 1.0,
+      "zeros": [
+       {
+        "beta_GHz2": 15.099643672274043,
+        "f_GHz": 3.885825996139565,
+        "ctilde2_GHz4": 0.15347775688087512,
+        "residue_term_shares": {
+         "2": 0.9990606522806781,
+         "1": 0.0009393465193011628,
+         "8": 6.669252782246464e-10,
+         "5": 4.662414748108048e-10,
+         "6": 4.401858847363536e-11,
+         "7": 1.2716477179822609e-11,
+         "9": 6.337131319774667e-12,
+         "3": 3.269149541801981e-12,
+         "4": 5.12678426151994e-13
+        },
+        "largest_term_mode": 2,
+        "term_ratio_largest_to_next": 1063.5698666600056,
+        "derived_CONDITIONAL": {
+         "f_R_GHz": 3.885825996139565,
+         "g_MHz": 111.79889359439548,
+         "how": "f_R = sqrt(beta); g = coupling_GHz(sqrt(residue)*W0, beta*W0, L_F), the registered algebra applied to the normal-mode coordinate"
+        },
+        "is_readout_candidate_by_interlacing_only": true
+       },
+       {
+        "beta_GHz2": 104.32573219570853,
+        "f_GHz": 10.21399687662516,
+        "ctilde2_GHz4": 0.0017503280609037749,
+        "residue_term_shares": {
+         "3": 0.9999998313830416,
+         "1": 1.6794592669747396e-07,
+         "5": 3.1960822827057634e-10,
+         "2": 2.0639623369872502e-10,
+         "8": 1.17479274911908e-10,
+         "6": 2.0361151692317128e-11,
+         "7": 3.8439925210153635e-12,
+         "4": 2.409303517792747e-12,
+         "9": 9.33531046705803e-13
+        },
+        "largest_term_mode": 3,
+        "term_ratio_largest_to_next": 5954296.4277089685
+       },
+       {
+        "beta_GHz2": 108.94895188538693,
+        "f_GHz": 10.437861461304559,
+        "ctilde2_GHz4": 0.000421529478574347,
+        "residue_term_shares": {
+         "4": 0.9999999627044133,
+         "1": 3.701464813453225e-08,
+         "5": 1.821243361005596e-10,
+         "2": 4.492892871792894e-11,
+         "8": 3.932752183500916e-11,
+         "6": 9.411212455683768e-12,
+         "3": 3.344377918544678e-12,
+         "7": 1.502080304972777e-12,
+         "9": 3.0006220499253774e-13
+        },
+        "largest_term_mode": 4,
+        "term_ratio_largest_to_next": 27016330.374662638
+       },
+       {
+        "beta_GHz2": 117.53497906276509,
+        "f_GHz": 10.841355038129002,
+        "ctilde2_GHz4": 0.42356397220643877,
+        "residue_term_shares": {
+         "5": 0.9999678929699478,
+         "1": 3.185603955025233e-05,
+         "6": 1.1699966539608878e-07,
+         "8": 8.867312187215816e-08,
+         "2": 3.789399317048582e-08,
+         "7": 6.247627861963505e-09,
+         "9": 5.953921486952957e-10,
+         "3": 4.116586573047878e-10,
+         "4": 1.6904278308607665e-10
+        },
+        "largest_term_mode": 5,
+        "term_ratio_largest_to_next": 31390.213820915073
+       },
+       {
+        "beta_GHz2": 120.94524181196381,
+        "f_GHz": 10.997510709790822,
+        "ctilde2_GHz4": 0.04621544318398959,
+        "residue_term_shares": {
+         "6": 0.9999965731946768,
+         "1": 3.2788509138089514e-06,
+         "5": 1.2695332371713628e-07,
+         "8": 1.5034182889781634e-08,
+         "2": 3.872480020641752e-09,
+         "7": 1.9643212316191916e-09,
+         "9": 9.227877970573148e-11,
+         "3": 2.8374278922851232e-11,
+         "4": 9.448334357347232e-12
+        },
+        "largest_term_mode": 6,
+        "term_ratio_largest_to_next": 304983.8493672188
+       },
+       {
+        "beta_GHz2": 125.8342514581476,
+        "f_GHz": 11.217586703839093,
+        "ctilde2_GHz4": 0.014965403581408274,
+        "residue_term_shares": {
+         "7": 0.9999989988436222,
+         "1": 9.79355876060862e-07,
+         "8": 1.164632197118189e-08,
+         "5": 6.932490264953933e-09,
+         "6": 2.0121230909147263e-09,
+         "2": 1.1456844154485054e-09,
+         "9": 5.6851859430722325e-11,
+         "3": 5.485817111706592e-12,
+         "4": 1.5443042165634393e-12
+        },
+        "largest_term_mode": 7,
+        "term_ratio_largest_to_next": 1021078.2650999047
+       },
+       {
+        "beta_GHz2": 134.76890062601018,
+        "f_GHz": 11.609000845292853,
+        "ctilde2_GHz4": 1.092850944462361,
+        "residue_term_shares": {
+         "8": 0.9999375406740079,
+         "1": 6.219368938621941e-05,
+         "5": 1.1734757937211696e-07,
+         "2": 7.163611519142021e-08,
+         "9": 4.411819410497708e-08,
+         "6": 1.8377167220334164e-08,
+         "7": 1.3909355119067593e-08,
+         "3": 1.9996544036946677e-10,
+         "4": 4.82294247586129e-11
+        },
+        "largest_term_mode": 8,
+        "term_ratio_largest_to_next": 16077.797450870788
+       },
+       {
+        "beta_GHz2": 138.72242704329506,
+        "f_GHz": 11.778048524407389,
+        "ctilde2_GHz4": 0.01162283402492506,
+        "residue_term_shares": {
+         "9": 0.9999993281341697,
+         "1": 6.236605688678504e-07,
+         "8": 4.6474357844124495e-08,
+         "5": 8.256606749388712e-10,
+         "2": 7.139182707032165e-10,
+         "6": 1.1818008653935512e-10,
+         "7": 7.109295099404616e-11,
+         "3": 1.6659128011523003e-12,
+         "4": 3.857579322282331e-13
+        },
+        "largest_term_mode": 9,
+        "term_ratio_largest_to_next": 1603435.2307209326
+       }
+      ]
+     },
+     "rank_one_removal_Q_versus_Q_over_N": {
+      "identity": "det(zM - K + Q)/det(zM - K) = z G(z) + 1 - N",
+      "zeros_of_G_are": "the nonzero eigenvalues of (K - Q/N, M), the NORMALISED removal",
+      "roots_of_zG_plus_1_minus_N_are": "the eigenvalues of (K - Q, M), the DECLARED removal",
+      "N_used": 0.999254583555896,
+      "declared_removal_roots_GHz2": [
+       0.0017374159349687922,
+       15.099651244155394,
+       104.3257321326179,
+       108.94895219138431,
+       117.53497993273545,
+       120.94524481447087,
+       125.8342501631635,
+       134.7689070531538,
+       138.72242697118654
+      ],
+      "readout_root_declared_removal_GHz2": 15.099651244155394,
+      "readout_zero_normalised_removal_GHz2": 15.099643672274043,
+      "relative_difference_readout": 5.014609295156571e-07,
+      "extra_low_root_GHz2": 0.0017374159349687922,
+      "extra_low_root_note": "the declared removal frees the island, so its pencil carries a zero mode; on this truncation that mode appears as a small positive root rather than exactly zero",
+      "caveat": "both root sets are rank-one removals. Neither is the removal of the assembled K_port, and that difference is not bounded by the committed evidence"
+     }
+    },
+    "B_field_resonant_only": {
+     "included_modes": [
+      1,
+      2,
+      5,
+      8
+     ],
+     "excluded_modes": [
+      {
+       "m": 3,
+       "f_GHz": 10.21399772,
+       "reason": "equipartition defect 1-R = 1.000e+00: the mode's magnetic field energy is ~1e-5 of its electric energy, so it is not a field resonance of the modelled environment"
+      },
+      {
+       "m": 4,
+       "f_GHz": 10.43786163,
+       "reason": "equipartition defect 1-R = 1.000e+00: the mode's magnetic field energy is ~1e-5 of its electric energy, so it is not a field resonance of the modelled environment"
+      },
+      {
+       "m": 6,
+       "f_GHz": 10.99752823,
+       "reason": "equipartition defect 1-R = 9.999e-01: the mode's magnetic field energy is ~1e-5 of its electric energy, so it is not a field resonance of the modelled environment"
+      },
+      {
+       "m": 7,
+       "f_GHz": 11.2175922,
+       "reason": "equipartition defect 1-R = 1.000e+00: the mode's magnetic field energy is ~1e-5 of its electric energy, so it is not a field resonance of the modelled environment"
+      },
+      {
+       "m": 9,
+       "f_GHz": 11.77805216,
+       "reason": "equipartition defect 1-R = 9.999e-01: the mode's magnetic field energy is ~1e-5 of its electric energy, so it is not a field resonance of the modelled environment"
+      }
+     ],
+     "normalisation_N_equals_sum_abs_p": {
+      "a_GHz2_unnormalised": 2.3508870351819766,
+      "a_over_N_GHz2": 2.3526526437487423,
+      "N_used": 0.99924952433099,
+      "zeros": [
+       {
+        "beta_GHz2": 15.099643679464629,
+        "f_GHz": 3.8858259970647975,
+        "ctilde2_GHz4": 0.1533623920614249,
+        "residue_term_shares": {
+         "2": 0.9990606534725123,
+         "1": 0.0009393453943222794,
+         "4": 6.66924480333671e-10,
+         "3": 4.662409170218149e-10
+        },
+        "largest_term_mode": 2,
+        "term_ratio_largest_to_next": 1063.5711416814008,
+        "derived_CONDITIONAL": {
+         "f_R_GHz": 3.8858259970647975,
+         "g_MHz": 111.75686767438036,
+         "how": "f_R = sqrt(beta); g = coupling_GHz(sqrt(residue)*W0, beta*W0, L_F), the registered algebra applied to the normal-mode coordinate"
+        },
+        "is_readout_candidate_by_interlacing_only": true
+       },
+       {
+        "beta_GHz2": 117.53497690873085,
+        "f_GHz": 10.841354938785598,
+        "ctilde2_GHz4": 0.42374248483551985,
+        "residue_term_shares": {
+         "3": 0.9999679798826547,
+         "1": 3.189340181173025e-05,
+         "4": 8.877709637877064e-08,
+         "2": 3.7938437205012985e-08
+        },
+        "largest_term_mode": 3,
+        "term_ratio_largest_to_next": 31353.44375571975
+       },
+       {
+        "beta_GHz2": 134.7689011763323,
+        "f_GHz": 11.609000868995242,
+        "ctilde2_GHz4": 1.0918851505588394,
+        "residue_term_shares": {
+         "4": 0.9999376256469479,
+         "1": 6.21853945689889e-05,
+         "3": 1.1733192212086856e-07,
+         "2": 7.162656096745613e-08
+        },
+        "largest_term_mode": 4,
+        "term_ratio_largest_to_next": 16079.94341078933
+       }
+      ]
+     },
+     "normalisation_N_equals_one": {
+      "a_GHz2_unnormalised": 2.3508870351819766,
+      "a_over_N_GHz2": 2.3508870351819766,
+      "N_used": 1.0,
+      "zeros": [
+       {
+        "beta_GHz2": 15.099643679464629,
+        "f_GHz": 3.8858259970647975,
+        "ctilde2_GHz4": 0.15347757324588465,
+        "residue_term_shares": {
+         "2": 0.9990606534725123,
+         "1": 0.0009393453943222794,
+         "4": 6.66924480333671e-10,
+         "3": 4.662409170218149e-10
+        },
+        "largest_term_mode": 2,
+        "term_ratio_largest_to_next": 1063.5711416814008,
+        "derived_CONDITIONAL": {
+         "f_R_GHz": 3.8858259970647975,
+         "g_MHz": 111.79882669779472,
+         "how": "f_R = sqrt(beta); g = coupling_GHz(sqrt(residue)*W0, beta*W0, L_F), the registered algebra applied to the normal-mode coordinate"
+        },
+        "is_readout_candidate_by_interlacing_only": true
+       },
+       {
+        "beta_GHz2": 117.53497690873085,
+        "f_GHz": 10.841354938785598,
+        "ctilde2_GHz4": 0.4240607320971413,
+        "residue_term_shares": {
+         "3": 0.9999679798826547,
+         "1": 3.189340181173025e-05,
+         "4": 8.877709637877064e-08,
+         "2": 3.7938437205012985e-08
+        },
+        "largest_term_mode": 3,
+        "term_ratio_largest_to_next": 31353.44375571975
+       },
+       {
+        "beta_GHz2": 134.7689011763323,
+        "f_GHz": 11.609000868995242,
+        "ctilde2_GHz4": 1.092705199224258,
+        "residue_term_shares": {
+         "4": 0.9999376256469479,
+         "1": 6.21853945689889e-05,
+         "3": 1.1733192212086856e-07,
+         "2": 7.162656096745613e-08
+        },
+        "largest_term_mode": 4,
+        "term_ratio_largest_to_next": 16079.94341078933
+       }
+      ]
+     },
+     "rank_one_removal_Q_versus_Q_over_N": {
+      "identity": "det(zM - K + Q)/det(zM - K) = z G(z) + 1 - N",
+      "zeros_of_G_are": "the nonzero eigenvalues of (K - Q/N, M), the NORMALISED removal",
+      "roots_of_zG_plus_1_minus_N_are": "the eigenvalues of (K - Q, M), the DECLARED removal",
+      "N_used": 0.99924952433099,
+      "declared_removal_roots_GHz2": [
+       0.0017491992825372945,
+       15.09965130269549,
+       117.53497961441882,
+       134.7689072566978
+      ],
+      "readout_root_declared_removal_GHz2": 15.09965130269549,
+      "readout_zero_normalised_removal_GHz2": 15.099643679464629,
+      "relative_difference_readout": 5.048616392951451e-07,
+      "extra_low_root_GHz2": 0.0017491992825372945,
+      "extra_low_root_note": "the declared removal frees the island, so its pencil carries a zero mode; on this truncation that mode appears as a small positive root rather than exactly zero",
+      "caveat": "both root sets are rank-one removals. Neither is the removal of the assembled K_port, and that difference is not bounded by the committed evidence"
+     }
+    }
+   },
+   "conditional_far_mode_sensitivity": {
+    "condition": "assumes, without evidence, that the whole of delta_saved is spectral weight of a single omitted mode at f_far; the deficit's actual origin is unresolved and includes a strictly positive normalisation term (see the note)",
+    "delta_saved_placed": 0.0007454164441039746,
+    "rows": [
+     {
+      "f_far_GHz": null,
+      "f_R_GHz": 3.8858259970647975,
+      "g_MHz": 111.75686767438036,
+      "a_over_N_GHz2": 2.3526526437487423
+     },
+     {
+      "f_far_GHz": 12.0,
+      "f_R_GHz": 3.8858258828536476,
+      "g_MHz": 111.80680169223923,
+      "a_over_N_GHz2": 2.4582394399191485,
+      "shift_f_R_rel": 2.9391730344369344e-08,
+      "shift_g_rel": 0.00044680938986554073,
+      "shift_a_over_N_rel": 0.04487989183229492
+     },
+     {
+      "f_far_GHz": 15.0,
+      "f_R_GHz": 3.885825926929435,
+      "g_MHz": 111.80361497444727,
+      "a_over_N_GHz2": 2.5186184773627,
+      "shift_f_R_rel": 1.8049022900049814e-08,
+      "shift_g_rel": 0.00041829465195030867,
+      "shift_a_over_N_rel": 0.07054412985909642
+     },
+     {
+      "f_far_GHz": 20.0,
+      "f_R_GHz": 3.885825958818186,
+      "g_MHz": 111.8013093183392,
+      "a_over_N_GHz2": 2.6490670150493867,
+      "shift_f_R_rel": 9.842595032411018e-09,
+      "shift_g_rel": 0.0003976636504194164,
+      "shift_a_over_N_rel": 0.12599155769477918
+     },
+     {
+      "f_far_GHz": 30.0,
+      "f_R_GHz": 3.885825980429108,
+      "g_MHz": 111.79974674707476,
+      "a_over_N_GHz2": 3.0217771227256334,
+      "shift_f_R_rel": 4.281120483299583e-09,
+      "shift_g_rel": 0.0003836817690644185,
+      "shift_a_over_N_rel": 0.2844127800824438
+     },
+     {
+      "f_far_GHz": 50.0,
+      "f_R_GHz": 3.8858259911406883,
+      "g_MHz": 111.79897223927269,
+      "a_over_N_GHz2": 4.214449467289622,
+      "shift_f_R_rel": 1.5245430978297462e-09,
+      "shift_g_rel": 0.00037675147638357683,
+      "shift_a_over_N_rel": 0.7913606917229705
+     }
+    ]
+   }
+  }
+ },
+ "observed_refinement_sensitivity": {
+  "A_all_saved_modes|normalisation_N_equals_sum_abs_p": {
+   "N1R": {
+    "f_R_GHz": 3.885610651614066,
+    "g_MHz": 111.01771257049882,
+    "how": "f_R = sqrt(beta); g = coupling_GHz(sqrt(residue)*W0, beta*W0, L_F), the registered algebra applied to the normal-mode coordinate"
+   },
+   "N2R": {
+    "f_R_GHz": 3.885825996139565,
+    "g_MHz": 111.7572174595696,
+    "how": "f_R = sqrt(beta); g = coupling_GHz(sqrt(residue)*W0, beta*W0, L_F), the registered algebra applied to the normal-mode coordinate"
+   },
+   "observed_refinement_sensitivity_f_R": 5.5421025112138216e-05,
+   "observed_refinement_sensitivity_g": 0.006661143271180121,
+   "caveat": "an observed difference between two solved discretisations; not an error bound, not a convergence statement, not continuum accuracy"
+  },
+  "A_all_saved_modes|normalisation_N_equals_one": {
+   "N1R": {
+    "f_R_GHz": 3.885610651614066,
+    "g_MHz": 111.06124590080371,
+    "how": "f_R = sqrt(beta); g = coupling_GHz(sqrt(residue)*W0, beta*W0, L_F), the registered algebra applied to the normal-mode coordinate"
+   },
+   "N2R": {
+    "f_R_GHz": 3.885825996139565,
+    "g_MHz": 111.79889359439548,
+    "how": "f_R = sqrt(beta); g = coupling_GHz(sqrt(residue)*W0, beta*W0, L_F), the registered algebra applied to the normal-mode coordinate"
+   },
+   "observed_refinement_sensitivity_f_R": 5.5421025112138216e-05,
+   "observed_refinement_sensitivity_g": 0.0066418099995979776,
+   "caveat": "an observed difference between two solved discretisations; not an error bound, not a convergence statement, not continuum accuracy"
+  },
+  "B_field_resonant_only|normalisation_N_equals_sum_abs_p": {
+   "N1R": {
+    "f_R_GHz": 3.8856106542818587,
+    "g_MHz": 111.0170689271828,
+    "how": "f_R = sqrt(beta); g = coupling_GHz(sqrt(residue)*W0, beta*W0, L_F), the registered algebra applied to the normal-mode coordinate"
+   },
+   "N2R": {
+    "f_R_GHz": 3.8858259970647975,
+    "g_MHz": 111.75686767438036,
+    "how": "f_R = sqrt(beta); g = coupling_GHz(sqrt(residue)*W0, beta*W0, L_F), the registered algebra applied to the normal-mode coordinate"
+   },
+   "observed_refinement_sensitivity_f_R": 5.5420576609103524e-05,
+   "observed_refinement_sensitivity_g": 0.006663828853946733,
+   "caveat": "an observed difference between two solved discretisations; not an error bound, not a convergence statement, not continuum accuracy"
+  },
+  "B_field_resonant_only|normalisation_N_equals_one": {
+   "N1R": {
+    "f_R_GHz": 3.8856106542818587,
+    "g_MHz": 111.06105130081139,
+    "how": "f_R = sqrt(beta); g = coupling_GHz(sqrt(residue)*W0, beta*W0, L_F), the registered algebra applied to the normal-mode coordinate"
+   },
+   "N2R": {
+    "f_R_GHz": 3.8858259970647975,
+    "g_MHz": 111.79882669779472,
+    "how": "f_R = sqrt(beta); g = coupling_GHz(sqrt(residue)*W0, beta*W0, L_F), the registered algebra applied to the normal-mode coordinate"
+   },
+   "observed_refinement_sensitivity_f_R": 5.5420576609103524e-05,
+   "observed_refinement_sensitivity_g": 0.006642971485881728,
+   "caveat": "an observed difference between two solved discretisations; not an error bound, not a convergence statement, not continuum accuracy"
+  }
+ },
+ "E_C_F1F1": {
+  "status": "UNAVAILABLE",
+  "why": "E_C is fixed by a = sum_m p_m f_m^2 divided by the total weight N, and N is the complete-mode normalisation f^T K^-1 f / L, which is not 1 for this FEM model and is not measured by any committed column. The spread of a/N across the variants below is recorded as evidence of that, not as a value.",
+  "a_over_N_spread_GHz2": {
+   "N1R|A_all_saved_modes|normalisation_N_equals_sum_abs_p": 2.309915243138872,
+   "N1R|A_all_saved_modes|normalisation_N_equals_one": 2.3081047358962166,
+   "N1R|B_field_resonant_only|normalisation_N_equals_sum_abs_p": 2.3093312565397115,
+   "N1R|B_field_resonant_only|normalisation_N_equals_one": 2.307502536981796,
+   "N2R|A_all_saved_modes|normalisation_N_equals_sum_abs_p": 2.3532661027450668,
+   "N2R|A_all_saved_modes|normalisation_N_equals_one": 2.351511939494728,
+   "N2R|B_field_resonant_only|normalisation_N_equals_sum_abs_p": 2.3526526437487423,
+   "N2R|B_field_resonant_only|normalisation_N_equals_one": 2.3508870351819766
+  }
+ },
+ "environment": {
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "git_head": "46bf8b5c5691be84201d3812b97b774caaccb70c"
+ }
+}

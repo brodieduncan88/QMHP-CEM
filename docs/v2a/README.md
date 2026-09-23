@@ -6,6 +6,7 @@
 | [`m3-coherent-prescreen-registration.md`](m3-coherent-prescreen-registration.md) | Executable registration for the bounded M3 prescreen: the three conventions to freeze (drive normalisation, crosstalk dB definition, `f_C = 0.28 Φ₀` validity), the duration ladder, exported quantities, prohibitions and admissible outcomes. | DRAFT — `BIND` fields open |
 | [`verification.md`](verification.md) | What an independent two-lens pass reproduced from the assessment, the material additions it produced (cap-envelope interaction, clamping cost, further factors of two, the unfrozen `ζ` convention), the unstated assumptions, and what is not verified. | complete |
 | [`references.md`](references.md) | The literature the assessment cites, resolved from opaque citation markers, with what was and was not confirmed for each. | identified from search snippets only; scholarly hosts are blocked from this environment |
+| [`submission-recovery.md`](submission-recovery.md) | Recovery attempt for the 14 September 2026 numerical submission and its referenced executable artefacts, and their reconciliation against the coupled-candidate declaration. Disposition: NOT RECOVERED; proposed-design status retained. | complete |
 | [`reported-not-reproduced.md`](reported-not-reproduced.md) | Audit inputs (`f_22`, `Δ_min`, `n_C`, `ζ`, overlaps, ledger terms, …) that this repository takes on report and does not reproduce. | reference list |
 
 ## Programme position (as of the assessment)

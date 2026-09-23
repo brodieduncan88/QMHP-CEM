@@ -1,0 +1,2740 @@
+{
+  "schema": "qmhp-cem.s1-numerical-recovery/0.1.0",
+  "record_id": "COUPLED-S1-RECOVERY-20260916T105215Z",
+  "generated_utc": "2026-09-16T10:52:55Z",
+  "palace_launched": false,
+  "source_records": {
+    "L1": {
+      "record": "results/COUPLED-PILOT-20260916T035733Z",
+      "manifest_sha256": "8639bef802d70d19329e08d4a186067eebc682b26b92b22ab5f8f5551e3e4f40",
+      "files_manifested": 35,
+      "verified": "matches its own manifest",
+      "level": 1,
+      "has_port_field_probes": false
+    },
+    "L2": {
+      "record": "results/COUPLED-LADDER-O1-L2-20260916T080802Z",
+      "manifest_sha256": "ced09e5913189ad029bb38cb1a101130c8786807919a35afb8d3987cbfaf9574",
+      "files_manifested": 13,
+      "verified": "matches its own manifest",
+      "level": 2,
+      "has_port_field_probes": true
+    },
+    "L3": {
+      "record": "results/COUPLED-LADDER-O1-L3-20260916T091212Z",
+      "manifest_sha256": "41d9645add217668152696ec76ecfe291e13e82ec7530010f7b7f78f7d161878",
+      "files_manifested": 13,
+      "verified": "matches its own manifest",
+      "level": 3,
+      "has_port_field_probes": true
+    }
+  },
+  "preserved": "every source record was verified against its own manifest before and after this analysis and none was written to; this record is separately versioned",
+  "port_diagnostic": {
+    "L1": {
+      "level": 1,
+      "port_field_probes": false,
+      "why": "this run predates the port-field probes, so the port stiffness energy cannot be evaluated independently here. Only the closure requirement is available, and the closure requirement is not an independent measurement.",
+      "closure_only": [
+        {
+          "mode": 1,
+          "frequency_GHz": 1.158332505,
+          "participation_from_closure": 0.9985099226716773,
+          "participation_reported": 0.9985099177125104
+        },
+        {
+          "mode": 2,
+          "frequency_GHz": 3.693188998,
+          "participation_from_closure": 0.0009336202681325956,
+          "participation_reported": 0.0009336025799277931
+        },
+        {
+          "mode": 3,
+          "frequency_GHz": 6.699424816,
+          "participation_from_closure": 0.9999447433606907,
+          "participation_reported": 3.4106197995257136e-09
+        },
+        {
+          "mode": 4,
+          "frequency_GHz": 7.044198362,
+          "participation_from_closure": 0.9999532934460148,
+          "participation_reported": 1.3863347715009106e-11
+        },
+        {
+          "mode": 5,
+          "frequency_GHz": 7.300317505,
+          "participation_from_closure": 0.9999496278001536,
+          "participation_reported": 3.093840196982928e-11
+        },
+        {
+          "mode": 6,
+          "frequency_GHz": 7.694394165,
+          "participation_from_closure": 0.9999468194936287,
+          "participation_reported": 3.709362321379726e-11
+        },
+        {
+          "mode": 7,
+          "frequency_GHz": 8.184160416,
+          "participation_from_closure": 0.9999380220305257,
+          "participation_reported": 3.378874282989676e-11
+        },
+        {
+          "mode": 8,
+          "frequency_GHz": 8.469360702,
+          "participation_from_closure": 0.9999255511286366,
+          "participation_reported": 2.5708676513454677e-11
+        },
+        {
+          "mode": 9,
+          "frequency_GHz": 9.961037312,
+          "participation_from_closure": 1.9213998425637868e-05,
+          "participation_reported": 1.8935743057755816e-05
+        }
+      ]
+    },
+    "L2": {
+      "level": 2,
+      "port_field_probes": true,
+      "conversion": {
+        "kappa": 0.3886882528812872,
+        "kappa_definition": "1 / (t_nd * Ls_nd); derived, not fitted",
+        "factors": {
+          "Lc_m": 0.004,
+          "L0_m": 0.001,
+          "length_scale_Lc_over_L0": 4.0,
+          "tc_ns": 0.01334256380791072,
+          "inductance_H": 1.0345665367517793e-07,
+          "inductance_nd": 20.582047285188583,
+          "port_length_mm": 0.039999999999999994,
+          "port_width_mm": 0.020000000000000018,
+          "port_area_mm2": 0.0008000000000000006,
+          "port_n_elements": 1,
+          "to_square_w_over_l": 0.5000000000000006,
+          "sheet_inductance_nd": 10.291023642594302,
+          "probe_thickness_mesh_units": 1.0,
+          "probe_thickness_nd": 0.25,
+          "probe_permittivity": 1.0
+        },
+        "source": {
+          "port_enters_K_as_a_boundary_mass_term": "palace/models/lumpedportoperator.cpp:571-591 assembles the inductive port face with coefficient 1/Ls; palace/models/spaceoperator.cpp:300-307 puts it in the stiffness matrix and :236-238 makes it a VectorFEMassIntegrator, i.e. INT_Gamma (1/Ls) |E_t|^2 dS",
+          "Ls_definition": "palace/models/lumpedportoperator.cpp:578 Ls = L * GetToSquare(elem); palace/models/lumpedportoperator.hpp:57-60 GetToSquare = (w/l) * elems.size()",
+          "l_and_w_definition": "palace/fem/lumpedelement.cpp:53-69: l is the port bounding-box extent most aligned with the declared direction, w the largest remaining extent",
+          "L_nondimensionalisation": "palace/utils/iodata.cpp:512 data.L /= mu0_ * Lc",
+          "t_nondimensionalisation": "palace/utils/iodata.cpp:535 data.t /= Lc / model.L0",
+          "Lc_definition": "palace/utils/iodata.cpp:452-464: Model.Lc if given, else the largest axis-aligned mesh bounding-box extent, in metres",
+          "tc_definition": "palace/utils/iodata.cpp:465 tc = 1.0e9 * Lc / c0_ [ns]",
+          "omega_nondimensionalisation": "palace/utils/iodata.cpp:539 and :575 - frequencies carry 1/(2 pi tc), so omega_nd = 2 pi f_GHz tc",
+          "probe_default": "palace/fem/coefficient.hpp:373-391 gives 0.5 * t * eps * |E|^2",
+          "probe_ma": "palace/fem/coefficient.hpp:393-413 gives 0.5 * (t/eps) * |E_n|^2",
+          "probe_side_rule": "palace/fem/coefficient.hpp:330-360 GetLocalVectorValue - the same side rule for both probe types, so the choice cancels in their difference",
+          "probe_integration": "palace/models/surfacepostoperator.cpp:287-301 integrates the coefficient with BoundaryLFIntegrator against H1, whose basis is a partition of unity, so the sum of the linear form is the plain surface integral",
+          "probe_normalisation": "palace/models/postoperator.cpp:419-427 divides by E_m; palace/drivers/basesolver.cpp:538-540 passes the argument named E_elec; palace/drivers/eigensolver.cpp:349 supplies E_elec + E_cap",
+          "E_ind_is_rank_one": "palace/models/lumpedportoperator.cpp:200-213 V = 1/w INT E.l_hat dS; palace/models/postoperator.cpp:493-508 E_ind = 0.5 |L| |I|^2 with I = V/(i w L)",
+          "energy_scale_is_1e9_times_SI": "palace/utils/iodata.cpp:565-602: the ENERGY scale factor is Hc^2 Z0 Lc^2 tc with Hc^2 Z0 Lc^2 = 1 W by construction and tc in NANOseconds, so the columns headed (J) in domain-E.csv carry 1e9 x SI joules",
+          "B_carries_one_over_omega": "palace/drivers/eigensolver.cpp:310-315 B = -1/(i omega) curl E, so E_mag carries 1/omega^2, exactly as E_port does"
+        },
+        "unverified_assumptions": [
+          {
+            "assumption": "quadrature",
+            "statement": "the probes are integrated by BoundaryLFIntegrator against H1 while the stiffness term is integrated by a libCEED VectorFEMassIntegrator; the two need not use the same quadrature rule",
+            "why_it_is_believed_harmless": "both integrands are degree-2 polynomials per face for order-1 Nedelec on affine tetrahedra, which either rule integrates exactly",
+            "what_would_settle_it": "a Palace build instrumented to print INT_Gamma (1/Ls)|E_t|^2 dS directly; not available from the saved outputs"
+          },
+          {
+            "assumption": "single port element",
+            "statement": "elems.size() == 1, so GetToSquare is w/l with no multiplicity",
+            "why_it_is_believed_harmless": "the configuration declares LumpedPort[0].Attributes = [10], one attribute and one coplanar rectangle, which builds exactly one UniformElementData",
+            "what_would_settle_it": "already settled by the committed config.json"
+          },
+          {
+            "assumption": "tangential trace",
+            "statement": "the boundary VectorFEMassIntegrator on a Nedelec space sees the tangential trace, so the assembled term is INT |E_t|^2 dS and not INT |E|^2 dS",
+            "why_it_is_believed_harmless": "it is the defining property of the H(curl)-conforming trace, and the measured agreement with the closure defect would not survive otherwise",
+            "what_would_settle_it": "the measured agreement, which is reported per mode"
+          }
+        ]
+      },
+      "modes": [
+        {
+          "mode": 1,
+          "frequency_GHz": 1.461886595,
+          "participation": {
+            "from_probes": 0.9985982218855033,
+            "reported_E_ind": 0.9985647137779834,
+            "from_closure": 0.9985982223182035
+          },
+          "independence": {
+            "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+            "reported_E_ind": "Palace's rank-one averaged-voltage surrogate",
+            "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance"
+          },
+          "probe_over_closure": 0.9999999995666924,
+          "uniformity_factor_E_ind_over_E_port": 0.999966444855613,
+          "tangential_integral_over_E_elec_plus_E_cap": 0.3087059791136,
+          "reported_EPR_signed": -0.9985647137,
+          "backward_error": 1.892470258e-17
+        },
+        {
+          "mode": 2,
+          "frequency_GHz": 3.885511214,
+          "participation": {
+            "from_probes": 0.0007803571804328921,
+            "reported_E_ind": 0.0007781308391251577,
+            "from_closure": 0.0007803575197262713
+          },
+          "independence": {
+            "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+            "reported_E_ind": "Palace's rank-one averaged-voltage surrogate",
+            "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance"
+          },
+          "probe_over_closure": 0.999999565207779,
+          "uniformity_factor_E_ind_over_E_port": 0.9971470227178542,
+          "tangential_integral_over_E_elec_plus_E_cap": 0.001704184650976,
+          "reported_EPR_signed": 0.0007781308392,
+          "backward_error": 4.989020308e-17
+        },
+        {
+          "mode": 3,
+          "frequency_GHz": 5.08891501,
+          "participation": {
+            "from_probes": 0.9999626259748974,
+            "reported_E_ind": 9.058151661042444e-06,
+            "from_closure": 0.9999626259803905
+          },
+          "independence": {
+            "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+            "reported_E_ind": "Palace's rank-one averaged-voltage surrogate",
+            "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance"
+          },
+          "probe_over_closure": 0.9999999999945066,
+          "uniformity_factor_E_ind_over_E_port": 9.058490213283066e-06,
+          "tangential_integral_over_E_elec_plus_E_cap": 3.7459420027999997,
+          "reported_EPR_signed": 9.058151661e-06,
+          "backward_error": 7.395572053e-17
+        },
+        {
+          "mode": 4,
+          "frequency_GHz": 6.039804406,
+          "participation": {
+            "from_probes": 0.9999405758199725,
+            "reported_E_ind": 1.1002491682444124e-05,
+            "from_closure": 0.9999405764246355
+          },
+          "independence": {
+            "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+            "reported_E_ind": "Palace's rank-one averaged-voltage surrogate",
+            "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance"
+          },
+          "probe_over_closure": 0.999999999395301,
+          "uniformity_factor_E_ind_over_E_port": 1.1003145535345285e-05,
+          "tangential_integral_over_E_elec_plus_E_cap": 5.27651073376,
+          "reported_EPR_signed": -1.100249168e-05,
+          "backward_error": 2.55578496e-15
+        },
+        {
+          "mode": 5,
+          "frequency_GHz": 7.177901519,
+          "participation": {
+            "from_probes": 0.9999500970803875,
+            "reported_E_ind": 8.605176638627622e-06,
+            "from_closure": 0.9999500987103093
+          },
+          "independence": {
+            "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+            "reported_E_ind": "Palace's rank-one averaged-voltage surrogate",
+            "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance"
+          },
+          "probe_over_closure": 0.9999999983699969,
+          "uniformity_factor_E_ind_over_E_port": 8.605606083496223e-06,
+          "tangential_integral_over_E_elec_plus_E_cap": 7.4524694266400004,
+          "reported_EPR_signed": -8.605176639e-06,
+          "backward_error": 1.464304843e-11
+        },
+        {
+          "mode": 6,
+          "frequency_GHz": 8.706861807,
+          "participation": {
+            "from_probes": 0.9999420725591699,
+            "reported_E_ind": 2.368540546986305e-06,
+            "from_closure": 0.9999420730391309
+          },
+          "independence": {
+            "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+            "reported_E_ind": "Palace's rank-one averaged-voltage surrogate",
+            "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance"
+          },
+          "probe_over_closure": 0.9999999995200113,
+          "uniformity_factor_E_ind_over_E_port": 2.368677758427002e-06,
+          "tangential_integral_over_E_elec_plus_E_cap": 10.965413916800001,
+          "reported_EPR_signed": 2.368540548e-06,
+          "backward_error": 1.617874144e-11
+        }
+      ],
+      "worst_relative_disagreement_probe_vs_closure": 4.3479222100462067e-07,
+      "what_the_agreement_shows": "the port stiffness term, evaluated from the probes and a conversion that reads no energy column, accounts for the whole energy-balance defect on every mode. The two numbers share no input.",
+      "what_it_does_not_show": "it does not show that the mesh resolves that term, and it is not a convergence statement about anything."
+    },
+    "L3": {
+      "level": 3,
+      "port_field_probes": true,
+      "conversion": {
+        "kappa": 0.3886882528812872,
+        "kappa_definition": "1 / (t_nd * Ls_nd); derived, not fitted",
+        "factors": {
+          "Lc_m": 0.004,
+          "L0_m": 0.001,
+          "length_scale_Lc_over_L0": 4.0,
+          "tc_ns": 0.01334256380791072,
+          "inductance_H": 1.0345665367517793e-07,
+          "inductance_nd": 20.582047285188583,
+          "port_length_mm": 0.039999999999999994,
+          "port_width_mm": 0.020000000000000018,
+          "port_area_mm2": 0.0008000000000000006,
+          "port_n_elements": 1,
+          "to_square_w_over_l": 0.5000000000000006,
+          "sheet_inductance_nd": 10.291023642594302,
+          "probe_thickness_mesh_units": 1.0,
+          "probe_thickness_nd": 0.25,
+          "probe_permittivity": 1.0
+        },
+        "source": {
+          "port_enters_K_as_a_boundary_mass_term": "palace/models/lumpedportoperator.cpp:571-591 assembles the inductive port face with coefficient 1/Ls; palace/models/spaceoperator.cpp:300-307 puts it in the stiffness matrix and :236-238 makes it a VectorFEMassIntegrator, i.e. INT_Gamma (1/Ls) |E_t|^2 dS",
+          "Ls_definition": "palace/models/lumpedportoperator.cpp:578 Ls = L * GetToSquare(elem); palace/models/lumpedportoperator.hpp:57-60 GetToSquare = (w/l) * elems.size()",
+          "l_and_w_definition": "palace/fem/lumpedelement.cpp:53-69: l is the port bounding-box extent most aligned with the declared direction, w the largest remaining extent",
+          "L_nondimensionalisation": "palace/utils/iodata.cpp:512 data.L /= mu0_ * Lc",
+          "t_nondimensionalisation": "palace/utils/iodata.cpp:535 data.t /= Lc / model.L0",
+          "Lc_definition": "palace/utils/iodata.cpp:452-464: Model.Lc if given, else the largest axis-aligned mesh bounding-box extent, in metres",
+          "tc_definition": "palace/utils/iodata.cpp:465 tc = 1.0e9 * Lc / c0_ [ns]",
+          "omega_nondimensionalisation": "palace/utils/iodata.cpp:539 and :575 - frequencies carry 1/(2 pi tc), so omega_nd = 2 pi f_GHz tc",
+          "probe_default": "palace/fem/coefficient.hpp:373-391 gives 0.5 * t * eps * |E|^2",
+          "probe_ma": "palace/fem/coefficient.hpp:393-413 gives 0.5 * (t/eps) * |E_n|^2",
+          "probe_side_rule": "palace/fem/coefficient.hpp:330-360 GetLocalVectorValue - the same side rule for both probe types, so the choice cancels in their difference",
+          "probe_integration": "palace/models/surfacepostoperator.cpp:287-301 integrates the coefficient with BoundaryLFIntegrator against H1, whose basis is a partition of unity, so the sum of the linear form is the plain surface integral",
+          "probe_normalisation": "palace/models/postoperator.cpp:419-427 divides by E_m; palace/drivers/basesolver.cpp:538-540 passes the argument named E_elec; palace/drivers/eigensolver.cpp:349 supplies E_elec + E_cap",
+          "E_ind_is_rank_one": "palace/models/lumpedportoperator.cpp:200-213 V = 1/w INT E.l_hat dS; palace/models/postoperator.cpp:493-508 E_ind = 0.5 |L| |I|^2 with I = V/(i w L)",
+          "energy_scale_is_1e9_times_SI": "palace/utils/iodata.cpp:565-602: the ENERGY scale factor is Hc^2 Z0 Lc^2 tc with Hc^2 Z0 Lc^2 = 1 W by construction and tc in NANOseconds, so the columns headed (J) in domain-E.csv carry 1e9 x SI joules",
+          "B_carries_one_over_omega": "palace/drivers/eigensolver.cpp:310-315 B = -1/(i omega) curl E, so E_mag carries 1/omega^2, exactly as E_port does"
+        },
+        "unverified_assumptions": [
+          {
+            "assumption": "quadrature",
+            "statement": "the probes are integrated by BoundaryLFIntegrator against H1 while the stiffness term is integrated by a libCEED VectorFEMassIntegrator; the two need not use the same quadrature rule",
+            "why_it_is_believed_harmless": "both integrands are degree-2 polynomials per face for order-1 Nedelec on affine tetrahedra, which either rule integrates exactly",
+            "what_would_settle_it": "a Palace build instrumented to print INT_Gamma (1/Ls)|E_t|^2 dS directly; not available from the saved outputs"
+          },
+          {
+            "assumption": "single port element",
+            "statement": "elems.size() == 1, so GetToSquare is w/l with no multiplicity",
+            "why_it_is_believed_harmless": "the configuration declares LumpedPort[0].Attributes = [10], one attribute and one coplanar rectangle, which builds exactly one UniformElementData",
+            "what_would_settle_it": "already settled by the committed config.json"
+          },
+          {
+            "assumption": "tangential trace",
+            "statement": "the boundary VectorFEMassIntegrator on a Nedelec space sees the tangential trace, so the assembled term is INT |E_t|^2 dS and not INT |E|^2 dS",
+            "why_it_is_believed_harmless": "it is the defining property of the H(curl)-conforming trace, and the measured agreement with the closure defect would not survive otherwise",
+            "what_would_settle_it": "the measured agreement, which is reported per mode"
+          }
+        ]
+      },
+      "modes": [
+        {
+          "mode": 1,
+          "frequency_GHz": 1.709561611,
+          "participation": {
+            "from_probes": 0.9983352644177811,
+            "reported_E_ind": 0.9983175827132608,
+            "from_closure": 0.9983352648171949
+          },
+          "independence": {
+            "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+            "reported_E_ind": "Palace's rank-one averaged-voltage surrogate",
+            "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance"
+          },
+          "probe_over_closure": 0.9999999995999201,
+          "uniformity_factor_E_ind_over_E_port": 0.9999822888110332,
+          "tangential_integral_over_E_elec_plus_E_cap": 0.422058655528,
+          "reported_EPR_signed": 0.9983175827,
+          "backward_error": 1.546079355e-17
+        },
+        {
+          "mode": 2,
+          "frequency_GHz": 4.087683186,
+          "participation": {
+            "from_probes": 0.0009115928860804443,
+            "reported_E_ind": 0.0009112763977722024,
+            "from_closure": 0.0009115928673848472
+          },
+          "independence": {
+            "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+            "reported_E_ind": "Palace's rank-one averaged-voltage surrogate",
+            "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance"
+          },
+          "probe_over_closure": 1.0000000205087136,
+          "uniformity_factor_E_ind_over_E_port": 0.9996528183654408,
+          "tangential_integral_over_E_elec_plus_E_cap": 0.00220334380984,
+          "reported_EPR_signed": 0.0009112763978,
+          "backward_error": 6.04538441e-17
+        },
+        {
+          "mode": 3,
+          "frequency_GHz": 9.109258337,
+          "participation": {
+            "from_probes": 0.9999471348694924,
+            "reported_E_ind": 2.627565280892978e-06,
+            "from_closure": 0.9999471351297884
+          },
+          "independence": {
+            "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+            "reported_E_ind": "Palace's rank-one averaged-voltage surrogate",
+            "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance"
+          },
+          "probe_over_closure": 0.9999999997396902,
+          "uniformity_factor_E_ind_over_E_port": 2.6277041948181724e-06,
+          "tangential_integral_over_E_elec_plus_E_cap": 12.00245159096,
+          "reported_EPR_signed": -2.627565281e-06,
+          "backward_error": 3.553627567e-12
+        },
+        {
+          "mode": 4,
+          "frequency_GHz": 10.27209411,
+          "participation": {
+            "from_probes": 0.999968214726311,
+            "reported_E_ind": 2.7687939792987643e-07,
+            "from_closure": 0.9999682137331848
+          },
+          "independence": {
+            "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+            "reported_E_ind": "Palace's rank-one averaged-voltage surrogate",
+            "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance"
+          },
+          "probe_over_closure": 1.0000000009931578,
+          "uniformity_factor_E_ind_over_E_port": 2.7688819889705963e-07,
+          "tangential_integral_over_E_elec_plus_E_cap": 15.2626891784,
+          "reported_EPR_signed": 2.76879398e-07,
+          "backward_error": 1.404808628e-12
+        },
+        {
+          "mode": 5,
+          "frequency_GHz": 11.09871152,
+          "participation": {
+            "from_probes": 0.9999676068956985,
+            "reported_E_ind": 1.4169412618183974e-07,
+            "from_closure": 0.9999676067208807
+          },
+          "independence": {
+            "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+            "reported_E_ind": "Palace's rank-one averaged-voltage surrogate",
+            "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance"
+          },
+          "probe_over_closure": 1.0000000001748235,
+          "uniformity_factor_E_ind_over_E_port": 1.4169871624313438e-07,
+          "tangential_integral_over_E_elec_plus_E_cap": 17.817958508799997,
+          "reported_EPR_signed": -1.416941262e-07,
+          "backward_error": 1.068144065e-12
+        },
+        {
+          "mode": 6,
+          "frequency_GHz": 11.83612104,
+          "participation": {
+            "from_probes": 0.0008599129833258111,
+            "reported_E_ind": 4.2035294061229644e-05,
+            "from_closure": 0.0008599129946165185
+          },
+          "independence": {
+            "from_probes": "independent of the energy balance: surface-Q.csv, eig.csv and geometry only",
+            "reported_E_ind": "Palace's rank-one averaged-voltage surrogate",
+            "from_closure": "NOT independent: this is what the port term must be for the balance to close, so it cannot verify that balance"
+          },
+          "probe_over_closure": 0.9999999868699421,
+          "uniformity_factor_E_ind_over_E_port": 0.048883195016608975,
+          "tangential_integral_over_E_elec_plus_E_cap": 0.01742609939288,
+          "reported_EPR_signed": -4.203529405e-05,
+          "backward_error": 3.459067705e-11
+        }
+      ],
+      "worst_relative_disagreement_probe_vs_closure": 2.050871361625184e-08,
+      "what_the_agreement_shows": "the port stiffness term, evaluated from the probes and a conversion that reads no energy column, accounts for the whole energy-balance defect on every mode. The two numbers share no input.",
+      "what_it_does_not_show": "it does not show that the mesh resolves that term, and it is not a convergence statement about anything."
+    }
+  },
+  "refinement_trend": {
+    "per_mode": {
+      "L1m1": {
+        "role": "LUMPED_DOMINATED",
+        "modes_by_level": {
+          "1": 1,
+          "2": 1,
+          "3": 1
+        },
+        "h_mm": [
+          0.01,
+          0.006666666666666666,
+          0.005
+        ],
+        "frequency_GHz": [
+          1.158332505,
+          1.461886595,
+          1.709561611
+        ],
+        "exponent_q_in_f_squared_proportional_to_h_to_the_minus_q": [
+          1.1480460834967074,
+          1.0880704421867833
+        ],
+        "exponents_agree_within": 0.05224149289134017,
+        "ladder_estimator_verdict": "the successive differences shrink by only 1.226, at or below the 1.409 that the refinement ratios impose even as the order tends to zero: no positive order of convergence fits these three rungs",
+        "cumulative_change_fraction": 0.47588158289661403
+      },
+      "L1m2": {
+        "role": "FIELD_DOMINATED",
+        "modes_by_level": {
+          "1": 2,
+          "2": 2,
+          "3": 2
+        },
+        "h_mm": [
+          0.01,
+          0.006666666666666666,
+          0.005
+        ],
+        "frequency_GHz": [
+          3.693188998,
+          3.885511214,
+          4.087683186
+        ],
+        "exponent_q_in_f_squared_proportional_to_h_to_the_minus_q": [
+          0.250400090362442,
+          0.3526378210196665
+        ],
+        "exponents_agree_within": 0.40829749905137963,
+        "ladder_estimator_verdict": "the successive differences shrink by only 0.9513, at or below the 1.409 that the refinement ratios impose even as the order tends to zero: no positive order of convergence fits these three rungs",
+        "cumulative_change_fraction": 0.10681668016817791
+      }
+    },
+    "port_face_tangential_integral_over_denominator": {
+      "L2": {
+        "1": 0.3087059791136,
+        "2": 0.001704184650976,
+        "3": 3.7459420027999997,
+        "4": 5.27651073376,
+        "5": 7.4524694266400004,
+        "6": 10.965413916800001
+      },
+      "L3": {
+        "1": 0.422058655528,
+        "2": 0.00220334380984,
+        "3": 12.00245159096,
+        "4": 15.2626891784,
+        "5": 17.817958508799997,
+        "6": 0.01742609939288
+      }
+    },
+    "L3_over_L2_growth": {
+      "1": 1.3671865272576649,
+      "2": 1.2929020388595378,
+      "3": 3.204121041379835,
+      "4": 2.892572373774729,
+      "5": 2.3908797861158555,
+      "6": 0.0015891875605517861
+    },
+    "internal_consistency_note": "for the lumped-dominated mode the port participation is saturated near 1, so the tangential integral and omega^2 must move together. That the ratios match is a consistency check on the conversion, NOT independent evidence about the frequency.",
+    "what_this_does_not_establish": [
+      "it does not prove mathematical nonconvergence: three points and two intervals cannot do that, and a sequence may follow one law over a range and another beyond it",
+      "it does not show that the physical architecture fails: nothing here is about the device, only about the discretisation of a declared idealisation",
+      "it does not show that every in-budget mesh has been exhausted: it is precisely because that is untrue that a local-refinement experiment is proposed",
+      "it identifies no limit and measures no order of convergence"
+    ],
+    "what_it_does_say": "the tested sequence moves in a consistent direction with a consistent exponent, which is what an unresolved local feature looks like and is a reason to refine locally rather than globally"
+  },
+  "mesh_inspection": {
+    "levels": {
+      "L1": {
+        "mesh": "/home/user/QMHP-CEM/results/COUPLED-PILOT-20260916T035733Z/P2/solver/coupled_chip_cell_L1.msh",
+        "nodes": 7215,
+        "triangles": 8293,
+        "tetrahedra": 31885,
+        "physical_names": {
+          "1": "vacuum",
+          "2": "outer_pec",
+          "3": "substrate",
+          "4": "sheet_pec",
+          "10": "port_F1",
+          "11": "port_R1_a",
+          "12": "port_R1_b"
+        },
+        "bounding_box_mm": {
+          "min": [
+            -2.0,
+            -2.0,
+            -0.43
+          ],
+          "max": [
+            2.0,
+            2.0,
+            1.5
+          ]
+        },
+        "largest_extent_mm": 4.0,
+        "Lc_m_implied": 0.004,
+        "tetrahedra_by_tag": {
+          "vacuum": 17047,
+          "substrate": 14838
+        },
+        "ports": {
+          "port_F1": {
+            "tag": 10,
+            "name": "port_F1",
+            "triangles": 17,
+            "area_mm2": 0.0008000000000000005,
+            "planar": true,
+            "unit_normals": [
+              [
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "edge_length_mm": {
+              "min": 0.00677800079907717,
+              "mean": 0.010678121871686732,
+              "max": 0.020000000000000018
+            },
+            "equivalent_element_size_mm": 0.010424859602402902,
+            "quality_2rin_over_rcirc": {
+              "min": 0.5320266652385048,
+              "mean": 0.8790487081915483
+            },
+            "bounding_box_mm": {
+              "min": [
+                -0.61,
+                -0.115,
+                0.0
+              ],
+              "max": [
+                -0.59,
+                -0.07500000000000001,
+                0.0
+              ]
+            },
+            "declared_length_mm": 0.04,
+            "declared_width_mm": 0.02,
+            "declared_area_mm2": 0.0008,
+            "requested_h_gap_mm": 0.01,
+            "measured_over_requested": {
+              "equivalent_element_size_over_h_gap": 1.04248596024029,
+              "longest_edge_over_h_gap": 2.0000000000000018,
+              "note": "h_gap is the size prescribed AT the conductor and etch curves. The port face's own curves are not all in the Distance field and its interior is up to width/2 away from those that are, so this ratio is not expected to be 1 and measuring it is the point."
+            },
+            "elements_across_width": 1.918491064895498
+          },
+          "port_R1_a": {
+            "tag": 11,
+            "name": "port_R1_a",
+            "triangles": 13,
+            "area_mm2": 0.0006000000000000009,
+            "planar": true,
+            "unit_normals": [
+              [
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "edge_length_mm": {
+              "min": 0.006859467578447202,
+              "mean": 0.010487845749963772,
+              "max": 0.020000000000000018
+            },
+            "equivalent_element_size_mm": 0.010324133959041736,
+            "quality_2rin_over_rcirc": {
+              "min": 0.5846062141542077,
+              "mean": 0.8796693090289271
+            },
+            "bounding_box_mm": {
+              "min": [
+                1.09,
+                -0.2929999999999998,
+                0.0
+              ],
+              "max": [
+                1.12,
+                -0.2729999999999998,
+                0.0
+              ]
+            },
+            "declared_length_mm": 0.02,
+            "declared_width_mm": 0.03,
+            "declared_area_mm2": 0.0006,
+            "requested_h_gap_mm": 0.01,
+            "measured_over_requested": {
+              "equivalent_element_size_over_h_gap": 1.0324133959041735,
+              "longest_edge_over_h_gap": 2.0000000000000018,
+              "note": "h_gap is the size prescribed AT the conductor and etch curves. The port face's own curves are not all in the Distance field and its interior is up to width/2 away from those that are, so this ratio is not expected to be 1 and measuring it is the point."
+            },
+            "elements_across_width": 2.905812741196215
+          },
+          "port_R1_b": {
+            "tag": 12,
+            "name": "port_R1_b",
+            "triangles": 13,
+            "area_mm2": 0.0006000000000000009,
+            "planar": true,
+            "unit_normals": [
+              [
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "edge_length_mm": {
+              "min": 0.006859467578447225,
+              "mean": 0.010487845749963797,
+              "max": 0.020000000000000018
+            },
+            "equivalent_element_size_mm": 0.010324133959041736,
+            "quality_2rin_over_rcirc": {
+              "min": 0.5846062141541475,
+              "mean": 0.8796693090289245
+            },
+            "bounding_box_mm": {
+              "min": [
+                1.17,
+                -0.2929999999999998,
+                0.0
+              ],
+              "max": [
+                1.2,
+                -0.2729999999999998,
+                0.0
+              ]
+            },
+            "declared_length_mm": 0.02,
+            "declared_width_mm": 0.03,
+            "declared_area_mm2": 0.0006,
+            "requested_h_gap_mm": 0.01,
+            "measured_over_requested": {
+              "equivalent_element_size_over_h_gap": 1.0324133959041735,
+              "longest_edge_over_h_gap": 2.0000000000000018,
+              "note": "h_gap is the size prescribed AT the conductor and etch curves. The port face's own curves are not all in the Distance field and its interior is up to width/2 away from those that are, so this ratio is not expected to be 1 and measuring it is the point."
+            },
+            "elements_across_width": 2.905812741196215
+          }
+        },
+        "surfaces": {
+          "outer_pec": {
+            "tag": 2,
+            "name": "outer_pec",
+            "triangles": 1466,
+            "area_mm2": 62.879999999999995,
+            "planar": false,
+            "unit_normals": [
+              [
+                0.0,
+                0.0,
+                1.0
+              ],
+              [
+                0.0,
+                1.0,
+                0.0
+              ],
+              [
+                1.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "edge_length_mm": {
+              "min": 0.21480022675736898,
+              "mean": 0.31620912045471194,
+              "max": 0.3976416787674804
+            },
+            "equivalent_element_size_mm": 0.3147305954070064,
+            "quality_2rin_over_rcirc": {
+              "min": 0.7893411754296445,
+              "mean": 0.9720299777815441
+            },
+            "bounding_box_mm": {
+              "min": [
+                -2.0,
+                -2.0,
+                -0.43
+              ],
+              "max": [
+                2.0,
+                2.0,
+                1.5
+              ]
+            }
+          },
+          "sheet_pec": {
+            "tag": 4,
+            "name": "sheet_pec",
+            "triangles": 6784,
+            "area_mm2": 15.546319999999977,
+            "planar": true,
+            "unit_normals": [
+              [
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "edge_length_mm": {
+              "min": 0.00535948852422703,
+              "mean": 0.03571649201567567,
+              "max": 0.4657866638504031
+            },
+            "equivalent_element_size_mm": 0.07274791719165632,
+            "quality_2rin_over_rcirc": {
+              "min": 0.13161742437362464,
+              "mean": 0.748220125963996
+            },
+            "bounding_box_mm": {
+              "min": [
+                -2.0,
+                -2.0,
+                0.0
+              ],
+              "max": [
+                2.0,
+                2.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "level": 1,
+        "requested_h_gap_mm": 0.01
+      },
+      "L2": {
+        "mesh": "/home/user/QMHP-CEM/results/COUPLED-LADDER-O1-L2-20260916T080802Z/L2/solver/coupled_chip_cell_L2.msh",
+        "nodes": 13991,
+        "triangles": 14535,
+        "tetrahedra": 64434,
+        "physical_names": {
+          "1": "vacuum",
+          "2": "outer_pec",
+          "3": "substrate",
+          "4": "sheet_pec",
+          "10": "port_F1",
+          "11": "port_R1_a",
+          "12": "port_R1_b"
+        },
+        "bounding_box_mm": {
+          "min": [
+            -2.0,
+            -2.0,
+            -0.43
+          ],
+          "max": [
+            2.0,
+            2.0,
+            1.5
+          ]
+        },
+        "largest_extent_mm": 4.0,
+        "Lc_m_implied": 0.004,
+        "tetrahedra_by_tag": {
+          "vacuum": 35533,
+          "substrate": 28901
+        },
+        "ports": {
+          "port_F1": {
+            "tag": 10,
+            "name": "port_F1",
+            "triangles": 25,
+            "area_mm2": 0.0008000000000000007,
+            "planar": true,
+            "unit_normals": [
+              [
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "edge_length_mm": {
+              "min": 0.0037616470480029605,
+              "mean": 0.008769375388711769,
+              "max": 0.01378405301856589
+            },
+            "equivalent_element_size_mm": 0.00859655945458834,
+            "quality_2rin_over_rcirc": {
+              "min": 0.5568314291340611,
+              "mean": 0.8463620131290464
+            },
+            "bounding_box_mm": {
+              "min": [
+                -0.61,
+                -0.115,
+                0.0
+              ],
+              "max": [
+                -0.59,
+                -0.07500000000000001,
+                0.0
+              ]
+            },
+            "declared_length_mm": 0.04,
+            "declared_width_mm": 0.02,
+            "declared_area_mm2": 0.0008,
+            "requested_h_gap_mm": 0.006666666666666666,
+            "measured_over_requested": {
+              "equivalent_element_size_over_h_gap": 1.289483918188251,
+              "longest_edge_over_h_gap": 2.0676079527848836,
+              "note": "h_gap is the size prescribed AT the conductor and etch curves. The port face's own curves are not all in the Distance field and its interior is up to width/2 away from those that are, so this ratio is not expected to be 1 and measuring it is the point."
+            },
+            "elements_across_width": 2.326512147755248
+          },
+          "port_R1_a": {
+            "tag": 11,
+            "name": "port_R1_a",
+            "triangles": 23,
+            "area_mm2": 0.0006000000000000011,
+            "planar": true,
+            "unit_normals": [
+              [
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "edge_length_mm": {
+              "min": 0.004161305388940996,
+              "mean": 0.008060552509226982,
+              "max": 0.015104816898935723
+            },
+            "equivalent_element_size_mm": 0.007761781076573644,
+            "quality_2rin_over_rcirc": {
+              "min": 0.402810930997854,
+              "mean": 0.7846352960360474
+            },
+            "bounding_box_mm": {
+              "min": [
+                1.09,
+                -0.2929999999999998,
+                0.0
+              ],
+              "max": [
+                1.12,
+                -0.2729999999999998,
+                0.0
+              ]
+            },
+            "declared_length_mm": 0.02,
+            "declared_width_mm": 0.03,
+            "declared_area_mm2": 0.0006,
+            "requested_h_gap_mm": 0.006666666666666666,
+            "measured_over_requested": {
+              "equivalent_element_size_over_h_gap": 1.1642671614860467,
+              "longest_edge_over_h_gap": 2.2657225348403585,
+              "note": "h_gap is the size prescribed AT the conductor and etch curves. The port face's own curves are not all in the Distance field and its interior is up to width/2 away from those that are, so this ratio is not expected to be 1 and measuring it is the point."
+            },
+            "elements_across_width": 3.865092264782503
+          },
+          "port_R1_b": {
+            "tag": 12,
+            "name": "port_R1_b",
+            "triangles": 23,
+            "area_mm2": 0.000600000000000001,
+            "planar": true,
+            "unit_normals": [
+              [
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "edge_length_mm": {
+              "min": 0.004158952304715527,
+              "mean": 0.008074344324885045,
+              "max": 0.014762050175521294
+            },
+            "equivalent_element_size_mm": 0.007761781076573643,
+            "quality_2rin_over_rcirc": {
+              "min": 0.3984127930296021,
+              "mean": 0.8020725206182076
+            },
+            "bounding_box_mm": {
+              "min": [
+                1.17,
+                -0.2929999999999998,
+                0.0
+              ],
+              "max": [
+                1.2,
+                -0.2729999999999998,
+                0.0
+              ]
+            },
+            "declared_length_mm": 0.02,
+            "declared_width_mm": 0.03,
+            "declared_area_mm2": 0.0006,
+            "requested_h_gap_mm": 0.006666666666666666,
+            "measured_over_requested": {
+              "equivalent_element_size_over_h_gap": 1.1642671614860465,
+              "longest_edge_over_h_gap": 2.214307526328194,
+              "note": "h_gap is the size prescribed AT the conductor and etch curves. The port face's own curves are not all in the Distance field and its interior is up to width/2 away from those that are, so this ratio is not expected to be 1 and measuring it is the point."
+            },
+            "elements_across_width": 3.8650922647825032
+          }
+        },
+        "surfaces": {
+          "outer_pec": {
+            "tag": 2,
+            "name": "outer_pec",
+            "triangles": 3040,
+            "area_mm2": 62.8800000000005,
+            "planar": false,
+            "unit_normals": [
+              [
+                0.0,
+                0.0,
+                1.0
+              ],
+              [
+                0.0,
+                1.0,
+                0.0
+              ],
+              [
+                1.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "edge_length_mm": {
+              "min": 0.13994913090890618,
+              "mean": 0.21907340759604124,
+              "max": 0.2686692652391747
+            },
+            "equivalent_element_size_mm": 0.21855923238649433,
+            "quality_2rin_over_rcirc": {
+              "min": 0.8082109628999543,
+              "mean": 0.9875680199095739
+            },
+            "bounding_box_mm": {
+              "min": [
+                -2.0,
+                -2.0,
+                -0.43
+              ],
+              "max": [
+                2.0,
+                2.0,
+                1.5
+              ]
+            }
+          },
+          "sheet_pec": {
+            "tag": 4,
+            "name": "sheet_pec",
+            "triangles": 11424,
+            "area_mm2": 15.546319999999978,
+            "planar": true,
+            "unit_normals": [
+              [
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "edge_length_mm": {
+              "min": 0.003767346318125747,
+              "mean": 0.027618500509900758,
+              "max": 0.29611036771284416
+            },
+            "equivalent_element_size_mm": 0.05606016687311727,
+            "quality_2rin_over_rcirc": {
+              "min": 0.2120475071640639,
+              "mean": 0.7561224585036393
+            },
+            "bounding_box_mm": {
+              "min": [
+                -2.0,
+                -2.0,
+                0.0
+              ],
+              "max": [
+                2.0,
+                2.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "level": 2,
+        "requested_h_gap_mm": 0.006666666666666666
+      },
+      "L3": {
+        "mesh": "/home/user/QMHP-CEM/results/COUPLED-LADDER-O1-L3-20260916T091212Z/L3/solver/coupled_chip_cell_L3.msh",
+        "nodes": 24338,
+        "triangles": 22106,
+        "tetrahedra": 120370,
+        "physical_names": {
+          "1": "vacuum",
+          "2": "outer_pec",
+          "3": "substrate",
+          "4": "sheet_pec",
+          "10": "port_F1",
+          "11": "port_R1_a",
+          "12": "port_R1_b"
+        },
+        "bounding_box_mm": {
+          "min": [
+            -2.0,
+            -2.0,
+            -0.43
+          ],
+          "max": [
+            2.0,
+            2.0,
+            1.5
+          ]
+        },
+        "largest_extent_mm": 4.0,
+        "Lc_m_implied": 0.004,
+        "tetrahedra_by_tag": {
+          "vacuum": 68819,
+          "substrate": 51551
+        },
+        "ports": {
+          "port_F1": {
+            "tag": 10,
+            "name": "port_F1",
+            "triangles": 45,
+            "area_mm2": 0.0008000000000000007,
+            "planar": true,
+            "unit_normals": [
+              [
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "edge_length_mm": {
+              "min": 0.0031984552562970055,
+              "mean": 0.0064441702365541885,
+              "max": 0.011069955727627534
+            },
+            "equivalent_element_size_mm": 0.006407497104359347,
+            "quality_2rin_over_rcirc": {
+              "min": 0.4641016151377564,
+              "mean": 0.8501113383926142
+            },
+            "bounding_box_mm": {
+              "min": [
+                -0.61,
+                -0.115,
+                0.0
+              ],
+              "max": [
+                -0.59,
+                -0.07500000000000001,
+                0.0
+              ]
+            },
+            "declared_length_mm": 0.04,
+            "declared_width_mm": 0.02,
+            "declared_area_mm2": 0.0008,
+            "requested_h_gap_mm": 0.005,
+            "measured_over_requested": {
+              "equivalent_element_size_over_h_gap": 1.2814994208718695,
+              "longest_edge_over_h_gap": 2.213991145525507,
+              "note": "h_gap is the size prescribed AT the conductor and etch curves. The port face's own curves are not all in the Distance field and its interior is up to width/2 away from those that are, so this ratio is not expected to be 1 and measuring it is the point."
+            },
+            "elements_across_width": 3.1213435877158617
+          },
+          "port_R1_a": {
+            "tag": 11,
+            "name": "port_R1_a",
+            "triangles": 39,
+            "area_mm2": 0.000600000000000001,
+            "planar": true,
+            "unit_normals": [
+              [
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "edge_length_mm": {
+              "min": 0.003536551846475708,
+              "mean": 0.006027249989536426,
+              "max": 0.010497941941511199
+            },
+            "equivalent_element_size_mm": 0.005960641520402503,
+            "quality_2rin_over_rcirc": {
+              "min": 0.630519342530237,
+              "mean": 0.8696579200028564
+            },
+            "bounding_box_mm": {
+              "min": [
+                1.09,
+                -0.2929999999999998,
+                0.0
+              ],
+              "max": [
+                1.12,
+                -0.2729999999999998,
+                0.0
+              ]
+            },
+            "declared_length_mm": 0.02,
+            "declared_width_mm": 0.03,
+            "declared_area_mm2": 0.0006,
+            "requested_h_gap_mm": 0.005,
+            "measured_over_requested": {
+              "equivalent_element_size_over_h_gap": 1.1921283040805006,
+              "longest_edge_over_h_gap": 2.09958838830224,
+              "note": "h_gap is the size prescribed AT the conductor and etch curves. The port face's own curves are not all in the Distance field and its interior is up to width/2 away from those that are, so this ratio is not expected to be 1 and measuring it is the point."
+            },
+            "elements_across_width": 5.033015305032837
+          },
+          "port_R1_b": {
+            "tag": 12,
+            "name": "port_R1_b",
+            "triangles": 39,
+            "area_mm2": 0.000600000000000001,
+            "planar": true,
+            "unit_normals": [
+              [
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "edge_length_mm": {
+              "min": 0.003536551846475749,
+              "mean": 0.00602724998953643,
+              "max": 0.010497941941510611
+            },
+            "equivalent_element_size_mm": 0.005960641520402503,
+            "quality_2rin_over_rcirc": {
+              "min": 0.6305193425299718,
+              "mean": 0.8696579200028511
+            },
+            "bounding_box_mm": {
+              "min": [
+                1.17,
+                -0.2929999999999998,
+                0.0
+              ],
+              "max": [
+                1.2,
+                -0.2729999999999998,
+                0.0
+              ]
+            },
+            "declared_length_mm": 0.02,
+            "declared_width_mm": 0.03,
+            "declared_area_mm2": 0.0006,
+            "requested_h_gap_mm": 0.005,
+            "measured_over_requested": {
+              "equivalent_element_size_over_h_gap": 1.1921283040805006,
+              "longest_edge_over_h_gap": 2.0995883883021222,
+              "note": "h_gap is the size prescribed AT the conductor and etch curves. The port face's own curves are not all in the Distance field and its interior is up to width/2 away from those that are, so this ratio is not expected to be 1 and measuring it is the point."
+            },
+            "elements_across_width": 5.033015305032837
+          }
+        },
+        "surfaces": {
+          "outer_pec": {
+            "tag": 2,
+            "name": "outer_pec",
+            "triangles": 5330,
+            "area_mm2": 62.87999999999932,
+            "planar": false,
+            "unit_normals": [
+              [
+                0.0,
+                0.0,
+                1.0
+              ],
+              [
+                0.0,
+                1.0,
+                0.0
+              ],
+              [
+                1.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "edge_length_mm": {
+              "min": 0.11373443095171236,
+              "mean": 0.16545057553982254,
+              "max": 0.21893078869775565
+            },
+            "equivalent_element_size_mm": 0.16506019125365418,
+            "quality_2rin_over_rcirc": {
+              "min": 0.8538742880800625,
+              "mean": 0.9875914359677893
+            },
+            "bounding_box_mm": {
+              "min": [
+                -2.0,
+                -2.0,
+                -0.43
+              ],
+              "max": [
+                2.0,
+                2.0,
+                1.5
+              ]
+            }
+          },
+          "sheet_pec": {
+            "tag": 4,
+            "name": "sheet_pec",
+            "triangles": 16653,
+            "area_mm2": 15.546319999999989,
+            "planar": true,
+            "unit_normals": [
+              [
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "edge_length_mm": {
+              "min": 0.002992763715100262,
+              "mean": 0.02342959465582645,
+              "max": 0.22227095616579542
+            },
+            "equivalent_element_size_mm": 0.04643198413552406,
+            "quality_2rin_over_rcirc": {
+              "min": 0.16946915472852164,
+              "mean": 0.7823453407542856
+            },
+            "bounding_box_mm": {
+              "min": [
+                -2.0,
+                -2.0,
+                0.0
+              ],
+              "max": [
+                2.0,
+                2.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "level": 3,
+        "requested_h_gap_mm": 0.005
+      }
+    },
+    "consistency_across_levels": {
+      "physical_names_identical": true,
+      "physical_names_by_level": {
+        "L1": {
+          "1": "vacuum",
+          "2": "outer_pec",
+          "3": "substrate",
+          "4": "sheet_pec",
+          "10": "port_F1",
+          "11": "port_R1_a",
+          "12": "port_R1_b"
+        },
+        "L2": {
+          "1": "vacuum",
+          "2": "outer_pec",
+          "3": "substrate",
+          "4": "sheet_pec",
+          "10": "port_F1",
+          "11": "port_R1_a",
+          "12": "port_R1_b"
+        },
+        "L3": {
+          "1": "vacuum",
+          "2": "outer_pec",
+          "3": "substrate",
+          "4": "sheet_pec",
+          "10": "port_F1",
+          "11": "port_R1_a",
+          "12": "port_R1_b"
+        }
+      },
+      "bounding_box_identical": true,
+      "largest_extent_mm": {
+        "L1": 4.0,
+        "L2": 4.0,
+        "L3": 4.0
+      },
+      "areas_mm2": {
+        "port_F1": {
+          "L1": 0.0008000000000000005,
+          "L2": 0.0008000000000000007,
+          "L3": 0.0008000000000000007
+        },
+        "port_R1_a": {
+          "L1": 0.0006000000000000009,
+          "L2": 0.0006000000000000011,
+          "L3": 0.000600000000000001
+        },
+        "port_R1_b": {
+          "L1": 0.0006000000000000009,
+          "L2": 0.000600000000000001,
+          "L3": 0.000600000000000001
+        },
+        "outer_pec": {
+          "L1": 62.879999999999995,
+          "L2": 62.8800000000005,
+          "L3": 62.87999999999932
+        },
+        "sheet_pec": {
+          "L1": 15.546319999999977,
+          "L2": 15.546319999999978,
+          "L3": 15.546319999999989
+        }
+      },
+      "area_relative_tolerance": 1e-09,
+      "areas_identical": {
+        "port_F1": true,
+        "port_R1_a": true,
+        "port_R1_b": true,
+        "outer_pec": true,
+        "sheet_pec": true
+      },
+      "port_orientation_identical": {
+        "port_F1": true,
+        "port_R1_a": true,
+        "port_R1_b": true
+      },
+      "verdict": "MODEL UNCHANGED ACROSS LEVELS"
+    },
+    "size_field": {
+      "per_level": {
+        "L1": {
+          "level": 1,
+          "halo_mm": 0.08,
+          "h_gap_mm": 0.01,
+          "h_far_mm": 0.3333333333333333,
+          "planar_faces_at_z0": 110,
+          "face_classes": {
+            "conductor": 51,
+            "port": 3,
+            "etch": 55,
+            "ground_plane": 1
+          },
+          "field_curves_total": 285,
+          "ports": {
+            "port_F1": {
+              "occ_faces": [
+                42
+              ],
+              "curves": [
+                {
+                  "curve": 141,
+                  "in_distance_field": false,
+                  "contributed_by": [],
+                  "other_neighbours": [
+                    "ground_plane"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      -0.6100001,
+                      -0.11500010000000002,
+                      -1.0000000001387778e-07
+                    ],
+                    "max": [
+                      -0.5899998999999999,
+                      -0.11499989999999999,
+                      1.0000000001387778e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 142,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "etch"
+                  ],
+                  "other_neighbours": [
+                    "etch"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      -0.5900000999999999,
+                      -0.11500010000000001,
+                      -1e-07
+                    ],
+                    "max": [
+                      -0.5899999,
+                      -0.07499990000000001,
+                      1e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 143,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "conductor"
+                  ],
+                  "other_neighbours": [
+                    "conductor"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      -0.6100001,
+                      -0.07500010000000003,
+                      -1.0000000001387778e-07
+                    ],
+                    "max": [
+                      -0.5899998999999999,
+                      -0.0749999,
+                      1.0000000001387778e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 144,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "etch"
+                  ],
+                  "other_neighbours": [
+                    "etch"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      -0.6100000999999999,
+                      -0.11500010000000001,
+                      -1e-07
+                    ],
+                    "max": [
+                      -0.6099999,
+                      -0.07499990000000001,
+                      1e-07
+                    ]
+                  }
+                }
+              ],
+              "curves_total": 4,
+              "curves_in_field": 3,
+              "curves_missing": [
+                141
+              ],
+              "missing_curve_neighbours": [
+                "ground_plane"
+              ]
+            },
+            "port_R1_a": {
+              "occ_faces": [
+                43
+              ],
+              "curves": [
+                {
+                  "curve": 145,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "etch"
+                  ],
+                  "other_neighbours": [
+                    "etch"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.0899999000000002,
+                      -0.2930000999999998,
+                      -1e-07
+                    ],
+                    "max": [
+                      1.1200001000000004,
+                      -0.2929998999999998,
+                      1e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 146,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "conductor"
+                  ],
+                  "other_neighbours": [
+                    "conductor"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.1199999,
+                      -0.29300010000000004,
+                      -1.0000000022887833e-07
+                    ],
+                    "max": [
+                      1.1200001000000006,
+                      -0.2729998999999996,
+                      1.0000000022887833e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 147,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "etch"
+                  ],
+                  "other_neighbours": [
+                    "etch"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.0899999000000002,
+                      -0.2730000999999998,
+                      -1e-07
+                    ],
+                    "max": [
+                      1.1200001000000004,
+                      -0.2729998999999998,
+                      1e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 148,
+                  "in_distance_field": false,
+                  "contributed_by": [],
+                  "other_neighbours": [
+                    "ground_plane"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.0899999,
+                      -0.29300010000000004,
+                      -1.0000000022887833e-07
+                    ],
+                    "max": [
+                      1.0900001000000006,
+                      -0.2729998999999996,
+                      1.0000000022887833e-07
+                    ]
+                  }
+                }
+              ],
+              "curves_total": 4,
+              "curves_in_field": 3,
+              "curves_missing": [
+                148
+              ],
+              "missing_curve_neighbours": [
+                "ground_plane"
+              ]
+            },
+            "port_R1_b": {
+              "occ_faces": [
+                44
+              ],
+              "curves": [
+                {
+                  "curve": 149,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "etch"
+                  ],
+                  "other_neighbours": [
+                    "etch"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.1699998999999999,
+                      -0.2930000999999998,
+                      -1e-07
+                    ],
+                    "max": [
+                      1.2000001,
+                      -0.2929998999999998,
+                      1e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 150,
+                  "in_distance_field": false,
+                  "contributed_by": [],
+                  "other_neighbours": [
+                    "ground_plane"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.1999999,
+                      -0.2930000999999998,
+                      -1e-07
+                    ],
+                    "max": [
+                      1.2000001,
+                      -0.2729998999999998,
+                      1e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 151,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "etch"
+                  ],
+                  "other_neighbours": [
+                    "etch"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.1699998999999999,
+                      -0.2730000999999998,
+                      -1e-07
+                    ],
+                    "max": [
+                      1.2000001,
+                      -0.2729998999999998,
+                      1e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 152,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "conductor"
+                  ],
+                  "other_neighbours": [
+                    "conductor"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.1699998999999999,
+                      -0.2930000999999998,
+                      -1e-07
+                    ],
+                    "max": [
+                      1.1700001,
+                      -0.2729998999999998,
+                      1e-07
+                    ]
+                  }
+                }
+              ],
+              "curves_total": 4,
+              "curves_in_field": 3,
+              "curves_missing": [
+                150
+              ],
+              "missing_curve_neighbours": [
+                "ground_plane"
+              ]
+            }
+          },
+          "size_field": {
+            "profile": "gmsh Threshold, linear from h_gap at distance 0 to h_far at the halo",
+            "gradient_mm_per_mm": 4.041666666666666,
+            "distance_at_which_the_prescribed_size_doubles_mm": 0.0024742268041237116,
+            "half_port_width_mm": 0.01,
+            "reach_covers_half_the_port_width": false,
+            "prescribed_size_at_port_centre_mm": 0.050416666666666665,
+            "prescribed_size_at_port_centre_over_h_gap": 5.041666666666666,
+            "prescribed_size_at_port_centre_over_port_width": 2.520833333333333,
+            "port_width_mm": 0.02,
+            "note": "The size is prescribed by distance to a Distance-field curve, and the port face's interior is up to half its width from the nearest one. The ratio of the prescribed size at the port centre to h_gap is scale-invariant - h_gap and h_far both carry the level factor while the halo does not, so the whole profile scales by the level factor and the ratio does not change with refinement. When the size prescribed at the centre exceeds the port width, the only thing setting the element count on the face is the face's own boundary."
+          },
+          "early_port_face_continue": {
+            "question": "does skipping the port faces when collecting Distance-field curves omit curves that no other face contributes?",
+            "answer": {
+              "port_F1": "1 of 4 missing, neighbours ['ground_plane']",
+              "port_R1_a": "1 of 4 missing, neighbours ['ground_plane']",
+              "port_R1_b": "1 of 4 missing, neighbours ['ground_plane']"
+            }
+          }
+        },
+        "L2": {
+          "level": 2,
+          "halo_mm": 0.08,
+          "h_gap_mm": 0.006666666666666666,
+          "h_far_mm": 0.2222222222222222,
+          "planar_faces_at_z0": 110,
+          "face_classes": {
+            "conductor": 51,
+            "port": 3,
+            "etch": 55,
+            "ground_plane": 1
+          },
+          "field_curves_total": 285,
+          "ports": {
+            "port_F1": {
+              "occ_faces": [
+                42
+              ],
+              "curves": [
+                {
+                  "curve": 141,
+                  "in_distance_field": false,
+                  "contributed_by": [],
+                  "other_neighbours": [
+                    "ground_plane"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      -0.6100001,
+                      -0.11500010000000002,
+                      -1.0000000001387778e-07
+                    ],
+                    "max": [
+                      -0.5899998999999999,
+                      -0.11499989999999999,
+                      1.0000000001387778e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 142,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "etch"
+                  ],
+                  "other_neighbours": [
+                    "etch"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      -0.5900000999999999,
+                      -0.11500010000000001,
+                      -1e-07
+                    ],
+                    "max": [
+                      -0.5899999,
+                      -0.07499990000000001,
+                      1e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 143,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "conductor"
+                  ],
+                  "other_neighbours": [
+                    "conductor"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      -0.6100001,
+                      -0.07500010000000003,
+                      -1.0000000001387778e-07
+                    ],
+                    "max": [
+                      -0.5899998999999999,
+                      -0.0749999,
+                      1.0000000001387778e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 144,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "etch"
+                  ],
+                  "other_neighbours": [
+                    "etch"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      -0.6100000999999999,
+                      -0.11500010000000001,
+                      -1e-07
+                    ],
+                    "max": [
+                      -0.6099999,
+                      -0.07499990000000001,
+                      1e-07
+                    ]
+                  }
+                }
+              ],
+              "curves_total": 4,
+              "curves_in_field": 3,
+              "curves_missing": [
+                141
+              ],
+              "missing_curve_neighbours": [
+                "ground_plane"
+              ]
+            },
+            "port_R1_a": {
+              "occ_faces": [
+                43
+              ],
+              "curves": [
+                {
+                  "curve": 145,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "etch"
+                  ],
+                  "other_neighbours": [
+                    "etch"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.0899999000000002,
+                      -0.2930000999999998,
+                      -1e-07
+                    ],
+                    "max": [
+                      1.1200001000000004,
+                      -0.2929998999999998,
+                      1e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 146,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "conductor"
+                  ],
+                  "other_neighbours": [
+                    "conductor"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.1199999,
+                      -0.29300010000000004,
+                      -1.0000000022887833e-07
+                    ],
+                    "max": [
+                      1.1200001000000006,
+                      -0.2729998999999996,
+                      1.0000000022887833e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 147,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "etch"
+                  ],
+                  "other_neighbours": [
+                    "etch"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.0899999000000002,
+                      -0.2730000999999998,
+                      -1e-07
+                    ],
+                    "max": [
+                      1.1200001000000004,
+                      -0.2729998999999998,
+                      1e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 148,
+                  "in_distance_field": false,
+                  "contributed_by": [],
+                  "other_neighbours": [
+                    "ground_plane"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.0899999,
+                      -0.29300010000000004,
+                      -1.0000000022887833e-07
+                    ],
+                    "max": [
+                      1.0900001000000006,
+                      -0.2729998999999996,
+                      1.0000000022887833e-07
+                    ]
+                  }
+                }
+              ],
+              "curves_total": 4,
+              "curves_in_field": 3,
+              "curves_missing": [
+                148
+              ],
+              "missing_curve_neighbours": [
+                "ground_plane"
+              ]
+            },
+            "port_R1_b": {
+              "occ_faces": [
+                44
+              ],
+              "curves": [
+                {
+                  "curve": 149,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "etch"
+                  ],
+                  "other_neighbours": [
+                    "etch"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.1699998999999999,
+                      -0.2930000999999998,
+                      -1e-07
+                    ],
+                    "max": [
+                      1.2000001,
+                      -0.2929998999999998,
+                      1e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 150,
+                  "in_distance_field": false,
+                  "contributed_by": [],
+                  "other_neighbours": [
+                    "ground_plane"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.1999999,
+                      -0.2930000999999998,
+                      -1e-07
+                    ],
+                    "max": [
+                      1.2000001,
+                      -0.2729998999999998,
+                      1e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 151,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "etch"
+                  ],
+                  "other_neighbours": [
+                    "etch"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.1699998999999999,
+                      -0.2730000999999998,
+                      -1e-07
+                    ],
+                    "max": [
+                      1.2000001,
+                      -0.2729998999999998,
+                      1e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 152,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "conductor"
+                  ],
+                  "other_neighbours": [
+                    "conductor"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.1699998999999999,
+                      -0.2930000999999998,
+                      -1e-07
+                    ],
+                    "max": [
+                      1.1700001,
+                      -0.2729998999999998,
+                      1e-07
+                    ]
+                  }
+                }
+              ],
+              "curves_total": 4,
+              "curves_in_field": 3,
+              "curves_missing": [
+                150
+              ],
+              "missing_curve_neighbours": [
+                "ground_plane"
+              ]
+            }
+          },
+          "size_field": {
+            "profile": "gmsh Threshold, linear from h_gap at distance 0 to h_far at the halo",
+            "gradient_mm_per_mm": 2.694444444444444,
+            "distance_at_which_the_prescribed_size_doubles_mm": 0.0024742268041237116,
+            "half_port_width_mm": 0.01,
+            "reach_covers_half_the_port_width": false,
+            "prescribed_size_at_port_centre_mm": 0.03361111111111111,
+            "prescribed_size_at_port_centre_over_h_gap": 5.041666666666667,
+            "prescribed_size_at_port_centre_over_port_width": 1.6805555555555556,
+            "port_width_mm": 0.02,
+            "note": "The size is prescribed by distance to a Distance-field curve, and the port face's interior is up to half its width from the nearest one. The ratio of the prescribed size at the port centre to h_gap is scale-invariant - h_gap and h_far both carry the level factor while the halo does not, so the whole profile scales by the level factor and the ratio does not change with refinement. When the size prescribed at the centre exceeds the port width, the only thing setting the element count on the face is the face's own boundary."
+          },
+          "early_port_face_continue": {
+            "question": "does skipping the port faces when collecting Distance-field curves omit curves that no other face contributes?",
+            "answer": {
+              "port_F1": "1 of 4 missing, neighbours ['ground_plane']",
+              "port_R1_a": "1 of 4 missing, neighbours ['ground_plane']",
+              "port_R1_b": "1 of 4 missing, neighbours ['ground_plane']"
+            }
+          }
+        },
+        "L3": {
+          "level": 3,
+          "halo_mm": 0.08,
+          "h_gap_mm": 0.005,
+          "h_far_mm": 0.16666666666666666,
+          "planar_faces_at_z0": 110,
+          "face_classes": {
+            "conductor": 51,
+            "port": 3,
+            "etch": 55,
+            "ground_plane": 1
+          },
+          "field_curves_total": 285,
+          "ports": {
+            "port_F1": {
+              "occ_faces": [
+                42
+              ],
+              "curves": [
+                {
+                  "curve": 141,
+                  "in_distance_field": false,
+                  "contributed_by": [],
+                  "other_neighbours": [
+                    "ground_plane"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      -0.6100001,
+                      -0.11500010000000002,
+                      -1.0000000001387778e-07
+                    ],
+                    "max": [
+                      -0.5899998999999999,
+                      -0.11499989999999999,
+                      1.0000000001387778e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 142,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "etch"
+                  ],
+                  "other_neighbours": [
+                    "etch"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      -0.5900000999999999,
+                      -0.11500010000000001,
+                      -1e-07
+                    ],
+                    "max": [
+                      -0.5899999,
+                      -0.07499990000000001,
+                      1e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 143,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "conductor"
+                  ],
+                  "other_neighbours": [
+                    "conductor"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      -0.6100001,
+                      -0.07500010000000003,
+                      -1.0000000001387778e-07
+                    ],
+                    "max": [
+                      -0.5899998999999999,
+                      -0.0749999,
+                      1.0000000001387778e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 144,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "etch"
+                  ],
+                  "other_neighbours": [
+                    "etch"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      -0.6100000999999999,
+                      -0.11500010000000001,
+                      -1e-07
+                    ],
+                    "max": [
+                      -0.6099999,
+                      -0.07499990000000001,
+                      1e-07
+                    ]
+                  }
+                }
+              ],
+              "curves_total": 4,
+              "curves_in_field": 3,
+              "curves_missing": [
+                141
+              ],
+              "missing_curve_neighbours": [
+                "ground_plane"
+              ]
+            },
+            "port_R1_a": {
+              "occ_faces": [
+                43
+              ],
+              "curves": [
+                {
+                  "curve": 145,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "etch"
+                  ],
+                  "other_neighbours": [
+                    "etch"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.0899999000000002,
+                      -0.2930000999999998,
+                      -1e-07
+                    ],
+                    "max": [
+                      1.1200001000000004,
+                      -0.2929998999999998,
+                      1e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 146,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "conductor"
+                  ],
+                  "other_neighbours": [
+                    "conductor"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.1199999,
+                      -0.29300010000000004,
+                      -1.0000000022887833e-07
+                    ],
+                    "max": [
+                      1.1200001000000006,
+                      -0.2729998999999996,
+                      1.0000000022887833e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 147,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "etch"
+                  ],
+                  "other_neighbours": [
+                    "etch"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.0899999000000002,
+                      -0.2730000999999998,
+                      -1e-07
+                    ],
+                    "max": [
+                      1.1200001000000004,
+                      -0.2729998999999998,
+                      1e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 148,
+                  "in_distance_field": false,
+                  "contributed_by": [],
+                  "other_neighbours": [
+                    "ground_plane"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.0899999,
+                      -0.29300010000000004,
+                      -1.0000000022887833e-07
+                    ],
+                    "max": [
+                      1.0900001000000006,
+                      -0.2729998999999996,
+                      1.0000000022887833e-07
+                    ]
+                  }
+                }
+              ],
+              "curves_total": 4,
+              "curves_in_field": 3,
+              "curves_missing": [
+                148
+              ],
+              "missing_curve_neighbours": [
+                "ground_plane"
+              ]
+            },
+            "port_R1_b": {
+              "occ_faces": [
+                44
+              ],
+              "curves": [
+                {
+                  "curve": 149,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "etch"
+                  ],
+                  "other_neighbours": [
+                    "etch"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.1699998999999999,
+                      -0.2930000999999998,
+                      -1e-07
+                    ],
+                    "max": [
+                      1.2000001,
+                      -0.2929998999999998,
+                      1e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 150,
+                  "in_distance_field": false,
+                  "contributed_by": [],
+                  "other_neighbours": [
+                    "ground_plane"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.1999999,
+                      -0.2930000999999998,
+                      -1e-07
+                    ],
+                    "max": [
+                      1.2000001,
+                      -0.2729998999999998,
+                      1e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 151,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "etch"
+                  ],
+                  "other_neighbours": [
+                    "etch"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.1699998999999999,
+                      -0.2730000999999998,
+                      -1e-07
+                    ],
+                    "max": [
+                      1.2000001,
+                      -0.2729998999999998,
+                      1e-07
+                    ]
+                  }
+                },
+                {
+                  "curve": 152,
+                  "in_distance_field": true,
+                  "contributed_by": [
+                    "conductor"
+                  ],
+                  "other_neighbours": [
+                    "conductor"
+                  ],
+                  "bounding_box_mm": {
+                    "min": [
+                      1.1699998999999999,
+                      -0.2930000999999998,
+                      -1e-07
+                    ],
+                    "max": [
+                      1.1700001,
+                      -0.2729998999999998,
+                      1e-07
+                    ]
+                  }
+                }
+              ],
+              "curves_total": 4,
+              "curves_in_field": 3,
+              "curves_missing": [
+                150
+              ],
+              "missing_curve_neighbours": [
+                "ground_plane"
+              ]
+            }
+          },
+          "size_field": {
+            "profile": "gmsh Threshold, linear from h_gap at distance 0 to h_far at the halo",
+            "gradient_mm_per_mm": 2.020833333333333,
+            "distance_at_which_the_prescribed_size_doubles_mm": 0.0024742268041237116,
+            "half_port_width_mm": 0.01,
+            "reach_covers_half_the_port_width": false,
+            "prescribed_size_at_port_centre_mm": 0.025208333333333333,
+            "prescribed_size_at_port_centre_over_h_gap": 5.041666666666666,
+            "prescribed_size_at_port_centre_over_port_width": 1.2604166666666665,
+            "port_width_mm": 0.02,
+            "note": "The size is prescribed by distance to a Distance-field curve, and the port face's interior is up to half its width from the nearest one. The ratio of the prescribed size at the port centre to h_gap is scale-invariant - h_gap and h_far both carry the level factor while the halo does not, so the whole profile scales by the level factor and the ratio does not change with refinement. When the size prescribed at the centre exceeds the port width, the only thing setting the element count on the face is the face's own boundary."
+          },
+          "early_port_face_continue": {
+            "question": "does skipping the port faces when collecting Distance-field curves omit curves that no other face contributes?",
+            "answer": {
+              "port_F1": "1 of 4 missing, neighbours ['ground_plane']",
+              "port_R1_a": "1 of 4 missing, neighbours ['ground_plane']",
+              "port_R1_b": "1 of 4 missing, neighbours ['ground_plane']"
+            }
+          }
+        }
+      },
+      "prescribed_size_at_port_centre_over_h_gap": {
+        "L1": 5.041666666666666,
+        "L2": 5.041666666666667,
+        "L3": 5.041666666666666
+      },
+      "ratio_is_scale_invariant": true,
+      "finding": "the size the existing field prescribes at the port centre is a fixed multiple of h_gap at every level, so refining the ladder never resolves the port face"
+    }
+  },
+  "prepared_experiment": {
+    "meshes": {
+      "R1": {
+        "base_level": 2,
+        "h_gap_mm": 0.006666666666666666,
+        "h_far_mm": 0.2222222222222222,
+        "halo_mm": 0.08,
+        "port_refinement": {
+          "h_port_mm": 0.003333333333333333,
+          "pad_mm": 0.01,
+          "transition_mm": 0.02,
+          "ports": [
+            "port_F1"
+          ],
+          "field": "gmsh Box (VIn = h_port, VOut = h_far, Thickness = transition)",
+          "combination": "Min with the existing conductor/etch Threshold",
+          "can_only_refine": true,
+          "holds_fixed": "h_far, the conductor/etch Distance field, the halo, the geometry, the materials, the port dimensions and inductance, the boundary conditions and the physical groups"
+        },
+        "h_port_over_h_gap": 0.5,
+        "measured": {
+          "dof_order1": 80762,
+          "dof_order2": 424836,
+          "tetrahedra": 65068,
+          "nodes": 14175,
+          "edges": 80762,
+          "mesh_sha256": "a49ef282c7f07c56f210a450b291a2e027de530ba7c3e78bbdcead3b67315fee",
+          "mesh_filename": "coupled_chip_cell_L2_R1.msh",
+          "dry_run_wall_clock_s": 17.507833895999738,
+          "gmsh_version": "4.15.2"
+        },
+        "budget": {
+          "dof_budget": 250000,
+          "fraction_of_budget": 0.323048,
+          "within_budget_order1": true
+        },
+        "port_face": {
+          "triangles": 176,
+          "equivalent_element_size_mm": 0.00323995024986952,
+          "elements_across_width": 6.172934291446433,
+          "achieved_over_requested": 0.9719850749608561
+        }
+      },
+      "R2": {
+        "base_level": 2,
+        "h_gap_mm": 0.006666666666666666,
+        "h_far_mm": 0.2222222222222222,
+        "halo_mm": 0.08,
+        "port_refinement": {
+          "h_port_mm": 0.0016666666666666666,
+          "pad_mm": 0.01,
+          "transition_mm": 0.02,
+          "ports": [
+            "port_F1"
+          ],
+          "field": "gmsh Box (VIn = h_port, VOut = h_far, Thickness = transition)",
+          "combination": "Min with the existing conductor/etch Threshold",
+          "can_only_refine": true,
+          "holds_fixed": "h_far, the conductor/etch Distance field, the halo, the geometry, the materials, the port dimensions and inductance, the boundary conditions and the physical groups"
+        },
+        "h_port_over_h_gap": 0.25,
+        "measured": {
+          "dof_order1": 111238,
+          "dof_order2": 590446,
+          "tetrahedra": 91233,
+          "nodes": 18487,
+          "edges": 111238,
+          "mesh_sha256": "5a983c9125a9b9cefff017275e4088853fd93e4e9a41eee2109a2edb25c97bca",
+          "mesh_filename": "coupled_chip_cell_L2_R2.msh",
+          "dry_run_wall_clock_s": 21.12600177000013,
+          "gmsh_version": "4.15.2"
+        },
+        "budget": {
+          "dof_budget": 250000,
+          "fraction_of_budget": 0.444952,
+          "within_budget_order1": true
+        },
+        "port_face": {
+          "triangles": 680,
+          "equivalent_element_size_mm": 0.001648315031553526,
+          "elements_across_width": 12.133602871503351,
+          "achieved_over_requested": 0.9889890189321158
+        }
+      }
+    },
+    "predeclaration": {
+      "id": "qmhp-cem.s1-port-refinement-experiment/0.1.0",
+      "status": "predeclared; awaiting the owner's approval. No solve is authorised by it.",
+      "what_is_held_fixed": [
+        "the S1 geometry, materials and substrate permittivity",
+        "the port dimensions, direction and inductance",
+        "the port formulation, conductor thickness and edge treatment",
+        "every boundary condition and physical group",
+        "the pinned Palace v0.13.0 image and every solver setting",
+        "h_far, the halo, and the conductor/etch Distance field, so the distant size prescription is the baseline's"
+      ],
+      "what_changes": "one number: the element size held over a declared box around the port face. The two meshes differ from each other in that number alone.",
+      "observed": {
+        "fluxonium_like_mode": {
+          "frequency_GHz": {
+            "L1": 1.158333,
+            "L2": 1.461887,
+            "L3": 1.709562
+          },
+          "shift_L2_to_L3_GHz": 0.247675,
+          "port_participation_from_probes": {
+            "L2": 0.9985982,
+            "L3": 0.9983353
+          },
+          "note": "its stiffness is almost entirely the port boundary term, so its frequency tracks the port-face tangential-field integral"
+        },
+        "readout_like_mode": {
+          "frequency_GHz": {
+            "L1": 3.693189,
+            "L2": 3.885511,
+            "L3": 4.087683
+          },
+          "shift_L2_to_L3_GHz": 0.202172,
+          "port_participation_from_probes": {
+            "L2": 0.0007803572,
+            "L3": 0.0009115929
+          },
+          "note": "its stiffness is essentially all domain curl-curl; the port is negligible"
+        },
+        "port_face_elements_across_width": {
+          "L1": 1.92,
+          "L2": 2.33,
+          "L3": 3.12
+        }
+      },
+      "unchanged_tolerances": {
+        "frozen_halo_participation_tolerance_abs": 0.01,
+        "frozen_halo_frequency_tolerance_rel": 0.0001,
+        "eigenmode_backward_error_max_tolerance": 1e-06,
+        "mode_admission_rule": "qmhp-cem.mode-admission/0.1.0, abs(R - 1) <= 1e-3",
+        "mode_matching_rule": "qmhp-cem.mode-matching/0.1.1, two orderings plus the separation guard",
+        "comparison_convention": "magnitudes, with the sign preserved and reported",
+        "declared_window_GHz": [
+          0.5,
+          9.0
+        ],
+        "dof_budget": 250000,
+        "per_solve_wall_clock_cap_s": 2700,
+        "finite_element_order": 1
+      },
+      "mode_matching": {
+        "rule": "qmhp-cem.mode-matching/0.1.1, imported unchanged",
+        "applied_to": "the admitted, in-window modes of the base level-2 run and of each refined run",
+        "baseline": "the committed COUPLED-LADDER-O1-L2 run is the baseline and is NOT re-solved: R1 and R2 differ from it in the mesh alone",
+        "global_comparison_point": "the committed COUPLED-LADDER-O1-L3 run, which refines everywhere by the same factor, is the contrast: it buys a 1.34x finer port face for 84 % more DOF",
+        "if_matching_refuses": "report the refusal and stop. A refusal is a result: it would mean the mode set changed under a mesh change that touches only the port neighbourhood, which is itself the finding."
+      },
+      "stop_conditions": [
+        {
+          "condition": "measured DOF above the 250 000 rule",
+          "action": "the driver refuses to launch the solve and records REFUSED-DOF-BUDGET",
+          "enforced_by": "scripts/palace_order1_ladder.py, already in place and unchanged"
+        },
+        {
+          "condition": "a solve exceeds the 45-minute per-solve cap",
+          "action": "the solve is killed and the rung is recorded as failed",
+          "enforced_by": "the existing SOLVE_TIMEOUT_S; the cap is not extended"
+        },
+        {
+          "condition": "the built mesh does not hash to the dry-run mesh named in the approval",
+          "action": "stop before solving; the mesh is not the one that was approved",
+          "enforced_by": "the approval's dry_run_mesh_sha256, checked by the driver"
+        },
+        {
+          "condition": "the matching rule refuses",
+          "action": "report the refusal and stop. It would mean the mode set changed under a mesh change confined to the port neighbourhood, which is itself the finding.",
+          "enforced_by": "qmhp-cem.mode-matching/0.1.1, unchanged"
+        },
+        {
+          "condition": "the independent port participation disagrees with the closure requirement by more than 1e-4 on any mode",
+          "action": "stop and resolve that before reading any frequency: it would mean the derived conversion does not describe the refined mesh, and every other number in the run would be resting on it. Observed range on the committed rows is 2e-8 to 4.3e-7, so this is a wide margin.",
+          "enforced_by": "reported per mode by solvers.palace.port_diagnostic"
+        },
+        {
+          "condition": "both runs complete",
+          "action": "report against the five predeclared outcomes and STOP for review. No third mesh, no base-level change and no order-2 run without a further approval.",
+          "enforced_by": "this predeclaration"
+        }
+      ],
+      "diagnostic_checks": [
+        {
+          "check": "independent port participation",
+          "how": "solvers.palace.port_diagnostic with the conversion derived from that run's own config and its own mesh bounding box",
+          "status": "reported, not a gate"
+        },
+        {
+          "check": "probe versus closure",
+          "how": "abs(p_probe/p_closure - 1); it was below 2e-5 on all 12 committed rows",
+          "status": "reported. A material disagreement would mean the derived conversion does not describe the refined mesh, and would have to be resolved before reading anything else."
+        },
+        {
+          "check": "uniformity factor",
+          "how": "E_ind/E_port, which Cauchy-Schwarz bounds by 1",
+          "status": "reported. It measures how far the port field is from the rank-one form the lumped-port circuit model represents, and refining the face may move it."
+        },
+        {
+          "check": "port-face resolution, measured",
+          "how": "solvers.palace.mesh_inspection: triangles, element size and elements across the width",
+          "status": "reported; distinguishes what was requested from what was built"
+        },
+        {
+          "check": "energy-balance admission",
+          "how": "the unchanged rule, on the reported energies",
+          "status": "gate, unchanged. Note what it actually tests: with the port term evaluated correctly the balance closes for EVERY mode to about 2e-5, so the rule's discriminating power comes from the surrogate's failure. It selects modes whose port field is close to uniform and aligned, which is a useful criterion but is not the same as algebraic convergence."
+        }
+      ],
+      "outcomes": [
+        {
+          "id": "A",
+          "if": "the fluxonium-like mode moves under R1 and R2 by an amount comparable to or larger than its 0.248 GHz L2->L3 shift, while the readout-like mode moves by much less than its own 0.202 GHz L2->L3 shift",
+          "would_mean": "the port face's discretisation drives the fluxonium-like mode's frequency, and the global ladder was spending its DOF budget on the wrong region. R1 costs 818 DOF more than the baseline, so a large shift at that price is strong evidence of locality.",
+          "would_not_mean": "that the mode converges under port refinement, or that any limit has been identified. Two meshes cannot show that.",
+          "next_step": "a port-anchored refinement sequence long enough to test for an order"
+        },
+        {
+          "id": "B",
+          "if": "the fluxonium-like mode barely moves under R1 and R2",
+          "would_mean": "the port face is not what the L2->L3 shift was buying. The port-stiffness account of the energy *imbalance* is established separately and would stand; it would simply not be the frequency driver.",
+          "would_not_mean": "that the mesh is adequate, or that the ladder had converged",
+          "next_step": "refine at the zero-thickness PEC sheet edges generally, which are field singularities everywhere in this model, not only at the port"
+        },
+        {
+          "id": "C",
+          "if": "both modes move by comparable fractions of their L2->L3 shifts",
+          "would_mean": "a global effect reached the port box too, or the box perturbed more than intended. Check the measured distant element sizes against the baseline's before reading anything into it.",
+          "would_not_mean": "that local refinement failed",
+          "next_step": "reduce the pad and repeat before drawing any conclusion"
+        },
+        {
+          "id": "D",
+          "if": "the fluxonium-like mode moves from the baseline to R1 and then much less from R1 to R2",
+          "would_mean": "the port face was under-resolved and R1 resolves it enough for this mode. That is a statement about the port face only: the global mesh's own contribution would still be untested.",
+          "would_not_mean": "that the frequency has converged",
+          "next_step": "repeat the pair at base level 3 to separate the two axes"
+        },
+        {
+          "id": "E",
+          "if": "the independent port participation changes materially between R1 and R2",
+          "would_mean": "the port-face integral itself has not settled under the refinement",
+          "would_not_mean": "anything about a limit; report the trend and its direction",
+          "next_step": "extend the port-refinement sequence, not the global one"
+        }
+      ],
+      "what_two_meshes_cannot_do": "establish convergence, identify a limit, or measure an order. This experiment discriminates between candidate causes of the observed frequency drift; it does not resolve it.",
+      "approval_block_to_paste": {
+        "where": ".github/ladder-approval.json, alongside the approved level",
+        "R1": {
+          "id": "R1",
+          "h_port_mm": 0.003333333333333333,
+          "pad_mm": 0.01,
+          "transition_mm": 0.02,
+          "ports": [
+            "port_F1"
+          ]
+        },
+        "R2": {
+          "id": "R2",
+          "h_port_mm": 0.0016666666666666666,
+          "pad_mm": 0.01,
+          "transition_mm": 0.02,
+          "ports": [
+            "port_F1"
+          ]
+        },
+        "level": 2,
+        "dry_run_mesh_sha256": {
+          "R1": "a49ef282c7f07c56f210a450b291a2e027de530ba7c3e78bbdcead3b67315fee",
+          "R2": "5a983c9125a9b9cefff017275e4088853fd93e4e9a41eee2109a2edb25c97bca"
+        },
+        "note": "the hashes are for those exact values; the dry run is deterministic and reproduces them, which is asserted in tests/test_s1_recovery.py"
+      },
+      "cost": {
+        "solves": 2,
+        "order": 1,
+        "dof_order1": {
+          "R1": 80762,
+          "R2": 111238
+        },
+        "dof_budget": 250000,
+        "per_solve_cap_s": 2700,
+        "projected_wall_clock_s": {
+          "R1": "about 82 s, from the baseline's 81.2 s at 79 944 DOF",
+          "R2": "about 120 s, from the measured within-order timing exponent of 1.10"
+        }
+      }
+    }
+  },
+  "constraints_unchanged": {
+    "finite_element_order": 1,
+    "halo_mm": 0.08,
+    "dof_budget": 250000,
+    "per_solve_wall_clock_cap_s": 2700,
+    "admission_matching_and_magnitude_rules": "unchanged",
+    "declared_window_GHz": [
+      0.5,
+      9.0
+    ]
+  },
+  "wall_clock_s": 40.509367241999826
+}

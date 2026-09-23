@@ -1,0 +1,337 @@
+{
+ "label": "FIRST-MOMENT DIAGNOSTIC ON N2R - PREPARED, QUALIFIED ON SYNTHETIC FIXTURES, NOT APPROVED, NOT EXECUTED ON N2R",
+ "status": {
+  "prepared": true,
+  "compiled": true,
+  "approved": false,
+  "executed_on_N2R": false,
+  "compiled_where": "natively from the pinned tag with the patch applied; see compiled_qualification.json. The reviewed IMAGE could not be built in the preparation session - see image_blocker."
+ },
+ "image_blocker": {
+  "what": "docker build of docker/palace-first-moment.Dockerfile",
+  "blocked_by": "the session egress policy",
+  "exact_error": "gateway answered 403 to CONNECT for production.cloudfront.docker.com:443 (Docker Hub blob CDN) while pulling the digest-pinned ubuntu:24.04 base",
+  "not_routed_around": "no alternative registry or mirror was used: an organization egress denial is reported, not worked around",
+  "consequence": "the image ID, repo digest and PALACE_PATCH_SHA256 that a qualifying run must carry can only be produced by a build in an environment where that host is allowed"
+ },
+ "what_would_be_computed": {
+  "space": "N2R's Nedelec space: same mesh file, same two-level box refinement, order 1, MGMaxLevels 1, same PEC attributes {2, 4}, same lumped port (attribute 10, +Y, L = 1.0345665367517793e-07 H, R = C = 0)",
+  "functional": "f = P^T v, v = LumpedPortData::v (the exact GetVoltage form), zeroed on the PEC true dofs",
+  "operator": "M = SpaceOperator::GetMassMatrix(DIAG_ONE) = [[M_free, 0], [0, I]]",
+  "solve": "M x = f by PCG + Jacobi, RelTol 1e-12, MaxIts 2000; independent residual r = M x - f",
+  "A_nd": "Re(f^T x) / L_nd  with  L_nd = L_H / (mu0 Lc)",
+  "A_GHz2": "A_nd * (1 / (2 pi tc_ns))^2",
+  "error_qualification": {
+   "identity": "A_computed - A_exact = (Re(x^H r) - r^H M^-1 r) / L",
+   "certified": "one-sided only: A_exact >= A_computed - Re(x^H r)/L, because r^H M^-1 r >= 0 for SPD M",
+   "not_certified": "no upper bound on A_exact; ||x|| ||r|| / L is reported as an ESTIMATE and is not a bound"
+  },
+  "checks_built_in": [
+   "f . Re(E) + i f . Im(E) == GetVoltage(E) on a random complex field zeroed on the PEC dofs (structured FAILED record, then abort)",
+   "u^T K u >= (f . u)^2 / L_nd for x and four random constrained fields - a SAMPLED runtime check, not a proof",
+   "x vanishes on the PEC dofs; ||r|| / ||f|| reported"
+  ],
+  "written": "postpro/first-moment.json (see reference_model.RECORD_KEYS); no fields"
+ },
+ "the_one_execution": {
+  "launcher": {
+   "script": "experiments/first-moment-diagnostic/run_diagnostic.py",
+   "state": "PREPARED, NOT ACTIVATED",
+   "refuses_without": "experiments/first-moment-diagnostic/EXECUTION-APPROVAL.json",
+   "approval_absent": true,
+   "enforces": {
+    "wall_clock": "the container is read line by line under a deadline and KILLED on expiry; the bare docker command in the earlier proposal was not a timeout mechanism",
+    "dof": "the streamed log is probed for the finest-space ND count and the container is KILLED the moment it exceeds the budget",
+    "provenance": "image ID, repo digests, labels, the four PALACE_* files read from inside the image, and the sha256 of config, mesh, patch, Dockerfile and diagnostic code are written to provenance.json"
+   },
+   "argv": [
+    "docker",
+    "run",
+    "--rm",
+    "--network",
+    "none",
+    "--hostname",
+    "localhost",
+    "--name",
+    "<name>",
+    "--entrypoint",
+    "stdbuf",
+    "-e",
+    "HOME=/tmp",
+    "-e",
+    "OMP_NUM_THREADS=1",
+    "-e",
+    "OPENBLAS_NUM_THREADS=1",
+    "-v",
+    "<workdir>:/work",
+    "-w",
+    "/work",
+    "qmhp-cem/palace-first-moment:0.13.0",
+    "-oL",
+    "-eL",
+    "palace",
+    "-np",
+    "1",
+    "config.json"
+   ]
+  },
+  "image": {
+   "dockerfile": "docker/palace-first-moment.Dockerfile",
+   "dockerfile_sha256": "7887689075bdd0020aa4f8417469a18a49a70cacf52a7d1195136995524e3690",
+   "production_dockerfile": "docker/palace.Dockerfile",
+   "production_dockerfile_sha256_untouched": "ae61175a4237cfed043d0df47126080215fa06c42acd897a53107b2c99fc88a9",
+   "patch": "docker/patches/first-moment-diagnostic.patch",
+   "patch_sha256": "e8a1ad51d4e355b0426e84c70cb9c796a4915b1216bb035d5fe60913de512fee",
+   "palace_version": "0.13.0",
+   "palace_commit": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+   "build": "docker build -f docker/palace-first-moment.Dockerfile -t qmhp-cem/palace-first-moment:0.13.0 .",
+   "must_be_built_where": "an environment whose egress policy allows the Docker Hub blob CDN; see image_blocker"
+  },
+  "inputs": {
+   "config": "experiments/first-moment-diagnostic/config.candidate.json",
+   "config_sha256": "6d791a2df4d790a0f50cdb579e195834df1b4874efe323b82ee871f9392d218e",
+   "delta_vs_N2R_solved_config": "experiments/first-moment-diagnostic/config.delta.txt",
+   "N2R_solved_config_sha256": "79304b5f8bd7c67741e995ec7ae7880b41dfcee23d6c3c12984f5baba8c1f33f",
+   "mesh": "results/COUPLED-LADDER-O1-L2-N2R-20260918T061455Z/L2/solver/coupled_chip_cell_L2.msh",
+   "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428"
+  },
+  "required_provenance": {
+   "PALACE_VERSION": "0.13.0",
+   "PALACE_COMMIT": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+   "PALACE_PATCH": "first-moment-diagnostic",
+   "PALACE_PATCH_SHA256": "e8a1ad51d4e355b0426e84c70cb9c796a4915b1216bb035d5fe60913de512fee",
+   "config_sha256": "6d791a2df4d790a0f50cdb579e195834df1b4874efe323b82ee871f9392d218e",
+   "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+   "patch_sha256": "e8a1ad51d4e355b0426e84c70cb9c796a4915b1216bb035d5fe60913de512fee",
+   "dockerfile_sha256": "7887689075bdd0020aa4f8417469a18a49a70cacf52a7d1195136995524e3690",
+   "image_id": "SUPPLIED BY THE EXECUTION: the image ID the launcher records"
+  },
+  "mpi_processes": 1,
+  "hard_caps": {
+   "dof": 250000,
+   "wall_s": 2700,
+   "meaning": "hard caps on the execution, not runtime promises. The space is N2R's, 103411 true dofs, so the DOF cap is known to hold; the wall cap is enforced by the launcher, and a run that hits either cap is FAILED, never retried",
+   "enforced_by": "experiments/first-moment-diagnostic/run_diagnostic.py"
+  },
+  "expected_outputs": [
+   "postpro/first-moment.json",
+   "postpro/palace.json",
+   "palace_log.txt",
+   "provenance.json"
+  ],
+  "evaluation": "uv run python experiments/first-moment-diagnostic/evaluate_record.py --record <record dir>",
+  "mechanism": "NO workflow runs this and none is added by this preparation. The approval must name the mechanism - a separate manually dispatched workflow that builds docker/palace-first-moment.Dockerfile, or a local run whose record is committed - and must not reuse the spent PO1 approval or edit .github/ladder-approval.json.",
+  "what_it_authorises": "one execution of this config with this image, once; no retry",
+  "what_it_does_not_authorise": [
+   "no eigensolve, no driven sweep, no N3, no golden run",
+   "no Route A or Route B extraction, no real-data E_C or g",
+   "no registered-definition change, no historical-record rewrite",
+   "no budget or cap increase, no merge of PR #7"
+  ]
+ },
+ "expected_scales": {
+  "printed_by_palace": {
+   "Lc_m": 0.004,
+   "tc_ns": 0.01334
+  },
+  "expected_exact_from_Lc_4mm": {
+   "Lc_m": 0.004,
+   "tc_ns": 0.01334256380791072,
+   "FrequencyScale_GHz": 11.92836289810609,
+   "InductanceScale_H": 5.026548245743669e-09,
+   "VoltageScale_V": 19.409541814844687,
+   "EnergyScale_J": 0.01334256380791072,
+   "A_GHz2_per_nd": 142.28584142891393
+  },
+  "L_nd_expected": 20.582047285188583,
+  "note": "expected values only: the diagnostic record reports Lc, tc and the scales it actually used, and the evaluator compares against those"
+ },
+ "A_saved_from_committed_columns": {
+  "A_all_saved_modes": {
+   "modes": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "N_partial": 0.999254583555896,
+   "A_partial_GHz2": 2.351511939494728,
+   "A_partial_nd_at_expected_tc": 0.01652667556996206,
+   "per_mode": [
+    {
+     "mode": 1,
+     "f_GHz": 1.526014889,
+     "abs_p": 0.9982168757,
+     "abs_p_f2_GHz2": 2.3245690416595024,
+     "error_bkwd": 2.118832308e-17,
+     "error_abs": 1.584145824e-11
+    },
+    {
+     "mode": 2,
+     "f_GHz": 3.887370723,
+     "abs_p": 0.000938532088,
+     "abs_p_f2_GHz2": 0.014182769495709954,
+     "error_bkwd": 4.190047529e-17,
+     "error_abs": 3.132691057e-11
+    },
+    {
+     "mode": 3,
+     "f_GHz": 10.21399772,
+     "abs_p": 1.695794496e-07,
+     "abs_p_f2_GHz2": 1.769150316645745e-05,
+     "error_bkwd": 4.52178736e-13,
+     "error_abs": 3.380719088e-07
+    },
+    {
+     "mode": 4,
+     "f_GHz": 10.43786163,
+     "abs_p": 2.94212949e-08,
+     "abs_p_f2_GHz2": 3.205419346077069e-06,
+     "error_bkwd": 9.529963581e-12,
+     "error_abs": 7.125087603e-06
+    },
+    {
+     "mode": 5,
+     "f_GHz": 10.84152451,
+     "abs_p": 3.187837728e-05,
+     "abs_p_f2_GHz2": 0.0037469415476615382,
+     "error_bkwd": 2.519230684e-14,
+     "error_abs": 1.883505691e-08
+    },
+    {
+     "mode": 6,
+     "f_GHz": 10.99752823,
+     "abs_p": 3.213212399e-06,
+     "abs_p_f2_GHz2": 0.00038862398882634085,
+     "error_bkwd": 2.217141543e-12,
+     "error_abs": 1.657648449e-06
+    },
+    {
+     "mode": 7,
+     "f_GHz": 11.2175922,
+     "abs_p": 1.015989182e-06,
+     "abs_p_f2_GHz2": 0.00012784636348548266,
+     "error_bkwd": 3.364439685e-12,
+     "error_abs": 2.515427342e-06
+    },
+    {
+     "mode": 8,
+     "f_GHz": 11.60935606,
+     "abs_p": 6.223816571e-05,
+     "abs_p_f2_GHz2": 0.008388282479102886,
+     "error_bkwd": 1.683360668e-11,
+     "error_abs": 1.258566707e-05
+    },
+    {
+     "mode": 9,
+     "f_GHz": 11.77805216,
+     "abs_p": 6.310225805e-07,
+     "abs_p_f2_GHz2": 8.753703792710015e-05,
+     "error_bkwd": 5.311352841e-11,
+     "error_abs": 3.971039723e-05
+    }
+   ],
+   "central_GHz2": 2.351511939494728,
+   "lo_GHz2": 2.351511937837953,
+   "hi_GHz2": 2.3515119411515033,
+   "halfwidth_GHz2": 1.6567751615070847e-09,
+   "source": "printed precision of the committed columns only",
+   "eigensolver_convergence": {
+    "max_backward_error": 5.311352841e-11,
+    "max_absolute_error": 3.971039723e-05,
+    "propagated_into_A": "UNQUANTIFIED",
+    "why": "eig.csv reports a backward and an absolute error per eigenpair; turning either into an error on p_m = (q^H E_m)^2 / lambda_m needs a spectral gap, which the committed record does not measure. It is therefore kept out of the interval and stated separately, and any tail conclusion must account for it."
+   }
+  },
+  "B_field_resonant_only": {
+   "modes": [
+    1,
+    2,
+    5,
+    8
+   ],
+   "N_partial": 0.99924952433099,
+   "A_partial_GHz2": 2.3508870351819766,
+   "A_partial_nd_at_expected_tc": 0.016522283676106173,
+   "per_mode": [
+    {
+     "mode": 1,
+     "f_GHz": 1.526014889,
+     "abs_p": 0.9982168757,
+     "abs_p_f2_GHz2": 2.3245690416595024,
+     "error_bkwd": 2.118832308e-17,
+     "error_abs": 1.584145824e-11
+    },
+    {
+     "mode": 2,
+     "f_GHz": 3.887370723,
+     "abs_p": 0.000938532088,
+     "abs_p_f2_GHz2": 0.014182769495709954,
+     "error_bkwd": 4.190047529e-17,
+     "error_abs": 3.132691057e-11
+    },
+    {
+     "mode": 5,
+     "f_GHz": 10.84152451,
+     "abs_p": 3.187837728e-05,
+     "abs_p_f2_GHz2": 0.0037469415476615382,
+     "error_bkwd": 2.519230684e-14,
+     "error_abs": 1.883505691e-08
+    },
+    {
+     "mode": 8,
+     "f_GHz": 11.60935606,
+     "abs_p": 6.223816571e-05,
+     "abs_p_f2_GHz2": 0.008388282479102886,
+     "error_bkwd": 1.683360668e-11,
+     "error_abs": 1.258566707e-05
+    }
+   ],
+   "central_GHz2": 2.3508870351819766,
+   "lo_GHz2": 2.3508870335258996,
+   "hi_GHz2": 2.3508870368380537,
+   "halfwidth_GHz2": 1.6560770532692004e-09,
+   "source": "printed precision of the committed columns only",
+   "eigensolver_convergence": {
+    "max_backward_error": 1.683360668e-11,
+    "max_absolute_error": 1.258566707e-05,
+    "propagated_into_A": "UNQUANTIFIED",
+    "why": "eig.csv reports a backward and an absolute error per eigenpair; turning either into an error on p_m = (q^H E_m)^2 / lambda_m needs a spectral gap, which the committed record does not measure. It is therefore kept out of the interval and stated separately, and any tail conclusion must account for it."
+   }
+  }
+ },
+ "what_the_comparison_will_and_will_not_say": [
+  "A_direct - A_saved is called an omitted first moment only after every provenance and numerical check in evaluate_record.py passes",
+  "only a CERTIFIED LOWER BOUND on the omitted moment can be stated, from A_certified_lower - A_saved_hi; there is no certified upper bound, so a small difference is NOT RESOLVED and never a small tail",
+  "a materially negative difference is flagged INCONSISTENT - the non-negative mode weights forbid it - and is never labelled an omitted moment",
+  "mass-solve uncertainty and A_saved uncertainty are reported separately",
+  "E_C and g stay UNAVAILABLE whatever the number"
+ ],
+ "not_done_in_preparation": [
+  "no N2R FEM assembly, functional, matrix or solve",
+  "no build of the reviewed image (blocked; see image_blocker)",
+  "no golden run, no reuse of the spent PO1 approval, no workflow added",
+  "no registered-definition change, no historical-record rewrite, no Route A/B, no N3, no budget increase, no PR #7 merge"
+ ],
+ "workflow_trigger_paths_untouched": [
+  ".github/ladder-approval.json",
+  ".github/pilot-approval.json",
+  ".github/workflows/",
+  "docker/palace.Dockerfile",
+  "solvers/palace/",
+  "scripts/palace_golden_run.py",
+  "scripts/palace_verify_campaign.py"
+ ],
+ "code_sha256": {
+  "reference_model.py": "14700555f63c126cf76b96b406d4e6a101ec12f49395a7d46b11803fcf515a57",
+  "prepare.py": "b5cd006eec0fe7453e4b7717d5e0c8142d3923b1833a150913574a8839eb50eb",
+  "evaluate_record.py": "a217d4c10a93ecfa626aaf92f4d6b5c0fe5305980c16cc0599062a53b6f74c35",
+  "run_diagnostic.py": "9b0c312565273b70470a8e8ce81ba2787781c46ad9984100a483618713f5956d",
+  "synthetic_fixture.py": "d36a810afbb1db8ffd810b866a223134b90c1e5b398bedfe4fbadac5441b0a7f"
+ }
+}

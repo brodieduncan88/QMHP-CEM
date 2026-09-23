@@ -1,0 +1,139 @@
+{
+ "schema": "qmhp-cem.nested-refinement-candidate/0.2.0",
+ "id": "N1R",
+ "purpose": "a CONTROL: re-solve N1's discrete problem - the SAME mesh, the SAME one-level box, the SAME order, tolerances and eigenvalue target - with the one-level solver configuration N2R used (Solver.Linear.MGMaxLevels: 1), so that the refinement step N1R -> N2R has the same preconditioner strategy on both sides. As a by-product, N1 vs N1R is the same discrete problem under two solver paths, which measures the solver-path effect directly.",
+ "not_this": "N1R is NOT a new refinement level, NOT the gmsh R2 experiment, and NOT a re-interpretation of N1. It carries no change to the mesh, the order, the tolerances, the eigenvalue target, the DOF budget or the 45-minute cap.",
+ "mechanism": "identical to N1 - Palace Model.Refinement.Boxes, ONE level from the ORIGINAL L2 mesh - plus one Solver.Linear override, MGMaxLevels: 1, identical to N2R's.",
+ "pinned": {
+  "original_L2_mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+  "original_L2_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+  "n1_reference_record": "COUPLED-LADDER-O1-L2-N1-20260917T001735Z",
+  "n2r_reference_record": "COUPLED-LADDER-O1-L2-N2R-20260918T061455Z",
+  "n1_solved_config_sha256": "85c93c2db2c0e3e9323132aba2dc8e7d53ec2acf6e9ddcb878dd1c20bcf110c0",
+  "n1r_candidate_config_sha256": "4f4cbcad6d1a1a33ecf0cdc23b63c8896b059c0b3a22b8d5c4e60ea05cd62ef0",
+  "palace_commit": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+  "mfem_commit": "c444b17c973cc301590a6ac186fb33587b5881e6",
+  "config_delta_is": "config.candidate.json here IS the config N1 solved, byte-for-byte, with one key added: Solver.Linear.MGMaxLevels = 1. diff gives 104c104,105 (a comma after MaxIts, then the key)."
+ },
+ "refinement_region": {
+  "BoundingBoxMin": [
+   -0.62,
+   -0.125,
+   -0.01
+  ],
+  "BoundingBoxMax": [
+   -0.58,
+   -0.065,
+   0.01
+  ],
+  "Levels": 1,
+  "unchanged_from_N1": "byte-identical to N1's box and depth"
+ },
+ "the_solver_change": {
+  "key": "Solver.Linear.MGMaxLevels",
+  "from": "unset, i.e. Palace's default 100 (configfile.hpp:777)",
+  "to": 1,
+  "documented_as": "configfile.hpp:776 - 'Maximum number of levels for geometric multigrid (set to 1 to disable multigrid)'. This is a supported setting, not a workaround.",
+  "why": "N2R's record compares it against N1, which ran a two-level V-cycle where N2R ran one level with the preconditioner applied directly. That comparison is honest but not preconditioner-controlled. N1R removes the difference: with it, L2 (1 level, no refinement), N1R (1 level) and N2R (1 level) form a sequence with the same solver strategy at every point.",
+  "what_it_changes": "ONE branch. geodata.cpp:204 reserves capacity for intermediate meshes only when mg_use_mesh && mg_max_levels > 1. With mg_max_levels = 1 the reserve is skipped, so mesh.capacity() stays 1, geodata.cpp:346 does not copy, and :350 runs the SAME GeneralRefinement(refs, -1) call in place. multigrid.hpp:88 then builds a one-level hierarchy, and ksp.cpp:202 returns the preconditioner directly instead of demoting it to the coarse solver of a V-cycle.",
+  "what_it_does_not_change": [
+   "the mesh file, which is the baseline's and hash-gated before launch",
+   "the refinement flags and the GeneralRefinement call, hence the final refined mesh",
+   "the finite element order, the ND/H1/RT spaces and the assembled operators",
+   "Solver.Linear.Type, KSPType, Tol (1e-08) and MaxIts (400)",
+   "Solver.Eigenmode N (6), Tol (1e-06), Target (0.5 GHz) and Save (6)",
+   "the materials, the lumped port, L_s, kappa, Lc and the boundary conditions",
+   "the 250 000-DOF rule and the 45-minute cap"
+  ],
+  "two_paths_checked_for_side_effects": {
+   "RebalanceMesh": "fires at geodata.cpp:353-355 only when capacity()==1, i.e. exactly on this path. Verified inert here: it returns 1.0 immediately when Mpi::Size(comm)==1 (geodata.cpp:1445-1448) and its only preceding work is gated on save_adapt_mesh, which defaults false (configfile.hpp:169) and is not set. The run uses one MPI process.",
+   "ReorientTetMesh": "reachable at geodata.cpp:362 when mesh.size()==1, but gated on reorient_tet, which defaults false (configfile.hpp:206) and is not set."
+  },
+  "not_on_the_allow_list": "the driver accepts only MGMaxLevels and MGUseMesh from an approval (_SOLVER_LINEAR_OVERRIDE_KEYS). Tol, MaxIts, Type and KSPType are refused before launch, so an approval cannot change what 'converged' means."
+ },
+ "dof": {
+  "original_L2_measured": 79944,
+  "n1_measured": 84485,
+  "n1r_expected": 84485,
+  "why_expected_not_unknown": "N1 ran this exact mesh and box and its probe read 84 485. N1R must reproduce that count; a different one means the mesh is not N1's and the control is void.",
+  "budget": 250000,
+  "fraction_of_budget": 0.3379,
+  "enforcement": "the DOF probe, unchanged. It matches 'ND (p = 1): N' in Palace's 'Assembling system matrices' line, which prints the FINEST space once per run and is emitted before the multigrid hierarchy block. Removing the hierarchy removes hierarchy lines the probe never matched; N2's log confirms the probe read exactly one value, 103 411."
+ },
+ "mesh_identity_check": {
+  "why": "the whole comparison rests on N1R solving N1's mesh. That is GUARANTEED by the hash gate on the mesh file plus the identical box prescription. The four counts below are the cross-check that both did what they say: Palace prints them for the mesh it solved, and they satisfy V - E + F - T = 1. The characteristic is NECESSARY, not sufficient - it holds for the baseline and N1 too - so a mismatch voids the comparison but a match on its own does not establish identity.",
+  "expected": {
+   "vertices": 14667,
+   "edges": 84485,
+   "faces": 138118,
+   "elements": 68299
+  },
+  "euler_characteristic": 1,
+  "edges_is_the_order1_ND_dimension": true,
+  "print_shape_differs": "N1 printed 'Coarse Parallel Mesh Stats' for the loaded mesh and 'Refined Parallel Mesh Stats' for the finest. With one mesh, geodata.cpp:394-400 prints a single un-prefixed 'Parallel Mesh Stats' block carrying the REFINED counts - as N2R did."
+ },
+ "resource_uncertainty": {
+  "n1_wall_clock_s": 923.523767673,
+  "n2r_wall_clock_s": 159.0,
+  "cap_s": 2700,
+  "do_not_extrapolate": "no runtime is predicted. N2R solved a LARGER problem (103 411 DOF) on this configuration in 159.0 s, and N1R's operator is 18 % smaller, but that is context, not a prediction.",
+  "either_is_the_result": "a TIMEOUT or a RUN_FAILED is recorded and reported as the outcome. The cap, the budget and the solver configuration are not changed to rescue it."
+ },
+ "comparisons": {
+  "computed_by_the_run": "original L2 -> N1R (baseline_record = the plain L2 rung, as for N1)",
+  "computed_offline_afterwards": [
+   "N1R -> N2R, through the driver's own compare_against_baseline with N1R as baseline and N2R's committed record as the entry - the same rule, convention and tolerances",
+   "N1 vs N1R, the SAME discrete problem under two solver paths, matched with the same match_runs rule; compare_against_baseline refuses equal-depth pairs by design"
+  ],
+  "script": "scripts/controlled_sequence_comparison.py",
+  "output": "experiments/N1R-controlled-preconditioner/controlled-comparison.json",
+  "why_offline": "N2R is already recorded and its record must not be modified. The driver only compares a run against a SHALLOWER baseline at run time, and N2R is deeper than N1R.",
+  "rules_unchanged": "the same matching rule, magnitude convention and frozen tolerances. An ambiguous correspondence is reported as UNAVAILABLE and is never repaired by changing the criteria.",
+  "no_extrapolation": "no order is fitted and no continuum limit is inferred from three points. The refinement is LOCAL: stabilisation here would be local stabilisation, NOT global mesh convergence."
+ },
+ "approval_must_carry": {
+  "baseline_record": "COUPLED-LADDER-O1-L2-20260916T080802Z",
+  "sequence_records": [],
+  "baseline_mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+  "palace_refinement.solver_linear_overrides": {
+   "MGMaxLevels": 1
+  },
+  "why_the_baseline_is_L2": "N1R is a one-level run, so its baseline is the plain rung at the same level, exactly as N1's was. N1 is at the SAME depth and is refused as a baseline by design; N1 vs N1R is computed offline as a same-problem comparison instead.",
+  "why_sequence_records_is_empty": "a one-level run's sequence is its baseline comparison; a one-step sequence_records would add a report banner ('not against a plain rung') that is false for N1R."
+ },
+ "invariants_by_construction": {
+  "mesh_file": "byte-identical; refinement is a config block",
+  "existing_vertex_coordinates": "never moved; new vertices are edge midpoints only (mesh.cpp:10834-10841)",
+  "element_attributes": "inherited by children (mesh.cpp:10890,10896)",
+  "boundary_attributes": "inherited by children (BdrBisection, mesh.cpp:10959)",
+  "port_connectivity_and_L_s": "w and l come from mesh::GetBoundingBox on the port attribute (lumpedelement.cpp:22-69). That box is ORIENTED, not axis-aligned (geodata.hpp:124-128). Midpoints are convex combinations so no inserted vertex can become a new extremum; the extremal-point selection is tie-broken by list order and refinement reorders the cloud, but axes are re-sorted by descending length (geodata.cpp:1013-1014), so Lengths() is permutation-invariant. Safe for THIS rectangular planar port; not a general guarantee.",
+  "Lc": "computed from the PRE-refinement bounding box: main.cpp:311-313 orders ReadMesh -> NondimensionalizeInputs -> RefineMesh, and iodata.cpp:448-463 runs under MFEM_VERIFY(!init). Lc cannot see the refinement at all.",
+  "parent_child": "tracked by MFEM as CoarseFineTr.embeddings[i].parent (mesh.cpp:10908)",
+  "holds_at_depth_1": "these are the per-refinement arguments N1 already relied on; N1R runs the same single level on the same mesh, so nothing new is asked of them. N1 measured the outcome: +4 541 DOF, 2 621 beyond the 221 marked tets."
+ },
+ "marking": {
+  "stage_1": {
+   "criterion": "any vertex of the element inside the closed box (geodata.cpp:282-306)",
+   "marked_tets": 221,
+   "marked_fraction": 0.00343,
+   "marked_submesh": {
+    "E": 307,
+    "F": 464,
+    "T": 221
+   },
+   "material_attributes_touched": [
+    1,
+    3
+   ],
+   "accounting_gap": "boundary elements are bisected too, and Palace adds 9449 interface boundary elements at load; neither appears in the 221/64434 element count. Edge count is unaffected.",
+   "note": "measured offline on the ORIGINAL mesh; unchanged for N2's first stage"
+  }
+ },
+ "propagation": {
+  "conforming": true,
+  "why": "GeneralRefinement forces nonconforming=0 for 3D simplex meshes (mesh.cpp:10565-10567)",
+  "beyond_the_region": "YES. ParMesh::LocalRefinement (pmesh.cpp:3385) restores conformity by bisecting ANY element needing it, marked or not (pmesh.cpp:3467-3477), with an MPI face exchange (3489-3560) and boundary elements (3568-3580). This is NOT a face-only or box-only change, and its extent is not computable offline.",
+  "MaxNCLevels_and_Nonconformal": "inert for tets; the conforming branch is taken first",
+  "at_depth_1_measured_by_N1": "one closure pass. N1 gained 3 865 elements where octasection of the 221 marked tets alone would add 1 547, so the conforming closure more than doubled the refinement; N1R must reproduce the same 68 299 elements."
+ }
+}

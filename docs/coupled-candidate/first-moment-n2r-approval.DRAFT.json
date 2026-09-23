@@ -1,0 +1,63 @@
+{
+ "DRAFT": "NOT AN APPROVAL. This is the PROPOSED payload for one attempt at the first-moment diagnostic on N2R, prepared for review. It sits outside the live approval path and grants nothing while it is here. Copying it into experiments/first-moment-diagnostic/EXECUTION-APPROVAL.json is the act of approving, and only a human does that.",
+ "how_to_grant_it": "1. Review every digest below against this tree. 2. Copy this file to experiments/first-moment-diagnostic/EXECUTION-APPROVAL.json, deleting only the DRAFT, how_to_grant_it and _inputs keys and changing nothing else. 3. Commit it on palace/physical-coupled-candidate. 4. The workflow is already registered on the default branch. 5. Dispatch it at ref palace/physical-coupled-candidate, typing the confirmation string. It must be the workflow's run number 2; run number 1 was consumed by run 35721700281 and any other run refuses.",
+ "_inputs": {
+  "config_path": "experiments/first-moment-diagnostic/config.candidate.json",
+  "mesh_path": "results/COUPLED-LADDER-O1-L2-N2R-20260918T061455Z/L2/solver/coupled_chip_cell_L2.msh",
+  "patch_path": "docker/patches/first-moment-diagnostic.patch",
+  "dockerfile_path": "docker/palace-first-moment.Dockerfile"
+ },
+ "diagnostic": "first-moment",
+ "authorises": "one execution",
+ "scope": "ONE attempt at A = Re(f^H M^-1 f)/L on N2R's constrained Nedelec space. No coupling extraction, no E_C, no g, no second level, no retry.",
+ "config_sha256": "eb15031cd18c4db120e7a35d5dfa3360206c9e34c23aca804c121c0b596d8454",
+ "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+ "patch_sha256": "e8a1ad51d4e355b0426e84c70cb9c796a4915b1216bb035d5fe60913de512fee",
+ "dockerfile_sha256": "7887689075bdd0020aa4f8417469a18a49a70cacf52a7d1195136995524e3690",
+ "image_id": "sha256:5df2170a204ea2926f63639848751cb3ec4207520430b8ecdd529c239731dcf1",
+ "image_archive_sha256": "7e09f5028f4bc028b9aae52cbde6bc837e97c4d11c22622b590f04e764062834",
+ "image_source": {
+  "built_by_run_id": 35691886143,
+  "artifact_id": 10679358298,
+  "qualified_by_run_id": 35699653327,
+  "artifact_expires_utc": "2026-12-21T05:44:24Z",
+  "note": "image_id and image_archive_sha256 are DIFFERENT identifiers; no registry digest exists, the image was never pushed"
+ },
+ "execution": {
+  "runtime": "docker",
+  "np_processes": 1,
+  "omp_num_threads": 1,
+  "openblas_num_threads": 1,
+  "network": "none",
+  "pull": "never",
+  "dof_cap": 250000,
+  "wall_cap_s": 2700,
+  "dof_expected_from_baseline": 103411,
+  "dof_note": "an expectation from the N2R baseline, NOT a substitute for measuring and enforcing the cap on the actual run",
+  "no_retry": "a timeout, a DOF refusal or a nonzero exit is the recorded outcome; the attempt is spent either way",
+  "no_oversubscribe": "the synthetic fixtures' launcher option is not used here and is not authorised for this run"
+ },
+ "one_attempt": {
+  "repository": "brodieduncan88/QMHP-CEM",
+  "workflow_ref": "brodieduncan88/QMHP-CEM/.github/workflows/first-moment-n2r.yml@refs/heads/palace/physical-coupled-candidate",
+  "workflow_path": ".github/workflows/first-moment-n2r.yml",
+  "workflow_sha256": "aaf5139a8e7ae110ef55b3858a8baf9ea85c6d25540c11e493794c558539173f",
+  "run_number": 2,
+  "run_attempt": 1,
+  "ref": "refs/heads/palace/physical-coupled-candidate",
+  "code_sha256": {
+   "run_diagnostic.py": "05f21ce4a7d4b276ec1a822e27ed9a1fe87f4281ce813e7f09441532a64f3db1",
+   "run_authority.py": "4ef7bc558a0253e278fc457c8b2b3b5cc17c7ca8e7d673fe5b7e7314539c55c0"
+  },
+  "why_run_number_2": "SUPERSEDED. Run number 1 was consumed by run 35721700281, which executed correctly and was recorded UNQUALIFIED on the independent-residual check. That result stands and is preserved. This approval authorises run number 2, the next dispatch of the same workflow, and nothing else. If run 2 is consumed without launching, this approval is spent and a fresh one naming run 3 is required.",
+  "not_bound": "the commit, because this file is part of the commit it would have to name; the reviewed state is bound by the digests above instead"
+ },
+ "supersedes": {
+  "previous_run_id": 35721700281,
+  "previous_run_number": 1,
+  "previous_outcome": "UNQUALIFIED - independent relative residual 1.3313e-12 > 1e-12",
+  "what_changed": "Solver.FirstMoment.Tol 1e-12 -> 1e-14, the PCG stopping tolerance",
+  "what_did_not_change": "the 1e-12 acceptance limit, MaxIts, the image, the mesh, the patch, the caps, the resources and every scientific input",
+  "preserved": "the original record is retained as artefact 10691407527 of run 35721700281 and is not modified or deleted"
+ }
+}

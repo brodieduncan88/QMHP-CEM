@@ -1,0 +1,141 @@
+{
+ "predeclaration_sha256": "29276d45f333be5a7e64678023b5f4e87cb8d24b411bc7bd34e70b389e9e54a5",
+ "approval_sha256": "581236cb716308bedfd72cb1a7bed799e994a6d19ce3cd250c7369c4f550a5e7",
+ "approval": {
+  "authorises": "one execution of the static-only nested refinement study",
+  "run_label": "static-only nested refinement study, attempt 1 of 1",
+  "attempt": 1,
+  "prior_records": [],
+  "source_commit": "8480db691e4e9081059a08ae821c34af8f936454",
+  "repository_path": "/home/user/QMHP-CEM",
+  "not_before_utc": "2026-09-23T06:15:30+00:00",
+  "not_after_utc": "2026-09-29T06:20:30+00:00",
+  "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+  "predeclaration_sha256": "29276d45f333be5a7e64678023b5f4e87cb8d24b411bc7bd34e70b389e9e54a5",
+  "code_sha256": {
+   "study_driver.py": "97783b3b2749c6b4b21e266f4251038b216d5306dfeb8269786ea8c17304a799",
+   "nested_solver.py": "75ee657917ac86f0fc346cc086b44ecc0b24f5081ca914b478c84ae74b1cc03f",
+   "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
+   "orchestrator/manifest.py": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f"
+  },
+  "environment": {
+   "python": "3.11.15",
+   "numpy": "2.4.6",
+   "scipy": "1.17.1",
+   "threads_env": {
+    "OPENBLAS_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1"
+   },
+   "longdouble_eps_below": 1e-18,
+   "rule": "The versions the solver verification, preflight and dry run ran on. execute() refuses before spending the attempt if any differs, if a thread variable is not '1', if np.longdouble is not wider than float64 (x86-64 80-bit), or if long-double ARITHMETIC fails the probe (an x87 precision-control word set to 53 bits passes the storage-format check but fails the probe). The repository pins Python only to '3.11' (.python-version, CI), so a rebuild of .venv with another patch release makes the study refuse with nothing spent; the study then needs a new pre-declaration and approval. Push CI runs the tests on its own interpreter and is not the verified environment."
+  },
+  "invocation": "from the repository root, locally, no workflow, no network: env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 timeout --signal=KILL 3660 .venv/bin/python experiments/static-refinement-study/study_driver.py",
+  "budget": {
+   "cpu_minutes": 60,
+   "memory_GB": 12,
+   "wall_cap_minutes": 60,
+   "attempts": 1,
+   "retry": "none. A failure, a refusal after the record exists, a timeout, a budget limit or an integrity failure is the recorded outcome."
+  },
+  "after_the_run_before_the_environment_is_discarded": "Mandatory, whatever the outcome: follow predeclaration.json one_attempt.preservation_before_the_environment_is_discarded. In short: commit and push the record with ATTEMPT-SPENT.json and STUDY-APPROVAL.consumed.json; if no record directory exists (a ledger-only failure, exit 3 'no record could be created'), first copy <git common directory>/qmhp-attempts/STATIC-REFINEMENT-STUDY.json byte for byte to experiments/static-refinement-study/ATTEMPT-LEDGER-NOTE.json and commit it with them; confirm the push before the environment is discarded, and never discard it with that evidence only inside it.",
+  "does_not_authorise": [
+   "a second attempt, whatever the first one's outcome (any class, a failure, a timeout, a budget limit or an integrity failure)",
+   "running from another checkout, another commit or outside the validity window",
+   "removing or editing ATTEMPT-SPENT.json, the git-common-directory ledger entry, STUDY-APPROVAL.consumed.json or the record",
+   "writing a new STUDY-APPROVAL.json after this one has been consumed, in this checkout or in any other clone",
+   "a level 3, another mesh, another refinement method, or any change to the solver settings, tolerances, windows or rules",
+   "reading the consistency window more widely than declared, or reading S'_h as H_h unless the level-0 check is CONSISTENT",
+   "combining C_h, C'_h, S_h, S'_h or delta_h with g, f_R or any Route A output",
+   "reporting any value as E_C,F1F1",
+   "any Palace solve or workflow dispatch",
+   "any change to the withdrawn paired test or to the executed static-anchor record"
+  ]
+ },
+ "source_commit_measured": "8480db691e4e9081059a08ae821c34af8f936454",
+ "repository_path": "/home/user/QMHP-CEM",
+ "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+ "level_mesh_digests": {
+  "0": "5087fee82eae901c989ddc81f1236d44e5c273f01a72ace0091ddab53f373b54",
+  "1": "c1a93691a02c72d21849a0dad11ed36c86462e9a3b14a8e4c399f903be4a87fd",
+  "2": "1f780cdb5c1675756de95812f10113a87165008ea6f8173d9f63a8fc341f5348"
+ },
+ "band_baseline": {
+  "sum_p_over_f2_GHz-2": 0.46730189366826225,
+  "N_B": 0.999373878899728,
+  "f_max_GHz": 8.706861807,
+  "H_band_GHz2": 2.139944249209271,
+  "modes": 6
+ },
+ "static_anchor_values": {
+  "C0_F": 1.1433875970637405e-13,
+  "C1_F": 8.22021777287097e-14
+ },
+ "environment": {
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "platform": "Linux-6.18.44-fc-v37-x86_64-with-glibc2.39",
+  "longdouble_eps": 1.0842021724855044e-19,
+  "extended_precision_probe": {
+   "scalar": true,
+   "csr_matvec": true,
+   "dot": true
+  },
+  "threads_env": {
+   "OPENBLAS_NUM_THREADS": "1",
+   "OMP_NUM_THREADS": "1",
+   "MKL_NUM_THREADS": "1"
+  },
+  "code_sha256": {
+   "study_driver.py": "97783b3b2749c6b4b21e266f4251038b216d5306dfeb8269786ea8c17304a799",
+   "nested_solver.py": "75ee657917ac86f0fc346cc086b44ecc0b24f5081ca914b478c84ae74b1cc03f",
+   "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
+   "orchestrator/manifest.py": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f"
+  }
+ },
+ "invocation": {
+  "cwd": "/home/user/QMHP-CEM",
+  "argv": [
+   "experiments/static-refinement-study/study_driver.py"
+  ],
+  "parent_argv": [
+   "timeout",
+   "--signal=KILL",
+   "3660",
+   ".venv/bin/python",
+   "experiments/static-refinement-study/study_driver.py"
+  ],
+  "executable": "/home/user/QMHP-CEM/.venv/bin/python",
+  "prefix": "/home/user/QMHP-CEM/.venv",
+  "optimize": 0,
+  "dont_write_bytecode": true,
+  "pycache_prefix": "/dev/null/qmhp-no-bytecode-cache",
+  "bytecode_cache_paths": {
+   "nested_solver.py": "/dev/null/qmhp-no-bytecode-cache/home/user/QMHP-CEM/experiments/static-refinement-study/nested_solver.cpython-311.pyc",
+   "anchor_fem.py": "/dev/null/qmhp-no-bytecode-cache/home/user/QMHP-CEM/experiments/static-anchor-hypothesis/anchor_fem.cpython-311.pyc",
+   "orchestrator/manifest.py": "/dev/null/qmhp-no-bytecode-cache/home/user/QMHP-CEM/orchestrator/manifest.cpython-311.pyc"
+  },
+  "threads_env": {
+   "OPENBLAS_NUM_THREADS": "1",
+   "OMP_NUM_THREADS": "1",
+   "MKL_NUM_THREADS": "1"
+  }
+ },
+ "started_utc": "2026-09-23T06:20:48.365192+00:00",
+ "limits": {
+  "cpu_s": 3600,
+  "cpu_hard_kill_s": 3660,
+  "address_space_bytes": 12884901888,
+  "address_space_hard_bytes": 13958643712,
+  "wall_alarm_s": 3591,
+  "wall_cap_from_start_s": 3600,
+  "stop_signals": [
+   "SIGXCPU",
+   "SIGALRM",
+   "SIGTERM",
+   "SIGHUP",
+   "SIGINT"
+  ]
+ }
+}

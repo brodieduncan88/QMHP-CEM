@@ -1,0 +1,41 @@
+{
+ "label": "field artefacts of N1R and N2R: identity verified through the GitHub API; bytes NOT retrieved",
+ "artefacts": [
+  {
+   "record": "N1R",
+   "run_id": 35438882836,
+   "artifact_id": 10583481701,
+   "name": "order1-ladder-fields-35438882836-1",
+   "size_in_bytes": 95969529,
+   "api_digest": "sha256:79c0401c66ec7d281c90312a01409db8a862a9e9d4ce1163b52e4b0e1c111ff0",
+   "user_supplied_sha256": "79c0401c66ec7d281c90312a01409db8a862a9e9d4ce1163b52e4b0e1c111ff0",
+   "created_at": "2026-09-19T11:03:36Z",
+   "expires_at": "2026-12-18T10:59:48Z",
+   "head_sha": "77f0659e4a2612319a6c1a9c2d7510ab31d1ada4",
+   "record_field_output_bytes_uncompressed": 132201090
+  },
+  {
+   "record": "N2R",
+   "run_id": 35313973073,
+   "artifact_id": 10533683685,
+   "name": "order1-ladder-fields-35313973073-1",
+   "size_in_bytes": 113746865,
+   "api_digest": "sha256:1ca851c4da54210270d6834f378bd8e5cf96e4db047beb546ac69a5079eb8b0e",
+   "user_supplied_sha256": "1ca851c4da54210270d6834f378bd8e5cf96e4db047beb546ac69a5079eb8b0e",
+   "created_at": "2026-09-18T06:18:25Z",
+   "expires_at": "2026-12-17T06:13:33Z",
+   "head_sha": "581e93fa1240c4d69af61691ba4fcc7c56f5eb90",
+   "record_field_output_bytes_uncompressed": 156820134
+  }
+ ],
+ "digests_match_user_supplied": true,
+ "retrieval": {
+  "attempted_utc": "2026-09-19T22:05:25Z",
+  "method": "GitHub API download_workflow_run_artifact -> redirect to Azure blob storage; curl through the session's egress proxy",
+  "result": "CONNECT to productionresultssa19.blob.core.windows.net:443 rejected with 403 by the egress proxy (organisation network policy); the second artefact's URL is on productionresultssa10.blob.core.windows.net and was not attempted after the first denial; the GitHub web URL for the artefact returns 403 unauthenticated",
+  "bytes_retrieved": false,
+  "content_digest_recomputed": false,
+  "environment_guidance": "/root/.ccr/README.md: a 403/407 from the proxy is an organisation policy denial; report the blocked host, do not retry or route around it"
+ },
+ "correction": "an earlier note in this campaign said N1R/N2R saved no fields; the records' own summary.json (rung.field_output) states the ParaView output was written (postpro/paraview, 132 MB / 157 MB) and uploaded as a workflow artefact rather than committed"
+}

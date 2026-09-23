@@ -1,0 +1,26 @@
+{
+ "n_nodes": 93935,
+ "n_unknowns": 60608,
+ "n_tets": 515472,
+ "island_nodes": 660,
+ "ground_nodes": 32667,
+ "C_F": 8.22021777287097e-14,
+ "C_fF": 82.2021777287097,
+ "S_GHz2": 2.9785062321795324,
+ "energy_nd": 2.320997120851734,
+ "Lc_m": 0.004,
+ "solve_relative_residual": 2.1609077144551924e-15,
+ "identity": {
+  "port_voltage_of_grad_phi": 0.9999999999999999,
+  "grad_phi_on_pec_edges_max_abs": 0.0,
+  "edge_energy_vs_p1_energy_rel": 0.0,
+  "S_edge_route_GHz2": 2.9785062321795324,
+  "S_two_routes_rel": 0.0
+ },
+ "level": 1,
+ "resources_so_far": {
+  "wall_s": 16.712090519999947,
+  "cpu_s": 18.99319,
+  "max_rss_MB": 1253.2890625
+ }
+}

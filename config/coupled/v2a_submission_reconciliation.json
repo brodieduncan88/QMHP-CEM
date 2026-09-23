@@ -1,0 +1,189 @@
+{
+ "schema": "qmhp-cem.v2a-submission-reconciliation/0.1.0",
+ "subject": "QMHP-CoPro V2A G0 follow-up audit v0.1 numerical submission, received 2026-09-14",
+ "disposition": "NOT RECOVERED",
+ "status_retained": "proposed design; nothing here is a bound parameter, an approved seed or a QMHP requirement",
+ "narrative": "docs/v2a/submission-recovery.md",
+ "searched": [
+  {
+   "what": "every V2A file ever added",
+   "how": "git log --all --diff-filter=A --name-only -- docs/v2a tools/v2a",
+   "result": "six documents added 2026-09-14 (PR #1); no numerical artefact"
+  },
+  {
+   "what": "every filename in all history",
+   "how": "git log --all --name-only, filtered for capacitance/hamiltonian/five/node/sweep/matrix/audit/submission",
+   "result": "no match outside those documents and this milestone's config/coupled files"
+  },
+  {
+   "what": "unreachable objects",
+   "how": "git fsck --lost-found",
+   "result": "one dangling blob (an old README), three dangling WIP commits, one dangling tree; no V2A numerics"
+  },
+  {
+   "what": "stash and reflog",
+   "how": "git stash list; git reflog --all",
+   "result": "nothing beyond this milestone's commits"
+  },
+  {
+   "what": "other branches",
+   "how": "git branch -a; git diff --name-only main <branch>",
+   "result": "Palace execution and result records only"
+  },
+  {
+   "what": "data files of any kind",
+   "how": "repository-wide search for .npy/.npz/.h5/.mat/.csv",
+   "result": "Palace solver outputs and test fixtures only"
+  }
+ ],
+ "referenced_artefacts": [
+  {
+   "id": "five_node_capacitance_matrix",
+   "contains": "5x5 Maxwell capacitance matrix generating self-charging and coupling terms",
+   "referenced_at": "assessment L25, L45, L55",
+   "status": "ABSENT",
+   "if_recovered": "comparable only in its gauge-invariant content (the charging energies of nodes carrying a declared lumped branch, each readout mode's bare frequency, and the invariant couplings); its readout-node entries depend on a normalisation convention and are not comparable until that convention is stated; never an input to the extraction"
+  },
+  {
+   "id": "diagonalisation",
+   "contains": "coupled spectrum, dressed labels, conditional mediator lines",
+   "referenced_at": "assessment L25, L74, L82",
+   "status": "ABSENT",
+   "if_recovered": "would allow the reported conditional lines to be reproduced rather than taken on report"
+  },
+  {
+   "id": "sweep_outputs",
+   "contains": "f_C sweep 0 to 0.30 Phi0, M1 static-wait sweep, duration ladder",
+   "referenced_at": "assessment L79-L90",
+   "status": "ABSENT",
+   "if_recovered": "M1/M3 arithmetic inputs"
+  },
+  {
+   "id": "frozen_coupled_hamiltonian_file",
+   "contains": "the coded H whose hash registration item R8 must bind",
+   "referenced_at": "registration L222 (BIND, open)",
+   "status": "ABSENT",
+   "if_recovered": "closes R8"
+  },
+  {
+   "id": "ledger_inputs",
+   "contains": "parent terms behind the error ledger",
+   "referenced_at": "reported-not-reproduced.md",
+   "status": "ABSENT",
+   "if_recovered": "ledger reproduction"
+  },
+  {
+   "id": "audit_document",
+   "contains": "QMHP-CoPro V2A G0 follow-up audit v0.1 itself",
+   "referenced_at": "assessment L5-L6",
+   "status": "ABSENT",
+   "if_recovered": "the primary source of every reported value"
+  }
+ ],
+ "reconciliation": {
+  "agreements": [
+   {
+    "item": "circuit class",
+    "submission": "fluxonium-transmon-fluxonium, state-conditioned mediator",
+    "declaration": "proposed_structure nodes F1, F2, C, R1, R2",
+    "verdict": "agree"
+   },
+   {
+    "item": "node count",
+    "submission": "five nodes of a lumped capacitance matrix",
+    "declaration": "five electrical nodes",
+    "verdict": "agree"
+   },
+   {
+    "item": "encoding",
+    "submission": "Branch-A logical {0,2}, sink 1",
+    "declaration": "source-bound to master/qmhp_v158f_requirements.yaml L30-31",
+    "verdict": "agree; bound to the master, not to the submission"
+   },
+   {
+    "item": "readout modes",
+    "submission": "two, passive, effect unresolved",
+    "declaration": "R1 declared, R2 UNBOUND",
+    "verdict": "agree"
+   },
+   {
+    "item": "capacitance discipline",
+    "submission": "one Maxwell matrix generating self-charging and coupling",
+    "declaration": "coupling-definition.md sections 2 and 8.6",
+    "verdict": "agree"
+   }
+  ],
+  "corrections": [
+   {
+    "finding": "five-node, not five-mode",
+    "detail": "the V2A documents say five-NODE throughout; 'five-mode' appears nowhere in docs/v2a. A node is not a mode; the mode count in a band is what the hidden-mode screen must establish."
+   },
+   {
+    "finding": "the submission's matrix is a comparison target only in its invariant content",
+    "detail": "if recovered, only its gauge-invariant content is the same object the routes estimate; its readout-node entries are convention-dependent and are never compared between the routes or against an extraction. Never an input."
+   },
+   {
+    "finding": "f_22 does not bind the mediator",
+    "detail": "one reported conditional line cannot determine E_J_sum, E_C, asymmetry and f_C; the line is a property of the coupled spectrum. Mediator parameters stay UNBOUND with no seed proposed."
+   },
+   {
+    "finding": "reported values are not seeds",
+    "detail": "f_22, Delta_min, n_C, zeta and the label overlaps remain in reported-not-reproduced.md and appear as values nowhere in the declaration."
+   },
+   {
+    "finding": "registration BIND fields remain open",
+    "detail": "R1.1-R1.7, R1b, R1c.1-R1c.3, R2.1-R2.3, R2.5, R3.1-R3.3, R7 and all R8 fields are unbound; the flux split is recorded as presumptive."
+   },
+   {
+    "finding": "port conventions are this milestone's, not the submission's",
+    "detail": "registration R2 governs a crosstalk transfer function; the declared ports are EM lumped ports for extraction. They must not be conflated."
+   }
+  ],
+  "would_change_if_recovered": [
+   "binding the mediator parameters from a primary source instead of leaving them UNBOUND",
+   "comparing the extraction's gauge-invariant quantities against the submission's, with both provenances and the readout-node convention stated",
+   "closing registration item R8 by hashing the coupled Hamiltonian file"
+  ],
+  "changes_now": "none; recovery failed, so nothing in the declaration changes"
+ },
+ "documents_held": [
+  {
+   "path": "docs/v2a/G0-followup-audit-v0.1-deep-research-assessment.md",
+   "sha256": "3bcb4dab2b0957853a24ebf68d764361adb77ded9c1dc719d90469528a455611"
+  },
+  {
+   "path": "docs/v2a/m3-coherent-prescreen-registration.md",
+   "sha256": "e56d4809d02873f7a3783a2e4a5905b109997145070a4e24856c01de0efe4011"
+  },
+  {
+   "path": "docs/v2a/verification.md",
+   "sha256": "7e2429de2442e0c8447e25d95eaeb5d2f05bd831be01fc3860c03e4bab03b02b"
+  },
+  {
+   "path": "docs/v2a/references.md",
+   "sha256": "9cea4090e5384f8378197bf35e19b5901a2250ae361c96c358032de16a38fc72"
+  },
+  {
+   "path": "docs/v2a/reported-not-reproduced.md",
+   "sha256": "c82c66d7ab79be8d15e811744f3039fe807dea30030c4a279926c71a244c689b"
+  },
+  {
+   "path": "docs/v2a/README.md",
+   "sha256": "1825f0d0f36c08eb56fe88c4142232a285b623bcb098140ba4155b6498471712"
+  },
+  {
+   "path": "tools/v2a/check_assessment_arithmetic.py",
+   "sha256": "06ab44601ea3988816b42b9ec68c27e8e6e0f83c63095db6cb4d9e058048327d"
+  }
+ ],
+ "standing_restrictions_unchanged": [
+  "physical G0 remains BLOCKED",
+  "M3 keeps its conditional go for one bounded prescreen once the registration is bound",
+  "AMD-E disabled until a native V2A gate exists",
+  "no 196.773 ns Surface-17 insertion",
+  "no Branch-A-versus-Branch-C architecture claim",
+  "no conversion of stress values into hardware measurements",
+  "no fabrication-yield statement from the component-box sweep",
+  "no PED/AMD-E observability calculation"
+ ]
+}

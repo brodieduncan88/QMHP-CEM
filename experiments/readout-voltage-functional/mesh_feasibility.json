@@ -1,0 +1,146 @@
+{
+ "mesh": "results/COUPLED-LADDER-O1-L2-N1R-20260919T110053Z/L2/solver/coupled_chip_cell_L2.msh",
+ "units": "mm (mesh units, Model.L0 = 1e-3)",
+ "bounding_box_mm": {
+  "min": [
+   -2.0,
+   -2.0,
+   -0.43
+  ],
+  "max": [
+   2.0,
+   2.0,
+   1.5
+  ],
+  "extent": [
+   4.0,
+   4.0,
+   1.93
+  ],
+  "Lc_mm_palace_default": 4.0
+ },
+ "port_F1": {
+  "triangles": 25,
+  "area_mm2": 0.0008000000000000007,
+  "declared_area_mm2": 0.0008,
+  "bbox_mm": {
+   "min": [
+    -0.61,
+    -0.115,
+    0.0
+   ],
+   "max": [
+    -0.59,
+    -0.07500000000000001,
+    0.0
+   ]
+  },
+  "z_max_abs": 0.0
+ },
+ "z0_faces": {
+  "unique": 20944,
+  "shared_by_two_tets": 20944,
+  "pec": 11424,
+  "port": 71,
+  "etched": 9449
+ },
+ "readout_rectangles": {
+  "Gamma_R_plusY": {
+   "x": [
+    -0.485,
+    -0.405
+   ],
+   "y": [
+    0.05,
+    0.08
+   ],
+   "direction": "-Y (from ground at +Y to the pad at -Y)",
+   "width_mm": 0.07999999999999996,
+   "gap_mm": 0.03,
+   "faces": 60,
+   "area_mm2": 0.0023794528954144316,
+   "expected_area_mm2": 0.002399999999999999,
+   "all_faces_etched": true,
+   "pec_faces_inside": 0,
+   "edge_length_mm": {
+    "min": 0.004166878267681567,
+    "median": 0.008917028383640377,
+    "max": 0.01826910839758362
+   },
+   "distinct_node_y_levels_in_gap": 23,
+   "pad_side_strip_faces_pec": 24,
+   "pad_side_strip_faces_total": 24,
+   "ground_side_strip_faces_pec": 22,
+   "ground_side_strip_faces_total": 22,
+   "corner_region_x[-0.505,-0.485]_beyond_gap": {
+    "faces": 23,
+    "pec": 0,
+    "prediction": "island etch, i.e. no ground: 0 pec faces"
+   }
+  },
+  "Gamma_R_minusY": {
+   "x": [
+    -0.485,
+    -0.405
+   ],
+   "y": [
+    -0.08,
+    -0.05
+   ],
+   "direction": "+Y (from ground at -Y to the pad at +Y)",
+   "width_mm": 0.07999999999999996,
+   "gap_mm": 0.03,
+   "faces": 60,
+   "area_mm2": 0.0024226800916883826,
+   "expected_area_mm2": 0.002399999999999999,
+   "all_faces_etched": true,
+   "pec_faces_inside": 0,
+   "edge_length_mm": {
+    "min": 0.004166878267668555,
+    "median": 0.008660979337203556,
+    "max": 0.018258873386486203
+   },
+   "distinct_node_y_levels_in_gap": 23,
+   "pad_side_strip_faces_pec": 24,
+   "pad_side_strip_faces_total": 24,
+   "ground_side_strip_faces_pec": 22,
+   "ground_side_strip_faces_total": 22,
+   "corner_region_x[-0.505,-0.485]_beyond_gap": {
+    "faces": 23,
+    "pec": 0,
+    "prediction": "island etch, i.e. no ground: 0 pec faces"
+   }
+  }
+ },
+ "pad_interior": {
+  "faces": 78,
+  "pec": 78,
+  "etched": 0
+ },
+ "island_interior": {
+  "faces": 148,
+  "pec": 148,
+  "etched": 0
+ },
+ "island_pad_gap": {
+  "faces": 54,
+  "pec": 0,
+  "expected_pec": 0
+ },
+ "refinement_box_vs_readout_rectangles": {
+  "box_mm": {
+   "min": [
+    -0.62,
+    -0.125,
+    -0.01
+   ],
+   "max": [
+    -0.58,
+    -0.065,
+    0.01
+   ]
+  },
+  "overlaps_Gamma_R": false,
+  "note": "N1R (1 level) and N2R (2 levels) refine only this box; the readout rectangles lie outside it, so their discretisation is the base L2 mesh in both records"
+ }
+}

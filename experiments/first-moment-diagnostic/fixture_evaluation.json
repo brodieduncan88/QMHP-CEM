@@ -1,0 +1,436 @@
+{
+ "label": "FIXTURE EVALUATION - THE EVALUATOR RECOVERS A KNOWN OMITTED MOMENT AND FAILS CLOSED OTHERWISE",
+ "fixture": {
+  "n_true": 36,
+  "n_essential": 6,
+  "n_modes_total": 30,
+  "n_modes_saved": 15
+ },
+ "truth": {
+  "A_total_nd": 5.760403548249147e-06,
+  "A_saved_nd": 5.585292722124025e-06,
+  "omitted_first_moment_exact_nd": 1.751108261251215e-07
+ },
+ "evaluator": {
+  "verdict": "OMITTED_MOMENT_CERTIFIED_LOWER_BOUND",
+  "all_checks_passed": true,
+  "A_direct_minus_A_saved_nd": 1.751108261251793e-07,
+  "certified_omitted_moment_lower_bound_nd": 1.7511082496548265e-07,
+  "error_vs_truth_nd": 5.7809998650106e-20,
+  "certified_lower_bound_is_below_the_truth": true,
+  "interpretation": "the modes absent from the saved set carry at least 2.491579e-05 GHz^2 of first moment"
+ },
+ "spoiled_records_are_unqualified": {
+  "functional": {
+   "verdict": "UNQUALIFIED",
+   "failed": [
+    "functional reproduces GetVoltage (complex, PEC-constrained field)"
+   ]
+  },
+  "null_space": {
+   "verdict": "UNQUALIFIED",
+   "failed": [
+    "sampled K >= q q^H check ran and passed on every sample"
+   ]
+  },
+  "convergence": {
+   "verdict": "UNQUALIFIED",
+   "failed": [
+    "linear solve converged"
+   ]
+  },
+  "status": {
+   "verdict": "UNQUALIFIED",
+   "failed": [
+    "record status is COMPLETED"
+   ]
+  },
+  "provenance_missing": {
+   "verdict": "UNQUALIFIED",
+   "failed": [
+    "provenance carries no unavailable field",
+    "embedded PALACE_PATCH_SHA256 matches the required value"
+   ]
+  },
+  "provenance_mismatch": {
+   "verdict": "UNQUALIFIED",
+   "failed": [
+    "embedded PALACE_COMMIT matches the required value"
+   ]
+  },
+  "developer_build": {
+   "verdict": "UNQUALIFIED",
+   "failed": [
+    "run came from the image identity directory (/opt/palace), not a developer build"
+   ]
+  },
+  "required_image_id_not_supplied": {
+   "verdict": "UNQUALIFIED",
+   "failed": [
+    "image_id measured and matches the required value"
+   ]
+  },
+  "measured_mesh_digest_mismatch": {
+   "verdict": "UNQUALIFIED",
+   "failed": [
+    "mesh_sha256 measured and matches the required value"
+   ]
+  }
+ },
+ "sloppy_solve": {
+  "relative_residual": 1e-06,
+  "verdict": "UNQUALIFIED",
+  "failed": [
+   "independent relative residual <= 1e-12"
+  ]
+ },
+ "negative_discrepancy": {
+  "verdict": "INCONSISTENT",
+  "difference_GHz2": -8.196238658326853e-07,
+  "threshold_GHz2": -1.6511527189666263e-13,
+  "interpretation": "INCONSISTENT: A_direct is materially below A_saved, which the non-negative mode weights forbid. Either the mass solve is under-converged (A_computed underestimates A_exact by r^H M^-1 r) or the functional, space or normalisation does not match the saved record. NOT an omitted moment."
+ },
+ "difference_inside_the_combined_uncertainty": {
+  "verdict": "NOT_RESOLVED",
+  "interpretation": "NOT RESOLVED: the difference lies inside the combined uncertainty; this is not evidence of a small tail",
+  "tail_upper_bound": "UNAVAILABLE"
+ },
+ "the_old_quantity_was_not_a_bound": [
+  {
+   "lhs": -1.000000082740371e-10,
+   "uncertified_estimate": 1e-13,
+   "eps": 1e-16,
+   "delta": 1e-13,
+   "relative_residual": 1e-13,
+   "estimate_is_a_bound": false,
+   "certified_bound_holds": true,
+   "violation_factor": 1000.000082740371
+  },
+  {
+   "lhs": -9.999999999998899e-05,
+   "uncertified_estimate": 1e-06,
+   "eps": 1e-08,
+   "delta": 1e-06,
+   "relative_residual": 9.999999999995e-07,
+   "estimate_is_a_bound": false,
+   "certified_bound_holds": true,
+   "violation_factor": 99.99999999998899
+  }
+ ],
+ "full_evaluation_of_the_good_record": {
+  "checks": [
+   {
+    "check": "record schema complete",
+    "passed": true,
+    "detail": {
+     "missing": []
+    }
+   },
+   {
+    "check": "record status is COMPLETED",
+    "passed": true,
+    "detail": {
+     "status": "COMPLETED"
+    }
+   },
+   {
+    "check": "provenance carries no unavailable field",
+    "passed": true,
+    "detail": {
+     "PALACE_VERSION": "0.13.0",
+     "PALACE_COMMIT": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+     "PALACE_PATCH": "first-moment-diagnostic",
+     "PALACE_PATCH_SHA256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+   },
+   {
+    "check": "run came from the image identity directory (/opt/palace), not a developer build",
+    "passed": true,
+    "detail": {
+     "dir": "/opt/palace"
+    }
+   },
+   {
+    "check": "embedded PALACE_VERSION matches the required value",
+    "passed": true,
+    "detail": {
+     "record": "0.13.0",
+     "required": "0.13.0"
+    }
+   },
+   {
+    "check": "embedded PALACE_COMMIT matches the required value",
+    "passed": true,
+    "detail": {
+     "record": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+     "required": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac"
+    }
+   },
+   {
+    "check": "embedded PALACE_PATCH matches the required value",
+    "passed": true,
+    "detail": {
+     "record": "first-moment-diagnostic",
+     "required": "first-moment-diagnostic"
+    }
+   },
+   {
+    "check": "embedded PALACE_PATCH_SHA256 matches the required value",
+    "passed": true,
+    "detail": {
+     "record": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "required": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+   },
+   {
+    "check": "config_sha256 measured and matches the required value",
+    "passed": true,
+    "detail": {
+     "measured": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+     "required": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+   },
+   {
+    "check": "mesh_sha256 measured and matches the required value",
+    "passed": true,
+    "detail": {
+     "measured": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+     "required": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+   },
+   {
+    "check": "patch_sha256 measured and matches the required value",
+    "passed": true,
+    "detail": {
+     "measured": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "required": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+   },
+   {
+    "check": "dockerfile_sha256 measured and matches the required value",
+    "passed": true,
+    "detail": {
+     "measured": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+     "required": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+   },
+   {
+    "check": "image_id measured and matches the required value",
+    "passed": true,
+    "detail": {
+     "measured": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+     "required": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    }
+   },
+   {
+    "check": "functional reproduces GetVoltage (complex, PEC-constrained field)",
+    "passed": true,
+    "detail": {
+     "relative_error": 0.0,
+     "tolerance": 1e-10
+    }
+   },
+   {
+    "check": "sampled K >= q q^H check ran and passed on every sample",
+    "passed": true,
+    "detail": {
+     "min_relative_gap": 0.9999839964795035,
+     "tolerance": -1e-10,
+     "note": "sampled runtime check, not a proof for every vector"
+    }
+   },
+   {
+    "check": "linear solve converged",
+    "passed": true,
+    "detail": {
+     "iterations": 17
+    }
+   },
+   {
+    "check": "independent relative residual <= 1e-12",
+    "passed": true,
+    "detail": {
+     "relative_residual": 1.279034924178295e-13
+    }
+   },
+   {
+    "check": "solution vanishes on the essential dofs",
+    "passed": true,
+    "detail": {
+     "essential_norm": 0.0,
+     "norm": 0.0012186957948739756
+    }
+   },
+   {
+    "check": "Free == True - Essential",
+    "passed": true,
+    "detail": {
+     "True": 36,
+     "Essential": 6,
+     "Free": 30
+    }
+   },
+   {
+    "check": "true dofs within the 250000 hard cap",
+    "passed": true,
+    "detail": {
+     "true": 36,
+     "cap": 250000
+    }
+   },
+   {
+    "check": "same true-dof count as the saved eigenmode record",
+    "passed": true,
+    "detail": {
+     "true": 36,
+     "expected": 36
+    }
+   },
+   {
+    "check": "port inductance matches the configured L (henries)",
+    "passed": true,
+    "detail": {
+     "L_H": 1.034463628974047e-07,
+     "expected": 1.034463628974047e-07
+    }
+   },
+   {
+    "check": "tc_ns == 1e9 Lc / c0",
+    "passed": true,
+    "detail": {
+     "tc_ns": 0.01334256380791072,
+     "expected": 0.01334256380791072
+    }
+   },
+   {
+    "check": "FrequencyScale_GHz == 1/(2 pi tc)",
+    "passed": true,
+    "detail": {
+     "scale": 11.92836289810609,
+     "expected": 11.92836289810609
+    }
+   },
+   {
+    "check": "InductanceScale_H == mu0 Lc",
+    "passed": true,
+    "detail": {
+     "scale": 5.026548245743669e-09,
+     "expected": 5.026548245743669e-09
+    }
+   },
+   {
+    "check": "A_GHz2_per_nd == FrequencyScale^2",
+    "passed": true,
+    "detail": {}
+   },
+   {
+    "check": "A_GHz2 == A_nd * A_GHz2_per_nd",
+    "passed": true,
+    "detail": {
+     "A_GHz2": 0.0008196238658327395,
+     "A_nd": 5.760403548249205e-06
+    }
+   },
+   {
+    "check": "certified lower bound == A_nd - Re(x^H r)/L, converted consistently",
+    "passed": true,
+    "detail": {
+     "lower_nd": 5.760403548249145e-06,
+     "A_nd": 5.760403548249205e-06,
+     "err_ub_nd": 6.01030385882176e-20
+    }
+   },
+   {
+    "check": "no certified upper bound is claimed",
+    "passed": true,
+    "detail": {
+     "value": "UNAVAILABLE"
+    }
+   },
+   {
+    "check": "L_H == L_nd * InductanceScale_H",
+    "passed": true,
+    "detail": {}
+   },
+   {
+    "check": "wall time within the 2700 s hard cap",
+    "passed": true,
+    "detail": {
+     "wall_s": 12.5,
+     "cap_s": 2700
+    }
+   }
+  ],
+  "all_checks_passed": true,
+  "verdict": "OMITTED_MOMENT_CERTIFIED_LOWER_BOUND",
+  "interpretation": "the modes absent from the saved set carry at least 2.491579e-05 GHz^2 of first moment",
+  "A_direct": {
+   "A_nd": 5.760403548249205e-06,
+   "A_GHz2": 0.0008196238658327395,
+   "certified_lower_bound_GHz2": 0.000819623865832731
+  },
+  "A_saved": {
+   "central_GHz2": 0.0007947080745942061,
+   "modes": [
+    12,
+    25,
+    4,
+    16,
+    11,
+    21,
+    28,
+    9,
+    27,
+    23,
+    29,
+    5,
+    8,
+    18,
+    7
+   ]
+  },
+  "difference": {
+   "A_direct_minus_A_saved_GHz2": 2.491579123853338e-05,
+   "relative_to_A_saved": 0.031352130467852464,
+   "certified_omitted_moment_lower_bound_GHz2": 2.4915791073524965e-05,
+   "materially_negative_threshold_GHz2": -1.6511527189666263e-13
+  },
+  "mass_solve_uncertainty": {
+   "identity": "A_computed - A_exact = (Re(x^H r) - r^H M^-1 r) / L, with r = M x - f",
+   "x_dot_r_nd": 1.236920534145518e-18,
+   "certified_error_upper_bound_GHz2": 8.551811417959024e-18,
+   "certified_lower_bound_A_GHz2": 0.000819623865832731,
+   "certified_upper_bound_A_GHz2": "UNAVAILABLE",
+   "uncertified_error_estimate_GHz2": 1.1527189666256573e-16,
+   "why_the_estimate_is_not_a_bound": "the identity's r^H M^-1 r term is bounded by ||r||^2 / lambda_min(M_free), which exceeds ||x|| ||r|| whenever lambda_min(M_free) < ||r||/||x||",
+   "sufficient_condition_for_the_estimate_to_be_a_bound": {
+    "condition": "lambda_min(M_free) >= ||r|| / ||x||",
+    "threshold": 1.1225779250340174e-11,
+    "lambda_min_measured": false
+   },
+   "why_no_certified_upper_bound": "a certified upper bound on A_exact requires r^H M^-1 r, hence a lower bound on lambda_min(M_free) or a second solve; neither is authorised or performed"
+  },
+  "A_saved_uncertainty": {
+   "central_GHz2": 0.0007947080745942061,
+   "printed_precision_interval_GHz2": [
+    0.0007947080744292062,
+    0.0007947080747592061
+   ],
+   "halfwidth_GHz2": 1.6500000000000005e-13,
+   "source": "synthetic fixture, printed precision emulated",
+   "eigensolver_convergence": {
+    "propagated_into_A": "UNQUANTIFIED"
+   },
+   "kept_separate_from_mass_solve_uncertainty": true
+  },
+  "tail_upper_bound": "UNAVAILABLE",
+  "not_established_here": [
+   "no upper bound on A_exact is certified, so a small difference NEVER establishes a small omitted tail; it establishes only 'not resolved'",
+   "the eigensolver convergence error of A_saved is not propagated into A_saved's interval and must be accounted for before any tail conclusion",
+   "the sampled K >= q q^H check is a runtime sanity check on finitely many vectors, not a proof; the proof is the separate quadrature-parity argument"
+  ],
+  "N": "not measured by this diagnostic",
+  "E_C": "UNAVAILABLE",
+  "g": "UNAVAILABLE"
+ }
+}

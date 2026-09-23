@@ -1,0 +1,147 @@
+{
+ "label": "SYNTHETIC",
+ "reference_circuit_B": [
+  [
+   2.25,
+   0.41,
+   1.735591282047179
+  ],
+  [
+   0.41,
+   15.209999999999999,
+   2.0
+  ],
+  [
+   1.735591282047179,
+   2.0,
+   64.0
+  ]
+ ],
+ "modes_GHz": [
+  1.4804049723186885,
+  3.8906312508409373,
+  8.008207638911093
+ ],
+ "p_F": [
+  0.9985164153503578,
+  0.0006835846496421581,
+  0.0007999999999999996
+ ],
+ "exact_identification": {
+  "a": 2.25,
+  "beta": [
+   15.128153287238975,
+   64.08184671276102
+  ],
+  "ctil2": [
+   0.11471111402084723,
+   3.065665984298036
+  ]
+ },
+ "rows": [
+  {
+   "delta": 0.00078,
+   "f_far_GHz": 9.5,
+   "sum_p_in_band": 0.99922,
+   "in_band_only": {
+    "rel_shift_a": -0.030360469930648996,
+    "rel_shift_beta_R": 7.880345083182051e-08,
+    "rel_shift_ctil2_R": -0.000268907355513496,
+    "rel_shift_f_R": 3.94017247717926e-08,
+    "rel_shift_g": -0.00013448241608071676
+   },
+   "a_with_far_mode_rel_to_reference": 0.030506666666666585
+  },
+  {
+   "delta": 0.00078,
+   "f_far_GHz": 12.9,
+   "sum_p_in_band": 0.99922,
+   "in_band_only": {
+    "rel_shift_a": -0.05458257136282706,
+    "rel_shift_beta_R": 3.9128686366064755e-08,
+    "rel_shift_ctil2_R": -0.0001335395064997213,
+    "rel_shift_f_R": 1.956434303451715e-08,
+    "rel_shift_g": -6.678176401697655e-05
+   },
+   "a_with_far_mode_rel_to_reference": 0.056908799999999836
+  },
+  {
+   "delta": 0.00078,
+   "f_far_GHz": 20.0,
+   "sum_p_in_band": 0.99922,
+   "in_band_only": {
+    "rel_shift_a": -0.12186333729779762,
+    "rel_shift_beta_R": 1.537971593336133e-08,
+    "rel_shift_ctil2_R": -5.249246488525879e-05,
+    "rel_shift_f_R": 7.689857861592486e-09,
+    "rel_shift_g": -2.625042171200409e-05
+   },
+   "a_with_far_mode_rel_to_reference": 0.13788666666666652
+  },
+  {
+   "delta": 0.00078,
+   "f_far_GHz": 50.0,
+   "sum_p_in_band": 0.99922,
+   "in_band_only": {
+    "rel_shift_a": -0.46447980048806115,
+    "rel_shift_beta_R": 2.382049254836099e-09,
+    "rel_shift_ctil2_R": -8.130515502998724e-06,
+    "rel_shift_f_R": 1.1910246122681656e-09,
+    "rel_shift_g": -4.065861524571446e-06
+   },
+   "a_with_far_mode_rel_to_reference": 0.8658866666666667
+  },
+  {
+   "delta": 0.0001,
+   "f_far_GHz": 9.5,
+   "sum_p_in_band": 0.9999,
+   "in_band_only": {
+    "rel_shift_a": -0.003995484327961678,
+    "rel_shift_beta_R": 1.0094951814222697e-08,
+    "rel_shift_ctil2_R": -3.445388196273294e-05,
+    "rel_shift_f_R": 5.047475770680876e-09,
+    "rel_shift_g": -1.7229613062164084e-05
+   },
+   "a_with_far_mode_rel_to_reference": 0.003911111111111075
+  },
+  {
+   "delta": 0.0001,
+   "f_far_GHz": 12.9,
+   "sum_p_in_band": 0.9999,
+   "in_band_only": {
+    "rel_shift_a": -0.00734242963339471,
+    "rel_shift_beta_R": 5.012795119903702e-09,
+    "rel_shift_ctil2_R": -1.7109307130279e-05,
+    "rel_shift_f_R": 2.5063975339634226e-09,
+    "rel_shift_g": -8.555943344479289e-06
+   },
+   "a_with_far_mode_rel_to_reference": 0.0072959999999999935
+  },
+  {
+   "delta": 0.0001,
+   "f_far_GHz": 20.0,
+   "sum_p_in_band": 0.9999,
+   "in_band_only": {
+    "rel_shift_a": -0.0174689652913496,
+    "rel_shift_beta_R": 1.970372276366577e-09,
+    "rel_shift_ctil2_R": -6.725303137946424e-06,
+    "rel_shift_f_R": 9.851861548781926e-10,
+    "rel_shift_g": -3.363149814084032e-06
+   },
+   "a_with_far_mode_rel_to_reference": 0.01767777777777783
+  },
+  {
+   "delta": 0.0001,
+   "f_far_GHz": 50.0,
+   "sum_p_in_band": 0.9999,
+   "in_band_only": {
+    "rel_shift_a": -0.1000090008100729,
+    "rel_shift_beta_R": 3.051822459691969e-10,
+    "rel_shift_ctil2_R": -1.0416670366422026e-06,
+    "rel_shift_f_R": 1.5259105090592584e-10,
+    "rel_shift_g": -5.209099495084857e-07
+   },
+   "a_with_far_mode_rel_to_reference": 0.11101111111111114
+  }
+ ]
+}

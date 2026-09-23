@@ -1,0 +1,27 @@
+{
+ "label": "EXTERNALLY PRODUCED POSTPROCESSING DIAGNOSTIC; NOT REPRODUCED IN THIS REPOSITORY'S ANALYSIS ENVIRONMENT",
+ "supplied_package": {
+  "file_name_as_uploaded": "e6c11246-QMHP_Readout_Field_Diagnostic.zip",
+  "upload_path": "/root/.claude/uploads/7e301b81-9cc3-5878-8c8a-f1390dcdb988/",
+  "received_utc": "2026-09-20T03:14Z",
+  "sha256": "4408146e016aa5079ab4fada7cc509fdc006342ea43071c6c65be671ec21f97e",
+  "size_bytes": 15429,
+  "internal_manifest": "supplied/manifest.sha256 (all four entries verified OK on unpacking)"
+ },
+ "field_archives": {
+  "N1R_fields_35438882836.zip": {"registered_sha256": "79c0401c66ec7d281c90312a01409db8a862a9e9d4ce1163b52e4b0e1c111ff0", "present_in_analysis_environment": false},
+  "N2R_fields_35313973073.zip": {"registered_sha256": "1ca851c4da54210270d6834f378bd8e5cf96e4db047beb546ac69a5079eb8b0e", "present_in_analysis_environment": false},
+  "consequence": "evaluate_readout_fields.py was NOT run here; supplied/evaluation/results.json is the external evaluator's output and is labelled as such throughout"
+ },
+ "local_verifications": {
+  "functional_json_blob_sha_at_5bc50d0": "4a605e89513236695a17a66f261003bec6b6abc8 (matches the script's pin)",
+  "N1R_port_V_blob_sha_at_5bc50d0": "12286f083959af9491c94be42d3496303d76f770 (matches)",
+  "N2R_port_V_blob_sha_at_5bc50d0": "a16a65f0a5f1b93eb55e72aed0a376ff229f9642 (matches)",
+  "port_V_reference_values_in_script": "equal to the committed port-V.csv values for m1, m2 of both records",
+  "surfaces_widths_scale_in_script": "equal to functional.json: +Y [-0.485,-0.405]x[0.05,0.08] sign -1; -Y [-0.485,-0.405]x[-0.08,-0.05] sign +1; w_R 0.080; w_F 0.020; sqrt(Z0)/lambda = 19.409541814844687/4",
+  "vtk_in_locked_environment": false,
+  "shapely_in_locked_environment": "2.1.2",
+  "interface_attribute_25": "Palace v0.13.0 geodata.cpp adds boundary elements at material interfaces (substrate/vacuum at z = 0) with new attributes; the z = 0 etched faces inside the readout rectangles therefore appear in the boundary export, which the external diagnostic used"
+ },
+ "review": "review_external_diagnostic.py derives the assessment tables from supplied/evaluation/results.json by arithmetic only and writes review.json"
+}

@@ -1,0 +1,143 @@
+{
+ "label": "EXTERNAL FULL-FIELD CORRESPONDENCE - VERIFIED AS FAR AS IT CAN BE WITHOUT THE FIELDS",
+ "supersedes": "ONLY the transport limitation of experiments/po1-n2r-correspondence: that the archives were unreachable and so no overlap existed. An overlap now exists, computed elsewhere. Nothing else in that record is withdrawn, and PO1's committed record and its pre-declared INCONCLUSIVE FOR MODE IDENTITY verdict are untouched.",
+ "correspondence": {
+  "partner": [
+   "PO1 m1",
+   "N2R m2"
+  ],
+  "overlap": 0.9999270208301023,
+  "rms_optimal_complex_scale": 0.012081101515848293,
+  "optimal_complex_scale": "(-0.417565897424355+0.908566325469898j)",
+  "phase_rad": 2.0015947109775283,
+  "po1_m1_overlap_row": [
+   0.012036416098798484,
+   0.9999270208301023,
+   6.103798051003929e-06,
+   1.0972634173482695e-05,
+   5.9978858917932886e-05,
+   0.0002871278172601694
+  ],
+  "status": "ESTABLISHED BY EXTERNAL COMPUTATION, VERIFIED HERE ONLY IN ITS ALGEBRA AND PROVENANCE"
+ },
+ "not_verifiable_here": "the field values themselves. No field sample was read in this environment - the egress policy still denies the archives. Every overlap number above is the package's; this record verifies its manifest, provenance, constants, export shape and internal algebra, and nothing about the fields.",
+ "checks": {
+  "package_manifest": {
+   "README.md": {
+    "expected": "cab4e67e4ec6725033eca26d19964ea64351696b7ed212b7d9cacaba8910f1b9",
+    "actual": "cab4e67e4ec6725033eca26d19964ea64351696b7ed212b7d9cacaba8910f1b9",
+    "ok": true
+   },
+   "field_overlap_check.py": {
+    "expected": "107d37ffa0a63dd56d033091c25223454270a582662fdae74b298ab10832d1e1",
+    "actual": "107d37ffa0a63dd56d033091c25223454270a582662fdae74b298ab10832d1e1",
+    "ok": true
+   },
+   "results.json": {
+    "expected": "b6cf1595c81e3c5de19ad0e1487454fcbdad9ffc8a4e0b0e3c6475259f00b4d1",
+    "actual": "b6cf1595c81e3c5de19ad0e1487454fcbdad9ffc8a4e0b0e3c6475259f00b4d1",
+    "ok": true
+   }
+  },
+  "artefact_digests_match_this_repositorys_api_reading": {
+   "PO1": {
+    "package": "a156768cbd0723c9988ce4617db1d1c07f29d5376d2cc5e7bf6ee25906ea8dc8",
+    "recorded_here_before_the_package_existed": "a156768cbd0723c9988ce4617db1d1c07f29d5376d2cc5e7bf6ee25906ea8dc8",
+    "ok": true
+   },
+   "N2R": {
+    "package": "1ca851c4da54210270d6834f378bd8e5cf96e4db047beb546ac69a5079eb8b0e",
+    "recorded_here_before_the_package_existed": "1ca851c4da54210270d6834f378bd8e5cf96e4db047beb546ac69a5079eb8b0e",
+    "ok": true
+   }
+  },
+  "constants_match_the_repository": {
+   "substrate_permittivity": {
+    "declared": 11.45,
+    "used_by_the_script": 11.45,
+    "ok": true
+   },
+   "attribute_numbers": {
+    "vacuum": 1,
+    "substrate": 3,
+    "script_maps": "attr 1 -> 1.0, attr 3 -> 11.45",
+    "ok": true
+   },
+   "saved_mode_count": {
+    "config_Solver_Eigenmode_Save": 6,
+    "script_loops_over": 6,
+    "ok": true
+   }
+  },
+  "export_shape": {
+   "points": 337780,
+   "cells": 84445,
+   "points_equals_four_times_cells": true,
+   "why_it_matters": "per-element vertex samples, not node-averaged ones. A lowest-order Nedelec field is affine inside a tetrahedron, so P1 interpolation from four per-element vertex values reproduces it exactly and the P1 mass formula the script uses is the exact integral. Node averaging would have destroyed the normal-component jumps and made that formula an approximation."
+  },
+  "mesh_identity_AS_REPORTED_BY_THE_PACKAGE": {
+   "coords_exact": true,
+   "connectivity_exact": true,
+   "attributes_exact": true,
+   "caveat": "these three booleans are the package's own output. They were not verified here, because verifying them needs the meshes this environment cannot read."
+  },
+  "internal_algebra": {
+   "rms_is_the_identity_sqrt_one_minus_overlap_squared": {
+    "reported_rms": 0.012081101515848293,
+    "sqrt_1_minus_ov2": 0.012081101515844113,
+    "ok": true,
+    "consequence": "the RMS carries no information the overlap does not. It is a restatement, not a second measurement, and must not be cited as corroboration."
+   },
+   "bessel_over_the_saved_set": {
+    "sum_of_squared_overlaps": 0.9999990084961693,
+    "at_most_one": true,
+    "squared_norm_outside_the_saved_span": 9.915038307051205e-07
+   },
+   "bound_on_the_N2R_modes_the_archive_does_not_contain": {
+    "which": "N2R m7, m8, m9 - the run converged 9 modes and Solver.Eigenmode.Save is 6",
+    "loose_bound_orthogonal_to_m2_only": 0.012081101515844113,
+    "tighter_bound_from_bessel": 0.000995742853705273,
+    "m2_exceeds_the_tighter_bound_by": 1004.2020558914982,
+    "why_the_bound_is_valid": "the inner product is the epsilon-weighted volume integral, which IS the mass-matrix inner product of the generalised eigenproblem, so N2R's eigenvectors are orthogonal under it. Bessel's inequality then bounds every unsaved mode's overlap by the norm PO1 m1 leaves outside the saved span."
+   },
+   "best_and_second_best": {
+    "best": {
+     "n2r_mode": 2,
+     "overlap": 0.9999270208301023
+    },
+    "second": {
+     "n2r_mode": 1,
+     "overlap": 0.012036416098798484
+    },
+    "ratio": 83.07514567645417
+   }
+  },
+  "completes_the_prior_exclusion_analysis": {
+   "prior_surviving_candidates": [
+    2,
+    5,
+    8
+   ],
+   "resolution": {
+    "2": "overlap 0.999927020830 - the partner",
+    "5": "overlap 0.000059978859 - refuted by the field data",
+    "8": "not in the archive; bounded at <= 0.000995743 by Bessel over the saved set - cannot be the partner"
+   },
+   "note": "the prior analysis used only frequency-free port-face scalars and could not separate these three. It is completed, not contradicted."
+  },
+  "frequency_arithmetic_against_this_repositorys_own_computation": {
+   "K_minus_Q": {
+    "package_signed_Hz": 900.5855940991125,
+    "computed_here_signed_Hz": 900.5855940991125,
+    "ok": true
+   },
+   "K_minus_Q_over_N": {
+    "package_signed_Hz": 1874.895696918344,
+    "computed_here_signed_Hz": 1874.895696918344,
+    "ok": true
+   },
+   "note": "the same arithmetic was done here independently, before the package arrived."
+  }
+ },
+ "all_checks_pass": true
+}

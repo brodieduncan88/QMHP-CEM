@@ -1,0 +1,101 @@
+{
+  "schema": "qmhp.offline-readout-faraday-consistency/0.1",
+  "classification": "OFFLINE POSTPROCESSING DIAGNOSTIC; NOT COUPLING EXTRACTION",
+  "repository_reference_commit": "476ee3314f8eff7d88b2c6aa47c5550a006f47ff",
+  "source_archives": {
+    "N1R": {
+      "file": "N1R_fields_35438882836.zip",
+      "sha256": "79c0401c66ec7d281c90312a01409db8a862a9e9d4ce1163b52e4b0e1c111ff0",
+      "frequency_GHz": {
+        "1": 1.515753609,
+        "2": 3.887131643
+      }
+    },
+    "N2R": {
+      "file": "N2R_fields_35313973073.zip",
+      "sha256": "1ca851c4da54210270d6834f378bd8e5cf96e4db047beb546ac69a5079eb8b0e",
+      "frequency_GHz": {
+        "1": 1.526014889,
+        "2": 3.887370723
+      }
+    }
+  },
+  "predeclaration_corrections": {
+    "orientation": "The declared loop traverses the right-hand gap from +Y to -Y and returns around the west side, so it is clockwise viewed from +z. Its Stokes normal is therefore -z. With Palace \u2207\u00d7E = -i\u03c9B, comparison to +z B_z is V+ - V- = +i\u03c9 \u03a6_z, equivalently retain -i\u03c9 only if flux is defined with the -z normal.",
+    "spanning_surface_attributes": "A_west geometrically includes the existing P_F1 lumped-port face (attribute 10, area \u22480.00080000156 mm\u00b2). Restricting A_west to interface attribute 25 omits that piece and loses about 4\u20135.5% of the weighted magnetic flux."
+  },
+  "geometry": {
+    "A_west_area_mm2": 0.0284,
+    "weighted_strip_area_each_mm2": 0.0012,
+    "lambda_Lc_over_L0": 4.0,
+    "sqrt_Z0": 19.409541814844687,
+    "Lc_m": 0.004
+  },
+  "comparisons": {
+    "N1R": {
+      "1": {
+        "measured_Vplus_minus_Vminus_V": {
+          "real": -0.006431886657529119,
+          "imag": -0.0010413533872530448
+        },
+        "faraday_prediction_V": {
+          "real": -0.006431880540889469,
+          "imag": -0.0010413523049445262
+        },
+        "relative_complex_disagreement": 9.533453095811348e-07,
+        "absolute_complex_disagreement_V": 6.2116561675331974e-09,
+        "prediction_over_measurement_magnitude": 0.999999046756578,
+        "phase_error_degrees": -7.985680976912755e-07,
+        "attribute10_fraction_of_weighted_flux_magnitude": 0.04044747094996809
+      },
+      "2": {
+        "measured_Vplus_minus_Vminus_V": {
+          "real": -0.0036641906726426754,
+          "imag": -0.003249888542704138
+        },
+        "faraday_prediction_V": {
+          "real": -0.0036641577510205074,
+          "imag": -0.003249862525518979
+        },
+        "relative_complex_disagreement": 8.567386998094843e-06,
+        "absolute_complex_disagreement_V": 4.196101916972306e-08,
+        "prediction_over_measurement_magnitude": 0.9999914464123187,
+        "phase_error_degrees": 2.7849507851510276e-05,
+        "attribute10_fraction_of_weighted_flux_magnitude": 0.05217935179565623
+      }
+    },
+    "N2R": {
+      "1": {
+        "measured_Vplus_minus_Vminus_V": {
+          "real": -0.0036327734520553885,
+          "imag": -0.005663198587270185
+        },
+        "faraday_prediction_V": {
+          "real": -0.0036327701961752484,
+          "imag": -0.005663194111482307
+        },
+        "relative_complex_disagreement": 8.226176955158053e-07,
+        "absolute_complex_disagreement_V": 5.534747746639923e-09,
+        "prediction_over_measurement_magnitude": 0.9999991787920108,
+        "phase_error_degrees": 2.7581317956279052e-06,
+        "attribute10_fraction_of_weighted_flux_magnitude": 0.041891509693339025
+      },
+      "2": {
+        "measured_Vplus_minus_Vminus_V": {
+          "real": -0.00279527936721502,
+          "imag": 0.004161963404459623
+        },
+        "faraday_prediction_V": {
+          "real": -0.002795243587954371,
+          "imag": 0.0041619185606291504
+        },
+        "relative_complex_disagreement": 1.1442691094480362e-05,
+        "absolute_complex_disagreement_V": 5.736832422207665e-08,
+        "prediction_over_measurement_magnitude": 0.9999885957668844,
+        "phase_error_degrees": -5.370716241159682e-05,
+        "attribute10_fraction_of_weighted_flux_magnitude": 0.054923165784342295
+      }
+    }
+  },
+  "conclusion": "After correcting only the loop orientation and including every boundary piece geometrically inside the predeclared spanning surface, the Faraday prediction reproduces V+\u2212V\u2212 with relative complex disagreement from 8.23e-7 to 1.14e-5 across both modes and both records. Thus the 5\u20137 mV mirror-surface difference is the magnetic-flux/path term of the stored discrete EM solution to the precision of the exported data and post-processing. This does not choose a readout path, establish continuum convergence, validate the three-mode reduction, or authorize a coupling extraction."
+}

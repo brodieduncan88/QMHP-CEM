@@ -1,0 +1,60 @@
+{
+ "label": "MOMENT IDENTITIES - DERIVED AND VERIFIED ON SYNTHETIC PENCILS ONLY",
+ "supplied_package_status": "the small review package named in the task did NOT reach this environment; the uploads directory holds only the three earlier archives. Nothing here is a cross-check against it, and it is not treated as authority or as reproduced.",
+ "trials": 200,
+ "dimension": 40,
+ "nullity": 6,
+ "seed": 20260920,
+ "identities": {
+  "zeroth_moment": "N = sum_m p_m = q^H K^+ q",
+  "first_moment": "A = sum_m lambda_m p_m = q^H M^-1 q",
+  "max_relative_error_N": 1.5656661467541213e-13,
+  "max_relative_error_A": 1.1615613375173378e-15,
+  "both_verified": true,
+  "why_A_is_the_easy_one": "sum_m lambda_m p_m = sum_m (q^H E_m)^2 is a Parseval sum over the M-orthonormal basis, so the first moment needs only M - no K, no pseudoinverse, no null-space handling beyond the condition below. The zeroth moment needs K^+."
+ },
+ "assumptions": {
+  "completeness": "the sums run over ALL eigenpairs of the constrained pencil, not a filtered subset. sum_m E_m E_m^H = M^-1 holds only for the complete set.",
+  "null_space": "q^H E_0 = 0 for every zero mode. Without it p_0 diverges and neither sum exists; with it q lies in range(K), which is what makes q^H K^+ q independent of which generalised inverse is used. This is an ASSUMPTION about the QMHP model, not something these synthetic trials establish for it.",
+  "normalisation": "E_m^H M E_m = 1, unit electric energy. Any other scaling rescales p_m and both moments; Palace's reported p already carries its own normalisation, which must be reconciled rather than assumed to match.",
+  "projection": "the divergence-free projector changes the space the returned eigenvectors span. If it removes a direction q has a component along, the returned set is not complete FOR q and both sums fall short by that component - silently.",
+  "units": "lambda_m = omega_m^2. A therefore carries the units of lambda; the GHz^2 moment the existing analysis uses is A / (2*pi*1e9)^2, which is sum_m p_m f_m^2 with f_m in GHz. N is dimensionless."
+ },
+ "how_the_identities_fail": {
+  "filtered_subset_keeps_a_third_of_the_modes": {
+   "fraction_of_N_recovered": {
+    "min": 0.819399673338699,
+    "max": 0.9915972633637112,
+    "median": 0.9455196837585337
+   },
+   "fraction_of_A_recovered": {
+    "min": 0.38428559370390303,
+    "max": 0.8655023607347159,
+    "median": 0.6024908428118811
+   },
+   "reading": "a filtered subset is not a basis. Note the two fractions differ: filtering by weight preserves N far better than A, because A is weighted by lambda and the discarded high-lambda modes carry little weight but much moment."
+  },
+  "q_with_a_kernel_component": {
+   "max_fraction_of_q_in_the_kernel": 0.9786491900691744,
+   "ratio_of_the_sum_to_the_quadratic_form_N": {
+    "min": 0.030674929918891373,
+    "max": 2.019389169676569,
+    "median": 0.2941313526430679
+   },
+   "ratio_of_the_sum_to_the_quadratic_form_A": {
+    "min": 0.0213508099308255,
+    "max": 0.6339553394625465,
+    "median": 0.08145329106930549
+   },
+   "reading": "both identities break. The sums omit the kernel component entirely while the quadratic forms do not, so they disagree by exactly that component - and p_0 itself is infinite, so the 'sum' is only defined by dropping it."
+  },
+  "eigenvectors_not_M_normalised": {
+   "ratio_of_the_sum_to_the_quadratic_form_N": {
+    "min": 0.7386234535174624,
+    "max": 3.5302030867751797,
+    "median": 1.757396961840231
+   },
+   "reading": "an arbitrary per-mode rescaling breaks N by an arbitrary factor."
+  }
+ }
+}

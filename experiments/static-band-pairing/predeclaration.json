@@ -1,0 +1,150 @@
+{
+ "record": "paired static-vs-band refinement test - pre-declaration",
+ "status": "PREPARED. NOT APPROVED. NOT EXECUTED. No Palace solve and no QMHP static solve has been run for this test; no refined QMHP mesh exists at the time this file was frozen.",
+ "question": "Under nested Palace box refinement of the island-gap-port region (levels 0, 1, 2 of the committed L2 mesh), does Palace's band first moment move with the static quantity computed on the SAME meshes, as the spectral-moment identity predicts, and by how much do both move?",
+ "theory": {
+  "lumped_port_theorem": "For the declared LUMPED inductor (rank-one port term f f^T/L) and a port whose Dirichlet voltage is 1: N = sum p = 1; sum over all modes of p/lambda = L C_h; hence S_h = 1/(L C_h) is exactly the participation-weighted HARMONIC mean of lambda over the complete spectrum, and S_h <= B_k/N_k for every truncation to the lowest k modes (Cauchy-Schwarz). Verified to 1e-12 on synthetic geometries (static-band-pairing.md section 3).",
+  "palace_port": "Palace assembles the port as a distributed sheet, int (1/L_s)|E_t|^2 over the face. For it the first-moment Parseval identity still holds exactly, but the -1 moment is perturbed: delta = S_h * sum p/lambda - 1 was +2.3 % and +3.0 % on synthetic slabs and is at least +6.6e-4 on the committed L2 mesh (band only). S_h <= B_k/N_k is therefore not guaranteed for Palace's pencil.",
+  "lumped_reduction": "In a lumped two-node reduction B/S -> C_FF (C^-1)_FF = 1/(1 - k^2): the ratio S/B is NOT expected to converge to 1 but to 1 - k^2_eff, further perturbed by delta. The committed rungs show H/B = 0.991-0.996.",
+  "prediction_not_target": "The co-movement is a PREDICTION of this theory. S_h is computed without reading any band value; the windows below were fixed before any refined QMHP mesh or value existed."
+ },
+ "configuration": {
+  "base_mesh": "results/COUPLED-LADDER-O1-L2-20260916T080802Z/L2/solver/coupled_chip_cell_L2.msh",
+  "base_mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+  "base_config": "results/COUPLED-LADDER-O1-L2-20260916T080802Z/L2/solver/config.json",
+  "base_config_sha256": "0ae6e3ac793e4348983719a36de8a940bd72c92049d446f5262c4608c8e4ea6f",
+  "levels": [
+   0,
+   1,
+   2
+  ],
+  "box": {
+   "min_mm": [
+    -0.7,
+    -0.125,
+    -0.02
+   ],
+   "max_mm": [
+    -0.5,
+    0.1,
+    0.02
+   ],
+   "why": "island bbox [-0.675,-0.075]..[-0.525,0.075] at z = 0, widened by 0.025 mm (the whole 0.020 mm gap to the ground edge) and down to 0.010 mm below the port face (y = -0.115); z within one gap width. Palace marks an element if any vertex is inside (geodata.cpp) and splits it into 8 with conforming closure.",
+   "marked_base_tets": 1880
+  },
+  "palace_deltas": {
+   "Solver.Eigenmode.Save": 0,
+   "Solver.Linear.MGMaxLevels": 1,
+   "Model.Refinement.Boxes": "levels 1 and 2 only: one box, Levels = level",
+   "Model.Refinement.SaveAdaptMesh": "levels 1 and 2 only: true",
+   "why": "Save 0 only disables field output. MGMaxLevels 1 is the N1R/N2R setting and keeps the mesh vector at capacity 1, which is what makes Palace call RebalanceMesh and write the refined mesh (geodata.cpp RefineMesh, main.cpp). Every other key is the committed L2 config, unchanged."
+  },
+  "palace": {
+   "commit": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+   "image": "docker/palace.Dockerfile, built by the workflow as the ladder builds it",
+   "mpi_processes": 1
+  },
+  "static_model": {
+   "eps_r": {
+    "1": 1.0,
+    "3": 11.45
+   },
+   "pec_attrs": [
+    2,
+    4
+   ],
+   "port_attr": 10,
+   "direction": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "L0_m": 0.001,
+   "L_H": 1.0345665367517793e-07
+  },
+  "static_engine": "experiments/static-anchor-hypothesis/static_capacitance.py (static_capacitance), unchanged; direct sparse solve on the level mesh",
+  "config_sha256": {
+   "0": "4e7153ed186cf8583be63330a08405cacc72d2506791c27c445108744dfce453",
+   "1": "7908827a3a966bec91b37a126637c67ac8862ef47018bb9fb17bb0451a2b21b3",
+   "2": "9412f87e45ea3bfc754de0cd4f1b2203ba313efd48818ffad7e07163d8b50312"
+  }
+ },
+ "measured": {
+  "per_level": "S_h (static, GHz^2), C_h (fF), B_h = sum|p| f^2 / sum|p| over the 6 saved modes, H_h = 1/sum(|p|/f^2), N_B, f1, the Palace DOF count",
+  "decisive": {
+   "g": "S_2 / S_0 (static growth, the power condition)",
+   "delta_h": "S_h * sum_B(|p|/f^2) - 1 at each level",
+   "r_h": "S_h / B_h at each level; drift = max_h |r_h - r_0|"
+  },
+  "descriptive_never_decisive": "B_2/B_0, H_2/H_0, level-to-level differences and their ratio, a three-point extrapolation (valid only in the asymptotic regime), the rigorous one-sided bound S_continuum >= S_2 of the meshed model (nesting verified), and e^2/(2 C_2) as a lower bound on E_C,F1F1 under assumption A-R"
+ },
+ "relation_to_registered_E_C": "Unchanged from the static-anchor pre-declaration: e^2/(2 C_h) <= e^2/(2 C_FF) <= E_C,F1F1 under A-R, with the Schur gap 1/(1 - k^2) unmeasured. In the lumped reduction B corresponds to (C^-1)_FF / L_F, H to 1/(C_FF L_F). E_C,F1F1 and g stay UNAVAILABLE; nothing here is combined with the conditional Route A coupling.",
+ "integrity": {
+  "dof_cap_per_level": 450000,
+  "modes_saved": 6,
+  "eigen_backward_error_max": 1e-06,
+  "N_B_excess_tol": 1e-06,
+  "port_voltage_abs_tol": 1e-09,
+  "pec_edge_abs_tol": 1e-12,
+  "identity_rel_tol": 1e-09,
+  "solve_residual_tol": 1e-10,
+  "nested_monotone_rel_tol": 1e-12,
+  "galerkin_identity_rel_tol": 1e-10,
+  "level0_static_reproduces_GHz2": 2.1413534596006496,
+  "level0_reproduction_rel_tol": 1e-10,
+  "level0_band_f1_reproduces_GHz": 1.461886595,
+  "level0_band_f1_rel_tol": 1e-05,
+  "meaning": "Any failure makes the record UNQUALIFIED: no verdict is read. So does a missing, non-finite or non-positive decisive value, an unverified nesting step, a digest mismatch, or a level that did not complete."
+ },
+ "outcomes": {
+  "power_min_static_growth": 1.05,
+  "supports_max_abs_delta": 0.01,
+  "supports_max_ratio_drift": 0.01,
+  "contradicts_abs_delta_above": 0.03,
+  "contradicts_ratio_drift_above": 0.03,
+  "table": [
+   "any integrity failure: UNQUALIFIED",
+   "g < 1.05: UNRESOLVED (LOW POWER) - the box refinement did not move the static quantity by 5 %, so co-movement cannot be distinguished from no movement; the static error then lies outside the box",
+   "g >= 1.05, max|delta| <= 0.01 and drift <= 0.01: SUPPORTS - Palace's band moves with the static quantity on the same meshes and its sheet port stays within 1 % of the lumped element in the -1 moment",
+   "g >= 1.05 and (max|delta| > 0.03 or drift > 0.03): CONTRADICTS - the band and the static quantity decouple, or Palace's sheet port departs from the lumped element by more than 3 %",
+   "otherwise: UNRESOLVED"
+  ],
+  "why_these_windows": "The lumped theory allows r_h to change only through the band's dispersion (H/B moved by at most 0.5 % across the committed rungs) and delta; 1 % gives that margin. 3 % is the sheet-vs-lumped perturbation of a synthetic port face comparable to the whole structure, i.e. a Palace port that no longer behaves as a lumped element. 5 % static growth is a fifth of what one uniform refinement produced (x1.39).",
+  "power": "Stated before the result: SUPPORTS needs the static quantity to move; if the box misses the region carrying the static error the test returns LOW POWER, not SUPPORTS."
+ },
+ "feasibility": {
+  "dof_estimate": {
+   "level0": 79944,
+   "level1": "96k-119k",
+   "level2": "227k-433k",
+   "basis": "ideal 8x growth of 1880 marked tets, times the 1.4-2.4x closure factor measured on the N1R/N2R port box"
+  },
+  "time_estimate": "level 0 about 80 s (L2 record), level 1 about 3 min, level 2 about 10-17 min (N2R: 103k DOF in 159 s, scaled as DOF^1.3); static solves seconds; image build as the ladder",
+  "level3": "1.3M-2.9M DOF: infeasible on the runner; not part of this test"
+ },
+ "budget": {
+  "per_level_solve_cap_s": 2700,
+  "workflow_timeout_min": 180,
+  "attempts": 1,
+  "retry": "none - a failure, a timeout, a DOF refusal or an integrity failure is the recorded outcome",
+  "one_attempt_mechanism": "the approval binds the workflow run number and attempt 1; the record directory is created before any solve"
+ },
+ "stop_conditions": [
+  "any refusal or integrity failure: record it and stop",
+  "no further level, box, mesh or config without a new pre-declaration and a new approval",
+  "no reinterpretation of the windows after the result"
+ ],
+ "expected_evidence": [
+  "results/STATIC-BAND-PAIRING-<UTC>/level{0,1,2}/: config.json, palace_run.json, palace/ (eig.csv, port-EPR.csv, domain-E.csv, palace.json, palace_log.txt), mesh.json (the mesh's sha256; the refined MFEM meshes are uploaded as workflow artefacts, never committed), static.json, band.json, nesting.json (levels 1, 2)",
+  "summary.json with the per-level table, integrity list and verdict",
+  "manifest.sha256 written by the driver at execution time, verified before exit, then by `cem verify-results` in the workflow",
+  "on any failure: failure.json, then the manifest"
+ ],
+ "cannot_establish": [
+  "E_C,F1F1 or g",
+  "that Route A is valid or invalid",
+  "convergence (three levels of LOCAL refinement)",
+  "anything outside the box",
+  "the physical device's capacitance (the model is the meshed geometry)"
+ ]
+}

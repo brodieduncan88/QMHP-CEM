@@ -1,0 +1,14 @@
+{
+ "label": "EXTERNALLY PRODUCED POSTPROCESSING DIAGNOSTIC; NOT REPRODUCED IN THIS REPOSITORY'S ANALYSIS ENVIRONMENT",
+ "supplied_package": {
+  "file_name_as_uploaded": "5152ecd9-QMHP_Faraday_Consistency_Diagnostic.zip",
+  "upload_path": "/root/.claude/uploads/7e301b81-9cc3-5878-8c8a-f1390dcdb988/",
+  "received_utc": "2026-09-20T05:51Z",
+  "sha256": "08d160d2f32c443ccb6881f4e0c99ddb84b0a586b7766739459cfd676ed3e7cc",
+  "size_bytes": 5287,
+  "internal_manifest": "supplied/manifest.sha256 (all four entries verified OK on unpacking)"
+ },
+ "field_archives": {"present_in_analysis_environment": false, "consequence": "no field integral was reproduced here; review.json holds archive-free checks only"},
+ "repository_reference_commit_claimed_by_package": "476ee3314f8eff7d88b2c6aa47c5550a006f47ff",
+ "local_verifications": "review.json: loop orientation (clockwise from +z), A_west geometry and the P_F1 face inside it, equality of the measured differences with the earlier diagnostic, recomputed relative disagreements, mode frequencies equal to the committed eig.csv"
+}

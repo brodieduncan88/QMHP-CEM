@@ -1,0 +1,26 @@
+{
+ "authorises": "one execution of the static-anchor test",
+ "run_label": "static-anchor test, attempt 1 of 1",
+ "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+ "predeclaration_sha256": "6f31470a38a58cfbe33eb7bee61c6ec06eeea428bdfbd943b39e52e3e4868f29",
+ "code_sha256": {
+  "static_capacitance.py": "54dd810f93f8d7af967cdfffb9fac78d0a583c8003c104e0c00002e2b8e98aab",
+  "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1"
+ },
+ "invocation": "from the repository root, locally, no workflow, no network: timeout --signal=KILL 1860 .venv/bin/python experiments/static-anchor-hypothesis/static_capacitance.py",
+ "budget": {
+  "cpu_minutes": 10,
+  "memory_GB": 8,
+  "wall_cap_minutes": 30,
+  "attempts": 1,
+  "retry": "none - a failure, a timeout or an integrity failure is the recorded outcome"
+ },
+ "does_not_authorise": [
+  "a second attempt, whatever the first one's outcome (any verdict, a failure, a timeout or an integrity failure)",
+  "a further refinement level, another mesh or any parameter change",
+  "any change to the outcome windows or integrity thresholds",
+  "combining C_h or S_h with g, f_R or any Route A output",
+  "reporting any value as E_C,F1F1",
+  "any Palace solve or workflow dispatch"
+ ]
+}

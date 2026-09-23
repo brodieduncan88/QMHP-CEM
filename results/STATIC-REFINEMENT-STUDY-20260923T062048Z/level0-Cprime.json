@@ -1,0 +1,34 @@
+{
+ "kind": "Cprime",
+ "n_unknowns": 4543,
+ "energy_nd": 3.230512778090043,
+ "energy_nd_extended": 3.2305127780900436,
+ "evaluation_error_bound_nd": 4.792208382176585e-15,
+ "evaluation_bound_terms_nd": {
+  "matvec": 1.5034059202735275e-15,
+  "dot": 2.4812668643336452e-15,
+  "float64_vs_extended": 8.027481766081971e-16
+ },
+ "extended_precision_probe_ok": true,
+ "certificate": {
+  "residual_2norm": 9.10177134086687e-16,
+  "rhs_2norm": 2.2383544467561616,
+  "relative_residual": 4.066277954350447e-16,
+  "asymmetry_max": 5.553729028258858e-17,
+  "error_bound_nd": 3.695471958632873e-21,
+  "roundoff_floor_nd": 3.627217071900466e-21
+ },
+ "total_error_bound_nd": 4.792212077648543e-15,
+ "total_error_bound_rel": 1.4834214896626479e-15,
+ "C_F": 1.1441426753772744e-13,
+ "C_fF": 114.41426753772744,
+ "S_GHz2": 2.1399402708491486,
+ "port_voltage": 0.9999999999999998,
+ "phi_abs_max": 1.0,
+ "solution_sha256": "7ea9e6b1c57054e8b72c799a3c97188a758b5d55a1b5beff06a9079945fcfd68",
+ "solver": {
+  "method": "direct"
+ },
+ "cpu_s": 0.030468963999998877,
+ "wall_s": 0.03340151799999802
+}

@@ -265,6 +265,231 @@ def z_polarisation_fraction(samples: list[ProbeSample]) -> dict[int, float | Non
     }
 
 
+@dataclass(frozen=True)
+class ParticipationRow:
+    """One mode's energy participation in each lumped inductive port."""
+
+    mode: int
+    participation: dict[int, float]
+
+
+def parse_port_epr_csv(path: Path) -> list[ParticipationRow]:
+    """Parse Palace's ``port-EPR.csv``.
+
+    Header at v0.13.0 is ``m`` followed by one ``p[j]`` column per lumped port
+    with a nonzero inductance. Palace's definition is
+    ``p_mj = sign(Re I) * 0.5 L |I|^2 / (E_elec + E_cap)``; it is the energy
+    participation Route A inverts, and its normalisation is checked against
+    ``domain-E.csv`` rather than assumed (see
+    ``docs/coupled-candidate/extraction-routes.md`` §2.2).
+    """
+    path = Path(path)
+    if not path.exists():
+        raise PalaceOutputError(
+            f"{path} was not written; Palace reports energy participation only for a lumped "
+            f"port with a nonzero inductance"
+        )
+    with path.open(newline="") as fh:
+        rows = [[c.strip() for c in row] for row in csv.reader(fh) if any(c.strip() for c in row)]
+    if len(rows) < 2:
+        raise PalaceOutputError(f"{path} holds a header but no modes")
+    header = rows[0]
+    port_columns: dict[int, int] = {}
+    for i, column in enumerate(header):
+        match = re.match(r"^p\[(\d+)\]$", column.replace(" ", ""))
+        if match:
+            port_columns[int(match.group(1))] = i
+    if not port_columns:
+        raise PalaceOutputError(f"{path} has no p[j] column; header was {header}")
+    exact_m = [i for i, c in enumerate(header) if c.strip().lower() == "m"]
+    if not exact_m:
+        raise PalaceOutputError(f"{path} has no mode column; header was {header}")
+    out: list[ParticipationRow] = []
+    for row in rows[1:]:
+        out.append(
+            ParticipationRow(
+                mode=int(_to_float(row[exact_m[0]])),
+                participation={j: _to_float(row[i]) for j, i in port_columns.items()},
+            )
+        )
+    return out
+
+
+@dataclass(frozen=True)
+class DomainEnergyRow:
+    """One mode's energy decomposition from ``domain-E.csv``."""
+
+    index: float
+    electric_J: float
+    magnetic_J: float
+    capacitive_J: float
+    inductive_J: float
+
+    @property
+    def equipartition_residual(self) -> float:
+        """``|(E_elec + E_cap) - (E_mag + E_ind)| / total``.
+
+        Palace normalises the participation by the electric-side energy; that
+        equals the inductive-side normalisation only when this residual is
+        small, so the check is made rather than assumed.
+        """
+        total = self.electric_J + self.magnetic_J + self.capacitive_J + self.inductive_J
+        if total <= 0:
+            return math.inf
+        left = self.electric_J + self.capacitive_J
+        right = self.magnetic_J + self.inductive_J
+        return abs(left - right) / total
+
+
+def parse_domain_energy_csv(path: Path) -> list[DomainEnergyRow]:
+    """Parse the global energy columns of Palace's ``domain-E.csv``."""
+    path = Path(path)
+    if not path.exists():
+        raise PalaceOutputError(f"{path} was not written")
+    with path.open(newline="") as fh:
+        rows = [[c.strip() for c in row] for row in csv.reader(fh) if any(c.strip() for c in row)]
+    if len(rows) < 2:
+        raise PalaceOutputError(f"{path} holds a header but no rows")
+    header = rows[0]
+
+    def column(*needles: str) -> int:
+        for i, c in enumerate(header):
+            flat = c.replace(" ", "").lower()
+            if all(n in flat for n in needles):
+                return i
+        raise PalaceOutputError(f"{path} has no column matching {needles}; header was {header}")
+
+    i_elec, i_mag = column("e_elec", "(j)"), column("e_mag", "(j)")
+    i_cap, i_ind = column("e_cap", "(j)"), column("e_ind", "(j)")
+    return [
+        DomainEnergyRow(
+            index=_to_float(row[0]),
+            electric_J=_to_float(row[i_elec]),
+            magnetic_J=_to_float(row[i_mag]),
+            capacitive_J=_to_float(row[i_cap]),
+            inductive_J=_to_float(row[i_ind]),
+        )
+        for row in rows[1:]
+    ]
+
+
+@dataclass(frozen=True)
+class PhasorRow:
+    """One mode's complex port phasor from ``port-I.csv`` or ``port-V.csv``.
+
+    The phasor is kept complex. An eigenvector is defined only up to an overall
+    complex scale, so the *phase* of a single port phasor is a property of the
+    solver's arbitrary normalisation and not of the mode; only phase-invariant
+    combinations (magnitudes, and ratios between phasors of the same mode) are
+    comparable between two independent solves. The raw complex value is
+    preserved here so that a later analysis can say which it used.
+    """
+
+    mode: int
+    phasor: dict[int, complex]
+
+
+def parse_port_phasor_csv(path: Path, symbol: str) -> list[PhasorRow]:
+    """Parse ``port-I.csv`` (``symbol='I'``) or ``port-V.csv`` (``symbol='V'``).
+
+    Header at v0.13.0 is ``m`` followed by ``Re{X[j]} (unit)``/``Im{X[j]} (unit)``
+    pairs, one pair per lumped port.
+    """
+    path = Path(path)
+    if not path.exists():
+        raise PalaceOutputError(f"{path} was not written")
+    with path.open(newline="") as fh:
+        rows = [[c.strip() for c in row] for row in csv.reader(fh) if any(c.strip() for c in row)]
+    if len(rows) < 2:
+        raise PalaceOutputError(f"{path} holds a header but no rows")
+    header = rows[0]
+
+    real: dict[int, int] = {}
+    imag: dict[int, int] = {}
+    pattern = re.compile(rf"^(Re|Im)\{{{re.escape(symbol)}\[(\d+)\]\}}", re.IGNORECASE)
+    for i, column in enumerate(header):
+        match = pattern.match(column.replace(" ", ""))
+        if not match:
+            continue
+        (real if match.group(1).lower() == "re" else imag)[int(match.group(2))] = i
+    if not real or set(real) != set(imag):
+        raise PalaceOutputError(
+            f"{path} has no complete Re/Im column pair for {symbol}[j]; header was {header}"
+        )
+
+    exact_m = [i for i, c in enumerate(header) if c.strip().lower() == "m"]
+    if not exact_m:
+        raise PalaceOutputError(f"{path} has no mode column; header was {header}")
+    i_m = exact_m[0]
+
+    parsed: list[PhasorRow] = []
+    for row in rows[1:]:
+        parsed.append(
+            PhasorRow(
+                mode=int(round(_to_float(row[i_m]))),
+                phasor={j: complex(_to_float(row[real[j]]), _to_float(row[imag[j]])) for j in real},
+            )
+        )
+    return parsed
+
+
+@dataclass(frozen=True)
+class SurfaceParticipationRow:
+    """One mode's interface-dielectric participations from ``surface-Q.csv``.
+
+    Palace writes ``p_surf[i] = integral(f_i) dS / (E_elec + E_cap)`` for each
+    configured interface index, i.e. already normalised by the same denominator
+    as the lumped-port participation, so the two are directly comparable.
+    """
+
+    mode: int
+    participation: dict[int, float]
+    quality_factor: dict[int, float]
+
+
+def parse_surface_q_csv(path: Path) -> list[SurfaceParticipationRow]:
+    """Parse Palace's ``surface-Q.csv``.
+
+    Header at v0.13.0 is ``m`` followed by a ``p_surf[i]``/``Q_surf[i]`` pair
+    per configured interface-dielectric index.
+    """
+    path = Path(path)
+    if not path.exists():
+        raise PalaceOutputError(
+            f"{path} was not written; Palace writes it only when "
+            f"Boundaries.Postprocessing.Dielectric is configured"
+        )
+    with path.open(newline="") as fh:
+        rows = [[c.strip() for c in row] for row in csv.reader(fh) if any(c.strip() for c in row)]
+    if len(rows) < 2:
+        raise PalaceOutputError(f"{path} holds a header but no rows")
+    header = rows[0]
+
+    p_columns: dict[int, int] = {}
+    q_columns: dict[int, int] = {}
+    for i, column in enumerate(header):
+        flat = column.replace(" ", "")
+        match = re.match(r"^([pQ])_surf\[(\d+)\]$", flat)
+        if match:
+            (p_columns if match.group(1) == "p" else q_columns)[int(match.group(2))] = i
+    if not p_columns:
+        raise PalaceOutputError(f"{path} has no p_surf[i] column; header was {header}")
+
+    exact_m = [i for i, c in enumerate(header) if c.strip().lower() == "m"]
+    if not exact_m:
+        raise PalaceOutputError(f"{path} has no mode column; header was {header}")
+    i_m = exact_m[0]
+
+    return [
+        SurfaceParticipationRow(
+            mode=int(round(_to_float(row[i_m]))),
+            participation={k: _to_float(row[v]) for k, v in p_columns.items()},
+            quality_factor={k: _to_float(row[v]) for k, v in q_columns.items()},
+        )
+        for row in rows[1:]
+    ]
+
+
 def read_metadata_json(path: Path) -> dict[str, Any]:
     """Palace's ``palace.json`` where present; empty dict where not."""
     path = Path(path)

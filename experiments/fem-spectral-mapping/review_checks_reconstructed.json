@@ -1,0 +1,111 @@
+{
+ "label": "SYNTHETIC counterexamples and identity checks; no QMHP record is read",
+ "supplied_file_status": "QMHP_46bf8b5_review_checks.py did NOT reach this environment; the three items are reconstructed from their descriptions and verified independently. Reconciliation with the supplied file is outstanding.",
+ "check_1_normalisation_rank_implication": [
+  {
+   "case": "minimal: K_port = diag(1,1,0), K_curl = diag(0,0,1), q = e1",
+   "rank_K_port": 2,
+   "K_port_minus_Q_is_PSD": true,
+   "N_from_pseudoinverse": 1.0,
+   "N_from_weights": 1.0,
+   "N_equals_one": true
+  },
+  {
+   "case": "rank-3 port term, general M, extra directions orthogonal to u",
+   "rank_K_port": 3,
+   "K_port_minus_Q_is_PSD": true,
+   "N_from_pseudoinverse": 1.0,
+   "N_from_weights": 1.0,
+   "N_equals_one": true
+  },
+  {
+   "case": "equality condition on 200 random draws",
+   "identity_checked": "N - N^2 = u^T K_curl u + u^T (K_port - Q) u,  u = K^+ q",
+   "max_abs_violation": 3.1086244689504383e-15,
+   "all_N_le_one": true,
+   "min_N": 0.038617603373972645,
+   "max_N": 0.9923733368134551
+  }
+ ],
+ "check_2_finite_operator_removal": {
+  "claim_tested": "relative eigenvalue shift after removing dK >= 0 is bounded by the mode's diagonal participation in dK",
+  "verdict": "FALSE",
+  "rows": [
+   {
+    "gap": 0.001,
+    "dK_11": 1e-08,
+    "dK_22": 1.0,
+    "dK_12": 0.0001,
+    "diagonal_participation_fraction": 1e-08,
+    "actual_relative_shift": 9.911854263688902e-06,
+    "ratio_actual_over_diagonal": 991.1854263688901,
+    "K_minus_dK_is_PSD": true
+   },
+   {
+    "gap": 0.01,
+    "dK_11": 1e-08,
+    "dK_22": 1.0,
+    "dK_12": 0.0001,
+    "diagonal_participation_fraction": 1e-08,
+    "actual_relative_shift": 1.00989902029891e-06,
+    "ratio_actual_over_diagonal": 100.989902029891,
+    "K_minus_dK_is_PSD": true
+   },
+   {
+    "gap": 0.1,
+    "dK_11": 1e-06,
+    "dK_22": 1.0,
+    "dK_12": 0.001,
+    "diagonal_participation_fraction": 1e-06,
+    "actual_relative_shift": 1.0998900230929642e-05,
+    "ratio_actual_over_diagonal": 10.998900230929642,
+    "K_minus_dK_is_PSD": true
+   }
+  ],
+  "what_a_valid_bound_needs": "the off-diagonal couplings ||(I - P_m) dK E_m|| and the spectral gaps to the states dK connects to; the diagonal alone is only the first-order term"
+ },
+ "check_3_exact_removal_identity": {
+  "identity": "det(zM - K + Q)/det(zM - K) = z G(z) + 1 - N",
+  "derivation": "matrix determinant lemma gives 1 + q^T (zM-K)^-1 q; the spectral sum q^T (zM-K)^-1 q = sum_m lambda_m p_m/(z - lambda_m) = z G(z) - N",
+  "max_identity_rel_error": 3.906066472004343e-13,
+  "max_rel_distance_zeros_to_K_minus_Q_over_N": 9.593388130215642e-14,
+  "consequence": "the zeros of G are the nonzero eigenvalues of (K - Q/N, M): the NORMALISED rank-one removal. The eigenvalues of (K - Q, M), the declared rank-one inductor removed, are instead the roots of z G(z) + 1 - N = 0, which coincide with the zeros of G only when N = 1.",
+  "rows": [
+   {
+    "trial": 0,
+    "N": 1.9018109470439681,
+    "sum_p_equals_N": true,
+    "identity_rel_error": 2.9449019825870084e-15,
+    "max_rel_distance_zeros_G_to_eig_K_minus_Q_over_N": 2.370898547120916e-15
+   },
+   {
+    "trial": 1,
+    "N": 0.7514791485289439,
+    "sum_p_equals_N": true,
+    "identity_rel_error": 4.422203722274418e-15,
+    "max_rel_distance_zeros_G_to_eig_K_minus_Q_over_N": 4.024802669649463e-15
+   },
+   {
+    "trial": 2,
+    "N": 11.87424000713848,
+    "sum_p_equals_N": true,
+    "identity_rel_error": 3.5315666304387154e-14,
+    "max_rel_distance_zeros_G_to_eig_K_minus_Q_over_N": 4.0180981659558516e-15
+   },
+   {
+    "trial": 3,
+    "N": 1.3299455554884647,
+    "sum_p_equals_N": true,
+    "identity_rel_error": 1.947182438000291e-15,
+    "max_rel_distance_zeros_G_to_eig_K_minus_Q_over_N": 6.648597256983829e-15
+   },
+   {
+    "trial": 4,
+    "N": 2.247095951538916,
+    "sum_p_equals_N": true,
+    "identity_rel_error": 1.058447508773809e-15,
+    "max_rel_distance_zeros_G_to_eig_K_minus_Q_over_N": 9.481979467064189e-15
+   }
+  ]
+ }
+}

@@ -1,0 +1,49 @@
+{
+  "Boundaries": {
+    "PEC": {
+      "Attributes": [
+        2
+      ]
+    }
+  },
+  "Domains": {
+    "Materials": [
+      {
+        "Attributes": [
+          1
+        ],
+        "LossTan": 0.0,
+        "Permeability": 1.0,
+        "Permittivity": 1.0
+      }
+    ]
+  },
+  "Model": {
+    "L0": 0.001,
+    "Mesh": "mesh.msh",
+    "Refinement": {
+      "UniformLevels": 0
+    }
+  },
+  "Problem": {
+    "Output": "postpro",
+    "Type": "Eigenmode",
+    "Verbose": 2
+  },
+  "Solver": {
+    "Device": "CPU",
+    "Eigenmode": {
+      "N": 4,
+      "Save": 0,
+      "Target": 8.19034,
+      "Tol": 1e-06
+    },
+    "Linear": {
+      "KSPType": "GMRES",
+      "MaxIts": 400,
+      "Tol": 1e-08,
+      "Type": "Default"
+    },
+    "Order": 2
+  }
+}

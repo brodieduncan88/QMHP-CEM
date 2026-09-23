@@ -1,0 +1,203 @@
+{
+ "provenance": "provenance.json",
+ "resources": {
+  "wall_s": 119.508380714,
+  "cpu_s": 119.232956,
+  "max_rss_MB": 3671.50390625,
+  "peak_address_space_MB": 4677.5234375
+ },
+ "C_fF": [
+  114.33875970637405,
+  82.2021777287097,
+  67.97553867601651
+ ],
+ "Cprime_fF": [
+  114.41426753772744,
+  82.26025937045856,
+  68.04546246722789
+ ],
+ "consistency_check_level0": {
+  "verdict": "CONSISTENT",
+  "delta0": 0.0006603870074095575,
+  "delta0_certified_range": [
+   0.0006603870074066709,
+   0.000660387007412444
+  ],
+  "delta_band_lower": 0.000658526684468308,
+  "tail_bound": 1.768574651809676e-05,
+  "window": [
+   0.0006585166844683079,
+   0.0006762224309864047
+  ],
+  "Sprime0_static_GHz2": 2.1399402708491486,
+  "H_band_GHz2": 2.139944249209271,
+  "meaning": "The static code and Palace's eigensolver agree on the same mesh within the predicted window. In a QUALIFIED record, S'_h is then reported under the name H_h, Palace's complete harmonic moment on the nested meshes under the identity; for levels 1 and 2 it is the moment Palace would have if given those meshes.",
+  "level0_integrity_failures": [],
+  "nesting_0_to_1": {
+   "status": "PASSED",
+   "failures": []
+  }
+ },
+ "integrity_failures": [],
+ "classes": {
+  "C": {
+   "values": [
+    3.2283807973564986,
+    2.320997120851734,
+    1.9193047424615535
+   ],
+   "d1": 0.9073836765047645,
+   "d2": 0.4016923783901807,
+   "d1_certified_range": [
+    0.9073836765047432,
+    0.9073836765047858
+   ],
+   "d2_certified_range": [
+    0.40169237838989047,
+    0.4016923783904709
+   ],
+   "R": 2.2589018993618657,
+   "R_certified_range": [
+    2.258901899360181,
+    2.258901899363551
+   ],
+   "p_obs": 1.1756216180628698,
+   "limit_bracket_model_based": [
+    1.5176123640713728,
+    1.6002231852776319
+   ],
+   "remaining_rel_error_at_level2_bracket": [
+    0.1993981590315243,
+    0.2646870755009803
+   ],
+   "bracket_assumption": "two terms, orders 1 and q in (1, 2], coefficients of one sign",
+   "remaining_rel_error_at_level2_certified_range": [
+    0.2646870755006908,
+    0.26468707550126985
+   ],
+   "cls": "CONVERGING",
+   "reason": "observed order within [1, 2]; level 2 not within tau of the model limit",
+   "upper_bound_fF": 67.9755386760262,
+   "bound_basis": "Applies to upper_bound_fF (C, C') and lower_bound_GHz2 (S, the second moment) ONLY. The Dirichlet principle: C <= C_2 (1 + certified error), certified relative to the assembled operator up to rho (method.certificate). The uncertified assembly round-off is reported beside each bound as assembly_term_estimate_rel_at_level2 = max|phi|^2 sum|K - K_ld| / E_2 (sum from the preflight): an estimate, not a certificate. A limit bracket, where given, is MODEL-BASED and carries its bracket_assumption; it is not covered by this basis.",
+   "assembly_term_estimate_rel_at_level2": 9.557771302420825e-11
+  },
+  "Cprime": {
+   "values": [
+    3.230512778090043,
+    2.322637069171818,
+    1.9212790565559594
+   ],
+   "d1": 0.9078757089182252,
+   "d2": 0.40135801261585846,
+   "d1_certified_range": [
+    0.907875708918203,
+    0.9078757089182474
+   ],
+   "d2_certified_range": [
+    0.4013580126155689,
+    0.401358012616148
+   ],
+   "R": 2.262009678095444,
+   "R_certified_range": [
+    2.262009678093757,
+    2.2620096780971313
+   ],
+   "p_obs": 1.177605101967182,
+   "limit_bracket_model_based": [
+    1.519921043940101,
+    1.6032482049847052
+   ],
+   "remaining_rel_error_at_level2_bracket": [
+    0.19836657267568134,
+    0.2640650408888448
+   ],
+   "bracket_assumption": "two terms, orders 1 and q in (1, 2], coefficients of one sign",
+   "remaining_rel_error_at_level2_certified_range": [
+    0.2640650408885567,
+    0.2640650408891329
+   ],
+   "cls": "CONVERGING",
+   "reason": "observed order within [1, 2]; level 2 not within tau of the model limit",
+   "upper_bound_fF": 68.04546246723753,
+   "bound_basis": "Applies to upper_bound_fF (C, C') and lower_bound_GHz2 (S, the second moment) ONLY. The Dirichlet principle: C <= C_2 (1 + certified error), certified relative to the assembled operator up to rho (method.certificate). The uncertified assembly round-off is reported beside each bound as assembly_term_estimate_rel_at_level2 = max|phi|^2 sum|K - K_ld| / E_2 (sum from the preflight): an estimate, not a certificate. A limit bracket, where given, is MODEL-BASED and carries its bracket_assumption; it is not covered by this basis.",
+   "assembly_term_estimate_rel_at_level2": 9.547949698146793e-11
+  },
+  "delta": {
+   "values": [
+    0.0006603870074095575,
+    0.0007065705964692803,
+    0.0010286610826970577
+   ],
+   "d1": -4.618358905972286e-05,
+   "d2": -0.00032209048622777736,
+   "d1_certified_range": [
+    -4.6183589077264386e-05,
+    -4.618358904218134e-05
+   ],
+   "d2_certified_range": [
+    -0.0003220904865266494,
+    -0.0003220904859286833
+   ],
+   "R": 0.1433870015864503,
+   "abs_R_certified_range": [
+    0.14338700139893812,
+    0.14338700177406133
+   ],
+   "cls": "NON-CONVERGENT",
+   "reason": "the differences do not shrink at levels 0-2",
+   "max_delta_levels_0_to_2": 0.0010286610826970577,
+   "S_and_Sprime_within_1_percent_at_levels_0_to_2": true
+  },
+  "S": {
+   "cls": "CONVERGING",
+   "values_GHz2": [
+    2.1413534596006496,
+    2.9785062321795324,
+    3.601879491248181
+   ],
+   "lower_bound_GHz2": 3.6018794912476677,
+   "bound_basis": "Applies to upper_bound_fF (C, C') and lower_bound_GHz2 (S, the second moment) ONLY. The Dirichlet principle: C <= C_2 (1 + certified error), certified relative to the assembled operator up to rho (method.certificate). The uncertified assembly round-off is reported beside each bound as assembly_term_estimate_rel_at_level2 = max|phi|^2 sum|K - K_ld| / E_2 (sum from the preflight): an estimate, not a certificate. A limit bracket, where given, is MODEL-BASED and carries its bracket_assumption; it is not covered by this basis.",
+   "assembly_term_estimate_rel_at_level2": 9.557771302420825e-11,
+   "limit_bracket_model_based_GHz2": [
+    4.320087630856472,
+    4.555250440093621
+   ],
+   "bracket_assumption": "two terms, orders 1 and q in (1, 2], coefficients of one sign",
+   "remaining_rel_error_at_level2_bracket": [
+    0.1993981590315243,
+    0.2646870755009803
+   ]
+  },
+  "H": {
+   "cls": "CONVERGING",
+   "values_GHz2": [
+    2.1399402708491486,
+    2.9764031931999804,
+    3.5981781853802715
+   ],
+   "lower_bound_GHz2": 3.5981781853797616,
+   "bound_basis": "Applies to upper_bound_fF (C, C') and lower_bound_GHz2 (S, the second moment) ONLY. The Dirichlet principle: C <= C_2 (1 + certified error), certified relative to the assembled operator up to rho (method.certificate). The uncertified assembly round-off is reported beside each bound as assembly_term_estimate_rel_at_level2 = max|phi|^2 sum|K - K_ld| / E_2 (sum from the preflight): an estimate, not a certificate. A limit bracket, where given, is MODEL-BASED and carries its bracket_assumption; it is not covered by this basis.",
+   "assembly_term_estimate_rel_at_level2": 9.547949698146793e-11,
+   "limit_bracket_model_based_GHz2": [
+    4.311936459890559,
+    4.548331255028063
+   ],
+   "bracket_assumption": "two terms, orders 1 and q in (1, 2], coefficients of one sign",
+   "remaining_rel_error_at_level2_bracket": [
+    0.19836657267568134,
+    0.2640650408888448
+   ]
+  }
+ },
+ "outcome": {
+  "verdict": "QUALIFIED",
+  "C": "CONVERGING",
+  "Cprime": "CONVERGING",
+  "delta": "NON-CONVERGENT",
+  "consistency_check_level0": "CONSISTENT",
+  "second_moment_name": "H",
+  "note": "The classes of C', S and H follow C's up to O(delta) and are not independent evidence."
+ },
+ "signals_received": [],
+ "not_reported": "E_C,F1F1 and g; no coupling, readout frequency or Route A output is read or combined"
+}

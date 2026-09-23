@@ -1,0 +1,84 @@
+{
+ "label": "N: BOUNDED TWO-SIDEDLY BY THE COMMITTED RECORDS, NOT MEASURED - AND NOT THE BINDING CONSTRAINT ON E_C",
+ "question": "does measuring N unblock E_C?",
+ "answer": "NO, not on its own.",
+ "why": {
+  "1_N_is_the_smallest_term": "across its ENTIRE admissible range, N moves a/N by 7.505e-04. The refinement difference moves it by 1.876e-02, 25x more, and the far-mode placement by at least 4.488e-02, 60x more. Pinning N exactly would collapse the smallest of the three.",
+  "2_but_N_is_still_the_right_lever": "delta_saved = (1 - N) + omitted_weight, both non-negative. Measuring N splits it: omitted_weight = delta_saved - (1 - N). If that comes out ~0 there are no missing modes and the far-mode ambiguity - the LARGEST contribution - vanishes entirely. If it comes out ~delta_saved the ambiguity stands in full. So N does not tighten a/N directly; it decides whether the dominant term exists.",
+  "3_even_then_E_C_is_not_unblocked": "the refinement contribution, 1.876e-02, is an observed difference between two discretisations and is untouched by any measurement of N. E_C would still rest on one mesh with no convergence statement."
+ },
+ "what_measuring_N_would_take": {
+  "it_is_not_an_eigenvalue": "N = f^T K^+ f / L is a STATIC quantity: one linear solve K u = f with the same operator the eigensolver assembles, then N = f^T u / L. No eigenproblem computes it, and summing p_m over more eigenmodes converges only as the 1/omega^2 tail.",
+  "pinned_palace_cannot_do_it_directly": "the five solver types are DRIVEN, EIGENMODE, ELECTROSTATIC, MAGNETOSTATIC and TRANSIENT (utils/configfile.hpp). None computes f^T K^+ f / L. In particular MAGNETOSTATIC builds CurlCurlOperator with SurfaceCurrentOperator excitation, so it omits K_port entirely and its excitation is not the port voltage functional f.",
+  "the_plausible_supported_route": "a DRIVEN sweep at frequencies well below the lowest resonance. The driven system matrix carries the same K = K_curl + K_port, and f^T (K - omega^2 M)^-1 f / L = sum_m p_m / (1 - omega^2 / lambda_m) -> N as omega -> 0, so two or three low frequencies extrapolated in omega^2 would give N. This is NOT proposed as ready: it needs the exact identification of which reported driven quantity equals f^T (K - omega^2 M)^-1 f, verified against the pinned source, and it is a solver type this campaign has never run.",
+  "not_attempted_here": "no configuration was written, nothing was launched, and no approval exists for a driven solve. The PO1 approval authorised one eigenmode run and is spent."
+ },
+ "records": {
+  "N2R": {
+   "bound_on_N": {
+    "lower": 0.999254583555896,
+    "lower_is": "sum of |p_m| over the modes this record saved; a partial sum of a non-negative series",
+    "upper": 1.0,
+    "upper_is": "N - N^2 = u^T K_curl u + u^T (K_port - Q) u with both terms >= 0, so N(1 - N) >= 0",
+    "width": 0.0007454164441039746,
+    "width_equals_delta_saved": true,
+    "relative_width": 0.0007454164441039746,
+    "status": "N is CONFINED, two-sidedly, to 0.0745 % - but not MEASURED. The window is delta_saved itself, so this bound carries no information about how delta_saved splits into (1 - N) and omitted spectral weight."
+   },
+   "a_over_N_budget": {
+    "baseline_GHz2": 2.3526526437487423,
+    "contributions": {
+     "the_N_normalisation_itself": {
+      "relative": 0.0007504756690100772,
+      "what_it_spans": "the entire admissible range of N, from sum|p| to 1"
+     },
+     "refinement_N1R_to_N2R": {
+      "relative": 0.01875927807513561,
+      "what_it_is": "an observed difference between two solved discretisations; not an error bound"
+     },
+     "placing_the_omitted_weight_at_12_GHz": {
+      "relative": 0.04487989183229492,
+      "what_it_is": "conditional on the whole of delta_saved being one omitted mode there"
+     },
+     "placing_the_omitted_weight_at_15_GHz": {
+      "relative": 0.07054412985909642,
+      "what_it_is": "conditional on the whole of delta_saved being one omitted mode there"
+     },
+     "placing_the_omitted_weight_at_20_GHz": {
+      "relative": 0.12599155769477918,
+      "what_it_is": "conditional on the whole of delta_saved being one omitted mode there"
+     },
+     "placing_the_omitted_weight_at_30_GHz": {
+      "relative": 0.2844127800824438,
+      "what_it_is": "conditional on the whole of delta_saved being one omitted mode there"
+     },
+     "placing_the_omitted_weight_at_50_GHz": {
+      "relative": 0.7913606917229705,
+      "what_it_is": "conditional on the whole of delta_saved being one omitted mode there"
+     }
+    }
+   }
+  },
+  "N1R": {
+   "bound_on_N": {
+    "lower": 0.9992162018723272,
+    "lower_is": "sum of |p_m| over the modes this record saved; a partial sum of a non-negative series",
+    "upper": 1.0,
+    "upper_is": "N - N^2 = u^T K_curl u + u^T (K_port - Q) u with both terms >= 0, so N(1 - N) >= 0",
+    "width": 0.000783798127672819,
+    "width_equals_delta_saved": true,
+    "relative_width": 0.000783798127672819,
+    "status": "N is CONFINED, two-sidedly, to 0.0745 % - but not MEASURED. The window is delta_saved itself, so this bound carries no information about how delta_saved splits into (1 - N) and omitted spectral weight."
+   },
+   "a_over_N_budget": {
+    "baseline_GHz2": 2.3093312565397115,
+    "contributions": {
+     "the_N_normalisation_itself": {
+      "relative": 0.0007918827377999376,
+      "what_it_spans": "the entire admissible range of N, from sum|p| to 1"
+     }
+    }
+   }
+  }
+ }
+}

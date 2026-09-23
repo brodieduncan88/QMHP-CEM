@@ -1,0 +1,61 @@
+{
+ "record": "item 1 - is C_h monotone under refinement, and an upper bound on the model's continuum capacitance? Verified on the ACTUAL implementation, no solve on the QMHP mesh",
+ "real_mesh": {
+  "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+  "level0": {
+   "max_face_multiplicity": 2,
+   "boundary_faces": 3040,
+   "every_single_faced_face_is_a_tagged_triangle": true,
+   "every_tagged_triangle_is_a_tet_face": true,
+   "coincident_nodes": 0,
+   "nodes_in_no_tet": 0
+  },
+  "conductors": {
+   "components": [
+    9244,
+    189
+   ],
+   "every_conductor_triangle_in_one_conductor": true
+  },
+  "level0_to_1": {
+   "coarse_nodes_unchanged": true,
+   "midpoints_exact_rel": 0.0,
+   "children_volume_sum_rel_err": 2.1757696590068532e-15,
+   "fine": {
+    "max_face_multiplicity": 2,
+    "boundary_faces": 12160,
+    "every_single_faced_face_is_a_tagged_triangle": true,
+    "every_tagged_triangle_is_a_tet_face": true,
+    "coincident_nodes": 0,
+    "nodes_in_no_tet": 0
+   },
+   "galerkin_identity_rel": 6.9170160909490025e-15,
+   "constraint_sets_nested": true,
+   "coarse_conductor_nodes_kept": true,
+   "numerical_conductor_extension_edges": 543,
+   "components_coarse_fine": [
+    [
+     9244,
+     189
+    ],
+    [
+     32667,
+     660
+    ]
+   ],
+   "indicator_energy_rel_diff": 5.575892131374211e-16,
+   "prolonged_indicator_admissible": true
+  },
+  "solves_performed": 0,
+  "wall_s": 7.87119460105896
+ },
+ "synthetic_controls": {
+  "nested_refinement_C1_over_C0": 0.9531476672597741,
+  "non_nested_space_orientation_preserved": true,
+  "non_nested_space_nodes_moved": 588,
+  "non_nested_space_C1_over_C0": 0.9544809821309355,
+  "galerkin_identity_rel_nested": 9.473903143467998e-16,
+  "galerkin_identity_rel_non_nested": 0.16932540795176607,
+  "non_nested_constraints_C1_over_C0": 1.055096685440793
+ }
+}

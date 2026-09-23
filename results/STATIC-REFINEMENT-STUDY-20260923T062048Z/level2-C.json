@@ -1,0 +1,141 @@
+{
+ "kind": "C",
+ "n_unknowns": 584914,
+ "energy_nd": 1.9193047424615535,
+ "energy_nd_extended": 1.9193047424615517,
+ "evaluation_error_bound_nd": 9.324637780094503e-14,
+ "evaluation_bound_terms_nd": {
+  "matvec": 1.5716749391517353e-14,
+  "dot": 7.544703271381576e-14,
+  "float64_vs_extended": 1.9894424710355576e-15
+ },
+ "extended_precision_probe_ok": true,
+ "certificate": {
+  "residual_2norm": 6.66489414995747e-11,
+  "rhs_2norm": 1.0004147438189746,
+  "relative_residual": 6.662131072274046e-11,
+  "asymmetry_max": 8.179815303685369e-17,
+  "error_bound_nd": 1.8018104475110666e-13,
+  "roundoff_floor_nd": 1.228724569788928e-17
+ },
+ "total_error_bound_nd": 2.734274225520517e-13,
+ "total_error_bound_rel": 1.4246170319019455e-13,
+ "C_F": 6.797553867601651e-14,
+ "C_fF": 67.97553867601651,
+ "S_GHz2": 3.601879491248181,
+ "port_voltage": 1.0,
+ "phi_abs_max": 1.0,
+ "solution_sha256": "53949126e6fc2e9000d46fcfb12a96b7a87a63ac878dbbdf35b9d384153c491c",
+ "solver": {
+  "method": "twogrid",
+  "fixed_rows_from_free_coarse_nnz": 0,
+  "setup_wall_s": 4.500497886000005,
+  "galerkin_identity_rel": 2.2686723185240468e-14,
+  "gauss_seidel_probe_rel": 5.630936357481888e-16,
+  "gauss_seidel_probe_backward_rel": 5.630936357481888e-16,
+  "settings": {
+   "nu": 1,
+   "maxiter": 1000,
+   "check_every": 5,
+   "target_rel": 1e-12,
+   "stagnation_checks": 20
+  },
+  "status": "CERTIFIED",
+  "iterations": 60,
+  "history": [
+   {
+    "k": 0,
+    "recursive_residual": 0.2921788916126187,
+    "true_residual": 0.2921788916126187,
+    "rel_certificate": null,
+    "wall_s": 0.2526370639999982
+   },
+   {
+    "k": 5,
+    "recursive_residual": 0.020460175336093418,
+    "true_residual": 0.020460175336093452,
+    "rel_certificate": null,
+    "wall_s": 0.9206512179999891
+   },
+   {
+    "k": 10,
+    "recursive_residual": 0.003916148723479407,
+    "true_residual": 0.003916148723479363,
+    "rel_certificate": null,
+    "wall_s": 1.7463571609999917
+   },
+   {
+    "k": 15,
+    "recursive_residual": 0.0006865546867703349,
+    "true_residual": 0.0006865546867703459,
+    "rel_certificate": null,
+    "wall_s": 2.6302491659999987
+   },
+   {
+    "k": 20,
+    "recursive_residual": 0.00013236848097256216,
+    "true_residual": 0.00013236848097255828,
+    "rel_certificate": 0.5295148516240633,
+    "wall_s": 3.511595943000003
+   },
+   {
+    "k": 25,
+    "recursive_residual": 2.0461296034864282e-05,
+    "true_residual": 2.0461296034770932e-05,
+    "rel_certificate": 0.008525342913890474,
+    "wall_s": 4.408591997000002
+   },
+   {
+    "k": 30,
+    "recursive_residual": 3.5388257032372637e-06,
+    "true_residual": 3.5388257031707602e-06,
+    "rel_certificate": 0.0002659361492417746,
+    "wall_s": 5.227217709000001
+   },
+   {
+    "k": 35,
+    "recursive_residual": 4.773213534146429e-07,
+    "true_residual": 4.773213533580621e-07,
+    "rel_certificate": 5.0106950225366226e-06,
+    "wall_s": 6.046834445999991
+   },
+   {
+    "k": 40,
+    "recursive_residual": 8.302357907098341e-08,
+    "true_residual": 8.302357923658404e-08,
+    "rel_certificate": 1.4997680458710302e-07,
+    "wall_s": 6.874201163999999
+   },
+   {
+    "k": 45,
+    "recursive_residual": 1.3029389743133739e-08,
+    "true_residual": 1.3029389833593139e-08,
+    "rel_certificate": 3.476425125924951e-09,
+    "wall_s": 7.677147587000007
+   },
+   {
+    "k": 50,
+    "recursive_residual": 1.9498934697665516e-09,
+    "true_residual": 1.9498934894986713e-09,
+    "rel_certificate": 8.423121512506487e-11,
+    "wall_s": 8.480537655999996
+   },
+   {
+    "k": 55,
+    "recursive_residual": 3.1557067134879896e-10,
+    "true_residual": 3.155706713100612e-10,
+    "rel_certificate": 2.1659433534985296e-12,
+    "wall_s": 9.30633357100001
+   },
+   {
+    "k": 60,
+    "recursive_residual": 6.664907698025409e-11,
+    "true_residual": 6.66489414995747e-11,
+    "rel_certificate": 9.387828871825594e-14,
+    "wall_s": 10.181452449000005
+   }
+  ]
+ },
+ "cpu_s": 18.95285124200001,
+ "wall_s": 19.076442974000003
+}

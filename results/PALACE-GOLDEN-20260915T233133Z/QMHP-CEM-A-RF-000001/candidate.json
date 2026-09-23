@@ -1,0 +1,41 @@
+{
+  "candidate_id": "QMHP-CEM-A-RF-000001",
+  "classification": "ENGINEERING-SEED",
+  "created_utc": "2026-08-24T00:00:00Z",
+  "master_revision": "v1.5.8f",
+  "object_type": "object001_single_device_package",
+  "parameters": {
+    "chip": {
+      "height_mm": 20.0,
+      "thickness_mm": 0.43,
+      "width_mm": 20.0
+    },
+    "chip_recess": {
+      "depth_mm": 0.45,
+      "xy_clearance_mm": 0.2
+    },
+    "launches": {
+      "bore_diameter_mm": 2.5,
+      "count": 2
+    },
+    "lid": {
+      "thickness_mm": 2.0
+    },
+    "mounting": {
+      "hole_count": 4
+    },
+    "package": {
+      "body_height_mm": 5.0,
+      "floor_thickness_mm": 1.0,
+      "outer_height_mm": 32.0,
+      "outer_width_mm": 32.0
+    },
+    "vacuum_cavity": {
+      "height_above_chip_mm": 1.5,
+      "height_mm": 22.0,
+      "width_mm": 22.0
+    }
+  },
+  "parent_candidate_id": null,
+  "schema": "qmhp-cem.candidate/0.1.0"
+}

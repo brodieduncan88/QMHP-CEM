@@ -1,0 +1,141 @@
+{
+ "kind": "Cprime",
+ "n_unknowns": 584701,
+ "energy_nd": 1.9212790565559594,
+ "energy_nd_extended": 1.9212790565559552,
+ "evaluation_error_bound_nd": 9.616564219129465e-14,
+ "evaluation_bound_terms_nd": {
+  "matvec": 1.580904071038309e-14,
+  "dot": 7.582837959018544e-14,
+  "float64_vs_extended": 4.4321523181074466e-15
+ },
+ "extended_precision_probe_ok": true,
+ "certificate": {
+  "residual_2norm": 6.647478453643782e-11,
+  "rhs_2norm": 1.0130179517872677,
+  "relative_residual": 6.562053951675421e-11,
+  "asymmetry_max": 8.194470561209754e-17,
+  "error_bound_nd": 1.7604193745293104e-13,
+  "roundoff_floor_nd": 1.2192007837145819e-17
+ },
+ "total_error_bound_nd": 2.7220757964422567e-13,
+ "total_error_bound_rel": 1.4168039708516745e-13,
+ "C_F": 6.80454624672279e-14,
+ "C_fF": 68.04546246722789,
+ "S_GHz2": 3.5981781853802715,
+ "port_voltage": 1.0,
+ "phi_abs_max": 1.0,
+ "solution_sha256": "9da51a076d18193c67d18621f7574fff41d017e4a92b49fcf6a7b2ce24505ca1",
+ "solver": {
+  "method": "twogrid",
+  "fixed_rows_from_free_coarse_nnz": 0,
+  "setup_wall_s": 5.243048896000005,
+  "galerkin_identity_rel": 2.2686723185240468e-14,
+  "gauss_seidel_probe_rel": 5.630936357481888e-16,
+  "gauss_seidel_probe_backward_rel": 5.630936357481888e-16,
+  "settings": {
+   "nu": 1,
+   "maxiter": 1000,
+   "check_every": 5,
+   "target_rel": 1e-12,
+   "stagnation_checks": 20
+  },
+  "status": "CERTIFIED",
+  "iterations": 60,
+  "history": [
+   {
+    "k": 0,
+    "recursive_residual": 0.29242612079485786,
+    "true_residual": 0.29242612079485786,
+    "rel_certificate": null,
+    "wall_s": 0.2868336329999863
+   },
+   {
+    "k": 5,
+    "recursive_residual": 0.02052912337824367,
+    "true_residual": 0.02052912337824363,
+    "rel_certificate": null,
+    "wall_s": 0.9911250499999937
+   },
+   {
+    "k": 10,
+    "recursive_residual": 0.003940881636576251,
+    "true_residual": 0.003940881636576254,
+    "rel_certificate": null,
+    "wall_s": 1.8110802949999822
+   },
+   {
+    "k": 15,
+    "recursive_residual": 0.0006886346423260082,
+    "true_residual": 0.0006886346423259,
+    "rel_certificate": null,
+    "wall_s": 2.6541881990000036
+   },
+   {
+    "k": 20,
+    "recursive_residual": 0.0001316586769203722,
+    "true_residual": 0.0001316586769203955,
+    "rel_certificate": 0.5154802218038776,
+    "wall_s": 3.5129064879999987
+   },
+   {
+    "k": 25,
+    "recursive_residual": 2.0492874948821548e-05,
+    "true_residual": 2.0492874948924523e-05,
+    "rel_certificate": 0.008519653332387495,
+    "wall_s": 4.3586050849999936
+   },
+   {
+    "k": 30,
+    "recursive_residual": 3.5207139988204753e-06,
+    "true_residual": 3.5207139988776483e-06,
+    "rel_certificate": 0.00026096377104152237,
+    "wall_s": 5.2113570189999905
+   },
+   {
+    "k": 35,
+    "recursive_residual": 4.857106256370135e-07,
+    "true_residual": 4.857106256443285e-07,
+    "rel_certificate": 5.1831123394128e-06,
+    "wall_s": 6.055199222999988
+   },
+   {
+    "k": 40,
+    "recursive_residual": 8.220897982230093e-08,
+    "true_residual": 8.220897975896207e-08,
+    "rel_certificate": 1.4630232526038385e-07,
+    "wall_s": 6.915005253999993
+   },
+   {
+    "k": 45,
+    "recursive_residual": 1.3084566157348334e-08,
+    "true_residual": 1.3084566158304173e-08,
+    "rel_certificate": 3.4883134826563227e-09,
+    "wall_s": 7.755966102999992
+   },
+   {
+    "k": 50,
+    "recursive_residual": 1.981826890032648e-09,
+    "true_residual": 1.981827036087465e-09,
+    "rel_certificate": 8.594255584388781e-11,
+    "wall_s": 8.610312703999995
+   },
+   {
+    "k": 55,
+    "recursive_residual": 3.183948557221615e-10,
+    "true_residual": 3.183949093338685e-10,
+    "rel_certificate": 2.1659048315850357e-12,
+    "wall_s": 9.441594826999989
+   },
+   {
+    "k": 60,
+    "recursive_residual": 6.647476911688094e-11,
+    "true_residual": 6.647478453643782e-11,
+    "rel_certificate": 9.162746913429426e-14,
+    "wall_s": 10.308380134000004
+   }
+  ]
+ },
+ "cpu_s": 19.86918275299999,
+ "wall_s": 20.081645982999987
+}

@@ -1,0 +1,285 @@
+{
+ "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+ "linear_solves": 0,
+ "levels": {
+  "0": {
+   "mesh_digest": "5087fee82eae901c989ddc81f1236d44e5c273f01a72ace0091ddab53f373b54",
+   "n_tets": 64434,
+   "n_nodes": 13991,
+   "mesh_facts": {
+    "max_face_multiplicity": 2,
+    "boundary_faces": 3040,
+    "every_boundary_face_is_tagged": true,
+    "every_boundary_face_on_the_box_surface": true,
+    "every_interior_face_separates_its_tetrahedra": true,
+    "volume_sum_over_box_minus_1": -1.1102230246251565e-16
+   },
+   "preconditions_failed": [],
+   "poincare": {
+    "box_extent_nd": [
+     1.0,
+     1.0,
+     0.4825
+    ],
+    "lambda1_box": 62.133278553696805,
+    "eps_min": 1.0,
+    "c": 62.133278553696805
+   },
+   "element_quality": {
+    "aspect_p50_p90_p99_max": [
+     4.698862653485424,
+     10.40103850988986,
+     14.209837377724428,
+     22.98010157963879
+    ],
+    "edge_nd_min_median_max": [
+     0.0008304705775127445,
+     0.017880239444930304,
+     0.1128319604071819
+    ]
+   },
+   "port": {
+    "t_ground": -0.02875,
+    "t_island": -0.018750000000000003,
+    "l_nd": 0.009999999999999998,
+    "w_nd": 0.0050000000000000044,
+    "n_port_tris": 25,
+    "n_port_nodes": 22,
+    "end_line_spread_rel": 0.0,
+    "outside_end_lines_rel": 0.0,
+    "normal_spread": 0.0,
+    "direction_out_of_plane": 0.0,
+    "area_over_lw_minus_1": 2.220446049250313e-16
+   },
+   "problems": {
+    "C": {
+     "n_unknowns": 4558,
+     "nnz_A": 49716,
+     "n_port_nodes_constrained_off_conductors": 0,
+     "certificate_floor_proxy_nd": 5.1539153182782676e-20,
+     "evaluation_matvec_term_proxy_nd": 1.339204623576969e-13,
+     "evaluation_dot_term_factor": 7.584536297622352e-16
+    },
+    "Cprime": {
+     "n_unknowns": 4543,
+     "nnz_A": 49535,
+     "n_port_nodes_constrained_off_conductors": 15,
+     "certificate_floor_proxy_nd": 5.091985344309085e-20,
+     "evaluation_matvec_term_proxy_nd": 1.339204623576969e-13,
+     "evaluation_dot_term_factor": 7.584536297622352e-16
+    }
+   },
+   "assembly_gap_estimate": {
+    "abs_sum_nd": 8.802962354085882e-12,
+    "max_entry_rel": 5.225515473673909e-16,
+    "problems": {
+     "C": {
+      "rho_gershgorin_over_c": 1.0336255263085188e-08
+     },
+     "Cprime": {
+      "rho_gershgorin_over_c": 1.0336255263085188e-08
+     }
+    }
+   }
+  },
+  "1": {
+   "mesh_digest": "c1a93691a02c72d21849a0dad11ed36c86462e9a3b14a8e4c399f903be4a87fd",
+   "n_tets": 515472,
+   "n_nodes": 93935,
+   "mesh_facts": {
+    "max_face_multiplicity": 2,
+    "boundary_faces": 12160,
+    "every_boundary_face_is_tagged": true,
+    "every_boundary_face_on_the_box_surface": true,
+    "every_interior_face_separates_its_tetrahedra": true,
+    "volume_sum_over_box_minus_1": 2.220446049250313e-16
+   },
+   "preconditions_failed": [],
+   "poincare": {
+    "box_extent_nd": [
+     1.0,
+     1.0,
+     0.4825
+    ],
+    "lambda1_box": 62.133278553696805,
+    "eps_min": 1.0,
+    "c": 62.133278553696805
+   },
+   "element_quality": {
+    "aspect_p50_p90_p99_max": [
+     4.861029967618802,
+     11.159910187318328,
+     16.770855513824014,
+     32.52758432683514
+    ],
+    "edge_nd_min_median_max": [
+     0.0004152352887563618,
+     0.009062132617489227,
+     0.0605751103241502
+    ]
+   },
+   "port": {
+    "t_ground": -0.028750000000000005,
+    "t_island": -0.018750000000000006,
+    "l_nd": 0.009999999999999998,
+    "w_nd": 0.0050000000000000044,
+    "n_port_tris": 100,
+    "n_port_nodes": 68,
+    "end_line_spread_rel": 0.0,
+    "outside_end_lines_rel": 3.4694469519536147e-16,
+    "normal_spread": 0.0,
+    "direction_out_of_plane": 0.0,
+    "area_over_lw_minus_1": 0.0
+   },
+   "problems": {
+    "C": {
+     "n_unknowns": 60608,
+     "nnz_A": 766864,
+     "n_port_nodes_constrained_off_conductors": 0,
+     "certificate_floor_proxy_nd": 3.9649108220069136e-17,
+     "evaluation_matvec_term_proxy_nd": 5.726247018036087e-13,
+     "evaluation_dot_term_factor": 5.092226553621319e-15,
+     "galerkin_identity_rel": 6.594853697671926e-15,
+     "fixed_rows_from_free_coarse_nnz": 0
+    },
+    "Cprime": {
+     "n_unknowns": 60552,
+     "nnz_A": 765912,
+     "n_port_nodes_constrained_off_conductors": 56,
+     "certificate_floor_proxy_nd": 3.959660644380352e-17,
+     "evaluation_matvec_term_proxy_nd": 5.726247018036087e-13,
+     "evaluation_dot_term_factor": 5.092226553621319e-15,
+     "galerkin_identity_rel": 6.594853697671926e-15,
+     "fixed_rows_from_free_coarse_nnz": 0
+    }
+   },
+   "assembly_gap_estimate": {
+    "abs_sum_nd": 4.1446188075090105e-11,
+    "max_entry_rel": 1.1774377107680733e-15,
+    "problems": {
+     "C": {
+      "rho_gershgorin_over_c": 5.349564469462018e-08
+     },
+     "Cprime": {
+      "rho_gershgorin_over_c": 5.349564469462018e-08
+     }
+    }
+   }
+  },
+  "2": {
+   "mesh_digest": "1f780cdb5c1675756de95812f10113a87165008ea6f8173d9f63a8fc341f5348",
+   "n_tets": 4123776,
+   "n_nodes": 709421,
+   "mesh_facts": {
+    "max_face_multiplicity": 2,
+    "boundary_faces": 48640,
+    "every_boundary_face_is_tagged": true,
+    "every_boundary_face_on_the_box_surface": true,
+    "every_interior_face_separates_its_tetrahedra": true,
+    "volume_sum_over_box_minus_1": 2.220446049250313e-16
+   },
+   "preconditions_failed": [],
+   "poincare": {
+    "box_extent_nd": [
+     1.0,
+     1.0,
+     0.4825
+    ],
+    "lambda1_box": 62.133278553696805,
+    "eps_min": 1.0,
+    "c": 62.133278553696805
+   },
+   "element_quality": {
+    "aspect_p50_p90_p99_max": [
+     4.852042864078854,
+     11.266352770404518,
+     17.140428698970894,
+     34.18296308451856
+    ],
+    "edge_nd_min_median_max": [
+     0.00020761764437816262,
+     0.004527494747706242,
+     0.03028755516207514
+    ]
+   },
+   "port": {
+    "t_ground": -0.028750000000000005,
+    "t_island": -0.018749999999999996,
+    "l_nd": 0.010000000000000009,
+    "w_nd": 0.0050000000000000044,
+    "n_port_tris": 400,
+    "n_port_nodes": 235,
+    "end_line_spread_rel": 0.0,
+    "outside_end_lines_rel": 0.0,
+    "normal_spread": 0.0,
+    "direction_out_of_plane": 0.0,
+    "area_over_lw_minus_1": -1.1102230246251565e-15
+   },
+   "problems": {
+    "C": {
+     "n_unknowns": 584914,
+     "nnz_A": 8073624,
+     "n_port_nodes_constrained_off_conductors": 0,
+     "certificate_floor_proxy_nd": 1.1136232316896442e-15,
+     "evaluation_matvec_term_proxy_nd": 2.2933302050664796e-12,
+     "evaluation_dot_term_factor": 3.845778947034343e-14,
+     "galerkin_identity_rel": 2.2686723185240468e-14,
+     "fixed_rows_from_free_coarse_nnz": 0
+    },
+    "Cprime": {
+     "n_unknowns": 584701,
+     "nnz_A": 8069405,
+     "n_port_nodes_constrained_off_conductors": 213,
+     "certificate_floor_proxy_nd": 1.1131421161266007e-15,
+     "evaluation_matvec_term_proxy_nd": 2.2933302050664796e-12,
+     "evaluation_dot_term_factor": 3.845778947034343e-14,
+     "galerkin_identity_rel": 2.2686723185240468e-14,
+     "fixed_rows_from_free_coarse_nnz": 0
+    }
+   },
+   "assembly_gap_estimate": {
+    "abs_sum_nd": 1.8344275788099228e-10,
+    "max_entry_rel": 1.3701028137413803e-15,
+    "problems": {
+     "C": {
+      "rho_gershgorin_over_c": 4.941411353766304e-07
+     },
+     "Cprime": {
+      "rho_gershgorin_over_c": 4.941411353766304e-07
+     }
+    }
+   }
+  }
+ },
+ "resources": {
+  "wall_s": 95.09838517099979,
+  "cpu_s": 94.990415,
+  "max_rss_MB": 3682.4921875,
+  "peak_address_space_MB": 3854.421875
+ },
+ "environment": {
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "platform": "Linux-6.18.44-fc-v37-x86_64-with-glibc2.39",
+  "longdouble_eps": 1.0842021724855044e-19,
+  "extended_precision_probe": {
+   "scalar": true,
+   "csr_matvec": true,
+   "dot": true
+  },
+  "threads_env": {
+   "OPENBLAS_NUM_THREADS": "1",
+   "OMP_NUM_THREADS": "1",
+   "MKL_NUM_THREADS": "1"
+  },
+  "code_sha256": {
+   "study_driver.py": "ee36a09369abb00c3a9435e625e39617a5105a3b9ff20fd293eada333432fbb3",
+   "nested_solver.py": "75ee657917ac86f0fc346cc086b44ecc0b24f5081ca914b478c84ae74b1cc03f",
+   "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
+   "orchestrator/manifest.py": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f",
+   "synthetic_cells.py": "c3ac1e73a774b405fe7d9382d35ee2cc935e90ebe67d9ff0aa7a8167895f4d6b",
+   "verify_solver.py": "648d65661a24461477d5506e0565e1af47f4e0015b00a1282ab15b286cefb00e"
+  }
+ }
+}

@@ -1,0 +1,302 @@
+{
+ "record": "static-anchor hypothesis - preserved measurements",
+ "classes": {
+  "A_committed_palace": "values Palace wrote into committed records or run logs",
+  "B_derived_from_committed": "arithmetic on class A only",
+  "C_reproduced_by_this_record": "independent code in this directory, re-run from committed inputs while preparing the record",
+  "D_earlier_analysis_not_rerun": "produced earlier in the session by independent code; not re-run here; kept with its provenance"
+ },
+ "A_committed_palace": {
+  "first_moment_run": {
+   "run_id": 35730927756,
+   "run_number": 2,
+   "head_sha": "ae9ff1f2d826a48305d742c6a3568406c53df464",
+   "artefact_id": 10694594873,
+   "artefact_zip_sha256": "b0d7f52a826ce8271ddcdb310117612faeb7250041d829107641dc31fb834056",
+   "verdict": "OMITTED_MOMENT_CERTIFIED_LOWER_BOUND",
+   "certified_omitted_lower_bound_GHz2": 1420.315,
+   "relative_residual": 1.3611110588125689e-14,
+   "iterations": 217,
+   "true_dofs": 103411,
+   "wall_s": 7.730966096000003,
+   "source": "job log of run 35730927756 (the artefact itself is behind an egress policy here)"
+  },
+  "band_moments_by_rung": {
+   "L2 (box 0)": {
+    "a_GHz2": 2.14705150128509,
+    "N_saved": 0.999373878899728,
+    "a_over_N_GHz2": 2.14839665776427,
+    "f1_GHz": 1.461886595,
+    "sha256": {
+     "eig.csv": "11c197844098d7fe0bad49cac00bf693dd8d498b695384aa5196d3668b9791c6",
+     "port-EPR.csv": "ed5dbf6000f8f7eac4e1c098c3a545aa721b8790b20482042fc0574018e6dec0"
+    }
+   },
+   "N1R (box 1)": {
+    "a_GHz2": 2.3081047358962166,
+    "N_saved": 0.9992162018723272,
+    "a_over_N_GHz2": 2.309915243138872,
+    "f1_GHz": 1.515753609,
+    "sha256": {
+     "eig.csv": "fb905c2dec20b352d5e53e569fd2724c3181f5623c09fc3fb219771ac729e166",
+     "port-EPR.csv": "e3a8fa676707af5ace8cb7bcb374c94b6ffd86c161cab0e517adb740b4672e30"
+    }
+   },
+   "N2R (box 2)": {
+    "a_GHz2": 2.351511939494728,
+    "N_saved": 0.999254583555896,
+    "a_over_N_GHz2": 2.3532661027450668,
+    "f1_GHz": 1.526014889,
+    "sha256": {
+     "eig.csv": "9e888a5c833258871262ce2c6c9e1dd39f2ec26f18c1b225e8bef32b5cc30c92",
+     "port-EPR.csv": "89ff7301e1f9b726da567ee0918a9e5f32443c709b9b49c1c0d7326d84bb7a65"
+    }
+   },
+   "L3 (other mesh)": {
+    "a_GHz2": 2.9390641083677114,
+    "N_saved": 0.9992739405306552,
+    "a_over_N_GHz2": 2.941199594184302,
+    "f1_GHz": 1.709561611,
+    "sha256": {
+     "eig.csv": "1a8c44b352404209f209d56fd94518d845cd9e0a405b5aa9d2e4b0bd78d2d2a2",
+     "port-EPR.csv": "2ce8288c2afec5c5be527f40f8fa998edb0154595d7be1f8a9bfa87a8a7d2c66"
+    }
+   }
+  }
+ },
+ "B_derived_from_committed": {
+  "A_direct_N2R_GHz2": {
+   "value": 1422.6665119411516,
+   "plus_minus": 0.0005,
+   "how": "certified omitted lower bound + A_saved upper end; the gap to A_direct is x.r/L, negligible at a 1.4e-14 residual"
+  },
+  "N_window": {
+   "lower": 0.999254583556,
+   "upper": 1.0,
+   "source": "normalisation.md (proven identity)"
+  },
+  "omitted_weight_at_most": 0.0007454164439999467,
+  "rms_frequency_of_omitted_modes_at_least_GHz": 1380.361546081687
+ },
+ "C_reproduced_by_this_record": {
+  "lower_bounds": {
+   "script": "lower_bounds.py",
+   "script_sha256": "706242137aab658f703b577b90c4ddf17f4213c988ce2504152390423f96eb2b",
+   "anchor_fem_sha256": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
+   "rows": [
+    {
+     "level": 0,
+     "n_tets": 64434,
+     "n_edges": 79944,
+     "n_free": 56050,
+     "port_edges_with_nonzero_f": 39,
+     "f_norm_2": 1.0430850727414327,
+     "fT_Dinv_f": 52.62274228939947,
+     "LB1_GHz2": 308.52735501349343,
+     "LB2_GHz2": 340.13337118626475,
+     "A_GHz2_per_nd": 142.28584142858628,
+     "L_nd": 20.582047285188583
+    },
+    {
+     "level": 1,
+     "n_tets": 515472,
+     "n_edges": 615486,
+     "n_free": 524306,
+     "port_edges_with_nonzero_f": 154,
+     "f_norm_2": 1.1381691696159408,
+     "fT_Dinv_f": 104.12182821533588,
+     "LB1_GHz2": 582.2206636078201,
+     "LB2_GHz2": 659.7201944967793,
+     "A_GHz2_per_nd": 142.28584142858628,
+     "L_nd": 20.582047285188583,
+     "LB2_ratio_to_previous": 1.9395926727092636
+    },
+    {
+     "level": 2,
+     "n_tets": 4123776,
+     "n_edges": 4857516,
+     "n_free": 4501588,
+     "port_edges_with_nonzero_f": 609,
+     "f_norm_2": 1.182848406816512,
+     "fT_Dinv_f": 207.81023368885053,
+     "LB1_GHz2": 1132.7083263958602,
+     "LB2_GHz2": 1324.0887021422488,
+     "A_GHz2_per_nd": 142.28584142858628,
+     "L_nd": 20.582047285188583,
+     "LB2_ratio_to_previous": 2.0070458857974414
+    }
+   ],
+   "how": "Rayleigh-Ritz on span{D^-1 f, D^-1 M D^-1 f}: matrix-vector products and a 2x2 solve; uniform red refinement"
+  },
+  "conductors_and_problem_sizes": {
+   "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+   "levels": [
+    {
+     "level": 0,
+     "n_tets": 64434,
+     "n_nodes": 13991,
+     "n_conductors": 2,
+     "conductor_nodes": [
+      9244,
+      189
+     ],
+     "port_touches": [
+      true,
+      true
+     ],
+     "dirichlet_unknowns": 4558,
+     "port_voltage_of_island_indicator": 1.0,
+     "indicator_gradient_on_pec_edges_max_abs": 0.0
+    },
+    {
+     "level": 1,
+     "n_tets": 515472,
+     "n_nodes": 93935,
+     "n_conductors": 2,
+     "conductor_nodes": [
+      32667,
+      660
+     ],
+     "port_touches": [
+      true,
+      true
+     ],
+     "dirichlet_unknowns": 60608,
+     "port_voltage_of_island_indicator": 1.0,
+     "indicator_gradient_on_pec_edges_max_abs": 0.0
+    }
+   ],
+   "band_baseline_B0_GHz2": 2.14839665776427,
+   "band_baseline_matches_predeclaration": true
+  },
+  "synthetic_controls": {
+   "slab_exact": {
+    "C_exact_F": 5.059535895783079e-14,
+    "rows": [
+     {
+      "level": 0,
+      "C_rel_error_vs_exact": 3.741975966824131e-16,
+      "S_GHz2": 50.06446526389154,
+      "A_complete_GHz2": 2338.3417088507863,
+      "identity": {
+       "port_voltage_of_grad_phi": 0.9999999999999999,
+       "grad_phi_on_pec_edges_max_abs": 0.0,
+       "edge_energy_vs_p1_energy_rel": 7.771561172376095e-16,
+       "S_edge_route_GHz2": 50.0644652638915,
+       "S_two_routes_rel": 8.515533706569775e-16
+      }
+     },
+     {
+      "level": 1,
+      "C_rel_error_vs_exact": 1.197432309383722e-14,
+      "S_GHz2": 50.06446526389215,
+      "A_complete_GHz2": 5160.8150333664835,
+      "identity": {
+       "port_voltage_of_grad_phi": 0.9999999999999999,
+       "grad_phi_on_pec_edges_max_abs": 0.0,
+       "edge_energy_vs_p1_energy_rel": 1.2745360322696951e-14,
+       "S_edge_route_GHz2": 50.06446526389151,
+       "S_two_routes_rel": 1.2773300559854507e-14
+      }
+     }
+    ],
+    "complete_growth": 2.2070405765899994,
+    "static_growth": 1.0000000000000122
+   },
+   "fringe_nested": {
+    "C0_F": 4.008808103573184e-14,
+    "C1_F": 3.820986092412859e-14,
+    "C1_over_C0": 0.9531476672597741,
+    "identities": [
+     {
+      "port_voltage_of_grad_phi": 1.0,
+      "grad_phi_on_pec_edges_max_abs": 0.0,
+      "edge_energy_vs_p1_energy_rel": 1.1770229465320596e-15,
+      "S_edge_route_GHz2": 63.18660124441163,
+      "S_two_routes_rel": 1.3494178609385671e-15
+     },
+     {
+      "port_voltage_of_grad_phi": 0.9999999999999999,
+      "grad_phi_on_pec_edges_max_abs": 0.0,
+      "edge_energy_vs_p1_energy_rel": 1.2760426180829253e-14,
+      "S_edge_route_GHz2": 66.29256243795605,
+      "S_two_routes_rel": 1.3076310610841402e-14
+     }
+    ]
+   }
+  },
+  "assembly_validation": {
+   "vectorised_A_nd_on_committed_fixture": 64.16250164577235,
+   "compiled_palace_A_nd": 64.16250164577238,
+   "relative_difference": 4.43e-16,
+   "edges_free_pec": [
+    663,
+    534,
+    129
+   ]
+  },
+  "budget_dry_run_synthetic": {
+   "what": "the gated execution sequence (solve, red refinement, solve) on synthetic fringing slabs under the pre-declared limits, enforced by _enforce_budget; no QMHP data; run while preparing this record",
+   "geometry": "static_capacitance._slab(n, island_patch=True): 2n x n x n Kuhn box",
+   "rows": [
+    {
+     "n": 18,
+     "level1_tets": 559872,
+     "level1_unknowns": 96499,
+     "wall_s": 102.86,
+     "cpu_s": 104.45,
+     "max_rss_MB": 2907.6,
+     "vm_peak_kB": 4152032
+    },
+    {
+     "n": 20,
+     "level1_tets": 768000,
+     "level1_unknowns": 131979,
+     "wall_s": 228.67,
+     "cpu_s": 241.12,
+     "max_rss_MB": 4159.3,
+     "vm_peak_kB": 5502684
+    }
+   ],
+   "limits": {
+    "cpu_s": 600,
+    "cpu_hard_kill_s": 660,
+    "address_space_bytes": 8589934592,
+    "wall_s": 1800
+   },
+   "caveat": "wall times were taken while the full test suite ran on the same 4 cores; the QMHP mesh is unstructured, so its factorisation fill is not measured by this stand-in"
+  },
+  "port_alignment_negative_control": {
+   "what": "the same fringing slab with n = 18, where the port and island edges at y = 0.25 and 0.75 fall between grid lines (0.25 x 18 = 4.5), so the meshed port face is a staircase that does not span ground-to-island everywhere",
+   "port_voltage_of_grad_phi": 0.9,
+   "S_two_routes_rel": 0.190000000000139,
+   "edge_energy_vs_p1_energy_rel": 1.7161532142823796e-13,
+   "aligned_n20": {
+    "port_voltage_of_grad_phi": 1.0,
+    "S_two_routes_rel_levels": [
+     1.0988069552900816e-13,
+     8.646987396178203e-14
+    ]
+   },
+   "meaning": "S_edge / S = V^2 = 0.81 exactly: a malformed port shows as V != 1 while the energy identity still holds. The pre-declared port-voltage check (1e-9) would mark such a run UNQUALIFIED. The QMHP preflight measured V = 1 at both levels without a solve."
+  }
+ },
+ "D_earlier_analysis_not_rerun": {
+  "complete_first_moment_base_mesh": {
+   "A_nd": 2.5854963904,
+   "A_GHz2": 367.8795294186366,
+   "how": "direct sparse solve of M x = f on the unrefined mesh by an independent assembly; stored solution re-checked to ||Mx-f||/||f|| = 4.507e-16 by one matrix-vector product",
+   "solution_vector_sha256": "6f3057770fe85d30d8c893043cdf505b826182ce1262646dc7a5113c76f4e0c3",
+   "committed": false
+  },
+  "locality": {
+   "LB1_over_A0": 0.8386641015363427,
+   "LB2_over_A0": 0.9245781403596461,
+   "meaning": "a trial field supported only on the port-face edges recovers this fraction of the exact complete moment"
+  },
+  "palace_box_ratio_vs_uniform_bound_ratio": {
+   "palace_base_to_box2": 3.867207599697795,
+   "uniform_LB2_level0_to_level2": 3.8928514938839913
+  }
+ }
+}

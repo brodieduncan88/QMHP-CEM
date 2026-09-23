@@ -1,0 +1,93 @@
+{
+ "label": "N2R PARTIAL MOMENTS - RECONCILED, AND THE TAIL OF A LEFT OPEN",
+ "what_this_establishes": "the quantity the existing analysis calls 'a' IS the first moment A = sum_m p_m f_m^2 of the identity verified in moment_identities.py. Both variants reproduce the recorded a/N and a values to better than 1e-9 from the raw columns, so the identity A = q^H M^-1 q applies to the recorded number directly.",
+ "variants": {
+  "A_all_saved_modes": {
+   "modes": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "N_partial": 0.999254583555896,
+   "A_partial_GHz2": 2.351511939494728,
+   "A_over_N_GHz2": 2.3532661027450668,
+   "recorded_a_over_N": 2.3532661027450668,
+   "recorded_a_with_N_equals_one": 2.351511939494728,
+   "reproduces_the_record": true
+  },
+  "B_field_resonant_only": {
+   "modes": [
+    1,
+    2,
+    5,
+    8
+   ],
+   "N_partial": 0.99924952433099,
+   "A_partial_GHz2": 2.3508870351819766,
+   "A_over_N_GHz2": 2.3526526437487423,
+   "recorded_a_over_N": 2.3526526437487423,
+   "recorded_a_with_N_equals_one": 2.3508870351819766,
+   "reproduces_the_record": true
+  }
+ },
+ "bookkeeping_correction": {
+  "the_inconsistency": "the N interval quoted previously used ALL NINE weights, while the a/N denominator sweep it was compared against used variant B's four. They are different denominators and must not appear in one budget.",
+  "N_all_nine": 0.999254583555896,
+  "N_variant_B": 0.99924952433099,
+  "difference_in_N": 5.059224906012183e-06,
+  "difference_in_N_relative": 5.062998948685014e-06,
+  "difference_in_A_GHz2": 0.0006249043127515286,
+  "difference_in_A_relative": 0.0002657457537237946,
+  "size": "the inconsistency is real but small - 5.1e-06 in N (5e-04 of it) and 6.2e-04 GHz^2 in A (2.7e-04 of it). It is corrected by quoting one variant throughout, not by arguing it does not matter."
+ },
+ "the_tail_of_A_is_not_controlled_by_the_tail_of_N": {
+  "delta_saved_all_nine": 0.0007454164441039746,
+  "statement": "a weight w omitted at frequency F contributes w to N and w F^2 to A. For fixed w, w F^2 is unbounded in F. So 'approximately zero omitted weight' constrains N and constrains NOTHING about A without an independent bound on F or on the moment itself.",
+  "scenarios": [
+   {
+    "F_GHz": 12.0,
+    "contribution_to_A_GHz2": 0.10733996795097234,
+    "as_a_fraction_of_A_partial": 0.045647213670552994
+   },
+   {
+    "F_GHz": 15.0,
+    "contribution_to_A_GHz2": 0.16771869992339428,
+    "as_a_fraction_of_A_partial": 0.07132377136023905
+   },
+   {
+    "F_GHz": 20.0,
+    "contribution_to_A_GHz2": 0.2981665776415898,
+    "as_a_fraction_of_A_partial": 0.1267978157515361
+   },
+   {
+    "F_GHz": 30.0,
+    "contribution_to_A_GHz2": 0.6708747996935771,
+    "as_a_fraction_of_A_partial": 0.2852950854409562
+   },
+   {
+    "F_GHz": 50.0,
+    "contribution_to_A_GHz2": 1.8635411102599364,
+    "as_a_fraction_of_A_partial": 0.7924863484471005
+   },
+   {
+    "F_GHz": 100.0,
+    "contribution_to_A_GHz2": 7.454164441039746,
+    "as_a_fraction_of_A_partial": 3.169945393788402
+   },
+   {
+    "F_GHz": 200.0,
+    "contribution_to_A_GHz2": 29.816657764158983,
+    "as_a_fraction_of_A_partial": 12.679781575153608
+   }
+  ],
+  "these_are_scenarios_not_bounds": "each row asks what WOULD follow if the whole of delta_saved were a single mode at that frequency. Nothing in the committed data says any of them is the case, nothing establishes that the missing spectrum lies in 12-50 GHz, and the list is not an uncertainty interval. The 100 and 200 GHz rows are included precisely to show the data does not close the top end.",
+  "no_universal_tail_rate_is_claimed": "p_m = (q^H E_m)^2 / lambda_m has a 1/lambda denominator, but the numerator (q^H E_m)^2 varies with the mode and is not bounded below or above by anything measured here. A 1/omega^2 decay rate cannot be asserted from the denominator alone, and no rate is assumed in this record."
+ },
+ "what_a_direct_measurement_of_A_would_settle": "A - A_partial is EXACTLY the omitted first moment, measured rather than scenarioed. If it is small the whole placement table above is excluded as a class, without assuming anything about where the missing weight sits. That is the tail bound the correction calls for, and no number of extra eigenmodes supplies it cheaply."
+}

@@ -1,0 +1,201 @@
+{
+ "schema": "qmhp-cem.source-register/0.2.0",
+ "purpose": "Every file a SOURCE-BOUND parameter of the coupled-candidate declaration cites, with its sha256 at the time of declaration. The offline check recomputes every digest; a mismatch fails closed.",
+ "repository_commit_at_declaration": "e736226 (main) -> branch palace/physical-coupled-candidate",
+ "sources": [
+  {
+   "id": "master_requirements",
+   "path": "master/qmhp_v158f_requirements.yaml",
+   "sha256": "b4f92c4cd05b77258706577909f6d1bb17073468bd6cfbc8126ce37942a7adde",
+   "revision": "v1.5.8f (schema qmhp-cem.master-requirements/0.1.0)",
+   "authority": "level 3 frozen requirements",
+   "binds": [
+    "EC_over_h_GHz L26",
+    "EJ_over_h_GHz L27",
+    "EL_over_h_GHz L28",
+    "phi_ext L29",
+    "logical_states/sink_state L30-31",
+    "static hamiltonian and grid L34-45",
+    "dressed_system.hamiltonian L75",
+    "coupling_g_GHz L73 (VERIFIED-COMPUTATIONAL, L74)",
+    "production root_GHz L85",
+    "high-truncation root L89",
+    "purcell filter L115-117",
+    "collision limit L122",
+    "coupling_extraction.max_relative_disagreement L151 (ENGINEERING-RULE)",
+    "conventions L192-199"
+   ]
+  },
+  {
+   "id": "validation_gates",
+   "path": "master/validation_gates.yaml",
+   "sha256": "9827b49d009c50d85f8e3a713bf1b2b2f29141d85949c8f1fd2fa4a35b40fe69",
+   "revision": "v1.5.8f",
+   "authority": "level 3",
+   "binds": [
+    "COUPLING_EXTRACTION gate L111-123 (HARD, 0.10, ENGINEERING-RULE, no silent averaging)"
+   ]
+  },
+  {
+   "id": "provenance",
+   "path": "master/provenance.json",
+   "sha256": "51b9fdbddcc0e2251e4ae3d8a50ae8d55b7b1b8b2b1b896afe185822d3f8aaa2",
+   "revision": "qmhp-cem.provenance/0.1.0",
+   "authority": "provenance record",
+   "binds": [
+    "master PDF digest status UNRESOLVED L6-16",
+    "reference bundle 27/29 verified"
+   ]
+  },
+  {
+   "id": "cem_spec",
+   "path": "QMHP-CEM_v0.1_Spec.md",
+   "sha256": "dd1386a44d99efbc90864dfa9c1015d5fb19a7ff37484722bc37dd3cbfd3267a",
+   "revision": "0.1.0",
+   "authority": "level 2 software authority",
+   "binds": [
+    "§4.1-4.4 device and pins",
+    "§5.5 coupling extraction",
+    "§7.3 frame",
+    "§7.4-7.5 Object 001",
+    "§10.3 Palace provenance",
+    "§15 deferred scope (coupler/readout co-design, multi-device cell, ports/de-embedding)"
+   ]
+  },
+  {
+   "id": "object001_seed",
+   "path": "config/object001_seed.yaml",
+   "sha256": "2edc0df3df76e761e2fdc9a72029188a52167e5b8937904648dd9cfaed081fa2",
+   "revision": "qmhp-cem.candidate/0.1.0, QMHP-CEM-A-RF-000001",
+   "authority": "ENGINEERING-SEED",
+   "binds": [
+    "chip 20x20x0.43 mm",
+    "vacuum cavity 22x22, height above chip 1.50 mm",
+    "package, recess, lid, launches"
+   ]
+  },
+  {
+   "id": "palace_golden_candidate",
+   "path": "solvers/palace/golden/QMHP-CEM-A-RF-000001.json",
+   "sha256": "ff9025e3a90aeee06e0d0d7b9b4130b044c8392cc53b0a742c8315b1489d3be3",
+   "revision": "golden, digest pinned by solvers/palace/golden/GOLDEN.sha256",
+   "authority": "ENGINEERING-SEED (frozen golden input)",
+   "binds": [
+    "same as object001_seed; the golden empty-box domain 22x22x1.5 mm"
+   ]
+  },
+  {
+   "id": "readout_replication",
+   "path": "reference/v1_5_8f_release_bundle/qmhp_v158f_readout_replication.py",
+   "sha256": "ba8486b19d34b61cd2ccff9e0bd76b53c348d1834f40f8c5fffc21ad8880d490",
+   "revision": "v1.5.8f release bundle, AMD-C manifest entry",
+   "authority": "physics authority of the reference bundle (reference/README.md)",
+   "binds": [
+    "EC0, EJ0, EL0, g = 0.150 L15",
+    "static grid and charge operator L17-25",
+    "dressed Hamiltonian pulls() L27-39 (g*nm[i,j]*x_ph, x_ph = a + a^dag)",
+    "null root bracket L41-43"
+   ]
+  },
+  {
+   "id": "master_pdf_final",
+   "path": "reference/v1_5_8f_release_bundle/QMHP-CoPro_v1_5_8f_Master_Final.pdf",
+   "sha256": "7a01e25b5814420011b54b096619baef63441387ad0a3185f894693a71bd9445",
+   "revision": "v1.5.8f Master (Final, build 2)",
+   "authority": "level 1 (frozen Master; note provenance.json digest dispute)",
+   "binds": [
+    "Branch A/B/C definitions (extracted text L175-181)",
+    "g/2pi = 150 MHz printed (extracted text L202)",
+    "no mediator, SQUID, V2A or five-node content (0 hits)"
+   ]
+  },
+  {
+   "id": "master_pdf_full",
+   "path": "reference/v1_5_8f_release_bundle/QMHP-CoPro_v1_5_8f_Full_Edition.pdf",
+   "sha256": "1527953cffae03bf6aa44e7d4698c08e30585baf4b357d5e21d477defcc146d2",
+   "revision": "v1.5.8f Full Edition",
+   "authority": "level 1",
+   "binds": [
+    "H/h = 4E_C n^2 + 1/2 E_L phi^2 - E_J cos(phi - phi_ext), [phi, n] = i (extracted text L237-240)",
+    "g/2pi = 150 MHz (L333)",
+    "17 per-device readout roots, >= 10 MHz same-feedline separation (L361-364)",
+    "no mediator/SQUID/V2A content (0 hits)"
+   ]
+  },
+  {
+   "id": "v2a_assessment",
+   "path": "docs/v2a/G0-followup-audit-v0.1-deep-research-assessment.md",
+   "sha256": "3bcb4dab2b0957853a24ebf68d764361adb77ded9c1dc719d90469528a455611",
+   "revision": "received 2026-09-14",
+   "authority": "received assessment; NOT a source of bound parameters",
+   "binds": [
+    "five-node hypothesis description only (L17, L43-45); every number it reports is REPORTED-NOT-REPRODUCED"
+   ]
+  },
+  {
+   "id": "v2a_registration",
+   "path": "docs/v2a/m3-coherent-prescreen-registration.md",
+   "sha256": "e56d4809d02873f7a3783a2e4a5905b109997145070a4e24856c01de0efe4011",
+   "revision": "v0.1-draft, BIND fields open",
+   "authority": "draft registration; NOT a source of bound parameters",
+   "binds": [
+    "conventions the coupled circuit must declare: R1c SQUID sign and flux allocation, R2 port normalisation and phase reference"
+   ]
+  },
+  {
+   "id": "v2a_reported_not_reproduced",
+   "path": "docs/v2a/reported-not-reproduced.md",
+   "sha256": "c82c66d7ab79be8d15e811744f3039fe807dea30030c4a279926c71a244c689b",
+   "revision": "reference list",
+   "authority": "register of unreproduced inputs",
+   "binds": [
+    "f_22, Delta_min, n_C, zeta, overlaps: on report only"
+   ]
+  },
+  {
+   "id": "palace_verify_main",
+   "path": "results/PALACE-VERIFY-20260915T115901Z/summary.json",
+   "sha256": "b9078b7a476ec472b43f1b85795da89b06b9aea74ae40fe268744d94c1984cf4",
+   "revision": "main e736226, workflow run 34964909999",
+   "authority": "executed numerical-verification record",
+   "binds": [
+    "first Object 001 package mode 9.635690 GHz (band ceiling rationale)",
+    "measured DOF/runtime references for the compute budget"
+   ]
+  },
+  {
+   "id": "palace_golden_main",
+   "path": "results/PALACE-GOLDEN-20260915T115911Z/QMHP-CEM-A-RF-000001/solver/postpro/eig.csv",
+   "sha256": "19877b1e7acad8f2787b7d193a23a906bb1b8f9385c3a6cb53dd4bafb505fdfa",
+   "revision": "main, workflow run 34964909848",
+   "authority": "executed golden record",
+   "binds": [
+    "golden empty-box modes; unchanged by this checkpoint"
+   ]
+  }
+ ],
+ "palace_pinned": {
+  "version": "0.13.0",
+  "commit": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+  "image": "qmhp-cem/palace:0.13.0",
+  "gslib": "ON",
+  "docs_checked": "docs/src/config/{boundaries,solver,domains,model,problem}.md, docs/src/guide/{postprocessing,problem,boundaries,model}.md, docs/src/reference.md, examples/cpw/*.json; source palace/drivers/{drivensolver,eigensolver,electrostaticsolver,basesolver}.cpp, palace/models/{lumpedportoperator,postoperator}.cpp, palace/fem/{interpolator,lumpedelement}.cpp at tag v0.13.0"
+ },
+ "absent_from_every_source": [
+  "mediator (SQUID-transmon) E_J, E_C, junction asymmetry, flux bias point, bare frequency, anharmonicity",
+  "fluxonium-mediator coupling (type, capacitance, g)",
+  "a second fluxonium parameter set distinct from the nominal Branch-A device",
+  "direct fluxonium-fluxonium coupling or spectator model",
+  "second readout mode frequency; per-device readout allocation beyond '>= 10 MHz same-feedline separation'",
+  "readout resonator impedance, type (lambda/4 or lambda/2), CPW dimensions, kappa design value",
+  "physical realisation of g = 150 MHz (coupling capacitance, resonator zero-point voltage)",
+  "junction critical current or area; superinductor inductance in nH, array count; shunt or intrinsic capacitances",
+  "electrode geometry, gaps, metallisation thickness",
+  "substrate material and permittivity, metal, loss tangent",
+  "port definitions, impedances, excitation type, de-embedding reference planes (spec §15 defers them)",
+  "Purcell filter topology and element values",
+  "flux-bias line geometry and mediator flux control",
+  "the five-node capacitance matrix, its diagonalisation and the frozen coupled Hamiltonian file of the V2A audit",
+  "Branch B contract (Appendix M) text"
+ ]
+}

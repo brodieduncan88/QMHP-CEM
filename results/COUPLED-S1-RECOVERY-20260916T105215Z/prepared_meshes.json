@@ -1,0 +1,84 @@
+{
+  "R1": {
+    "base_level": 2,
+    "h_gap_mm": 0.006666666666666666,
+    "h_far_mm": 0.2222222222222222,
+    "halo_mm": 0.08,
+    "port_refinement": {
+      "h_port_mm": 0.003333333333333333,
+      "pad_mm": 0.01,
+      "transition_mm": 0.02,
+      "ports": [
+        "port_F1"
+      ],
+      "field": "gmsh Box (VIn = h_port, VOut = h_far, Thickness = transition)",
+      "combination": "Min with the existing conductor/etch Threshold",
+      "can_only_refine": true,
+      "holds_fixed": "h_far, the conductor/etch Distance field, the halo, the geometry, the materials, the port dimensions and inductance, the boundary conditions and the physical groups"
+    },
+    "h_port_over_h_gap": 0.5,
+    "measured": {
+      "dof_order1": 80762,
+      "dof_order2": 424836,
+      "tetrahedra": 65068,
+      "nodes": 14175,
+      "edges": 80762,
+      "mesh_sha256": "a49ef282c7f07c56f210a450b291a2e027de530ba7c3e78bbdcead3b67315fee",
+      "mesh_filename": "coupled_chip_cell_L2_R1.msh",
+      "dry_run_wall_clock_s": 17.507833895999738,
+      "gmsh_version": "4.15.2"
+    },
+    "budget": {
+      "dof_budget": 250000,
+      "fraction_of_budget": 0.323048,
+      "within_budget_order1": true
+    },
+    "port_face": {
+      "triangles": 176,
+      "equivalent_element_size_mm": 0.00323995024986952,
+      "elements_across_width": 6.172934291446433,
+      "achieved_over_requested": 0.9719850749608561
+    }
+  },
+  "R2": {
+    "base_level": 2,
+    "h_gap_mm": 0.006666666666666666,
+    "h_far_mm": 0.2222222222222222,
+    "halo_mm": 0.08,
+    "port_refinement": {
+      "h_port_mm": 0.0016666666666666666,
+      "pad_mm": 0.01,
+      "transition_mm": 0.02,
+      "ports": [
+        "port_F1"
+      ],
+      "field": "gmsh Box (VIn = h_port, VOut = h_far, Thickness = transition)",
+      "combination": "Min with the existing conductor/etch Threshold",
+      "can_only_refine": true,
+      "holds_fixed": "h_far, the conductor/etch Distance field, the halo, the geometry, the materials, the port dimensions and inductance, the boundary conditions and the physical groups"
+    },
+    "h_port_over_h_gap": 0.25,
+    "measured": {
+      "dof_order1": 111238,
+      "dof_order2": 590446,
+      "tetrahedra": 91233,
+      "nodes": 18487,
+      "edges": 111238,
+      "mesh_sha256": "5a983c9125a9b9cefff017275e4088853fd93e4e9a41eee2109a2edb25c97bca",
+      "mesh_filename": "coupled_chip_cell_L2_R2.msh",
+      "dry_run_wall_clock_s": 21.12600177000013,
+      "gmsh_version": "4.15.2"
+    },
+    "budget": {
+      "dof_budget": 250000,
+      "fraction_of_budget": 0.444952,
+      "within_budget_order1": true
+    },
+    "port_face": {
+      "triangles": 680,
+      "equivalent_element_size_mm": 0.001648315031553526,
+      "elements_across_width": 12.133602871503351,
+      "achieved_over_requested": 0.9889890189321158
+    }
+  }
+}

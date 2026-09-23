@@ -1,0 +1,1316 @@
+{
+ "approved_pilot": [
+  {
+   "finite_element_order": 2,
+   "halo_mm": 0.08,
+   "level": 1,
+   "name": "P1",
+   "purpose": "the reference solve"
+  },
+  {
+   "finite_element_order": 1,
+   "halo_mm": 0.08,
+   "level": 1,
+   "name": "P2",
+   "purpose": "element-order sensitivity, against P1"
+  },
+  {
+   "finite_element_order": 2,
+   "halo_mm": 0.12,
+   "level": 1,
+   "name": "P3",
+   "purpose": "halo sensitivity, against P1"
+  }
+ ],
+ "batch_id": "COUPLED-PILOT-20260916T035733Z",
+ "declaration": {
+  "id": "QMHP-CEM-A-CC-000001",
+  "path": "/home/runner/work/QMHP-CEM/QMHP-CEM/config/coupled/v2a_five_node_candidate.json",
+  "sha256": "6d1e21a75f44ed67027f6b69dcda93ee667d396a78737b223022cc78e7617dcf"
+ },
+ "dof_budget": 250000,
+ "ended_utc": "2026-09-16T05:14:47.653815+00:00",
+ "environment": {
+  "architecture": "x86_64",
+  "docker_available": true,
+  "mpi_processes": 1,
+  "os": "Linux 6.17.0-1022-azure",
+  "python_version": "3.11.16"
+ },
+ "halo_criteria": {
+  "max_relative_frequency_change": 0.0001,
+  "max_relative_participation_change": 0.01
+ },
+ "halo_verdict": {
+  "criteria": {
+   "max_relative_frequency_change": 0.0001,
+   "max_relative_participation_change": 0.01
+  },
+  "delta_f_relative": 0.062153261978918996,
+  "delta_p_relative": 1.6477708822867019,
+  "frequency_check": "FAIL",
+  "frozen_in": "execution-proposal.md \u00a74.2",
+  "participation_check": "FAIL",
+  "reason": "the frequency check failed, which indicates the level-1 mesh is too coarse for this geometry or the model is wrong, not that the halo is bad; the halo question is not answerable from this pilot",
+  "verdict": "NOT-A-HALO-VERDICT"
+ },
+ "image": {
+  "image": "qmhp-cem/palace:0.13.0",
+  "image_id": "sha256:30c91c71d34ba29e49aa6ebcb67220800622251a0dd4cc8ea5dc7e8b229b945c",
+  "labels": {
+   "org.opencontainers.image.description": "Palace EM solver for QMHP-CEM, built from the pinned release tag",
+   "org.opencontainers.image.title": "qmhp-cem/palace",
+   "org.opencontainers.image.version": "24.04",
+   "org.qmhp.cem.apt-snapshot": "20260914T000000Z",
+   "org.qmhp.cem.palace-commit": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+   "org.qmhp.cem.palace-gslib": "ON",
+   "org.qmhp.cem.palace-version": "0.13.0",
+   "org.qmhp.cem.solver": "palace",
+   "org.qmhp.cem.spec": "QMHP-CEM v0.2 \u00a710.3"
+  },
+  "repo_digest": null,
+  "runtime": "docker"
+ },
+ "next_stage": {
+  "disposition": "REQUIRES-ANOTHER-BOUNDED-NUMERICAL-CHECK",
+  "reason": "the frequency check failed, which indicates the level-1 mesh is too coarse for this geometry or the model is wrong, not that the halo is bad; the halo question is not answerable from this pilot",
+  "statuses": {
+   "P1": "COMPLETED",
+   "P2": "COMPLETED",
+   "P3": "COMPLETED"
+  }
+ },
+ "order_verdict": {
+  "note": "the order-1 difference is reported as the measured cost of the cheaper discretisation",
+  "order_sensitivity_delta_f_relative": 0.2036728984386211,
+  "order_sensitivity_delta_p_relative": 0.9998862940401118,
+  "reason": "P1 completed inside its 45 minute cap, so order 2 is selected",
+  "rule": "execution-proposal.md \u00a74.3",
+  "selected_order": 2,
+  "wall_clock_s": 2009.722625085
+ },
+ "p1_vs_p2": {
+  "available": true,
+  "comparison": "P1 vs P2: element order at a fixed 0.08 mm halo",
+  "delta_f_relative": 0.2036728984386211,
+  "delta_p_relative": 0.9998862940401118,
+  "fluxonium_like_mode": {
+   "P1": {
+    "frequency_GHz": 1.707441654,
+    "site_participation": 0.9979639976
+   },
+   "P2": {
+    "frequency_GHz": 1.158332505,
+    "site_participation": 0.9985099177
+   }
+  },
+  "modes_in_window": {
+   "P1": 3,
+   "P2": 8
+  },
+  "readout_like_mode": {
+   "P1": {
+    "frequency_GHz": 8.845860386,
+    "site_participation": -1.219227886e-07
+   },
+   "P2": {
+    "frequency_GHz": 7.044198362,
+    "site_participation": -1.386334771e-11
+   }
+  }
+ },
+ "p1_vs_p3": {
+  "available": true,
+  "comparison": "P1 vs P3: halo at a fixed order 2",
+  "delta_f_relative": 0.062153261978918996,
+  "delta_p_relative": 1.6477708822867019,
+  "fluxonium_like_mode": {
+   "P1": {
+    "frequency_GHz": 1.707441654,
+    "site_participation": 0.9979639976
+   },
+   "P3": {
+    "frequency_GHz": 1.784105812,
+    "site_participation": 0.9982989962
+   }
+  },
+  "modes_in_window": {
+   "P1": 3,
+   "P3": 4
+  },
+  "readout_like_mode": {
+   "P1": {
+    "frequency_GHz": 8.845860386,
+    "site_participation": -1.219227886e-07
+   },
+   "P3": {
+    "frequency_GHz": 8.296061308,
+    "site_participation": 1.882190014e-07
+   }
+  }
+ },
+ "performed_coupling_extraction": false,
+ "performed_route_b": false,
+ "runs": {
+  "P1": {
+   "clearance_report": [],
+   "config": {
+    "Boundaries": {
+     "LumpedPort": [
+      {
+       "Attributes": [
+        10
+       ],
+       "Direction": "+Y",
+       "Index": 1,
+       "L": 1.0345665367517793e-07
+      }
+     ],
+     "PEC": {
+      "Attributes": [
+       2,
+       4
+      ]
+     }
+    },
+    "Domains": {
+     "Materials": [
+      {
+       "Attributes": [
+        1
+       ],
+       "LossTan": 0.0,
+       "Permeability": 1.0,
+       "Permittivity": 1.0
+      },
+      {
+       "Attributes": [
+        3
+       ],
+       "LossTan": 0.0,
+       "Permeability": 1.0,
+       "Permittivity": 11.45
+      }
+     ]
+    },
+    "Model": {
+     "L0": 0.001,
+     "Mesh": "coupled_chip_cell_L1.msh",
+     "Refinement": {
+      "UniformLevels": 0
+     }
+    },
+    "Problem": {
+     "Output": "postpro",
+     "Type": "Eigenmode",
+     "Verbose": 2
+    },
+    "Solver": {
+     "Device": "CPU",
+     "Eigenmode": {
+      "N": 6,
+      "Save": 0,
+      "Target": 0.5,
+      "Tol": 1e-06
+     },
+     "Linear": {
+      "KSPType": "GMRES",
+      "MaxIts": 400,
+      "Tol": 1e-08,
+      "Type": "Default"
+     },
+     "Order": 2
+    }
+   },
+   "dof_for_this_order": 208670,
+   "equipartition_residuals": [
+    2.6733434345779747e-06,
+    6.827028410944276e-07,
+    0.999969635852171,
+    0.9999656513721553,
+    0.9999648060346733,
+    0.9999624098894617
+   ],
+   "log_memory_lines": [
+    "Memory configuration: host-std"
+   ],
+   "max_backward_error": 7.865973704e-11,
+   "mesh": {
+    "aborted_reason": null,
+    "dof_budget": 250000,
+    "estimated": {
+     "dof_order2_from_per_tetrahedron_ratio": 261457,
+     "dof_per_tetrahedron_order2": 8.2,
+     "note": "cross-check only, and the only estimated quantity in this report: the 8.2 DOF per tetrahedron was measured on the empty-box mesh family of the verification campaign and is extrapolated here to a different mesh family. Nothing in the disposition uses it.",
+     "ratio_to_measured": 1.252968802415297
+    },
+    "format": "msh2.2-ascii",
+    "gmsh_version": "4.15.2",
+    "h0_gap_mm": 0.01,
+    "h_far_mm": 0.3333333333333333,
+    "h_gap_mm": 0.01,
+    "halo_mm": 0.08,
+    "level": 1,
+    "max_surface_elements": 400000,
+    "measured": {
+     "dof_order1": 39832,
+     "dof_order2": 208670,
+     "edges": 39832,
+     "faces": 64503,
+     "min_gap_elements": 2.0,
+     "nodes": 7215,
+     "note": "DOF = edges (order 1) and 2*edges + 2*faces (order 2) for MFEM Nedelec spaces on tetrahedra; both are measured from the mesh topology, not estimated. The count is the assembled space dimension before any essential-boundary elimination, so it is an upper bound on the size Palace factorises, and it is exactly what Palace reports as Problem.DegreesOfFreedom.",
+     "surface_elements_total": 13322,
+     "tetrahedra": 31885,
+     "tetrahedra_by_tag": {
+      "substrate": 14838,
+      "vacuum": 17047
+     },
+     "triangles_by_tag": {
+      "outer_pec": 1466,
+      "port_F1": 17,
+      "port_R1_a": 13,
+      "port_R1_b": 13,
+      "sheet_pec": 6784
+     }
+    },
+    "mesh_file": "coupled_chip_cell_L1.msh",
+    "mesh_path": "results/COUPLED-PILOT-20260916T035733Z/P1/solver/coupled_chip_cell_L1.msh",
+    "model": "coupled_chip_cell",
+    "physical_groups": {
+     "outer_pec": 2,
+     "port_F1": 10,
+     "port_R1_a": 11,
+     "port_R1_b": 12,
+     "sheet_pec": 4,
+     "substrate": 3,
+     "vacuum": 1
+    },
+    "scale": 1.0,
+    "sha256": "b21424959652487eca005893d9b1900e9b278f973290c280c786f72d42fac300",
+    "wall_clock_s": 8.397521022999996,
+    "within_budget_order1": true,
+    "within_budget_order2": true
+   },
+   "modes": [
+    {
+     "backward_error": 2.501892615e-11,
+     "frequency_GHz": 1.707441654,
+     "frequency_im_GHz": -2.735119502e-09,
+     "in_declared_window": true,
+     "index": 1,
+     "quality_factor": 312132916.4,
+     "site_participation": 0.9979639976
+    },
+    {
+     "backward_error": 7.865973704e-11,
+     "frequency_GHz": 4.184873507,
+     "frequency_im_GHz": 5.147735367e-08,
+     "in_declared_window": true,
+     "index": 2,
+     "quality_factor": 40647714.08,
+     "site_participation": 0.001203472453
+    },
+    {
+     "backward_error": 4.480125845e-11,
+     "frequency_GHz": 8.845860386,
+     "frequency_im_GHz": -1.390071223e-09,
+     "in_declared_window": true,
+     "index": 3,
+     "quality_factor": 3181801134.0,
+     "site_participation": -1.219227886e-07
+    },
+    {
+     "backward_error": 3.984709767e-11,
+     "frequency_GHz": 9.271015245,
+     "frequency_im_GHz": 2.220264878e-10,
+     "in_declared_window": false,
+     "index": 4,
+     "quality_factor": 20878173900.0,
+     "site_participation": 1.692210995e-07
+    },
+    {
+     "backward_error": 4.803572806e-11,
+     "frequency_GHz": 9.432440938,
+     "frequency_im_GHz": 3.501095519e-09,
+     "in_declared_window": false,
+     "index": 5,
+     "quality_factor": 1347069922.0,
+     "site_participation": 5.901272598e-08
+    },
+    {
+     "backward_error": 4.939855689e-11,
+     "frequency_GHz": 9.666430579,
+     "frequency_im_GHz": 3.316662333e-09,
+     "in_declared_window": false,
+     "index": 6,
+     "quality_factor": 1457252745.0,
+     "site_participation": 6.986448939e-08
+    }
+   ],
+   "modes_in_window": [
+    {
+     "backward_error": 2.501892615e-11,
+     "frequency_GHz": 1.707441654,
+     "frequency_im_GHz": -2.735119502e-09,
+     "in_declared_window": true,
+     "index": 1,
+     "quality_factor": 312132916.4,
+     "site_participation": 0.9979639976
+    },
+    {
+     "backward_error": 7.865973704e-11,
+     "frequency_GHz": 4.184873507,
+     "frequency_im_GHz": 5.147735367e-08,
+     "in_declared_window": true,
+     "index": 2,
+     "quality_factor": 40647714.08,
+     "site_participation": 0.001203472453
+    },
+    {
+     "backward_error": 4.480125845e-11,
+     "frequency_GHz": 8.845860386,
+     "frequency_im_GHz": -1.390071223e-09,
+     "in_declared_window": true,
+     "index": 3,
+     "quality_factor": 3181801134.0,
+     "site_participation": -1.219227886e-07
+    }
+   ],
+   "palace_metadata": {
+    "ElapsedTime": {
+     "Counts": {
+      "Adaptation": 0,
+      "CoarseSolve": 1269,
+      "Construction": 2,
+      "DiskIO": 1,
+      "Div.-FreeProjection": 42,
+      "EigenvalueSolve": 1,
+      "Estimation": 12,
+      "Initialization": 1,
+      "LinearSolve": 40,
+      "OperatorConstruction": 1,
+      "PROMConstruction": 0,
+      "PROMSolve": 0,
+      "Postprocessing": 1,
+      "Preconditioner": 1269,
+      "Rebalancing": 0,
+      "Setup": 1,
+      "Solve": 12,
+      "TimeStepping": 0,
+      "Total": 1,
+      "WavePorts": 0
+     },
+     "Durations": {
+      "Adaptation": 0.0,
+      "CoarseSolve": 18.80475094699999,
+      "Construction": 3.60007674,
+      "DiskIO": 0.122856048,
+      "Div.-FreeProjection": 288.69671542299994,
+      "EigenvalueSolve": 2.331912442,
+      "Estimation": 0.5183648260000001,
+      "Initialization": 0.392532745,
+      "LinearSolve": 120.99562238900002,
+      "OperatorConstruction": 2.200585568,
+      "PROMConstruction": 0.0,
+      "PROMSolve": 0.0,
+      "Postprocessing": 1.277294959,
+      "Preconditioner": 1339.6321306060006,
+      "Rebalancing": 0.0,
+      "Setup": 9.742232025,
+      "Solve": 219.066749012,
+      "TimeStepping": 0.0,
+      "Total": 2007.605859808,
+      "WavePorts": 0.0
+     }
+    },
+    "GitTag": "v0.13.0",
+    "LinearSolver": {
+     "TotalIts": 1229,
+     "TotalSolves": 40
+    },
+    "Problem": {
+     "DegreesOfFreedom": 208670,
+     "MPISize": 1,
+     "MeshElements": 31885,
+     "MultigridDegreesOfFreedom": [
+      39832,
+      208670
+     ]
+    }
+   },
+   "port_inductance_H": 1.0345665367517793e-07,
+   "run": {
+    "command": [
+     "docker",
+     "run",
+     "--rm",
+     "--network",
+     "none",
+     "--hostname",
+     "localhost",
+     "--name",
+     "qmhp-coupled-pilot-p1",
+     "--user",
+     "1001:1001",
+     "-e",
+     "HOME=/tmp",
+     "-e",
+     "OMP_NUM_THREADS=1",
+     "-e",
+     "OPENBLAS_NUM_THREADS=1",
+     "-v",
+     "/home/runner/work/QMHP-CEM/QMHP-CEM/results/COUPLED-PILOT-20260916T035733Z/P1/solver:/work",
+     "-w",
+     "/work",
+     "qmhp-cem/palace:0.13.0",
+     "-np",
+     "1",
+     "config.json"
+    ],
+    "memory_note": "ru_maxrss measures the container runtime CLI in this process tree, not the solver inside the container. Any solver-side figure below is quoted from Palace's own log.",
+    "returncode": 0,
+    "runner_cli_peak_rss_kb": 162992,
+    "runner_cli_peak_rss_kb_delta": 0,
+    "started_utc": "2026-09-16T03:57:42.109769+00:00",
+    "timed_out": false,
+    "timeout_s": 2700,
+    "wall_clock_s": 2009.722625085
+   },
+   "solver_rules": {
+    "band_ceiling_GHz": 9.0,
+    "band_floor_GHz": 0.5,
+    "eigenmode_backward_error_max_tolerance": 1e-06,
+    "eigenmode_target_GHz": 0.5,
+    "eigenmodes_requested": 6,
+    "eigenvalue_tolerance": 1e-06,
+    "linear_solver_max_iterations": 400,
+    "linear_solver_tolerance": 1e-08,
+    "mesh_size_rule": "min_gap/2 at conductor and etch edges, min(cell_x, cell_y)/12 beyond the halo",
+    "model": "S1 bounded chip cell: vacuum and substrate volumes, zero-thickness PEC sheets for the ground plane and conductors, PEC outer walls, one lumped inductive port at the F1 element site carrying the declared superinductor. The readout tap surfaces carry no boundary condition in Route A. This is NOT the empty Object 001 box of the golden path."
+   },
+   "spec": {
+    "finite_element_order": 2,
+    "halo_mm": 0.08,
+    "level": 1,
+    "name": "P1",
+    "purpose": "the reference solve"
+   },
+   "status": "COMPLETED",
+   "within_dof_budget": true
+  },
+  "P2": {
+   "clearance_report": [],
+   "config": {
+    "Boundaries": {
+     "LumpedPort": [
+      {
+       "Attributes": [
+        10
+       ],
+       "Direction": "+Y",
+       "Index": 1,
+       "L": 1.0345665367517793e-07
+      }
+     ],
+     "PEC": {
+      "Attributes": [
+       2,
+       4
+      ]
+     }
+    },
+    "Domains": {
+     "Materials": [
+      {
+       "Attributes": [
+        1
+       ],
+       "LossTan": 0.0,
+       "Permeability": 1.0,
+       "Permittivity": 1.0
+      },
+      {
+       "Attributes": [
+        3
+       ],
+       "LossTan": 0.0,
+       "Permeability": 1.0,
+       "Permittivity": 11.45
+      }
+     ]
+    },
+    "Model": {
+     "L0": 0.001,
+     "Mesh": "coupled_chip_cell_L1.msh",
+     "Refinement": {
+      "UniformLevels": 0
+     }
+    },
+    "Problem": {
+     "Output": "postpro",
+     "Type": "Eigenmode",
+     "Verbose": 2
+    },
+    "Solver": {
+     "Device": "CPU",
+     "Eigenmode": {
+      "N": 6,
+      "Save": 0,
+      "Target": 0.5,
+      "Tol": 1e-06
+     },
+     "Linear": {
+      "KSPType": "GMRES",
+      "MaxIts": 400,
+      "Tol": 1e-08,
+      "Type": "Default"
+     },
+     "Order": 1
+    }
+   },
+   "dof_for_this_order": 39832,
+   "equipartition_residuals": [
+    2.4795834224553402e-09,
+    8.844102478489667e-09,
+    0.9998894860071506,
+    0.9999065912271061,
+    0.999899260612898,
+    0.99989364456911,
+    0.9998760516755436,
+    0.9998511132903072,
+    1.3912770330132256e-07
+   ],
+   "log_memory_lines": [
+    "Memory configuration: host-std"
+   ],
+   "max_backward_error": 5.554783822e-12,
+   "mesh": {
+    "aborted_reason": null,
+    "dof_budget": 250000,
+    "estimated": {
+     "dof_order2_from_per_tetrahedron_ratio": 261457,
+     "dof_per_tetrahedron_order2": 8.2,
+     "note": "cross-check only, and the only estimated quantity in this report: the 8.2 DOF per tetrahedron was measured on the empty-box mesh family of the verification campaign and is extrapolated here to a different mesh family. Nothing in the disposition uses it.",
+     "ratio_to_measured": 1.252968802415297
+    },
+    "format": "msh2.2-ascii",
+    "gmsh_version": "4.15.2",
+    "h0_gap_mm": 0.01,
+    "h_far_mm": 0.3333333333333333,
+    "h_gap_mm": 0.01,
+    "halo_mm": 0.08,
+    "level": 1,
+    "max_surface_elements": 400000,
+    "measured": {
+     "dof_order1": 39832,
+     "dof_order2": 208670,
+     "edges": 39832,
+     "faces": 64503,
+     "min_gap_elements": 2.0,
+     "nodes": 7215,
+     "note": "DOF = edges (order 1) and 2*edges + 2*faces (order 2) for MFEM Nedelec spaces on tetrahedra; both are measured from the mesh topology, not estimated. The count is the assembled space dimension before any essential-boundary elimination, so it is an upper bound on the size Palace factorises, and it is exactly what Palace reports as Problem.DegreesOfFreedom.",
+     "surface_elements_total": 13322,
+     "tetrahedra": 31885,
+     "tetrahedra_by_tag": {
+      "substrate": 14838,
+      "vacuum": 17047
+     },
+     "triangles_by_tag": {
+      "outer_pec": 1466,
+      "port_F1": 17,
+      "port_R1_a": 13,
+      "port_R1_b": 13,
+      "sheet_pec": 6784
+     }
+    },
+    "mesh_file": "coupled_chip_cell_L1.msh",
+    "mesh_path": "results/COUPLED-PILOT-20260916T035733Z/P2/solver/coupled_chip_cell_L1.msh",
+    "model": "coupled_chip_cell",
+    "physical_groups": {
+     "outer_pec": 2,
+     "port_F1": 10,
+     "port_R1_a": 11,
+     "port_R1_b": 12,
+     "sheet_pec": 4,
+     "substrate": 3,
+     "vacuum": 1
+    },
+    "scale": 1.0,
+    "sha256": "b21424959652487eca005893d9b1900e9b278f973290c280c786f72d42fac300",
+    "wall_clock_s": 8.062738814000113,
+    "within_budget_order1": true,
+    "within_budget_order2": true
+   },
+   "modes": [
+    {
+     "backward_error": 1.262634881e-17,
+     "frequency_GHz": 1.158332505,
+     "frequency_im_GHz": -1.710216783e-13,
+     "in_declared_window": true,
+     "index": 1,
+     "quality_factor": 3386507829000.0,
+     "site_participation": 0.9985099177
+    },
+    {
+     "backward_error": 3.411566901e-17,
+     "frequency_GHz": 3.693188998,
+     "frequency_im_GHz": 8.391126758e-11,
+     "in_declared_window": true,
+     "index": 2,
+     "quality_factor": 22006514170.0,
+     "site_participation": -0.0009336025799
+    },
+    {
+     "backward_error": 3.786445437e-12,
+     "frequency_GHz": 6.699424816,
+     "frequency_im_GHz": 2.820972499e-11,
+     "in_declared_window": true,
+     "index": 3,
+     "quality_factor": 118743178400.0,
+     "site_participation": 3.410619799e-09
+    },
+    {
+     "backward_error": 8.60241075e-14,
+     "frequency_GHz": 7.044198362,
+     "frequency_im_GHz": -9.086459796e-12,
+     "in_declared_window": true,
+     "index": 4,
+     "quality_factor": 387620620200.0,
+     "site_participation": -1.386334771e-11
+    },
+    {
+     "backward_error": 6.073639452e-14,
+     "frequency_GHz": 7.300317505,
+     "frequency_im_GHz": -2.115618677e-11,
+     "in_declared_window": true,
+     "index": 5,
+     "quality_factor": 172533868800.0,
+     "site_participation": -3.093840197e-11
+    },
+    {
+     "backward_error": 2.741502744e-13,
+     "frequency_GHz": 7.694394165,
+     "frequency_im_GHz": -1.34993032e-10,
+     "in_declared_window": true,
+     "index": 6,
+     "quality_factor": 28499227150.0,
+     "site_participation": -3.709362322e-11
+    },
+    {
+     "backward_error": 6.164458559e-14,
+     "frequency_GHz": 8.184160416,
+     "frequency_im_GHz": 8.224683988e-11,
+     "in_declared_window": true,
+     "index": 7,
+     "quality_factor": 49753646630.0,
+     "site_participation": 3.378874283e-11
+    },
+    {
+     "backward_error": 1.78237874e-13,
+     "frequency_GHz": 8.469360702,
+     "frequency_im_GHz": -1.147944978e-10,
+     "in_declared_window": true,
+     "index": 8,
+     "quality_factor": 36889227550.0,
+     "site_participation": 2.570867651e-11
+    },
+    {
+     "backward_error": 5.554783822e-12,
+     "frequency_GHz": 9.961037312,
+     "frequency_im_GHz": 9.571053033e-11,
+     "in_declared_window": false,
+     "index": 9,
+     "quality_factor": 52037311240.0,
+     "site_participation": -1.893574305e-05
+    }
+   ],
+   "modes_in_window": [
+    {
+     "backward_error": 1.262634881e-17,
+     "frequency_GHz": 1.158332505,
+     "frequency_im_GHz": -1.710216783e-13,
+     "in_declared_window": true,
+     "index": 1,
+     "quality_factor": 3386507829000.0,
+     "site_participation": 0.9985099177
+    },
+    {
+     "backward_error": 3.411566901e-17,
+     "frequency_GHz": 3.693188998,
+     "frequency_im_GHz": 8.391126758e-11,
+     "in_declared_window": true,
+     "index": 2,
+     "quality_factor": 22006514170.0,
+     "site_participation": -0.0009336025799
+    },
+    {
+     "backward_error": 3.786445437e-12,
+     "frequency_GHz": 6.699424816,
+     "frequency_im_GHz": 2.820972499e-11,
+     "in_declared_window": true,
+     "index": 3,
+     "quality_factor": 118743178400.0,
+     "site_participation": 3.410619799e-09
+    },
+    {
+     "backward_error": 8.60241075e-14,
+     "frequency_GHz": 7.044198362,
+     "frequency_im_GHz": -9.086459796e-12,
+     "in_declared_window": true,
+     "index": 4,
+     "quality_factor": 387620620200.0,
+     "site_participation": -1.386334771e-11
+    },
+    {
+     "backward_error": 6.073639452e-14,
+     "frequency_GHz": 7.300317505,
+     "frequency_im_GHz": -2.115618677e-11,
+     "in_declared_window": true,
+     "index": 5,
+     "quality_factor": 172533868800.0,
+     "site_participation": -3.093840197e-11
+    },
+    {
+     "backward_error": 2.741502744e-13,
+     "frequency_GHz": 7.694394165,
+     "frequency_im_GHz": -1.34993032e-10,
+     "in_declared_window": true,
+     "index": 6,
+     "quality_factor": 28499227150.0,
+     "site_participation": -3.709362322e-11
+    },
+    {
+     "backward_error": 6.164458559e-14,
+     "frequency_GHz": 8.184160416,
+     "frequency_im_GHz": 8.224683988e-11,
+     "in_declared_window": true,
+     "index": 7,
+     "quality_factor": 49753646630.0,
+     "site_participation": 3.378874283e-11
+    },
+    {
+     "backward_error": 1.78237874e-13,
+     "frequency_GHz": 8.469360702,
+     "frequency_im_GHz": -1.147944978e-10,
+     "in_declared_window": true,
+     "index": 8,
+     "quality_factor": 36889227550.0,
+     "site_participation": 2.570867651e-11
+    }
+   ],
+   "palace_metadata": {
+    "ElapsedTime": {
+     "Counts": {
+      "Adaptation": 0,
+      "CoarseSolve": 0,
+      "Construction": 2,
+      "DiskIO": 1,
+      "Div.-FreeProjection": 32,
+      "EigenvalueSolve": 1,
+      "Estimation": 12,
+      "Initialization": 1,
+      "LinearSolve": 30,
+      "OperatorConstruction": 1,
+      "PROMConstruction": 0,
+      "PROMSolve": 0,
+      "Postprocessing": 1,
+      "Preconditioner": 60,
+      "Rebalancing": 0,
+      "Setup": 1,
+      "Solve": 12,
+      "TimeStepping": 0,
+      "Total": 1,
+      "WavePorts": 0
+     },
+     "Durations": {
+      "Adaptation": 0.0,
+      "CoarseSolve": 0.0,
+      "Construction": 3.200774608,
+      "DiskIO": 0.123156965,
+      "Div.-FreeProjection": 1.4002916200000004,
+      "EigenvalueSolve": 1.1485833900000002,
+      "Estimation": 0.28553810599999996,
+      "Initialization": 0.391802575,
+      "LinearSolve": 1.5230664989999998,
+      "OperatorConstruction": 1.1155055450000002,
+      "PROMConstruction": 0.0,
+      "PROMSolve": 0.0,
+      "Postprocessing": 1.074488442,
+      "Preconditioner": 1.4576362940000007,
+      "Rebalancing": 0.0,
+      "Setup": 0.023034134,
+      "Solve": 20.139032474000004,
+      "TimeStepping": 0.0,
+      "Total": 32.107663076,
+      "WavePorts": 0.0
+     }
+    },
+    "GitTag": "v0.13.0",
+    "LinearSolver": {
+     "TotalIts": 30,
+     "TotalSolves": 30
+    },
+    "Problem": {
+     "DegreesOfFreedom": 39832,
+     "MPISize": 1,
+     "MeshElements": 31885,
+     "MultigridDegreesOfFreedom": [
+      39832
+     ]
+    }
+   },
+   "port_inductance_H": 1.0345665367517793e-07,
+   "run": {
+    "command": [
+     "docker",
+     "run",
+     "--rm",
+     "--network",
+     "none",
+     "--hostname",
+     "localhost",
+     "--name",
+     "qmhp-coupled-pilot-p2",
+     "--user",
+     "1001:1001",
+     "-e",
+     "HOME=/tmp",
+     "-e",
+     "OMP_NUM_THREADS=1",
+     "-e",
+     "OPENBLAS_NUM_THREADS=1",
+     "-v",
+     "/home/runner/work/QMHP-CEM/QMHP-CEM/results/COUPLED-PILOT-20260916T035733Z/P2/solver:/work",
+     "-w",
+     "/work",
+     "qmhp-cem/palace:0.13.0",
+     "-np",
+     "1",
+     "config.json"
+    ],
+    "memory_note": "ru_maxrss measures the container runtime CLI in this process tree, not the solver inside the container. Any solver-side figure below is quoted from Palace's own log.",
+    "returncode": 0,
+    "runner_cli_peak_rss_kb": 171152,
+    "runner_cli_peak_rss_kb_delta": 0,
+    "started_utc": "2026-09-16T04:31:19.942321+00:00",
+    "timed_out": false,
+    "timeout_s": 2700,
+    "wall_clock_s": 32.355822464000084
+   },
+   "solver_rules": {
+    "band_ceiling_GHz": 9.0,
+    "band_floor_GHz": 0.5,
+    "eigenmode_backward_error_max_tolerance": 1e-06,
+    "eigenmode_target_GHz": 0.5,
+    "eigenmodes_requested": 6,
+    "eigenvalue_tolerance": 1e-06,
+    "linear_solver_max_iterations": 400,
+    "linear_solver_tolerance": 1e-08,
+    "mesh_size_rule": "min_gap/2 at conductor and etch edges, min(cell_x, cell_y)/12 beyond the halo",
+    "model": "S1 bounded chip cell: vacuum and substrate volumes, zero-thickness PEC sheets for the ground plane and conductors, PEC outer walls, one lumped inductive port at the F1 element site carrying the declared superinductor. The readout tap surfaces carry no boundary condition in Route A. This is NOT the empty Object 001 box of the golden path."
+   },
+   "spec": {
+    "finite_element_order": 1,
+    "halo_mm": 0.08,
+    "level": 1,
+    "name": "P2",
+    "purpose": "element-order sensitivity, against P1"
+   },
+   "status": "COMPLETED",
+   "within_dof_budget": true
+  },
+  "P3": {
+   "clearance_report": [],
+   "config": {
+    "Boundaries": {
+     "LumpedPort": [
+      {
+       "Attributes": [
+        10
+       ],
+       "Direction": "+Y",
+       "Index": 1,
+       "L": 1.0345665367517793e-07
+      }
+     ],
+     "PEC": {
+      "Attributes": [
+       2,
+       4
+      ]
+     }
+    },
+    "Domains": {
+     "Materials": [
+      {
+       "Attributes": [
+        1
+       ],
+       "LossTan": 0.0,
+       "Permeability": 1.0,
+       "Permittivity": 1.0
+      },
+      {
+       "Attributes": [
+        3
+       ],
+       "LossTan": 0.0,
+       "Permeability": 1.0,
+       "Permittivity": 11.45
+      }
+     ]
+    },
+    "Model": {
+     "L0": 0.001,
+     "Mesh": "coupled_chip_cell_L1.msh",
+     "Refinement": {
+      "UniformLevels": 0
+     }
+    },
+    "Problem": {
+     "Output": "postpro",
+     "Type": "Eigenmode",
+     "Verbose": 2
+    },
+    "Solver": {
+     "Device": "CPU",
+     "Eigenmode": {
+      "N": 6,
+      "Save": 0,
+      "Target": 0.5,
+      "Tol": 1e-06
+     },
+     "Linear": {
+      "KSPType": "GMRES",
+      "MaxIts": 400,
+      "Tol": 1e-08,
+      "Type": "Default"
+     },
+     "Order": 2
+    }
+   },
+   "dof_for_this_order": 235806,
+   "equipartition_residuals": [
+    8.736370312970894e-06,
+    5.969439509400451e-07,
+    0.999966521015502,
+    0.9999615723607321,
+    0.999958795920593,
+    0.9999586073811082,
+    0.9999226811663011,
+    0.9998806066323163
+   ],
+   "log_memory_lines": [
+    "Memory configuration: host-std"
+   ],
+   "max_backward_error": 1.18872193e-10,
+   "mesh": {
+    "aborted_reason": null,
+    "dof_budget": 250000,
+    "estimated": {
+     "dof_order2_from_per_tetrahedron_ratio": 296348,
+     "dof_per_tetrahedron_order2": 8.2,
+     "note": "cross-check only, and the only estimated quantity in this report: the 8.2 DOF per tetrahedron was measured on the empty-box mesh family of the verification campaign and is extrapolated here to a different mesh family. Nothing in the disposition uses it.",
+     "ratio_to_measured": 1.25674495135832
+    },
+    "format": "msh2.2-ascii",
+    "gmsh_version": "4.15.2",
+    "h0_gap_mm": 0.01,
+    "h_far_mm": 0.3333333333333333,
+    "h_gap_mm": 0.01,
+    "halo_mm": 0.12,
+    "level": 1,
+    "max_surface_elements": 400000,
+    "measured": {
+     "dof_order1": 44890,
+     "dof_order2": 235806,
+     "edges": 44890,
+     "faces": 73013,
+     "min_gap_elements": 2.0,
+     "nodes": 8018,
+     "note": "DOF = edges (order 1) and 2*edges + 2*faces (order 2) for MFEM Nedelec spaces on tetrahedra; both are measured from the mesh topology, not estimated. The count is the assembled space dimension before any essential-boundary elimination, so it is an upper bound on the size Palace factorises, and it is exactly what Palace reports as Problem.DegreesOfFreedom.",
+     "surface_elements_total": 14602,
+     "tetrahedra": 36140,
+     "tetrahedra_by_tag": {
+      "substrate": 16939,
+      "vacuum": 19201
+     },
+     "triangles_by_tag": {
+      "outer_pec": 1466,
+      "port_F1": 17,
+      "port_R1_a": 13,
+      "port_R1_b": 13,
+      "sheet_pec": 7258
+     }
+    },
+    "mesh_file": "coupled_chip_cell_L1.msh",
+    "mesh_path": "results/COUPLED-PILOT-20260916T035733Z/P3/solver/coupled_chip_cell_L1.msh",
+    "model": "coupled_chip_cell",
+    "physical_groups": {
+     "outer_pec": 2,
+     "port_F1": 10,
+     "port_R1_a": 11,
+     "port_R1_b": 12,
+     "sheet_pec": 4,
+     "substrate": 3,
+     "vacuum": 1
+    },
+    "scale": 1.0,
+    "sha256": "3780115712a6f56b09110b1d845f37b0664720f2e84035e4d8bc3c5e74c3bb24",
+    "wall_clock_s": 7.841307495000365,
+    "within_budget_order1": true,
+    "within_budget_order2": true
+   },
+   "modes": [
+    {
+     "backward_error": 2.744219802e-11,
+     "frequency_GHz": 1.784105812,
+     "frequency_im_GHz": 4.256119978e-09,
+     "in_declared_window": true,
+     "index": 1,
+     "quality_factor": 209592988.6,
+     "site_participation": 0.9982989962
+    },
+    {
+     "backward_error": 1.18872193e-10,
+     "frequency_GHz": 4.236676304,
+     "frequency_im_GHz": -2.555096286e-08,
+     "in_declared_window": true,
+     "index": 2,
+     "quality_factor": 82906392.36,
+     "site_participation": 0.0009093879301
+    },
+    {
+     "backward_error": 7.044258265e-11,
+     "frequency_GHz": 8.296061308,
+     "frequency_im_GHz": -1.129428433e-09,
+     "in_declared_window": true,
+     "index": 3,
+     "quality_factor": 3672681274.0,
+     "site_participation": 1.882190014e-07
+    },
+    {
+     "backward_error": 7.047389946e-11,
+     "frequency_GHz": 8.811356107,
+     "frequency_im_GHz": -6.96177778e-11,
+     "in_declared_window": true,
+     "index": 4,
+     "quality_factor": 63283807560.0,
+     "site_participation": -3.53992854e-07
+    },
+    {
+     "backward_error": 8.360383516e-11,
+     "frequency_GHz": 9.171484046,
+     "frequency_im_GHz": -2.775716435e-09,
+     "in_declared_window": false,
+     "index": 5,
+     "quality_factor": 1652093119.0,
+     "site_participation": 1.94497148e-07
+    },
+    {
+     "backward_error": 1.140432914e-10,
+     "frequency_GHz": 9.253442622,
+     "frequency_im_GHz": -2.817159809e-09,
+     "in_declared_window": false,
+     "index": 6,
+     "quality_factor": 1642335411.0,
+     "site_participation": -1.084477187e-07
+    },
+    {
+     "backward_error": 6.270994986e-11,
+     "frequency_GHz": 9.464060329,
+     "frequency_im_GHz": -6.494989801e-10,
+     "in_declared_window": false,
+     "index": 7,
+     "quality_factor": 7285662194.0,
+     "site_participation": 3.628768676e-06
+    },
+    {
+     "backward_error": 7.338641996e-11,
+     "frequency_GHz": 9.667000878,
+     "frequency_im_GHz": 1.650276171e-09,
+     "in_declared_window": false,
+     "index": 8,
+     "quality_factor": 2928903976.0,
+     "site_participation": -7.776676734e-06
+    }
+   ],
+   "modes_in_window": [
+    {
+     "backward_error": 2.744219802e-11,
+     "frequency_GHz": 1.784105812,
+     "frequency_im_GHz": 4.256119978e-09,
+     "in_declared_window": true,
+     "index": 1,
+     "quality_factor": 209592988.6,
+     "site_participation": 0.9982989962
+    },
+    {
+     "backward_error": 1.18872193e-10,
+     "frequency_GHz": 4.236676304,
+     "frequency_im_GHz": -2.555096286e-08,
+     "in_declared_window": true,
+     "index": 2,
+     "quality_factor": 82906392.36,
+     "site_participation": 0.0009093879301
+    },
+    {
+     "backward_error": 7.044258265e-11,
+     "frequency_GHz": 8.296061308,
+     "frequency_im_GHz": -1.129428433e-09,
+     "in_declared_window": true,
+     "index": 3,
+     "quality_factor": 3672681274.0,
+     "site_participation": 1.882190014e-07
+    },
+    {
+     "backward_error": 7.047389946e-11,
+     "frequency_GHz": 8.811356107,
+     "frequency_im_GHz": -6.96177778e-11,
+     "in_declared_window": true,
+     "index": 4,
+     "quality_factor": 63283807560.0,
+     "site_participation": -3.53992854e-07
+    }
+   ],
+   "palace_metadata": {
+    "ElapsedTime": {
+     "Counts": {
+      "Adaptation": 0,
+      "CoarseSolve": 1463,
+      "Construction": 2,
+      "DiskIO": 1,
+      "Div.-FreeProjection": 51,
+      "EigenvalueSolve": 1,
+      "Estimation": 12,
+      "Initialization": 1,
+      "LinearSolve": 49,
+      "OperatorConstruction": 1,
+      "PROMConstruction": 0,
+      "PROMSolve": 0,
+      "Postprocessing": 1,
+      "Preconditioner": 1463,
+      "Rebalancing": 0,
+      "Setup": 1,
+      "Solve": 12,
+      "TimeStepping": 0,
+      "Total": 1,
+      "WavePorts": 0
+     },
+     "Durations": {
+      "Adaptation": 0.0,
+      "CoarseSolve": 25.176851873000018,
+      "Construction": 6.507504538999999,
+      "DiskIO": 0.141791776,
+      "Div.-FreeProjection": 366.74300095900014,
+      "EigenvalueSolve": 3.3351186279999996,
+      "Estimation": 0.587598674,
+      "Initialization": 0.44957429299999996,
+      "LinearSolve": 155.24138354699986,
+      "OperatorConstruction": 2.8977525660000003,
+      "PROMConstruction": 0.0,
+      "PROMSolve": 0.0,
+      "Postprocessing": 1.9216453379999998,
+      "Preconditioner": 1769.4439682279942,
+      "Rebalancing": 0.0,
+      "Setup": 11.784113858,
+      "Solve": 222.776724,
+      "TimeStepping": 0.0,
+      "Total": 2567.230885464,
+      "WavePorts": 0.0
+     }
+    },
+    "GitTag": "v0.13.0",
+    "LinearSolver": {
+     "TotalIts": 1414,
+     "TotalSolves": 49
+    },
+    "Problem": {
+     "DegreesOfFreedom": 235806,
+     "MPISize": 1,
+     "MeshElements": 36140,
+     "MultigridDegreesOfFreedom": [
+      44890,
+      235806
+     ]
+    }
+   },
+   "port_inductance_H": 1.0345665367517793e-07,
+   "run": {
+    "command": [
+     "docker",
+     "run",
+     "--rm",
+     "--network",
+     "none",
+     "--hostname",
+     "localhost",
+     "--name",
+     "qmhp-coupled-pilot-p3",
+     "--user",
+     "1001:1001",
+     "-e",
+     "HOME=/tmp",
+     "-e",
+     "OMP_NUM_THREADS=1",
+     "-e",
+     "OPENBLAS_NUM_THREADS=1",
+     "-v",
+     "/home/runner/work/QMHP-CEM/QMHP-CEM/results/COUPLED-PILOT-20260916T035733Z/P3/solver:/work",
+     "-w",
+     "/work",
+     "qmhp-cem/palace:0.13.0",
+     "-np",
+     "1",
+     "config.json"
+    ],
+    "memory_note": "ru_maxrss measures the container runtime CLI in this process tree, not the solver inside the container. Any solver-side figure below is quoted from Palace's own log.",
+    "returncode": 0,
+    "runner_cli_peak_rss_kb": 171408,
+    "runner_cli_peak_rss_kb_delta": 0,
+    "started_utc": "2026-09-16T04:32:00.189919+00:00",
+    "timed_out": false,
+    "timeout_s": 2700,
+    "wall_clock_s": 2567.4613517719995
+   },
+   "solver_rules": {
+    "band_ceiling_GHz": 9.0,
+    "band_floor_GHz": 0.5,
+    "eigenmode_backward_error_max_tolerance": 1e-06,
+    "eigenmode_target_GHz": 0.5,
+    "eigenmodes_requested": 6,
+    "eigenvalue_tolerance": 1e-06,
+    "linear_solver_max_iterations": 400,
+    "linear_solver_tolerance": 1e-08,
+    "mesh_size_rule": "min_gap/2 at conductor and etch edges, min(cell_x, cell_y)/12 beyond the halo",
+    "model": "S1 bounded chip cell: vacuum and substrate volumes, zero-thickness PEC sheets for the ground plane and conductors, PEC outer walls, one lumped inductive port at the F1 element site carrying the declared superinductor. The readout tap surfaces carry no boundary condition in Route A. This is NOT the empty Object 001 box of the golden path."
+   },
+   "spec": {
+    "finite_element_order": 2,
+    "halo_mm": 0.12,
+    "level": 1,
+    "name": "P3",
+    "purpose": "halo sensitivity, against P1"
+   },
+   "status": "COMPLETED",
+   "within_dof_budget": true
+  }
+ },
+ "schema": "qmhp-cem.coupled-pilot/0.1.0",
+ "solve_timeout_s": 2700,
+ "solver_rules": {
+  "band_ceiling_GHz": 9.0,
+  "band_floor_GHz": 0.5,
+  "eigenmode_backward_error_max_tolerance": 1e-06,
+  "eigenmode_target_GHz": 0.5,
+  "eigenmodes_requested": 6,
+  "eigenvalue_tolerance": 1e-06,
+  "linear_solver_max_iterations": 400,
+  "linear_solver_tolerance": 1e-08,
+  "mesh_size_rule": "min_gap/2 at conductor and etch edges, min(cell_x, cell_y)/12 beyond the halo",
+  "model": "S1 bounded chip cell: vacuum and substrate volumes, zero-thickness PEC sheets for the ground plane and conductors, PEC outer walls, one lumped inductive port at the F1 element site carrying the declared superinductor. The readout tap surfaces carry no boundary condition in Route A. This is NOT the empty Object 001 box of the golden path."
+ },
+ "started_utc": "2026-09-16T03:57:33.619533+00:00",
+ "statement": "Numerical-method pilot. Three Palace eigenmode solves of the same declared S1 chip cell, differing only in element order and size-field halo. NO coupling extraction was performed: no Route A inversion, no g, no invariant triple, no gate input, no Route B. The record carries completion, the mode list in the declared window, the site energy participation, wall time and memory. Every geometric value remains an unapproved ENGINEERING-SEED."
+}
