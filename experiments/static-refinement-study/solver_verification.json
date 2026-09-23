@@ -481,8 +481,8 @@
     "rel_diff": 1.1410629790331307e-16,
     "within_bounds": true
    },
-   "wall_s_twogrid": 1.1100535109999328,
-   "wall_s_direct": 4.944035965999774,
+   "wall_s_twogrid": 1.0814105520000226,
+   "wall_s_direct": 6.850298903999999,
    "port_voltage": [
     1.0000000000000002,
     1.0000000000000002,
@@ -510,8 +510,8 @@
     "rel_diff": 5.700617225576857e-16,
     "within_bounds": true
    },
-   "wall_s_twogrid": 1.0831346350000786,
-   "wall_s_direct": 5.792253741999957,
+   "wall_s_twogrid": 1.083086289999983,
+   "wall_s_direct": 6.645859556000005,
    "port_voltage": [
     1.0,
     1.0,
@@ -556,8 +556,8 @@
     "rel_diff": 4.914321504214748e-16,
     "within_bounds": true
    },
-   "wall_s_twogrid": 3.328918926999904,
-   "wall_s_direct": 68.38543298500008,
+   "wall_s_twogrid": 3.8538485349999974,
+   "wall_s_direct": 78.27019816700005,
    "port_voltage": [
     1.0,
     1.0000000000000002,
@@ -585,8 +585,8 @@
     "rel_diff": 2.4549832578431253e-16,
     "within_bounds": true
    },
-   "wall_s_twogrid": 3.1576124220000565,
-   "wall_s_direct": 82.04574205300014,
+   "wall_s_twogrid": 4.293468070000017,
+   "wall_s_direct": 83.24278672799994,
    "port_voltage": [
     1.0,
     1.0,
@@ -756,7 +756,7 @@
   }
  },
  "qmhp_data_read": false,
- "wall_s": 251.74950768500003,
+ "wall_s": 270.255776554,
  "environment": {
   "python": "3.11.15",
   "numpy": "2.4.6",
@@ -774,7 +774,7 @@
    "MKL_NUM_THREADS": "1"
   },
   "code_sha256": {
-   "study_driver.py": "ee36a09369abb00c3a9435e625e39617a5105a3b9ff20fd293eada333432fbb3",
+   "study_driver.py": "97783b3b2749c6b4b21e266f4251038b216d5306dfeb8269786ea8c17304a799",
    "nested_solver.py": "75ee657917ac86f0fc346cc086b44ecc0b24f5081ca914b478c84ae74b1cc03f",
    "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
    "orchestrator/manifest.py": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f",

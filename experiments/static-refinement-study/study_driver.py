@@ -401,7 +401,15 @@ def classify(values, lows, highs, w: dict) -> dict:
     CONVERGING      R_min <= R <= R_max. The limit is bracketed, MODEL-BASED (two terms of
                     orders 1 and q in (1, 2], coefficients of one sign - an assumption the
                     theory does not supply), by X2 - d2 and X2 - d2 / (R - 1).
-    CONVERGED       CONVERGING and |d2| / |X2 - d2| <= tau (the bracket's conservative end).
+    CONVERGED       CONVERGING and d2 / (X2 - d2) <= tau (the bracket's conservative end),
+                    for EVERY value in the certified ranges (revision 4).
+
+    The tau comparison, like the R comparison, uses the certified ranges. The conservative
+    remaining error d2 / (X2 - d2) = (X1 - X2) / (2 X2 - X1) increases with X1 and decreases
+    with X2 wherever the model limit 2 X2 - X1 is positive, so its certified range is
+    [(low1 - high2) / (2 high2 - low1), (high1 - low2) / (2 low2 - high1)]. UNRESOLVED if the
+    model limit is not certainly positive, or if that range touches or contains tau (the same
+    fail-safe as the R edges); otherwise CONVERGED if it lies below tau, CONVERGING if above.
     """
     d1, d2, d1r, d2r = _differences(values, lows, highs)
     out = {"values": list(values), "d1": d1, "d2": d2,
@@ -433,7 +441,19 @@ def classify(values, lows, highs, w: dict) -> dict:
     out.update(limit_bracket_model_based=[lim1, lim_obs],
                remaining_rel_error_at_level2_bracket=[d2 / (R - 1.0) / lim_obs, remaining_hi],
                bracket_assumption="two terms, orders 1 and q in (1, 2], coefficients of one sign")
-    if remaining_hi <= w["tau_converged"]:
+    lim_lo, lim_hi = 2.0 * lows[2] - highs[1], 2.0 * highs[2] - lows[1]   # range of X2 - d2
+    if not lim_lo > 0:
+        return {**out, "cls": "UNRESOLVED",
+                "reason": "the model limit X2 - d2 is not certainly positive, so the remaining "
+                          "error is unbounded; not classified"}
+    rem = [(lows[1] - highs[2]) / lim_hi, (highs[1] - lows[2]) / lim_lo]
+    out["remaining_rel_error_at_level2_certified_range"] = rem
+    tau = w["tau_converged"]
+    if rem[0] <= tau <= rem[1]:
+        return {**out, "cls": "UNRESOLVED",
+                "reason": "the conservative remaining error is within its certified error of "
+                          "tau_converged (fail-safe)"}
+    if rem[1] < tau:
         return {**out, "cls": "CONVERGED",
                 "reason": "observed order within [1, 2]; level 2 within tau of the model limit"}
     return {**out, "cls": "CONVERGING",

@@ -10,9 +10,9 @@
  "not_before_utc": "<ISO-8601 UTC, e.g. 2026-09-23T00:00:00+00:00>",
  "not_after_utc": "<ISO-8601 UTC, at most 7 days after not_before_utc>",
  "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
- "predeclaration_sha256": "c1d1430c5da0da3655542679aadf9e07ede74b09ecf2287da031c15f9abfc563",
+ "predeclaration_sha256": "29276d45f333be5a7e64678023b5f4e87cb8d24b411bc7bd34e70b389e9e54a5",
  "code_sha256": {
-  "study_driver.py": "ee36a09369abb00c3a9435e625e39617a5105a3b9ff20fd293eada333432fbb3",
+  "study_driver.py": "97783b3b2749c6b4b21e266f4251038b216d5306dfeb8269786ea8c17304a799",
   "nested_solver.py": "75ee657917ac86f0fc346cc086b44ecc0b24f5081ca914b478c84ae74b1cc03f",
   "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
   "orchestrator/manifest.py": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f"
@@ -37,6 +37,7 @@
   "attempts": 1,
   "retry": "none. A failure, a refusal after the record exists, a timeout, a budget limit or an integrity failure is the recorded outcome."
  },
+ "after_the_run_before_the_environment_is_discarded": "Mandatory, whatever the outcome: follow predeclaration.json one_attempt.preservation_before_the_environment_is_discarded. In short: commit and push the record with ATTEMPT-SPENT.json and STUDY-APPROVAL.consumed.json; if no record directory exists (a ledger-only failure, exit 3 'no record could be created'), first copy <git common directory>/qmhp-attempts/STATIC-REFINEMENT-STUDY.json byte for byte to experiments/static-refinement-study/ATTEMPT-LEDGER-NOTE.json and commit it with them; confirm the push before the environment is discarded, and never discard it with that evidence only inside it.",
  "does_not_authorise": [
   "a second attempt, whatever the first one's outcome (any class, a failure, a timeout, a budget limit or an integrity failure)",
   "running from another checkout, another commit or outside the validity window",

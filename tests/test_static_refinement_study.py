@@ -47,7 +47,7 @@ manifest = sd.manifest
 
 #: frozen before any level-2, C' or delta value existed on the QMHP mesh; changing it
 #: needs a new pre-declaration revision, not an edit
-PREDECLARATION_SHA256 = "c1d1430c5da0da3655542679aadf9e07ede74b09ecf2287da031c15f9abfc563"
+PREDECLARATION_SHA256 = "29276d45f333be5a7e64678023b5f4e87cb8d24b411bc7bd34e70b389e9e54a5"
 
 #: the withdrawn paired test and its report, preserved unchanged
 WITHDRAWN_UNCHANGED = {
@@ -531,6 +531,101 @@ def test_the_model_bracket_is_what_the_two_term_model_gives(pre):
     c = sd.classify(*_seq(X, 1e-14), w)
     lo, hi = sorted(c["limit_bracket_model_based"])
     assert c["cls"] in ("CONVERGING", "CONVERGED") and not lo <= 5.0 <= hi
+
+
+# --- revision 4: the tau comparison uses the certified ranges ------------------------------
+
+def _tau_box(ratio, eps, X2=100.0, R=3.0):
+    """A sequence whose conservative remaining error d2/(X2 - d2) is ``ratio`` at R = 3, with
+    an absolute certified error ``eps`` on every energy (the external reproduction's form)."""
+    d2 = X2 * ratio / (1 + ratio)
+    vals = [X2 + d2 + R * d2, X2 + d2, X2]
+    return vals, [v - eps for v in vals], [v + eps for v in vals]
+
+
+def test_the_tau_comparison_uses_the_certified_ranges_at_the_boundary(pre):
+    """The external reproduction on 53bac23: central remaining error tau - 1e-10 with 5e-8 on
+    each energy. Revision 3 returned CONVERGED although an admissible truth in the certified
+    box (X2 lower by 5e-8) is CONVERGING. Now the range straddles tau: UNRESOLVED."""
+    w = pre["classification"]
+    tau = w["tau_converged"]
+    assert tau == 0.05                                    # the threshold itself is unchanged
+    vals, lows, highs = _tau_box(tau - 1e-10, 5e-8)
+    c = sd.classify(vals, lows, highs, w)
+    assert c["cls"] == "UNRESOLVED" and "within its certified error of tau_converged" in c["reason"]
+    lo, hi = c["remaining_rel_error_at_level2_certified_range"]
+    assert lo < c["remaining_rel_error_at_level2_bracket"][1] < hi and lo < tau < hi
+    assert lo == (lows[1] - highs[2]) / (2 * highs[2] - lows[1])
+    assert hi == (highs[1] - lows[2]) / (2 * lows[2] - highs[1])
+    # both classes are admissible inside the box: its corners, classified exactly
+    exact = lambda v: sd.classify(v, v, v, w)["cls"]
+    assert exact([vals[0], highs[1], lows[2]]) == "CONVERGING"
+    assert exact([vals[0], lows[1], highs[2]]) == "CONVERGED"
+    # a range that only TOUCHES tau is UNRESOLVED too (the fail-safe of the R edges)
+    c = sd.classify(vals, lows, highs, {**w, "tau_converged": hi})
+    assert c["cls"] == "UNRESOLVED"
+
+
+@pytest.mark.parametrize("ratio, eps, cls", [
+    (0.01, 5e-8, "CONVERGED"), (0.10, 5e-8, "CONVERGING"),          # the reproduction's controls
+    (0.0499, 1e-12, "CONVERGED"), (0.0501, 1e-12, "CONVERGING"),   # near tau, range clear of it
+    (0.0499, 1e-2, "UNRESOLVED"), (0.0501, 1e-2, "UNRESOLVED"),    # same values, wider ranges
+])
+def test_the_tau_comparison_away_from_and_near_the_boundary(pre, ratio, eps, cls):
+    w = pre["classification"]
+    c = sd.classify(*_tau_box(ratio, eps), w)
+    assert c["cls"] == cls, c
+    lo, hi = c["remaining_rel_error_at_level2_certified_range"]
+    assert lo <= c["remaining_rel_error_at_level2_bracket"][1] <= hi
+
+
+def test_a_model_limit_that_is_not_certainly_positive_is_unresolved(pre):
+    """Found while deriving the range: [5.8, 2.5, 1.0] has R = 2.2 but X2 - d2 = -0.5, so the
+    central remaining error is -3 and revision 3 returned CONVERGED."""
+    w = pre["classification"]
+    c = sd.classify(*_seq([5.8, 2.5, 1.0], 1e-12), w)
+    assert c["cls"] == "UNRESOLVED" and "model limit" in c["reason"]
+    assert c["remaining_rel_error_at_level2_bracket"][1] < 0          # what revision 3 compared
+    # a positive central limit (1e-7) whose certified range reaches zero, R = 3: UNRESOLVED
+    X2, lim = 1.0, 1e-7
+    X1 = 2 * X2 - lim
+    X = [X1 + 3 * (X1 - X2), X1, X2]
+    c = sd.classify(*_seq(X, 1e-7), w)
+    assert c["remaining_rel_error_at_level2_bracket"][1] > 0 and c["cls"] == "UNRESOLVED"
+    assert "model limit" in c["reason"]
+
+
+def test_no_admissible_point_contradicts_a_returned_class(pre):
+    """Soundness, sampled: whenever classify returns CONVERGED or CONVERGING, every point of
+    the certified box (its corners and random interior points), classified with zero error,
+    gets the same class; whenever the certified range of the remaining error lies wholly on
+    one side of tau, the class is not UNRESOLVED on account of tau."""
+    w = pre["classification"]
+    tau = w["tau_converged"]
+    rng = np.random.default_rng(20260923)
+    exact = lambda v: sd.classify(v, v, v, w)["cls"]
+    checked = {"CONVERGED": 0, "CONVERGING": 0, "UNRESOLVED": 0}
+    for i in range(3000):
+        X2 = rng.uniform(1.0, 200.0)
+        eps = X2 * 10 ** rng.uniform(-9, -3)
+        width = 4 * eps / X2                          # about the width of the remaining range
+        ratio = (tau * rng.uniform(0.5, 1.5) if i % 2 else          # anywhere, or within a few
+                 tau + width * rng.uniform(-3.0, 3.0))               # widths of tau
+        vals, lows, highs = _tau_box(ratio, eps, X2=X2, R=rng.uniform(2.05, 3.95))
+        c = sd.classify(vals, lows, highs, w)
+        if c["cls"] not in checked:
+            continue
+        checked[c["cls"]] += 1
+        if c["cls"] == "UNRESOLVED":
+            if "tau_converged" in c["reason"]:
+                lo, hi = c["remaining_rel_error_at_level2_certified_range"]
+                assert lo <= tau <= hi
+            continue
+        corners = [[a, b, e] for a in (lows[0], highs[0]) for b in (lows[1], highs[1]) for e in (lows[2], highs[2])]
+        inner = [[rng.uniform(lows[i], highs[i]) for i in range(3)] for _ in range(8)]
+        got = {exact(p) for p in corners + inner}
+        assert got == {c["cls"]}, (vals, eps, c["cls"], got)
+    assert min(checked.values()) > 100, checked
 
 
 def _fake_levels(E, Ep, bound=1e-15):
@@ -1430,12 +1525,46 @@ def test_the_failure_path_survives_memory_exhaustion_by_small_allocations(tmp_pa
 
 # --- the committed evidence of the preparation --------------------------------------------
 
+#: preflight.json (QMHP geometry and assembly, no solve) was produced by the revision-3
+#: study_driver.py below and NOT re-run for revision 4: revision 4 changes only classify(),
+#: which the preflight never executes. Both facts are checked here; the AST digest was
+#: computed from that revision-3 file (git show 53bac23:.../study_driver.py) and equals the
+#: current file's with classify() removed.
+PREFLIGHT_STUDY_DRIVER_SHA256 = "ee36a09369abb00c3a9435e625e39617a5105a3b9ff20fd293eada333432fbb3"
+PREFLIGHT_STUDY_DRIVER_AST_WITHOUT_CLASSIFY = "fec30d64a0b73167105d06cb599cd193a2534cf348241e9bc09c8c74d47dfbb7"
+
+
+def _ast_sha256_without(path: Path, names=("classify",)) -> str:
+    import ast
+    tree = ast.parse(Path(path).read_text())
+    tree.body = [n for n in tree.body if not (isinstance(n, ast.FunctionDef) and n.name in names)]
+    return hashlib.sha256(ast.dump(tree).encode()).hexdigest()
+
+
+def test_the_preflight_evidence_is_valid_for_the_current_code():
+    import ast
+    assert _ast_sha256_without(HERE / "study_driver.py") == PREFLIGHT_STUDY_DRIVER_AST_WITHOUT_CLASSIFY, (
+        "study_driver.py now differs from the preflight's producing code outside classify(): "
+        "the preflight must be re-run, which needs approval (it reads the QMHP mesh)")
+    tree = ast.parse((HERE / "study_driver.py").read_text())
+    fns = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
+    seen, todo = set(), ["preflight"]
+    while todo:
+        f = todo.pop()
+        if f not in seen:
+            seen.add(f)
+            todo += [n.id for n in ast.walk(fns[f]) if isinstance(n, ast.Name) and n.id in fns]
+    assert "classify" not in seen and {"_preflight_level", "ladder", "qmhp_mesh"} <= seen
+
+
 @pytest.mark.parametrize("name", ["solver_verification.json", "preflight.json", "dry_run.json"])
 def test_the_committed_evidence_was_produced_by_the_committed_code_in_the_verified_environment(name, pre):
     ev = _strict_json(HERE / name)
     env = ev["environment"]
-    assert env["code_sha256"] == {n: _sha(p) for n, p in sd.EVIDENCE_CODE.items()}, (
-        f"{name} was produced by other code: regenerate it")
+    want = {n: _sha(p) for n, p in sd.EVIDENCE_CODE.items()}
+    if name == "preflight.json":                        # see PREFLIGHT_STUDY_DRIVER_SHA256
+        want["study_driver.py"] = PREFLIGHT_STUDY_DRIVER_SHA256
+    assert env["code_sha256"] == want, f"{name} was produced by other code: regenerate it"
     for k in ("python", "numpy", "scipy"):
         assert env[k] == pre["environment"][k], (name, k)
     assert env["longdouble_eps"] < pre["environment"]["longdouble_eps_below"]
@@ -1570,9 +1699,15 @@ def test_the_predeclaration_is_frozen_and_complete(pre):
                 "no_combination", "budget", "stop_conditions", "expected_evidence",
                 "cannot_establish", "revision", "synthetic_expectations"):
         assert key in pre, key
-    assert pre["status"].startswith("PREPARED. NOT APPROVED. NOT EXECUTED. Revision 3.")
-    assert pre["revision"]["number"] == 3 and "9aa951f" in pre["revision"]["previous"]
-    assert "864c0ba" in pre["revision"]["previous"]
+    assert pre["status"].startswith("PREPARED. NOT APPROVED. NOT EXECUTED. Revision 4.")
+    assert pre["revision"]["number"] == 4 and "3270469" in pre["revision"]["previous"]
+    assert "9aa951f" in pre["revision"]["previous"] and "864c0ba" in pre["revision"]["previous"]
+    rules = pre["classification"]["rules"]
+    assert "certified range" in rules["CONVERGED"] and "tau_converged" in rules["UNRESOLVED"]
+    assert pre["classification"]["tau_converged"] == 0.05
+    oa = pre["one_attempt"]
+    assert {"C-1", "C-2", "C-3"} <= set(oa["residuals"])
+    assert "ATTEMPT-LEDGER-NOTE.json" in oa["preservation_before_the_environment_is_discarded"]
 
 
 def test_the_predeclaration_states_exactly_what_the_code_does(pre):
@@ -1650,7 +1785,8 @@ def test_the_report_states_the_status_and_keeps_proof_and_model_apart():
     for h in ("## 1.", "## 2.", "## 3.", "## 4.", "## 5.", "## 6.", "## 7.", "## 8."):
         assert h in text, h
     for phrase in ("model-based", "relative to the assembled operator", "UNAVAILABLE",
-                   "Sprime_static_identity_not_confirmed", "revision 3", "SIGKILL", "git common directory",
+                   "Sprime_static_identity_not_confirmed", "revision 4", "SIGKILL", "git common directory",
+                   "ATTEMPT-LEDGER-NOTE.json", "within its certified error of τ",
                    "STUDY-APPROVAL.consumed.json", "not conservative for the certificate"):
         assert phrase in text, phrase
     for stale in ("about 1e-14", "exact execution path", "10^2-10^4", "four certificates", "so it is tight"):

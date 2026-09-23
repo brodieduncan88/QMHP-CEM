@@ -9,7 +9,9 @@ mesh for this study, and no attempt has been spent. The following have run:
 - a preflight on the QMHP mesh that refines and assembles (including an extended-precision
   re-assembly) but solves nothing.
 
-This is **revision 3** of the preparation.
+This is **revision 4** of the preparation. Revision 4 is a targeted correction of revision 3
+(`3270469`); it changes only the τ comparison in `classify()` and the texts on the residuals
+(§4, §6).
 
 - Revision 1 (`864c0ba`) was reviewed adversarially on a frozen snapshot. The review confirmed
   10 major findings, recorded 25 minor ones, and found nothing blocking.
@@ -25,6 +27,9 @@ This is **revision 3** of the preparation.
 - A targeted closure check of the round-2 majors, run on the frozen revision-3 commit
   `3270469` with `9aa951f` as the pre-fix control, found every mechanism reproduced before
   the fix and absent after it, with two minor residuals (`review/closure_3270469.json`).
+- An external reproduction, supplied by the reviewer, showed that `classify()` compared only
+  the **central** remaining error with τ. It was confirmed on the frozen commit `53bac23`
+  before any change, and revision 4 corrects it (§4).
 
 Record: `experiments/static-refinement-study/`. The frozen statement is `predeclaration.json`;
 this page summarises it.
@@ -219,11 +224,34 @@ The rule works on `d1 = X0 − X1`, `d2 = X1 − X2` and `R = d1/d2`, each over 
 
 | class | rule |
 |---|---|
-| **CONVERGED** | `2 ≤ R ≤ 4` and `d2/(X2 − d2)` ≤ 0.05 |
+| **CONVERGED** | `2 ≤ R ≤ 4` and `d2/(X2 − d2)` ≤ 0.05 **for every value in the certified ranges**: the certified range of the remaining error lies wholly below 0.05 |
 | **CONVERGING** | `2 ≤ R ≤ 4`. The limit is reported with its **model-based** bracket `[X2 − d2, X2 − d2/(R−1)]`, not a rigorous one. The bracket carries its assumption in every block that shows it, including `S` and `H` |
 | **NON-CONVERGENT** | `R < 1`: no evidence of convergence at levels 0–2. Not a claim of mathematical divergence, which density excludes. It is also consistent with order 1 and a negative next term, or with pre-asymptotic behaviour. **Not** evidence against the order-1 theory |
-| **UNRESOLVED** | `1 < R < 2`: observed order below 1. `R > 4`: observed order above 2, pre-asymptotic. Also a difference within its certified error of zero, or a certified range touching a class edge (fail-safe) |
+| **UNRESOLVED** | `1 < R < 2`: observed order below 1. `R > 4`: observed order above 2, pre-asymptotic. Also a difference within its certified error of zero, or a certified range touching a class edge (fail-safe). Inside the window, also the remaining error within its certified error of τ, or a model limit `X2 − d2` that is not certainly positive (revision 4) |
 | **UNQUALIFIED** | any integrity failure |
+
+**The τ comparison uses the certified ranges (revision 4).**
+
+- **The formula.** The conservative remaining error `d2/(X2 − d2) = (X1 − X2)/(2X2 − X1)`
+  increases with `X1` and decreases with `X2` wherever the model limit `2X2 − X1` is positive.
+  Its certified range is therefore
+  `[(low₁ − high₂)/(2 high₂ − low₁), (high₁ − low₂)/(2 low₂ − high₁)]`.
+- **The decision.** The class is:
+  - CONVERGED if that range lies below τ;
+  - CONVERGING if it lies above τ;
+  - UNRESOLVED if it touches or contains τ, or if the model limit is not certainly positive.
+
+  τ itself is unchanged at 0.05.
+- **What revision 3 did wrong.** It compared only the central value, so a box straddling τ
+  was classified CONVERGED. An example: [119.048, 104.762, 100.0] with 5e-8 on each value.
+  An admissible truth inside that box is CONVERGING.
+- **A second defect in the same comparison.** A negative model limit, as in
+  [5.8, 2.5, 1.0] with R = 2.2, gave a negative remaining error that passed `≤ τ`.
+- **Scope.** Neither defect is reachable for `C` given the known `C_0` and `C_1`. The rule is
+  now only stricter, so every unreachability statement and the `C_2` intervals below stand.
+- **Tests.** A boundary test, tests away from the boundary, and a sampled soundness test guard
+  the fix. The sampled test also catches the old rule, which it contradicts in 285 of 2,985
+  cases.
 
 **`δ` is classified descriptively.** No rate theory exists for it, so it gets no bracket and
 no CONVERGED. Its classes are UNRESOLVED, NON-CONVERGENT or DIFFERENCES-SHRINKING.
@@ -376,8 +404,10 @@ empty file under the final name. A `.partial` file is kept and sealed.
 **Stop signals: the first raises, the rest are recorded.** SIGXCPU, SIGALRM, SIGTERM, SIGHUP
 and SIGINT (Ctrl-C) all end the attempt.
 
-- **What revision 2 lost.** GNU `timeout` forwards a process-group signal to the child a
-  second time. The second delivery then raised inside revision 2's failure path. On a bytecode
+- **What revision 2 lost.** GNU `timeout` forwards a process-group signal to the child, and
+  again to the whole group, so up to three deliveries reach the driver (residual C-3; revision
+  3's texts said "a second time"). A later delivery then raised inside revision 2's failure
+  path. On a bytecode
   loop, a Ctrl-C lost `failure.json` and the manifest in 8 of 8 trials; on the real workload,
   in 2 of 38.
 - **What revision 3 does.**
@@ -393,6 +423,39 @@ and SIGINT (Ctrl-C) all end the attempt.
 - **Before the record directory.** A failure after the ledger but before the record directory
   exists is written into the ledger entries this process created. Revision 2 spent the attempt
   with no record and a raw traceback in that case.
+
+**Disclosed residuals** (`predeclaration.json` `one_attempt.residuals`):
+
+- **C-1.** A stop signal arriving after the last solve, while `summary.json` and the manifest
+  are written, is ignored and **not recorded**. The record completes and is sealed. "The
+  first stop signal raises" holds only until the last solve completes.
+- **C-2.** A failure in the one-file-write window between the git-common-directory ledger
+  entry and `ATTEMPT-SPENT.json` is explained only in that entry, which is never committed.
+- **C-3.** Up to three deliveries of one group signal reach the driver, as described above.
+- **Fresh clone.** A second attempt is possible in a fresh clone with a deliberately
+  re-written approval. **SIGKILL** cannot be caught. A bound source file modified between its
+  import and its digest is not detected.
+
+**Preserving the evidence before the environment is discarded** (mandatory, whatever the
+outcome; `one_attempt.preservation_before_the_environment_is_discarded`):
+
+1. Record what exists:
+   - `git status --short --ignored`;
+   - a listing of `<git common directory>/qmhp-attempts/`.
+2. **If a record directory exists:** commit it unchanged, with `ATTEMPT-SPENT.json` and
+   `STUDY-APPROVAL.consumed.json`, and push.
+3. **If no record directory exists** (a ledger-only failure, C-2):
+   - copy `<git common directory>/qmhp-attempts/STATIC-REFINEMENT-STUDY.json` byte for byte to
+     `experiments/static-refinement-study/ATTEMPT-LEDGER-NOTE.json`, editing neither file;
+   - state its sha256 in the commit message;
+   - commit it with the other ledger files, and push.
+
+   The git-common-directory entry stays where it is.
+4. Confirm that the remote branch contains the commit before the environment is discarded.
+   If pushing is impossible, do not discard the environment until the files and their sha256
+   are preserved outside it, and report the attempt as FAILED with the note's content.
+5. After a SIGKILL, apply the same steps to whatever exists; the record is then quarantined by
+   content.
 
 **What cannot be caught: SIGKILL.** A kernel SIGKILL (the hard CPU limit or the OOM killer),
 or the outer timeout's SIGKILL, leaves the spent record with its raw files but with no
@@ -421,15 +484,15 @@ It bounds time and memory, not the certified error.
 
 | | stand-in, measured | QMHP, expected | declared cap |
 |---|---|---|---|
-| wall | 254.5 s | about 3–5 min | 60 min |
-| CPU | 253.2 s | about the same (single-threaded) | 60 min |
-| peak resident | 4,435 MB | 4–5 GB | — |
-| peak address space | 7,315 MB | < 8 GB | 12 GiB soft, 13 GiB hard |
-| level-2 PCG | 120 iterations each; 0.327 / 0.328 s per iteration; 20.0 / 26.5 s set-up | not known until the run | maxiter 1000 |
+| wall | 263.1 s | about 3–5 min | 60 min |
+| CPU | 262.0 s | about the same (single-threaded) | 60 min |
+| peak resident | 4,397 MB | 4–5 GB | — |
+| peak address space | 7,314 MB | < 8 GB | 12 GiB soft, 13 GiB hard |
+| level-2 PCG | 120 iterations each; 0.330 / 0.340 s per iteration; 21.1 / 27.5 s set-up | not known until the run | maxiter 1000 |
 | level-2 certified error | 3.2e-13 | not known until the run (evaluation part about 1e-12) | 1e-9 |
 
 - **Worst case within the settings.** With `maxiter` = 1000 everywhere, the run takes about
-  14 min wall and about the same CPU. The caps allow about 4.2 times that.
+  15 min wall and about the same CPU. The caps allow about 4.1 times that.
 - **Attempts.** 1. No retry.
 
 **Proposed command, from the repository root, locally, with no workflow and no network.** It
@@ -468,11 +531,11 @@ It cannot establish:
 
 | file | role |
 |---|---|
-| `predeclaration.json` | revision 3: the frozen question, method, environment, integrity, diagnostics, classification, consistency check, one-attempt ledger, invocation, budget and estimate |
+| `predeclaration.json` | revision 4: the frozen question, method, environment, integrity, diagnostics, classification, consistency check, one-attempt ledger, invocation, budget and estimate |
 | `nested_solver.py` | the two problems, the direct and two-grid solvers, the certificate, the evaluation bound, the arithmetic probe and the assembly-gap estimate, with their proofs |
 | `study_driver.py` | preflight, dry run, invocation check, and the gated one-attempt execution |
 | `synthetic_cells.py`, `verify_solver.py` | the synthetic cells (including the folded-mesh control) and the verification V1–V7 |
 | `solver_verification.json`, `preflight.json`, `dry_run.json` | the committed evidence of the preparation, each bound to the code and environment that produced it |
-| `review/review_864c0ba.json`, `review/review_9aa951f.json`, `review/closure_3270469.json` | the adversarial reviews of revisions 1 and 2, verbatim, and the targeted closure check of revision 3, with its raw outputs and harness sources |
+| `review/review_864c0ba.json`, `review/review_9aa951f.json`, `review/closure_3270469.json` | the adversarial reviews of revisions 1 and 2, verbatim, and the targeted closure check of revision 3, with its raw outputs and harness sources. `preflight.json` was produced by the revision-3 code and not re-run: revision 4 changes only `classify()`, which the preflight never executes (pinned by a test) |
 | `STUDY-APPROVAL.draft.json` | the approval a human would grant, with the commit and window left to fill; **not** an approval |
 | `tests/test_static_refinement_study.py` | rules, integrity, gate, invocation, ledger, failure paths, signals, budget, evidence, pins |
