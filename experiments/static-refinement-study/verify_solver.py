@@ -5,8 +5,12 @@
 No QMHP data is read. Run before anything touches the QMHP mesh; the committed output is
 solver_verification.json. Each check states what would make it fail.
 
-  V1  exact known answer: a layered box whose exact potential P1 reproduces; direct and
-      two-grid must return the exact energy at levels 0, 1, 2, within their certificates.
+  V1  continuum known answer (ACCURACY only): a layered box whose exact potential P1
+      reproduces; direct and two-grid (also from a zero start) must return the continuum
+      energy to 1e-12. The difference includes assembly round-off, which the certificate
+      does not cover, so this row does not test the certificate.
+  V1b the certificate against TRUTH for the discrete problem: the exact rational minimum of
+      the assembled quadratic form, with non-linear boundary data; direct and two-grid.
   V2  discrete known answer at level 2 on QMHP-like cells: two-grid against the direct
       solve of the same system, for C and C'; the certificate must reach 1e-9.
   V3  the certificate is an upper bound at EVERY iterate, not only at convergence, and
@@ -23,7 +27,11 @@ solver_verification.json. Each check states what would make it fail.
       (c) a non-nested prolongation is caught by the Galerkin check, and the certificate
       still holds; (d) an indefinite preconditioner ends in BREAKDOWN, never CERTIFIED;
       (e) a zero initial guess still certifies the same energy; (f) a perturbed solution
-      has a higher energy and the certificate covers the increase.
+      has a higher energy and the certificate covers the increase; (g) a FOLDED mesh that
+      passes conformity, tagging and constrained-boundary checks is caught by the tiling
+      checks, and the formula would understate its error; (h) the stagnation rule ignores
+      infinite certificates and stops on finite non-improving ones.
+  V6  the evaluation-error bound against the exact rational value of phi^T K phi.
 
 Usage: verify_solver.py --out solver_verification.json
 """
@@ -35,6 +43,7 @@ import json
 import math
 import sys
 import time
+from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
@@ -84,28 +93,130 @@ def _agree(a: dict, b: dict) -> dict:
             "within_bounds": bool(diff <= allow)}
 
 
+def _exact_min_energy(K, phi, fixed) -> Fraction:
+    """The exact minimum of phi^T K phi (the symmetric part of the assembled K, in rational
+    arithmetic) over the free nodes, with phi fixed elsewhere. Small problems only."""
+    Kd = K.toarray()
+    n = len(Kd)
+    Ks = [[(Fraction(Kd[i, j]) + Fraction(Kd[j, i])) / 2 for j in range(n)] for i in range(n)]
+    fr = [i for i in range(n) if not fixed[i]]
+    fx = [i for i in range(n) if fixed[i]]
+    p = [Fraction(float(v)) for v in phi]
+    A = [[Ks[i][j] for j in fr] for i in fr]
+    b = [-sum(Ks[i][j] * p[j] for j in fx) for i in fr]
+    m = len(fr)
+    for c in range(m):                                     # Gaussian elimination, exact
+        piv = next(r for r in range(c, m) if A[r][c] != 0)
+        A[c], A[piv], b[c], b[piv] = A[piv], A[c], b[piv], b[c]
+        for r in range(c + 1, m):
+            if A[r][c] != 0:
+                f = A[r][c] / A[c][c]
+                A[r] = [a - f * q for a, q in zip(A[r], A[c])]
+                b[r] -= f * b[c]
+    x = [Fraction(0)] * m
+    for c in range(m - 1, -1, -1):
+        x[c] = (b[c] - sum(A[c][j] * x[j] for j in range(c + 1, m))) / A[c][c]
+    for k, i in enumerate(fr):
+        p[i] = x[k]
+    return sum(p[i] * Ks[i][j] * p[j] for i in range(n) for j in range(n))
+
+
+def _exact_quadratic(K, phi) -> Fraction:
+    """phi^T K phi in exact rational arithmetic from the float64 data."""
+    Kc = K.tocoo()
+    p = [Fraction(float(v)) for v in phi]
+    return sum(Fraction(float(v)) * p[i] * p[j] for i, j, v in zip(Kc.row, Kc.col, Kc.data))
+
+
+def v1b_certificate_against_exact_discrete_minimum() -> dict:
+    """The certificate against TRUTH for the discrete problem: the exact rational minimum of
+    the assembled quadratic form. A layered 2x2x2 box, non-linear boundary data (so the
+    discrete solution is not trivially exact), levels 0 (1 unknown) and 1 (27 unknowns);
+    direct and two-grid from zero."""
+    xs = np.linspace(0.0, 1.0, 3)
+    tm = syn.tensor_mesh(xs, xs, xs)
+    mesh = {"xyz": tm["xyz"], "tets": tm["tets"],
+            "tet_attr": np.where(tm["xyz"][tm["tets"]][:, :, 2].mean(1) < 0.5, 1, 3),
+            "tris": tm["faces"][tm["boundary"]], "tri_attr": np.full(int(tm["boundary"].sum()), 2)}
+    model = {"eps_r": {1: 2.0, 3: 5.0}, "pec_attrs": (2,), "port_attr": 10,
+             "direction": (0.0, 0.0, 1.0), "L0_m": 1.0e-3, "L_H": 1.0e-8}
+    g = lambda x: x[:, 2] + 0.3 * np.sin(np.pi * x[:, 0]) * np.sin(np.pi * x[:, 1])
+
+    def data(m):
+        bn = ns.boundary_facts(m)["boundary_nodes"]
+        fixed = np.zeros(len(m["xyz"]), dtype=bool)
+        fixed[bn] = True
+        phi = np.where(fixed, g(m["xyz"]), 0.0)
+        used = np.unique(m["tets"])
+        return {"fixed": fixed, "phi": phi, "free": used[~fixed[used]], "geo": None}
+
+    L0 = ns.Level(mesh, model, kinds=())
+    L0.dd["g"] = data(mesh)
+    fine = af.refine_red(mesh)
+    L1 = ns.Level(fine, model, kinds=())
+    L1.dd["g"] = data(fine)
+    _, p0 = ns.solve(L0, "g", "direct")
+    rows = {}
+    for name, (L, method, kw) in {"level0_direct": (L0, "direct", {}),
+                                  "level1_direct": (L1, "direct", {}),
+                                  "level1_twogrid_from_zero": (L1, "twogrid",
+                                                               {"coarse": L0, "coarse_phi": np.zeros_like(p0)})}.items():
+        r, _ = ns.solve(L, "g", method, **kw)
+        Eh = _exact_min_energy(L.K, L.dd["g"]["phi"], L.dd["g"]["fixed"])
+        err = abs(Fraction(r["energy_nd"]) - Eh)
+        rows[name] = {"preconditions_failed": ns.certificate_preconditions(L, ns.boundary_facts(L.mesh, L.xyz)),
+                      "n_unknowns": r["n_unknowns"], "energy_nd": r["energy_nd"],
+                      "exact_discrete_minimum": float(Eh), "abs_error": float(err),
+                      "total_bound_nd": r["total_error_bound_nd"],
+                      "within_certificate": bool(err <= Fraction(r["total_error_bound_nd"])),
+                      "at_or_above_minimum_up_to_evaluation": bool(
+                          Fraction(r["energy_nd"]) >= Eh - Fraction(r["evaluation_error_bound_nd"]))}
+    return rows
+
+
+def v6_evaluation_bound() -> dict:
+    """The evaluation-error bound against the EXACT rational value of phi^T K phi for the
+    float64 data, on the small cell at levels 0 and 1, and its size against the worst-case
+    bound it replaces (gamma_{n+k} |phi|^T|K||phi| in extended precision)."""
+    mesh, model = syn.chip_cell(**SMALL)
+    lv = _ladder(mesh, model, 1)
+    out = {}
+    for h, L in enumerate(lv):
+        for kind in ns.KINDS:
+            r, phi = ns.solve(L, kind, "direct")
+            exact = _exact_quadratic(L.K, phi)
+            err = abs(Fraction(r["energy_nd"]) - exact)
+            k = int(np.diff(L.K.tocsr().indptr).max())
+            old = ns.gamma(len(phi) + k, ns.ULD) * float(np.abs(phi) @ (abs(L.K) @ np.abs(phi)))
+            out[f"level{h}_{kind}"] = {
+                "float64_abs_error_vs_exact": float(err),
+                "evaluation_bound_nd": r["evaluation_error_bound_nd"],
+                "bound_covers_error": bool(err <= Fraction(r["evaluation_error_bound_nd"])),
+                "terms_nd": r["evaluation_bound_terms_nd"],
+                "previous_worst_case_bound_nd": old,
+                "tightening_factor": old / r["evaluation_error_bound_nd"]}
+    return out
+
+
 def v1_exact() -> dict:
     mesh, model, profile, E_exact = syn.layered_box(4)
     rows, prev, prev_phi = [], None, None
     for level in range(3):
         L = ns.Level(mesh, model, kinds=())
         L.dd["exact"] = syn.exact_dirichlet(mesh, profile)
-        pre = ns.certificate_preconditions(L, ns.boundary_facts(mesh))
+        pre = ns.certificate_preconditions(L, ns.boundary_facts(mesh, L.xyz))
         rd, phid = ns.solve(L, "exact", "direct")
         row = {"level": level, "n_unknowns": rd["n_unknowns"], "preconditions_failed": pre,
-               "direct_rel_err": abs(rd["energy_nd"] - E_exact) / E_exact,
+               "direct_rel_err_vs_continuum": abs(rd["energy_nd"] - E_exact) / E_exact,
                "direct_bound_rel": rd["total_error_bound_rel"]}
         if prev is not None:
             # the prolonged coarse solution is already exact here, so also start from zero
             for start, cphi in (("prolonged", prev_phi), ("zero", np.zeros_like(prev_phi))):
                 rt, _ = ns.solve(L, "exact", "twogrid", coarse=prev, coarse_phi=cphi)
                 row[f"twogrid_{start}"] = {
-                    "rel_err": abs(rt["energy_nd"] - E_exact) / E_exact,
+                    "rel_err_vs_continuum": abs(rt["energy_nd"] - E_exact) / E_exact,
                     "bound_rel": rt["total_error_bound_rel"], "status": rt["solver"]["status"],
-                    "iterations": rt["solver"]["iterations"],
-                    "error_within_bound": bool(abs(rt["energy_nd"] - E_exact)
-                                               <= rt["total_error_bound_nd"] + rd["total_error_bound_nd"]
-                                               + abs(rd["energy_nd"] - E_exact))}
+                    "iterations": rt["solver"]["iterations"]}
         rows.append(row)
         prev, prev_phi = L, phid
         mesh = af.refine_red(mesh)
@@ -116,7 +227,7 @@ def v2_level2(cell: dict) -> dict:
     mesh, model = syn.chip_cell(**cell)
     lv = _ladder(mesh, model, 2)
     out = {"cell": cell, "tets": [int(len(L.mesh["tets"])) for L in lv],
-           "preconditions_failed": [ns.certificate_preconditions(L, ns.boundary_facts(L.mesh))
+           "preconditions_failed": [ns.certificate_preconditions(L, ns.boundary_facts(L.mesh, L.xyz))
                                     for L in lv]}
     for kind in ns.KINDS:
         r0, p0 = ns.solve(lv[0], kind, "direct")
@@ -158,10 +269,11 @@ def v3_every_iterate(cell: dict) -> dict:
         def certify(x):
             work[dd["free"]] = x
             E = float(work @ (L.K @ work))
-            bnd = ns.certificate(sysm, x, m_free, c)["error_bound_nd"]
+            ce = ns.certificate(sysm, x, m_free, c)
+            bnd = ce["error_bound_nd"]
             excess = E - rd["energy_nd"]
             audit.append({"energy_excess_nd": excess, "bound_nd": bnd})
-            return bnd / (E - bnd) if E > bnd else math.inf
+            return (bnd / (E - bnd) if E > bnd else math.inf), ce["residual_2norm"]
 
         for start in ("prolonged", "zero"):
             audit.clear()
@@ -257,7 +369,7 @@ def v5_negative() -> dict:
         c = L.poincare["c"]
         lam_AM = float(sla.eigh(A, M, eigvals_only=True, subset_by_index=[0, 0])[0])
         lam_AD, vec = sla.eigh(A, np.diag(Dm), subset_by_index=[0, 0])
-        row = {"preconditions_failed": ns.certificate_preconditions(L, ns.boundary_facts(L.mesh)),
+        row = {"preconditions_failed": ns.certificate_preconditions(L, ns.boundary_facts(L.mesh, L.xyz)),
                "c": c, "min_eig_A_over_M": lam_AM, "min_eig_A_over_Dm": float(lam_AD[0]),
                "min_eig_M_minus_Dm": float(np.linalg.eigvalsh(M - np.diag(Dm)).min()),
                "poincare_step_A_ge_cM_holds": bool(lam_AM >= c)}
@@ -289,8 +401,9 @@ def v5_negative() -> dict:
     def certify(x):
         work[dd["free"]] = x
         E = float(work @ (L.K @ work))
-        b = ns.certificate(sysm, x, m_free, c)["error_bound_nd"]
-        return b / (E - b) if E > b else math.inf
+        ce = ns.certificate(sysm, x, m_free, c)
+        b = ce["error_bound_nd"]
+        return (b / (E - b) if E > b else math.inf), ce["residual_2norm"]
 
     x, it = ns.pcg(sysm["A"], sysm["b"], (Pfull @ p0)[dd["free"]], tg, maxiter=1000,
                    check_every=5, target_rel=1e-12, stagnation_checks=20, certify=certify)
@@ -321,6 +434,49 @@ def v5_negative() -> dict:
                           "increase_positive": bool(Ep > rd["energy_nd"]),
                           "bound_covers_increase": bool(bnd + rd["total_error_bound_nd"]
                                                         >= Ep - rd["energy_nd"])}
+    # (g) a folded mesh: conforming, every boundary face tagged and constrained, yet the
+    # tetrahedra overlap. The tiling checks must report it, and the bound formula would
+    # understate a real error there.
+    fm, fmodel = syn.folded_box(3.0, 6)
+    Lf = ns.Level(fm, fmodel, kinds=())
+    bff = ns.boundary_facts(fm, Lf.xyz)
+    xf = fm["xyz"]
+    fixed = np.zeros(len(xf), dtype=bool)
+    fixed[bff["boundary_nodes"]] = True
+    Lf.dd["walls"] = {"fixed": fixed, "phi": np.where(fixed, xf[:, 0], 0.0),
+                      "free": np.flatnonzero(~fixed), "geo": None}
+    f = Lf.dd["walls"]["free"]
+    A = Lf.K[f][:, f].toarray()
+    lam, vec = sla.eigh(A, np.diag(Lf.m[f]), subset_by_index=[0, 0])
+    sysm_f = ns.system(Lf.K, Lf.dd["walls"])
+    xs = ns.solve_direct(sysm_f)
+    wf = Lf.dd["walls"]["phi"].copy()
+    wf[f] = xs
+    E0 = float(wf @ (Lf.K @ wf))
+    wf[f] = xs + 1e-3 * vec[:, 0] / np.abs(vec[:, 0]).max()
+    excess = float(wf @ (Lf.K @ wf)) - E0
+    bnd_f = ns.certificate(sysm_f, wf[f], Lf.m[f], Lf.poincare["c"])["error_bound_nd"]
+    out["g_folded_mesh"] = {"mesh_facts": {k: bff[k] for k in (
+        "max_face_multiplicity", "every_boundary_face_is_tagged",
+        "every_interior_face_separates_its_tetrahedra", "every_boundary_face_on_the_box_surface",
+        "volume_sum_over_box_minus_1")},
+        "preconditions_failed": ns.certificate_preconditions(Lf, bff),
+        "min_eig_A_over_Dm": float(lam[0]), "c": Lf.poincare["c"],
+        "lowest_mode_perturbation_excess_nd": excess, "certificate_nd": bnd_f,
+        "certificate_covers_excess": bool(bnd_f >= excess)}
+    # (h) the stagnation rule: infinite certificates never count; finite non-improving do
+    n = 3000
+    Aq = sp.diags(np.linspace(1.0, 50.0, n)).tocsr()
+    bq = np.ones(n)
+    runs = {}
+    for name, seq in (("inf_30_then_converging", [math.inf] * 30 + [1e-3, 1e-6, 1e-13]),
+                      ("finite_flat", [1e-3] * 40)):
+        it_seq = iter(seq)
+        _, it = ns.pcg(Aq, bq, np.zeros(n), lambda r: r, maxiter=500, check_every=1,
+                       target_rel=1e-12, stagnation_checks=20,
+                       certify=lambda x: (next(it_seq, 1e-3), 0.0))
+        runs[name] = {"status": it["status"], "iterations": it["iterations"]}
+    out["h_stagnation_rule"] = runs
     return out
 
 
@@ -329,6 +485,8 @@ def run() -> dict:
     t0 = time.monotonic()
     res = {"record": "solver verification on synthetic cases only; no QMHP data read",
            "solver_settings": ns.SOLVER, "V1_exact_known_answer": v1_exact(),
+           "V1b_certificate_against_exact_discrete_minimum": v1b_certificate_against_exact_discrete_minimum(),
+           "V6_evaluation_bound_against_exact_arithmetic": v6_evaluation_bound(),
            "V2_level2_small": v2_level2(SMALL), "V2_level2_medium": v2_level2(MEDIUM),
            "V3_every_iterate": v3_every_iterate(MEDIUM), "V4_consistency": v4_consistency(),
            "V5_negative_controls": v5_negative(), "qmhp_data_read": False}
@@ -342,7 +500,8 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out")
     a = ap.parse_args(argv)
-    text = json.dumps(run(), indent=1, default=float)
+    import study_driver  # noqa: PLC0415 - the same strict-JSON writer as the records
+    text = json.dumps(study_driver._clean(run()), indent=1, allow_nan=False)
     if a.out:
         Path(a.out).write_text(text + "\n")
     print(text)

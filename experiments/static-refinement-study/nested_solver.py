@@ -26,24 +26,36 @@ Solvers:
 
 Certificate (both solvers, the same code):
 
-  With the Dirichlet values imposed exactly, E(phi~) - E_h = e^T A e = r^T A^-1 r >= 0 for
-  the TRUE residual r = b - A x~: an inexact solve can only RAISE the energy. If every node
-  of every outer-boundary face is constrained, a homogeneous discrete function extends by
-  zero into H1_0 of the mesh's bounding box B, and
+  The discrete problem is the quadratic form phi^T K phi of the ASSEMBLED matrix K, which
+  sees only its symmetric part K_s. With the Dirichlet data imposed exactly,
+  E(phi~) - E_h = e^T A_s e = r_s^T A_s^-1 r_s >= 0 for the TRUE residual of the symmetric
+  problem, r_s = r + (A - A^T) x / 2 + (K_fD - K_Df^T) phi_D / 2 with r = b - A x: an inexact
+  solve can only RAISE the energy. If the mesh tiles its bounding box B (conforming; every
+  interior face separates its two tetrahedra; every boundary face lies on the surface of B;
+  sum |vol| = vol(B)) and every node of every boundary face is constrained, a homogeneous
+  discrete function extends by zero into H1_0(B), and
 
-      x^T A x >= eps_min int |grad v|^2 >= eps_min lambda_1(B) int v^2
-              >= eps_min lambda_1(B) sum_i m_i x_i^2,     m_i = sum_{K contains i} vol_K / 20
+      x^T A_s x >= eps_min int |grad v|^2 >= eps_min lambda_1(B) int v^2
+                >= eps_min lambda_1(B) sum_i m_i x_i^2,   m_i = sum_{K contains i} vol_K / 20
 
   (Dirichlet eigenvalue monotonicity under domain inclusion; the P1 element mass
-  vol/20 (I + 1 1^T) dominates vol/20 I). So A >= c D_m with c = eps_min lambda_1(B), and
+  vol/20 (I + 1 1^T) dominates vol/20 I). So A_s >= c D_m with c = eps_min lambda_1(B), and
 
-      0 <= E(phi~) - E_h <= sum_i r_i^2 / m_i / c.
+      0 <= E(phi~) - E_h <= sum_i r_s,i^2 / m_i / c.
 
-  |r_i| is bounded by the computed residual plus the floating-point error of computing it
-  and the right-hand side (gamma_n = n u / (1 - n u)). The certificate is relative to the
-  assembled matrix: assembly round-off is not certified, and is common to every solver.
-  The energy is also evaluated in extended precision; the float64-to-extended difference
-  plus a worst-case bound on the extended evaluation is the evaluation-error bound.
+  |r_s,i| is bounded by the computed residual, the computed asymmetry terms and the
+  floating-point error of computing r and b (gamma_n = n u / (1 - n u)).
+
+  Evaluation error: phi^T K phi is re-evaluated in extended precision as y = K phi, then
+  s = phi . y. |s - phi^T K phi| <= gamma_k |phi|^T |K| |phi| + gamma_n sum |phi_i y_i|
+  (k the longest row, n the length; u of the extended format). The n-term factor multiplies
+  sum |phi_i y_i|, which carries no cancellation: y vanishes at free nodes to solver
+  accuracy and is the nodal charge at constrained ones. The float64 energy's error is that
+  bound plus |e64 - s| and the rounding of s to float64.
+
+  Relative to the assembled operator: the round-off of assembling K from the coordinates
+  (about 1e-14 relative) is common to every solver and is NOT certified. "Rigorous" in this
+  study always means rigorous relative to the assembled operator.
 
 Nothing here reads the QMHP mesh, launches anything or writes anything.
 """
@@ -98,25 +110,56 @@ def mesh_digest(mesh: dict) -> str:
     return h.hexdigest()
 
 
-def boundary_facts(mesh: dict) -> dict:
+def boundary_facts(mesh: dict, xyz_nd=None) -> dict:
     """Faces shared by one tetrahedron: their nodes, the face multiplicity, and whether
-    each is a tagged triangle (a hanging node would leave an untagged one)."""
+    each is a tagged triangle (a hanging node would leave an untagged one). With the
+    coordinates, also whether the mesh tiles its bounding box: every interior face
+    separates its two tetrahedra, every boundary face lies on the box surface, and the
+    unsigned volumes sum to the box volume. A folded or overlapping mesh fails these."""
     t, n = mesh["tets"], len(mesh["xyz"])
     if n ** 3 >= 2 ** 63:
         raise Refusal("too many nodes for the face key")
-    faces = np.sort(np.vstack([t[:, [0, 1, 2]], t[:, [0, 1, 3]], t[:, [0, 2, 3]],
-                               t[:, [1, 2, 3]]]), axis=1).astype(np.int64)
+    loc = ((0, 1, 2, 3), (0, 1, 3, 2), (0, 2, 3, 1), (1, 2, 3, 0))
+    faces = np.sort(np.vstack([t[:, list(f[:3])] for f in loc]), axis=1).astype(np.int64)
+    opp = np.concatenate([t[:, f[3]] for f in loc])
     key = (faces[:, 0] * n + faces[:, 1]) * n + faces[:, 2]
-    del faces
-    uk, cnt = np.unique(key, return_counts=True)
-    del key
+    order = np.argsort(key, kind="stable")
+    key, faces, opp = key[order], faces[order], opp[order]
+    del order
+    uk, first, cnt = np.unique(key, return_index=True, return_counts=True)
     single = uk[cnt == 1]
     tri = np.sort(mesh["tris"], axis=1).astype(np.int64)
     tkey = (tri[:, 0] * n + tri[:, 1]) * n + tri[:, 2]
     nodes = np.unique(np.concatenate([single // (n * n), (single // n) % n, single % n]))
-    return {"max_face_multiplicity": int(cnt.max()), "boundary_faces": int(len(single)),
-            "every_boundary_face_is_tagged": bool(np.isin(single, tkey).all()),
-            "boundary_nodes": nodes}
+    out = {"max_face_multiplicity": int(cnt.max()), "boundary_faces": int(len(single)),
+           "every_boundary_face_is_tagged": bool(np.isin(single, tkey).all()),
+           "boundary_nodes": nodes}
+    if xyz_nd is not None:
+        lo, hi = xyz_nd.min(0), xyz_nd.max(0)
+        ext = hi - lo
+        tol = 1e-12 * float(ext.max())
+        bf = faces[first[cnt == 1]]
+        P = xyz_nd[bf]                                        # (nb, 3, 3)
+        on = np.zeros(len(bf), dtype=bool)
+        for ax in range(3):
+            for v in (lo[ax], hi[ax]):
+                on |= np.all(np.abs(P[:, :, ax] - v) <= tol, axis=1)
+        pair = first[cnt == 2]
+        f2, o1, o2 = faces[pair], opp[pair], opp[pair + 1]
+        del faces, opp, key
+        a0, a1, a2 = xyz_nd[f2[:, 0]], xyz_nd[f2[:, 1]], xyz_nd[f2[:, 2]]
+        nrm = np.cross(a1 - a0, a2 - a0)
+        s1 = np.einsum("ij,ij->i", nrm, xyz_nd[o1] - a0)
+        s2 = np.einsum("ij,ij->i", nrm, xyz_nd[o2] - a0)
+        _, vol = af._tet_geometry(xyz_nd, t)
+        out.update({"every_boundary_face_on_the_box_surface": bool(on.all()),
+                    "every_interior_face_separates_its_tetrahedra": bool(np.all(s1 * s2 < 0)),
+                    "volume_sum_over_box_minus_1": float(vol.sum() / float(np.prod(ext)) - 1.0)})
+    return out
+
+
+#: sum |vol| / vol(B) - 1 must be within this for the mesh to count as tiling its box
+TILING_VOLUME_TOL = 1e-9
 
 
 def nodal_mass_lower(mesh: dict, xyz_nd) -> np.ndarray:
@@ -185,7 +228,7 @@ def port_geometry(mesh: dict, xyz_nd, model: dict, ground, island) -> dict:
 
 
 PORT_GEOMETRY_TOL = 1e-12
-#: the Gauss-Seidel triangular solve must reproduce a probe vector to this relative accuracy
+#: diagnostic only: how well the Gauss-Seidel triangular solves reproduce a probe vector
 GS_PROBE_TOL = 1e-10
 
 
@@ -246,11 +289,15 @@ def dirichlet(mesh: dict, xyz_nd, model: dict, kind: str) -> dict:
 # --- the linear algebra ----------------------------------------------------------------
 
 def system(K, dd: dict) -> dict:
-    """A = K_ff and b = -K_fD phi_D, with exactly static_capacitance's expressions."""
+    """A = K_ff and b = -K_fD phi_D, with exactly static_capacitance's expressions, and the
+    moduli of the assembled matrix's asymmetry, which the certificate must include."""
     free, fixed, phi = dd["free"], dd["fixed"], dd["phi"]
     KfD = K[free][:, fixed]
     rhs = -(KfD @ phi[fixed])
-    return {"A": K[free][:, free].tocsr(), "b": rhs, "KfD": KfD.tocsr(), "phiD": phi[fixed]}
+    A = K[free][:, free].tocsr()
+    KDf = K[fixed][:, free].tocsr()
+    return {"A": A, "b": rhs, "KfD": KfD.tocsr(), "phiD": phi[fixed],
+            "A_asym_abs": abs(A - A.T).tocsr(), "D_asym_abs": abs(KfD - KDf.T).tocsr()}
 
 
 def solve_direct(sysm: dict) -> np.ndarray:
@@ -287,11 +334,12 @@ class TwoGrid:
         # SuperLU on a triangular matrix in natural order is a compiled triangular solve
         self.gs = spla.splu(Lower, permc_spec="NATURAL", diag_pivot_thresh=0.0,
                             options={"SymmetricMode": True})
+        # diagnostics only: the certificate does not depend on the preconditioner
         probe = np.random.default_rng(0).standard_normal(A.shape[0])
-        self.gs_probe_rel = float(np.abs(self.gs.solve(Lower @ probe) - probe).max()
-                                  / np.abs(probe).max())
-        if not self.gs_probe_rel <= GS_PROBE_TOL:
-            raise Refusal(f"the Gauss-Seidel triangular solve is inexact: {self.gs_probe_rel}")
+        scale = np.abs(probe).max()
+        self.gs_probe_rel = float(np.abs(self.gs.solve(Lower @ probe) - probe).max() / scale)
+        self.gs_probe_backward_rel = float(
+            np.abs(self.gs.solve(Lower.T @ probe, trans="T") - probe).max() / scale)
         self.Ac = (P.T @ A @ P).tocsc()
         self.lu = spla.splu(self.Ac)
 
@@ -314,33 +362,44 @@ def certificate(sysm: dict, x: np.ndarray, m_free: np.ndarray, c: float) -> dict
     kD = max(1, int(np.diff(KfD.indptr).max()) if KfD.nnz else 1)
     g = (gamma(kA + 1) * (np.abs(b) + abs(A) @ np.abs(x))
          + gamma(kD) * (abs(KfD) @ np.abs(phiD)))
-    rb = np.abs(r) + g
+    asym = 0.5 * (sysm["A_asym_abs"] @ np.abs(x) + sysm["D_asym_abs"] @ np.abs(phiD))
+    rb = np.abs(r) + g + asym
     return {"residual_2norm": float(np.linalg.norm(r)), "rhs_2norm": float(np.linalg.norm(b)),
             "relative_residual": float(np.linalg.norm(r) / np.linalg.norm(b)),
+            "asymmetry_max": float(asym.max()) if len(asym) else 0.0,
             "error_bound_nd": BOUND_SAFETY * float((rb * rb / m_free).sum()) / c,
-            "roundoff_floor_nd": BOUND_SAFETY * float((g * g / m_free).sum()) / c}
+            "roundoff_floor_nd": BOUND_SAFETY * float(((g + asym) ** 2 / m_free).sum()) / c}
 
 
 def energy(K, phi: np.ndarray) -> dict:
-    """phi^T K phi in float64 exactly as static_capacitance computes it, and a bound on its
-    evaluation error from an extended-precision re-evaluation."""
+    """phi^T K phi in float64 exactly as static_capacitance computes it, and a rigorous
+    bound on its evaluation error from an extended-precision re-evaluation (module
+    docstring): gamma_k |phi|^T|K||phi| for the matrix-vector product, gamma_n sum|phi_i y_i|
+    for the dot product, plus the float64-to-extended difference and its rounding."""
     e64 = float(phi @ (K @ phi))
-    Kl = K.astype(np.longdouble)
+    Kc = K.tocsr()
     pl = phi.astype(np.longdouble)
-    eld = pl @ (Kl @ pl)
-    k = int(np.diff(K.tocsr().indptr).max())
-    worst_ld = gamma(len(phi) + k, ULD) * float(np.abs(phi) @ (abs(K) @ np.abs(phi)))
-    eld64 = float(eld)
-    return {"energy_nd": e64, "energy_nd_extended": eld64,
-            "evaluation_error_bound_nd": abs(e64 - eld64) + U64 * abs(eld64) + worst_ld}
+    y = Kc.astype(np.longdouble) @ pl
+    s_ld = pl @ y
+    k = int(np.diff(Kc.indptr).max())
+    t_matvec = gamma(k, ULD) * float(np.abs(phi) @ (abs(Kc) @ np.abs(phi)))
+    t_dot = gamma(len(phi), ULD) * float(np.abs(pl * y).sum())
+    s64 = float(s_ld)
+    t_diff = abs(e64 - s64) + U64 * abs(s64)
+    return {"energy_nd": e64, "energy_nd_extended": s64,
+            "evaluation_error_bound_nd": BOUND_SAFETY * (t_matvec + t_dot + t_diff),
+            "evaluation_bound_terms_nd": {"matvec": t_matvec, "dot": t_dot,
+                                          "float64_vs_extended": t_diff}}
 
 
 def pcg(A, b, x0, precond, *, maxiter: int, check_every: int, target_rel: float,
         stagnation_checks: int, certify) -> tuple[np.ndarray, dict]:
-    """Preconditioned conjugate gradients. Every ``check_every`` iterations the TRUE
-    residual is certified; it stops when the relative certificate reaches ``target_rel``,
-    after ``stagnation_checks`` checks without a 10 % improvement, on breakdown, or at
-    ``maxiter``. The status is recorded; it is never a verdict by itself."""
+    """Preconditioned conjugate gradients. Every ``check_every`` iterations ``certify(x)``
+    returns (relative certificate, TRUE residual norm). It stops when the relative
+    certificate reaches ``target_rel`` (CERTIFIED), after ``stagnation_checks`` FINITE
+    checks without a 10 % improvement on the best finite one (STAGNATED; an infinite
+    certificate - the bound still above the energy - never counts toward stagnation), on
+    breakdown, or at ``maxiter``. The status is a recorded diagnostic, not a verdict."""
     w0 = time.monotonic()
     x = x0.copy()
     r = b - A @ x
@@ -348,9 +407,15 @@ def pcg(A, b, x0, precond, *, maxiter: int, check_every: int, target_rel: float,
     p = z.copy()
     rz = float(r @ z)
     hist, best, since, status, k = [], math.inf, 0, "MAXITER", 0
-    cert0 = certify(x)
-    hist.append([0, float(np.linalg.norm(r)), cert0, time.monotonic() - w0])
-    if cert0 <= target_rel:
+
+    def record(k_, rel_, true_):
+        hist.append({"k": k_, "recursive_residual": float(np.linalg.norm(r)),
+                     "true_residual": true_, "rel_certificate": rel_ if math.isfinite(rel_) else None,
+                     "wall_s": time.monotonic() - w0})
+
+    rel0, true0 = certify(x)
+    record(0, rel0, true0)
+    if rel0 <= target_rel:
         return x, {"status": "CERTIFIED", "iterations": 0, "history": hist}
     for k in range(1, maxiter + 1):
         Ap = A @ p
@@ -362,18 +427,19 @@ def pcg(A, b, x0, precond, *, maxiter: int, check_every: int, target_rel: float,
         x += alpha * p
         r -= alpha * Ap
         if k % check_every == 0:
-            rel = certify(x)
-            hist.append([k, float(np.linalg.norm(r)), rel, time.monotonic() - w0])
+            rel, true = certify(x)
+            record(k, rel, true)
             if rel <= target_rel:
                 status = "CERTIFIED"
                 break
-            if rel < 0.9 * best:
-                best, since = rel, 0
-            else:
-                since += 1
-                if since >= stagnation_checks:
-                    status = "STAGNATED"
-                    break
+            if math.isfinite(rel):
+                if rel < 0.9 * best:
+                    best, since = rel, 0
+                else:
+                    since += 1
+                    if since >= stagnation_checks:
+                        status = "STAGNATED"
+                        break
         z = precond(r)
         rz_new = float(r @ z)
         if not (math.isfinite(rz_new) and rz_new > 0):
@@ -410,6 +476,16 @@ def certificate_preconditions(level: Level, bfacts: dict) -> list[str]:
         bad.append("non-conforming: a face is shared by more than two tetrahedra")
     if not bfacts["every_boundary_face_is_tagged"]:
         bad.append("an untagged boundary face (a hanging node or a hole)")
+    if "volume_sum_over_box_minus_1" not in bfacts:
+        bad.append("the tiling of the bounding box was not checked (no coordinates)")
+    else:
+        if not bfacts["every_interior_face_separates_its_tetrahedra"]:
+            bad.append("an interior face does not separate its two tetrahedra (folded mesh)")
+        if not bfacts["every_boundary_face_on_the_box_surface"]:
+            bad.append("a boundary face lies off the bounding-box surface")
+        if not abs(bfacts["volume_sum_over_box_minus_1"]) <= TILING_VOLUME_TOL:
+            bad.append(f"the volumes do not tile the bounding box: "
+                       f"{bfacts['volume_sum_over_box_minus_1']!r}")
     for kind, dd in level.dd.items():
         if not dd["fixed"][bfacts["boundary_nodes"]].all():
             bad.append(f"{kind}: an outer-boundary node is not constrained")
@@ -445,20 +521,22 @@ def solve(level: Level, kind: str, method: str, *, coarse: Level | None = None,
         Acoarse = coarse.K[cd["free"]][:, cd["free"]]
         info["galerkin_identity_rel"] = float(abs(tg.Ac - Acoarse).max() / abs(Acoarse).max())
         info["gauss_seidel_probe_rel"] = tg.gs_probe_rel
+        info["gauss_seidel_probe_backward_rel"] = tg.gs_probe_backward_rel
         x0 = (Pfull @ coarse_phi)[dd["free"]]
         phi_work = phi.copy()
 
         def certify(xk):
             phi_work[dd["free"]] = xk
             e = float(phi_work @ (level.K @ phi_work))
-            bnd = certificate(sysm, xk, m_free, c)["error_bound_nd"]
-            return bnd / (e - bnd) if e > bnd else math.inf
+            ce = certificate(sysm, xk, m_free, c)
+            bnd = ce["error_bound_nd"]
+            return (bnd / (e - bnd) if e > bnd else math.inf), ce["residual_2norm"]
 
         x, it = pcg(sysm["A"], sysm["b"], x0, tg, maxiter=s["maxiter"],
                     check_every=s["check_every"], target_rel=s["target_rel"],
                     stagnation_checks=s["stagnation_checks"], certify=certify)
         info.update({"settings": s, "status": it["status"], "iterations": it["iterations"],
-                     "history_iter_residual_relcert_wall": it["history"]})
+                     "history": it["history"]})
     else:
         raise ValueError(method)
     phi[dd["free"]] = x

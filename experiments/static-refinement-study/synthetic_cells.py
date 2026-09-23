@@ -110,6 +110,22 @@ def chip_cell(h0: float = 0.02, q: float = 1.5, hmax: float = 0.4, *, half: floa
     return mesh, dict(QMHP_LIKE_MODEL)
 
 
+def folded_box(a: float = 3.0, n: int = 6) -> tuple[dict, dict]:
+    """A NEGATIVE CONTROL: a Kuhn mesh of [0, a]^3 folded into [0, 1]^3 by a triangle wave in
+    each coordinate. It is conforming and every boundary face is tagged and constrained, but
+    the tetrahedra overlap, so the certificate's embedding into H1_0(B) fails; the tiling
+    checks must report it."""
+    xs = np.linspace(0.0, a, n + 1)
+    m = tensor_mesh(xs, xs, xs)
+    fold = lambda v: np.where(np.floor(v) % 2 == 0, v - np.floor(v), 1.0 - (v - np.floor(v)))
+    xyz = fold(m["xyz"])
+    mesh = {"xyz": xyz, "tets": m["tets"], "tet_attr": m["tet_attr"],
+            "tris": m["faces"][m["boundary"]], "tri_attr": np.full(int(m["boundary"].sum()), 2)}
+    model = {"eps_r": {1: 1.0}, "pec_attrs": (2,), "port_attr": 10,
+             "direction": (1.0, 0.0, 0.0), "L0_m": 1.0e-3, "L_H": 1.0e-8}
+    return mesh, model
+
+
 def layered_box(n: int) -> tuple[dict, dict, np.ndarray, float]:
     """Unit box (mm), eps 2 below z = 0.5 and 5 above, every boundary node held at the exact
     potential. Returns mesh, model, the exact nodal potential, and the exact energy_nd."""

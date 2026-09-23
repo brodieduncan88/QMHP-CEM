@@ -6,10 +6,13 @@
    "mesh_digest": "5087fee82eae901c989ddc81f1236d44e5c273f01a72ace0091ddab53f373b54",
    "n_tets": 64434,
    "n_nodes": 13991,
-   "boundary": {
+   "mesh_facts": {
     "max_face_multiplicity": 2,
     "boundary_faces": 3040,
-    "every_boundary_face_is_tagged": true
+    "every_boundary_face_is_tagged": true,
+    "every_boundary_face_on_the_box_surface": true,
+    "every_interior_face_separates_its_tetrahedra": true,
+    "volume_sum_over_box_minus_1": -1.1102230246251565e-16
    },
    "preconditions_failed": [],
    "poincare": {
@@ -53,13 +56,17 @@
      "n_unknowns": 4558,
      "nnz_A": 49716,
      "n_port_nodes_constrained_off_conductors": 0,
-     "certificate_floor_nd": 5.135435288208106e-20
+     "certificate_floor_proxy_nd": 5.1539153182782676e-20,
+     "evaluation_matvec_term_proxy_nd": 1.339204623576969e-13,
+     "evaluation_dot_term_factor": 7.584536297622352e-16
     },
     "Cprime": {
      "n_unknowns": 4543,
      "nnz_A": 49535,
      "n_port_nodes_constrained_off_conductors": 15,
-     "certificate_floor_nd": 5.073566565276338e-20
+     "certificate_floor_proxy_nd": 5.091985344309085e-20,
+     "evaluation_matvec_term_proxy_nd": 1.339204623576969e-13,
+     "evaluation_dot_term_factor": 7.584536297622352e-16
     }
    }
   },
@@ -67,10 +74,13 @@
    "mesh_digest": "c1a93691a02c72d21849a0dad11ed36c86462e9a3b14a8e4c399f903be4a87fd",
    "n_tets": 515472,
    "n_nodes": 93935,
-   "boundary": {
+   "mesh_facts": {
     "max_face_multiplicity": 2,
     "boundary_faces": 12160,
-    "every_boundary_face_is_tagged": true
+    "every_boundary_face_is_tagged": true,
+    "every_boundary_face_on_the_box_surface": true,
+    "every_interior_face_separates_its_tetrahedra": true,
+    "volume_sum_over_box_minus_1": 2.220446049250313e-16
    },
    "preconditions_failed": [],
    "poincare": {
@@ -114,7 +124,9 @@
      "n_unknowns": 60608,
      "nnz_A": 766864,
      "n_port_nodes_constrained_off_conductors": 0,
-     "certificate_floor_nd": 3.956604313393055e-17,
+     "certificate_floor_proxy_nd": 3.9649108220069136e-17,
+     "evaluation_matvec_term_proxy_nd": 5.726247018036087e-13,
+     "evaluation_dot_term_factor": 5.092226553621319e-15,
      "galerkin_identity_rel": 6.594853697671926e-15,
      "fixed_rows_from_free_coarse_nnz": 0
     },
@@ -122,7 +134,9 @@
      "n_unknowns": 60552,
      "nnz_A": 765912,
      "n_port_nodes_constrained_off_conductors": 56,
-     "certificate_floor_nd": 3.951364961313896e-17,
+     "certificate_floor_proxy_nd": 3.959660644380352e-17,
+     "evaluation_matvec_term_proxy_nd": 5.726247018036087e-13,
+     "evaluation_dot_term_factor": 5.092226553621319e-15,
      "galerkin_identity_rel": 6.594853697671926e-15,
      "fixed_rows_from_free_coarse_nnz": 0
     }
@@ -132,10 +146,13 @@
    "mesh_digest": "1f780cdb5c1675756de95812f10113a87165008ea6f8173d9f63a8fc341f5348",
    "n_tets": 4123776,
    "n_nodes": 709421,
-   "boundary": {
+   "mesh_facts": {
     "max_face_multiplicity": 2,
     "boundary_faces": 48640,
-    "every_boundary_face_is_tagged": true
+    "every_boundary_face_is_tagged": true,
+    "every_boundary_face_on_the_box_surface": true,
+    "every_interior_face_separates_its_tetrahedra": true,
+    "volume_sum_over_box_minus_1": 2.220446049250313e-16
    },
    "preconditions_failed": [],
    "poincare": {
@@ -179,7 +196,9 @@
      "n_unknowns": 584914,
      "nnz_A": 8073624,
      "n_port_nodes_constrained_off_conductors": 0,
-     "certificate_floor_nd": 1.1111425138761289e-15,
+     "certificate_floor_proxy_nd": 1.1136232316896442e-15,
+     "evaluation_matvec_term_proxy_nd": 2.2933302050664796e-12,
+     "evaluation_dot_term_factor": 3.845778947034343e-14,
      "galerkin_identity_rel": 2.2686723185240468e-14,
      "fixed_rows_from_free_coarse_nnz": 0
     },
@@ -187,7 +206,9 @@
      "n_unknowns": 584701,
      "nnz_A": 8069405,
      "n_port_nodes_constrained_off_conductors": 213,
-     "certificate_floor_nd": 1.1106623567083632e-15,
+     "certificate_floor_proxy_nd": 1.1131421161266007e-15,
+     "evaluation_matvec_term_proxy_nd": 2.2933302050664796e-12,
+     "evaluation_dot_term_factor": 3.845778947034343e-14,
      "galerkin_identity_rel": 2.2686723185240468e-14,
      "fixed_rows_from_free_coarse_nnz": 0
     }
@@ -195,10 +216,10 @@
   }
  },
  "resources": {
-  "wall_s": 68.56056857300018,
-  "cpu_s": 67.919095,
-  "max_rss_MB": 3703.546875,
-  "peak_address_space_MB": 4128.03515625
+  "wall_s": 71.43945144600002,
+  "cpu_s": 71.256185,
+  "max_rss_MB": 3679.26171875,
+  "peak_address_space_MB": 3851.58203125
  },
  "environment": {
   "python": "3.11.15",
@@ -206,13 +227,18 @@
   "scipy": "1.17.1",
   "platform": "Linux-6.18.44-fc-v37-x86_64-with-glibc2.39",
   "longdouble_eps": 1.0842021724855044e-19,
+  "threads_env": {
+   "OPENBLAS_NUM_THREADS": "1",
+   "OMP_NUM_THREADS": "1",
+   "MKL_NUM_THREADS": "1"
+  },
   "code_sha256": {
-   "study_driver.py": "6e90d4dc979e41fb0693e8c0b442e9ad45112e066675cb0ba8ba8d49d6c8dd38",
-   "nested_solver.py": "051304f2bf755caadddc190ef2f145626e2bd84382150d3edb841f8f9611ebe3",
+   "study_driver.py": "75c04e729176e386460f89342f65f3f6676aaaecba2279da733eb81a240d6727",
+   "nested_solver.py": "4b4e233ef993ced8b71bfed00335dabcfc21b2c3de4399c418c78464654f0180",
    "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
    "orchestrator/manifest.py": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f",
-   "synthetic_cells.py": "625a69b6795ce8684135c7a15adae17e4fc9b3905ff4ac7676edc75e600161cb",
-   "verify_solver.py": "ce0713dd4fbf7ff5035d2a91be4c6a6711c7fc9ccc4300c92471f2d21144f3c7"
+   "synthetic_cells.py": "c3ac1e73a774b405fe7d9382d35ee2cc935e90ebe67d9ff0aa7a8167895f4d6b",
+   "verify_solver.py": "f5160578a65c444a60291d0fc5b7e0ef32fbe1a321d37881445dd2926055453a"
   }
  }
 }

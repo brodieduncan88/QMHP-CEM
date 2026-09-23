@@ -1,11 +1,11 @@
 {
  "record": "static-only nested refinement study - pre-declaration",
- "status": "PREPARED. NOT APPROVED. NOT EXECUTED. No linear solve has been run on the QMHP mesh for this study. What has run: the solver verification on synthetic cases (solver_verification.json), the QMHP-sized synthetic dry run (dry_run.json), and the QMHP preflight, which refines and assembles but solves nothing (preflight.json).",
+ "status": "PREPARED. NOT APPROVED. NOT EXECUTED. Revision 2. No linear solve has been run on the QMHP mesh for this study. What has run: the solver verification on synthetic cases (solver_verification.json), the QMHP-sized synthetic dry run (dry_run.json), and the QMHP preflight, which refines and assembles but solves nothing (preflight.json).",
  "question": {
   "primary": "Under nested uniform refinement of the committed mesh (levels 0, 1, 2), does the island capacitance C_h of the meshed model converge at the rate theory predicts? If it does, what limit does that rate imply? The limit comes with a model-based bracket; the one rigorous bound is C <= C_2.",
   "secondary": [
-   "The same for C'_h, and hence for H_h = 1/((2 pi)^2 L_F C'_h). By the verified sheet-port identity, H_h is Palace's complete harmonic moment on each nested mesh; it is derived, not measured by Palace.",
-   "delta_h = C'_h / C_h - 1 on each level: how far Palace's distributed sheet port departs from the declared lumped port in the static moment, since S_h = (1 + delta_h) H_h.",
+   "The same for C'_h, and hence for S'_h = 1/((2 pi)^2 L_F C'_h). Under the sheet-port identity S'_h would be H_h, Palace's complete harmonic moment on each mesh; for levels 1 and 2, the moment Palace would have if given these red-refined meshes. The identity is verified only on the project's own dense-pencil model of Palace's port. The level-0 consistency check is its first test against Palace, and S'_h is reported under the name H only if that check is CONSISTENT.",
+   "delta_h = C'_h / C_h - 1 on each level: how far Palace's distributed sheet port departs from the declared lumped port in the static moment, if the identity holds (S_h = (1 + delta_h) H_h).",
    "At level 0 only: a cross-code consistency check against the committed L2 band, which is Palace's eigensolver on the same mesh."
   ]
  },
@@ -19,9 +19,11 @@
  },
  "already_known_before_execution": [
   "C_0 and C_1 are known from the executed record, so d1 = C_0 - C_1 = 32.13658197766435 fF is known too. The class of C is therefore a function of C_2 alone. The C_2 intervals for each class are stated under classification.C_intervals_given_the_known_C0_and_C1, before C_2 exists.",
-  "Given those known values, C cannot be classified CONVERGED at tau = 0.05. Inside the CONVERGING window the conservative remaining error at level 2 is at least 0.1215. The reachable classes for C are CONVERGING, UNRESOLVED, NON-CONVERGENT and UNQUALIFIED. This is stated so that nobody reads a missing CONVERGED as a surprise.",
-  "delta_0 >= 6.585e-4. This is a lower bound from the band data (docs/coupled-candidate/static-band-pairing.md, section 2). The consistency check below predicts delta_0 to within a window 1.77e-5 wide.",
-  "A synthetic analogue, not QMHP data. On three QMHP-like cells the C sequence gave R = 2.76, 2.93 (solver_verification.json V2) and 2.60 (dry_run.json): all CONVERGING. On the dry-run cell delta GREW under refinement (3.3e-4, 1.0e-3, 1.7e-3; R = 0.98): NON-CONVERGENT at these levels, because a port face resolved by few elements at level 0 barely constrains the potential there and constrains it more as refinement adds nodes. This is recorded so that the classes expected before the run are on file. It is not a prediction of the QMHP values, and the rules were not tuned to it."
+  "Given those known values, C cannot be classified CONVERGED at tau = 0.05. Inside the CONVERGING window the conservative remaining error at level 2 is at least 0.1215. The reachable classes for C are CONVERGING, UNRESOLVED, NON-CONVERGENT and UNQUALIFIED.",
+  "CONVERGED is effectively unreachable for C' (and so for H or S') as well. With C'_0 fixed by the consistency window, it needs delta_1 >= 0.178, about 270 times delta_0. So tau decides nothing for C, C', S or H. It is kept only as the declared definition.",
+  "The classes of C', S and H follow the class of C up to O(delta): R' = R (1 + O(delta C / d)). They are not independent evidence. Agreement between them is one observation, not corroboration.",
+  "Under the identity, the band predicts delta_0 >= 6.585e-4. This is a PREDICTION that assumes the identity holds for Palace's p; it is not an established value. The consistency check predicts delta_0 to within a window 1.77e-5 wide.",
+  "A synthetic analogue, not QMHP data: see synthetic_expectations. It is recorded so that the classes expected before the run are on file. It is not a prediction of the QMHP values, and the rules were not tuned to it."
  ],
  "configuration": {
   "mesh": "results/COUPLED-LADDER-O1-L2-N2R-20260918T061455Z/L2/solver/coupled_chip_cell_L2.msh",
@@ -79,8 +81,8 @@
   "C_h": "Discrete (P1) Maxwell self-capacitance of the island with every other conductor grounded: C_h = eps0 Lc min int eps_r |grad phi|^2 over P1 phi with phi = 1 on the island and 0 on ground. This is the static-anchor quantity, set up with the same expressions.",
   "C'_h": "The same minimum with the port-face potential also held at the linear function of the coordinate along +Y: 0 on the ground end line, 1 on the island end line. Set up exactly as static-band-pairing/spectral.port_constrained_energy.",
   "S_h": "1 / ((2 pi)^2 L_F C_h) in GHz^2",
-  "H_h": "1 / ((2 pi)^2 L_F C'_h) in GHz^2. By the identity it equals Palace's complete harmonic moment N / sum(p/f^2) = 1 / sum(p/f^2) on the same mesh. The identity requires a rectangular port face whose conductor nodes lie only on its two end lines; this is checked at every level.",
-  "delta_h": "C'_h / C_h - 1 = S_h / H_h - 1 >= 0"
+  "H_h": "S'_h = 1 / ((2 pi)^2 L_F C'_h) in GHz^2, always reported. It is named H_h, Palace's complete harmonic moment N / sum(p/f^2) = 1 / sum(p/f^2), ONLY if the level-0 consistency check is CONSISTENT. The identity requires a rectangular port face whose conductor nodes lie only on its two end lines; this is checked at every level. For levels 1 and 2 it is the moment Palace would have if given these red-refined meshes, which Palace has never been run on.",
+  "delta_h": "C'_h / C_h - 1 >= 0 (= S_h / S'_h - 1)"
  },
  "independent_variable": "The refinement level, 0 -> 1 -> 2. For delta, also the port-face constraint.",
  "controlled_variables": [
@@ -106,9 +108,10 @@
    "target_rel": 1e-12,
    "stagnation_checks": 20
   },
-  "stopping": "Every check_every iterations the TRUE residual is certified. PCG stops when the relative certificate reaches target_rel (CERTIFIED), after stagnation_checks checks without a 10 % improvement (STAGNATED), on a non-positive curvature (BREAKDOWN), or at maxiter (MAXITER). Anything but CERTIFIED is an integrity failure.",
-  "certificate": "For every energy, direct or iterative: 0 <= E(phi~) - E_h <= sum_i r_i^2 / m_i / (eps_min lambda_1(B)). r is the true residual, bounded componentwise including its floating-point evaluation. m_i = sum of vol/20 over the tetrahedra at node i. B is the mesh's bounding box. The bound requires every outer-boundary node to be constrained, which is checked on every level. The energy's evaluation error is bounded by re-evaluating it in extended precision (x86-64 80-bit long double, required). An inexact solve can only RAISE the energy, so C_h is never understated by the solver. The certificate is relative to the assembled matrix: assembly round-off is common to every solver and is not certified. Proof: nested_solver module docstring.",
-  "verification_before_any_qmhp_solve": "solver_verification.json, synthetic only: V1 exact known answer; V2 two-grid against direct at level 2 on two QMHP-like cells; V3 the certificate holds at every iterate; V4 bit-identity with the reviewed static_capacitance and spectral code, and the dense sheet-port identity; V5 negative controls."
+  "stopping": "Every check_every iterations the TRUE residual is certified. PCG stops when the relative certificate reaches target_rel (CERTIFIED); on a non-positive curvature (BREAKDOWN); at maxiter (MAXITER); or after stagnation_checks FINITE checks without a 10 % improvement on the best finite one (STAGNATED). An infinite certificate, meaning the bound is still above the energy, never counts toward stagnation. The status is a recorded DIAGNOSTIC. Integrity judges only the certificate against certificate_rel_tol, because the certificate does not depend on how x was obtained.",
+  "certificate": "For every energy, direct or iterative: 0 <= E(phi~) - E_h <= sum_i r_s,i^2 / m_i / (eps_min lambda_1(B)). E is the quadratic form of the ASSEMBLED matrix, whose symmetric part it sees. r_s is the true residual of that symmetric problem: the computed residual, plus the assembled matrix's asymmetry terms, plus the floating-point error of computing r and b. m_i = sum of vol/20 over the tetrahedra at node i; B is the mesh's bounding box. The bound requires the mesh to TILE B and every boundary node to be constrained, both checked on every level. Tiling means: conforming; every interior face separates its two tetrahedra; every boundary face on the surface of B; sum |vol| = vol(B) within 1e-9. The energy's evaluation error is bounded by re-evaluating phi^T K phi in extended precision (x86-64 80-bit long double): gamma_k |phi|^T|K||phi| for the matrix-vector product, plus gamma_n sum |phi_i y_i| for the dot product, which has no cancellation. An inexact solve can only RAISE the energy, so C_h is never understated by the solver. 'Rigorous' means rigorous relative to the assembled operator. The round-off of assembling K from the coordinates (about 1e-14 relative) is common to every solver and is NOT certified. Proof: nested_solver module docstring.",
+  "verification_before_any_qmhp_solve": "solver_verification.json, synthetic only. V1: continuum known answer, an accuracy check only. V1b: the certificate against the exact rational minimum of the assembled form. V2: two-grid against direct at level 2 on two QMHP-like cells. V3: the certificate holds at every iterate. V4: bit identity with the reviewed static_capacitance and spectral code, and the dense sheet-port identity. V5: negative controls, including a folded mesh and the stagnation rule. V6: the evaluation-error bound against exact rational arithmetic.",
+  "record_layout": "ATTEMPT-SPENT.json (experiments/static-refinement-study/) and results/STATIC-REFINEMENT-STUDY-<UTC>/, both created before any solve. The record then receives, in order: provenance.json; level{h}.json (the level's mesh facts, written before its first solve); level{h}-C.json and level{h}-Cprime.json, each as its solve completes; level1-C-crosscheck.json and level1-Cprime-crosscheck.json; consistency-level0.json, as soon as level 0 completes; summary.json or failure.json; manifest.sha256, written last by write_verified. Non-finite values are written as null."
  },
  "integrity": {
   "certificate_rel_tol": 1e-09,
@@ -116,20 +119,20 @@
   "galerkin_identity_rel_tol": 1e-12,
   "reproduction_rel_tol": 1e-10,
   "port_geometry_tol": 1e-12,
-  "gauss_seidel_probe_rel_tol": 1e-10,
+  "tiling_volume_tol": 1e-09,
   "checks": [
    "every refined mesh equals its pre-declared digest (checked before the attempt is spent)",
-   "on every level: conforming, every boundary face tagged, every outer-boundary node constrained for both problems, and the port face a planar l x w rectangle whose conductor nodes lie only on its end lines (tolerance port_geometry_tol)",
-   "exactly two conductors, and the port face bridges them",
-   "every energy, C and S present, finite and positive; every bound finite and non-negative",
+   "on every level: the mesh tiles its bounding box (conforming, interior faces separate their tetrahedra, boundary faces on the box surface, volumes sum to the box within tiling_volume_tol); every boundary face tagged; every boundary node constrained for both problems; the port face a planar l x w rectangle whose conductor nodes lie only on its end lines (tolerance port_geometry_tol)",
+   "every energy, C_F, C_fF and S present, finite and positive; every bound finite and non-negative; every port voltage finite",
    "every one of the six primary energies and the two level-1 cross-checks certified to certificate_rel_tol, including the evaluation-error bound",
-   "every two-grid solve CERTIFIED, with the Galerkin identity within galerkin_identity_rel_tol and no coarse leak into constrained fine nodes",
+   "every two-grid solve: Galerkin identity within galerkin_identity_rel_tol and no coarse leak into constrained fine nodes",
    "level 1: the direct and two-grid energies agree within the sum of their bounds",
-   "port voltage of the solution equal to 1 within port_voltage_abs_tol, for every solve",
-   "C'_h >= C_h and E_{h+1} <= E_h for both problems, within the bounds",
-   "C_0 and C_1 reproduce the executed static-anchor record within reproduction_rel_tol"
+   "port voltage of the solution equal to 1 within port_voltage_abs_tol, for every solve including the cross-checks",
+   "C'_h >= C_h, and E_{h+1} <= E_h for both problems, within the bounds",
+   "C_0 and C_1 reproduce the executed static-anchor record within reproduction_rel_tol. This is checked inside the attempt, not before it, because every QMHP solve must happen inside a recorded attempt."
   ],
-  "meaning": "Any failure makes the record UNQUALIFIED: no class and no consistency verdict is read from it, though the raw values are preserved. A mesh, band-column, static-anchor-record, pre-declaration or code digest that does not match REFUSES before the attempt is spent."
+  "level0_scope": "The integrity items that need level 0 only. They are: its mesh digest, its preconditions, the validity of its values, its four certificates, its port voltages, C'_0 >= C_0, and C_0 reproduction. They qualify the level-0 consistency verdict independently of levels 1 and 2.",
+  "meaning": "Any failed check makes the record UNQUALIFIED: no class is read from it, and the raw values are preserved. The level-0 consistency verdict is read if its own level-0 scope passes. An exception after the attempt is spent, such as a refusal inside the run, a budget limit or a crash, gives FAILED: failure.json, a verified manifest where possible, and the raw results already written. A mesh, band-column, static-anchor-record, pre-declaration, code, environment or approval mismatch REFUSES before the attempt is spent."
  },
  "reproduction": {
   "record": "results/STATIC-ANCHOR-TEST-20260922T192243Z",
@@ -144,31 +147,33 @@
   "R_max": 4.0,
   "tau_converged": 0.05,
   "delta_small": 0.01,
-  "theory": "The energy error of the conforming P1 Dirichlet problem is E_h - E = ||u - u_h||_a^2 >= 0. Every sheet edge carries an r^(1/2) singularity, including sheets lying on the eps interface: the transmission condition keeps the exponent at 1/2. So under uniform refinement the leading term is of order h^1. Vertex singularities are of higher order: for the 90-degree convex plate corner the exponent is about 0.30, a literature value not re-derived here, giving energy order about 1.6. So are smooth terms (h^2). No P1 energy term is faster than h^2. The window below depends only on 1 < q <= 2, not on the vertex value. If X_h = X + a h + b h^q + ... with 1 < q <= 2 and a, b of one sign, then R = d1/d2 lies in [2, 2^q], a subset of [2, 4], and the level-2 error lies between d2/(R-1) and d2. Hence the window and the model-based bracket. The bracket is not a rigorous bound: it assumes the two-term model. The rigorous bound is C <= C_2.",
+  "theory": "The energy error of the conforming P1 Dirichlet problem is E_h - E = ||u - u_h||_a^2 >= 0. Every sheet edge carries an r^(1/2) singularity; sheets lying on the eps interface keep that exponent, because the transmission condition gives cos(lambda pi)(eps1 + eps2) = 0. So under uniform refinement the leading term is of order h^1, with a positive coefficient. Higher-order terms include vertex singularities (for the 90-degree convex plate corner the exponent is about 0.3, a literature value not re-derived here, giving energy order about 1.6) and smooth terms (h^2); higher orders than 2 also exist. If X_h = X + a h + b h^q with 1 < q <= 2 and a, b of ONE SIGN, then R = d1/d2 lies in [2, 2^q], a subset of [2, 4], and the level-2 error lies between d2/(R-1) and d2. That is the source of the window and of the model-based bracket. The one-sign premise is an ASSUMPTION the theory does not supply. Known mechanisms can violate it, such as the edge-vertex cutoff and the change of element-shape population under red refinement of a Gmsh mesh. With mixed signs, R < 2 can occur in the genuine order-1 regime, and a sequence inside [2, 4] can have its limit outside the bracket. The review found this in 12 % of random admissible three-order sequences. The bracket is therefore not rigorous. The rigorous bound is C <= C_2, relative to the assembled operator.",
   "rules": {
    "UNQUALIFIED": "any integrity failure; for C and C', also a certainly negative difference",
-   "NON-CONVERGENT": "|d2| >= |d1|: the differences do not shrink. This means no evidence of convergence at these levels. It does not mean mathematical divergence, which the density of nested P1 spaces excludes.",
-   "UNRESOLVED": "a difference within its certified error of zero; differences of opposite sign that shrink (possible only for delta); 1 < R < R_min (slower than the theoretical leading order); R > R_max (faster than any P1 energy order: pre-asymptotic); or the certified range of R touching 1, R_min or R_max. The last is fail-safe by design: the window's edges are nominally included, but a value that cannot be placed on one side of an edge is not classified. The certified ranges are about 1e-9 relative, so this matters only for a sequence that lands on an edge.",
-   "CONVERGING": "R_min <= R <= R_max. The limit is reported with its model-based bracket [X2 - d2, X2 - d2/(R-1)], in order, and the level-2 remaining error with the bracket [d2/(R-1), d2] / limit",
-   "CONVERGED": "CONVERGING, and the conservative remaining error |d2| / |X2 - d2| <= tau_converged"
+   "NON-CONVERGENT": "R < 1 (for delta: |d2| >= |d1|): the differences do not shrink at levels 0-2. This means no evidence of convergence at these levels. It does not mean mathematical divergence, which the density of nested P1 spaces excludes.",
+   "UNRESOLVED": "Any of: a difference within its certified error of zero; 1 < R < R_min; R > R_max; or the certified range of R touching 1, R_min or R_max. 1 < R < R_min means observed order below 1, consistent with a leading order of 1 and a negative next term, or pre-asymptotic. R > R_max means observed order above 2: pre-asymptotic. Touching an edge is UNRESOLVED as a fail-safe; the certified ranges are about 1e-9 relative, so this matters only for a sequence that lands on an edge.",
+   "CONVERGING": "R_min <= R <= R_max. The limit is reported with its MODEL-BASED bracket [X2 - d2, X2 - d2/(R-1)] and the assumption it rests on. The level-2 remaining error is reported with the bracket [d2/(R-1), d2] / limit.",
+   "CONVERGED": "CONVERGING, and the conservative remaining error d2 / (X2 - d2) <= tau_converged"
   },
   "applied_to": {
    "C": "energies of problem C, with their certified ranges",
    "Cprime": "energies of problem C', with their certified ranges",
-   "S": "the class of C; S = k / E, with the rigorous lower bound S >= S_2 / (1 + bound)",
-   "H": "the class of C'; H = k / E', with the rigorous lower bound H >= H_2 / (1 + bound)",
-   "delta": "delta_h with its certified range. The sign is free and oscillation is possible, and the rate theory is not derived for delta (both C and C' have leading order 1, so delta generically does too), so its class is descriptive. Also reported: max delta_h, and whether delta_h <= delta_small on every level (S and H agree within 1 %)."
+   "S": "the class of C; S = k / E, with the lower bound S >= S_2 / (1 + bound) (bound_basis)",
+   "H_or_Sprime": "the class of C'; S' = k / E', with the lower bound S' >= S'_2 / (1 + bound). The name is H only if the level-0 consistency check is CONSISTENT; otherwise it is Sprime_static_identity_not_confirmed.",
+   "delta": "DESCRIPTIVE ONLY, with no rate theory. Classes: UNRESOLVED (a difference within its certified error of zero, oscillation, or |R| touching 1), NON-CONVERGENT (|d2| >= |d1|), or DIFFERENCES-SHRINKING (one sign, |d2| < |d1|; R is reported and nothing is extrapolated). Also reported: max delta_h at levels 0-2, and whether delta_h <= delta_small at levels 0-2 (S and S' within 1 %). The latter covers levels 0-2 only and says nothing about the limit."
   },
   "C_intervals_given_the_known_C0_and_C1": {
    "d1_fF": 32.13658197766435,
    "NON-CONVERGENT": "C_2 <= 50.0656 fF",
-   "UNRESOLVED (slower than order 1)": "50.0656 < C_2 < 66.1339 fF",
+   "UNRESOLVED (observed order below 1)": "50.0656 < C_2 < 66.1339 fF",
    "CONVERGING": "66.1339 <= C_2 <= 74.1680 fF",
-   "UNRESOLVED (faster than order 2)": "74.1680 < C_2 <= 82.2022 fF",
+   "UNRESOLVED (observed order above 2)": "74.1680 < C_2 <= 82.2022 fF",
    "C_2 > 82.2022 fF": "UNQUALIFIED: nesting forbids it",
    "CONVERGED": "unreachable: inside the CONVERGING window the conservative remaining error is at least 0.1215"
   },
-  "why_tau_0_05": "A conventional engineering tolerance, fixed before any level-2 value exists. The static-anchor windows were factor-2 wide. For C the tolerance is unreachable, as stated above, so it constrains only C' and delta."
+  "why_tau_0_05": "A conventional engineering tolerance, fixed before any level-2 value exists. Given the known C_0 and C_1 and the consistency window for C'_0, it is unreachable for C, C', S and H. For C' it would need delta_1 >= 0.178. It decides nothing in this study; it is kept only as the declared definition of CONVERGED.",
+  "bound_basis": "The Dirichlet principle. It is certified relative to the assembled operator; the round-off of assembling K from the coordinates (about 1e-14 relative) is not included.",
+  "dependence_note": "The classes of C', S and H follow C's up to O(delta) and are not independent evidence."
  },
  "consistency_check": {
   "what": "At level 0, delta_0 = C'_0 / C_0 - 1 (static, this study) against the committed L2 band. The band is Palace's eigensolver on the byte-identical mesh. Two independent codes meet here.",
@@ -188,7 +193,7 @@
   },
   "prediction": "Given the identity (N = 1 over all modes, sum_all p/f^2 = 1/H_0 = (1 + delta_0)/S_0) and p >= 0, delta_0 must lie in [delta_band, delta_band + tail], with delta_band = S_0 sum_band p/f^2 - 1 and tail = S_0 (1 - N_B) / f_max^2. The upper end assumes no mode below f_max was missed. With Target 0.5 GHz below the lowest mode, any unsaved mode below f_max would have been closer to the target than mode 6.",
   "eta": 1e-08,
-  "eta_derivation": "The allowed discrepancy beyond the window, fixed now. Contributions: the band CSVs print 10 significant digits, which bounds the relative error of sum p/f^2 by 1.5e-9; Palace's recorded backward errors are at most 1.6e-11; the static certificates at level 0 are far below 1e-12; LossTan is 0 and Im f / Re f < 1e-9. Total below 4e-9, doubled and rounded up to 1e-8.",
+  "eta_derivation": "The allowed discrepancy beyond the window, fixed now. (1) CSV print precision: 10 significant digits bound the relative error of sum p/f^2 by 1.5e-9. (2) Palace's eigen-solve: the recorded values are BACKWARD errors (at most 1.6e-11). The forward error of each p is estimated, not derived, as roughly the backward error times (||K|| + |lambda| ||M||)/gap, a factor up to about 1e6. That gives relative p errors of about 2e-11 for mode 1, which carries 99.989 % of the sum. For modes 3-6 the estimate is about 1e-5, and each of those modes carries less than 1e-6 of the sum. The resulting forward errors are below 1e-10 in delta. (3) The static certificates at level 0 are below 1e-12. (4) LossTan is 0, and Im f / Re f < 1e-9. Total below 4e-9, doubled and rounded up to 1e-8. Part (2) is an estimate, not a bound. An INCONSISTENT verdict therefore also admits, as a possible cause, eigenvector inaccuracy of the weak modes 3-6: p errors of 1.3-2.8 % in those modes would move an edge by more than eta.",
   "window_at_freeze_with_the_record_S0": [
    0.0006585166844683079,
    0.0006762224309864047
@@ -196,11 +201,13 @@
   "window_rule": "Recomputed at execution from the pinned band values and the NEW S_0, which the reproduction check ties to the record: [delta_band - eta, delta_band + tail + eta]. CONSISTENT if delta_0's certified range lies inside; INCONSISTENT-LOW or INCONSISTENT-HIGH if it lies wholly below or above; UNRESOLVED if it straddles an edge.",
   "not_an_acceptance_criterion": "The check decides nothing about the convergence classes of C, C' or delta, which are static quantities of this study. It decides only whether H_h may be read as Palace's complete harmonic moment on the QMHP mesh. Its window is fixed here from pinned data and a stated error budget, and may not be widened after the result.",
   "consequence": {
-   "CONSISTENT": "The static code and Palace's eigensolver agree on the same mesh within the predicted window. H_h may be read as Palace's complete harmonic moment on the nested meshes, derived through the identity.",
-   "INCONSISTENT-LOW": "delta_0 is below what the band data force. This contradicts the identity as applied to Palace's pencil, or the C' implementation on the QMHP mesh. H_h is reported only as the static quantity S'_h, labelled 'identity not confirmed on the QMHP mesh'. The classes of C, C' and delta are unaffected.",
-   "INCONSISTENT-HIGH": "delta_0 exceeds the band's bound. Possible causes: a missed mode below f_max, N != 1 for Palace's p, or a mismatch in the p definition. H_h is reported only as S'_h, labelled 'identity not confirmed on the QMHP mesh'. The classes of C, C' and delta are unaffected.",
-   "UNRESOLVED": "delta_0's certified range straddles a window edge. H_h is reported as S'_h with the identity unconfirmed."
-  }
+   "CONSISTENT": "The static code and Palace's eigensolver agree on the same mesh within the predicted window. S'_h is reported as H_h, Palace's complete harmonic moment on the nested meshes under the identity. For levels 1 and 2 it is the moment Palace would have if given those meshes.",
+   "INCONSISTENT-LOW": "delta_0 is below what the band data force. This contradicts the identity as applied to Palace's pencil, the C' implementation on the QMHP mesh, or the accuracy of the band's weak-mode p. The second moment is reported only as Sprime_static_identity_not_confirmed. The classes of C, C' and delta are unaffected.",
+   "INCONSISTENT-HIGH": "delta_0 exceeds the band's bound. Possible causes: a missed mode below f_max, N != 1 for Palace's p, a mismatch in the p definition, or inaccurate weak-mode p. The second moment is reported only as Sprime_static_identity_not_confirmed. The classes of C, C' and delta are unaffected.",
+   "UNRESOLVED": "delta_0's certified range straddles a window edge. The second moment is reported as Sprime_static_identity_not_confirmed.",
+   "UNQUALIFIED": "The level-0 integrity scope failed, so no consistency verdict is read. The second moment is reported as Sprime_static_identity_not_confirmed if the classes are read at all."
+  },
+  "scope": "Level 0 only. The verdict is read if the level-0 integrity scope passes (integrity.level0_scope), whatever happens at levels 1 and 2. It is written to consistency-level0.json as soon as level 0 completes, and repeated in summary.json or failure.json."
  },
  "not_a_target": "Agreement with the band, and any class, are outcomes and not targets. Nothing in the computation of C_h or C'_h reads the band, the executed record's values or the expected classes. The tolerances, windows and rules above were fixed before any C_2, C'_h or delta_h value existed, and may not be changed after one does.",
  "no_combination": "C_h, C'_h, S_h, H_h and delta_h must not be combined with the conditional Route A coupling g, the readout frequency f_R or any Route A output. No E_C,F1F1 is reported; it stays UNAVAILABLE.",
@@ -210,29 +217,42 @@
   "wall_cap_minutes": 60,
   "attempts": 1,
   "retry": "none. A failure, a refusal after the record exists, a timeout, a budget limit or an integrity failure is the recorded outcome.",
-  "enforcement": "In the process, from the moment the record directory exists: RLIMIT_CPU soft (raises, and is recorded) with a kernel kill 60 s later; RLIMIT_AS (an allocation beyond it fails, and is recorded); SIGALRM at the wall cap (raises, and is recorded). Python handles signals between bytecodes, so the invocation also carries an outer hard kill 60 s beyond the wall cap.",
-  "invocation": "from the repository root, locally, no workflow, no network: timeout --signal=KILL 3660 .venv/bin/python experiments/static-refinement-study/study_driver.py",
+  "enforcement": "In the process, from the moment the record directory exists. RLIMIT_CPU soft limit: SIGXCPU raises, and is recorded; a kernel kill follows 60 CPU-s later. RLIMIT_AS soft limit: an allocation beyond it fails, and is recorded. The hard limit is 1 GiB higher, so the failure path can raise its own soft limit. SIGALRM at the wall cap measured from process start, so the outer kill at the cap + 60 s really is 60 s later. SIGTERM and SIGHUP raise, and are recorded. The failure path first disarms every one of these signals and lifts the soft limits, then writes failure.json and the manifest. UNCATCHABLE: a kernel SIGKILL (the hard CPU limit or the OOM killer) or the outer timeout's SIGKILL leaves the spent record with no failure.json and no manifest. The raw files already written survive; the record must then be quarantined by content, as STATIC-ANCHOR-TEST-20260922T192243Z was.",
+  "invocation": "from the repository root, locally, no workflow, no network: env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 timeout --signal=KILL 3660 .venv/bin/python experiments/static-refinement-study/study_driver.py",
   "estimate": {
-   "basis": "dry_run.json: the exact execution path under this budget, on a QMHP-sized synthetic stand-in LARGER than the QMHP ladder (level 2: 4,999,680 tets and 791,574 unknowns, against 4,123,776 and 584,914) with WORSE elements (aspect p50/p99 5.0/25.1, against 4.7/14.2).",
+   "basis": "dry_run.json runs the exact execution path under this budget, with single-threaded BLAS as in the invocation. It uses a QMHP-sized synthetic stand-in that is LARGER than the QMHP ladder: at level 2, 4,999,680 tets and 791,574 unknowns, against 4,123,776 and 584,914. Its elements are also WORSE: aspect p50/p99 5.0/25.1 at level 0, against 4.7/14.2.",
    "stand_in_measured": {
-    "wall_s": 241,
-    "cpu_s": 379,
-    "peak_rss_GB": 4.4,
-    "peak_address_space_GB": 7.4,
-    "level2_pcg_iterations": 120,
-    "level2_setup_wall_s": [
-     21.5,
-     26.8
-    ],
-    "level2_wall_s_per_iteration": [
-     0.32,
-     0.36
-    ],
-    "level1_cross_check_iterations": 85
+    "wall_s": 211.6,
+    "cpu_s": 210.5,
+    "peak_rss_MB": 4516,
+    "peak_address_space_MB": 7316,
+    "level2": {
+     "C": {
+      "iterations": 120,
+      "status": "CERTIFIED",
+      "setup_wall_s": 16.83,
+      "wall_s_per_iteration": 0.2937
+     },
+     "Cprime": {
+      "iterations": 120,
+      "status": "CERTIFIED",
+      "setup_wall_s": 21.63,
+      "wall_s_per_iteration": 0.2906
+     }
+    },
+    "level1_cross_check_iterations": {
+     "C": 85,
+     "Cprime": 85
+    },
+    "level2_total_error_bound_rel": {
+     "C": 3.215333781076514e-13,
+     "Cprime": 3.236744378526742e-13
+    }
    },
-   "expected_on_the_qmhp_ladder": "about 3-5 min wall, 5-8 min CPU, 4-5 GB resident, below 8 GB address space, if PCG needs a comparable iteration count. The iteration count on the real mesh is not known until the run; the level-1 cross-check reports it on the real operator.",
-   "worst_case_within_the_settings": "maxiter = 1000 on every PCG solve: about 60 s (levels 0-1 direct) + 2 x 50 s (level-1 cross-checks) + 2 x (27 + 360) s (level 2), about 16 min wall and 26 min CPU. The stagnation rule normally stops a failing solve well before that. Either way the result would be recorded as an integrity failure, not retried.",
-   "why_these_caps": "cpu 60 min and wall 60 min cover the worst case with a margin of about 2; the 12 GB address-space cap is 1.6 times the stand-in's peak on a 15 GB machine."
+   "expected_on_the_qmhp_ladder": "About 3-4 min wall and the same CPU, with 4-5 GB resident and less than 8 GB of address space, if PCG needs a comparable number of iterations. The iteration count on the real operator is not known until the run. The level-1 cross-check reports it on the real operator.",
+   "worst_case_within_the_settings": "With maxiter = 1000 on every PCG solve: level 2 takes 2 x (about 22 s set-up + 1000 x 0.294 s) = about 630 s. Levels 0-1 and the two level-1 cross-checks (about 0.03 s per iteration) add about 110 s, and refinement and assembly about 30 s. The total is about 13 min wall and, single-threaded, about the same CPU. The stagnation rule normally stops a failing solve earlier. Either way the solve is recorded, and its certificate decides integrity.",
+   "why_these_caps": "cpu 60 min and wall 60 min cover the worst case with a margin of about 4.6. The 12 GiB address-space soft limit is 1.7 times the stand-in's peak; its hard limit is 1 GiB higher for the failure path. The machine has 15 GB.",
+   "error_bound_margin": "On the stand-in, the level-2 total certified error is 3.2e-13 relative, against the 1e-9 tolerance. On the QMHP ladder, preflight.json bounds the evaluation term's matrix-vector part, with |phi| <= 1 and NO solve, at 2.3e-12 nd at level 2: about 1e-12 relative. The dot-product part is gamma_n(u_ld) = 3.8e-14 times sum |phi_i y_i|, which is of the order of the energy."
   }
  },
  "stop_conditions": [
@@ -241,18 +261,73 @@
   "no reinterpretation of the classes, windows or consistency verdict after the result"
  ],
  "expected_evidence": [
-  "results/STATIC-REFINEMENT-STUDY-<UTC>/level0.json, level1.json and level2.json, each written as its level completes (raw first)",
-  "summary.json: C_h and C'_h at every level; the integrity list; the classes of C, C', S, H and delta with their brackets and rigorous bounds; the consistency verdict; the approval and code digests; library versions; resources",
-  "on any exception or budget limit: failure.json with the levels completed, the error and the resources used, beside whatever raw levels were already written",
-  "manifest.sha256, written last by orchestrator.manifest.write_verified on every path, success and failure"
+  "experiments/static-refinement-study/ATTEMPT-SPENT.json, created before any solve",
+  "results/STATIC-REFINEMENT-STUDY-<UTC>/provenance.json: the approval and its digest; the measured HEAD, code, pre-declaration, mesh and level digests; the environment; the band and static-anchor inputs; the limits",
+  "level{h}.json, level{h}-C.json, level{h}-Cprime.json, level1-C-crosscheck.json and level1-Cprime-crosscheck.json, each written as it completes (raw first)",
+  "consistency-level0.json, as soon as level 0 completes",
+  "summary.json: C_h and C'_h at every level; the integrity list; the classes of C, C', S, the second moment and delta, with brackets, bounds and their basis; the level-0 consistency verdict; resources",
+  "on any exception after the attempt is spent: failure.json with the levels completed, the files written, the level-0 verdict if level 0 completed, the error, the resources and the provenance, beside every raw file already written",
+  "manifest.sha256, written last by write_verified on every catchable path"
  ],
  "cannot_establish": [
   "E_C,F1F1 or g",
   "that Route A is valid or invalid",
   "the device's capacitance (this is the meshed model: zero-thickness sheets, grounded walls, the port face open)",
-  "a rigorous continuum value or lower bound for C; the bracket is model-based",
+  "a rigorous continuum value or lower bound for C; the bracket is model-based and rests on an assumption the theory does not supply",
+  "anything beyond the assembled operator: its round-off (about 1e-14) is not certified",
   "B/H, the band dispersion, which needs eigen data on the refined meshes",
   "anything about Palace's box-refined operators, which are not rebuilt here",
-  "any H_h value measured by Palace; H_h is derived through the identity"
- ]
+  "that S'_h is Palace's moment H_h, unless the level-0 check is CONSISTENT; and even then only under the identity, for meshes Palace never ran on",
+  "convergence of delta: its class is descriptive"
+ ],
+ "revision": {
+  "number": 2,
+  "previous": "revision 1, commit 864c0baef389bbe0a45345b7b27cf74f8afd17c4 (kept in git history)",
+  "why": "An adversarial review of revision 1 (five lenses plus independent verification, on the frozen snapshot) confirmed 10 major and 25 minor defects in the preparation. No blocking defect was found. Revision 2 was made BEFORE approval and BEFORE any QMHP solve, so no result can have informed it. The review record is review/review_864c0ba.json.",
+  "changes": [
+   "the certificate's residual includes the assembled matrix's asymmetry; the preconditions include a tiling of the bounding box (a folded mesh passed revision 1's checks)",
+   "the evaluation-error bound applies the n-term worst case only to the cancellation-free sum |phi_i y_i| (rigorous, about 10^2-10^4 tighter); revision 1's margin to 1e-9 was never established on the QMHP ladder",
+   "integrity judges the certificate against 1e-9; the PCG status and Gauss-Seidel probes are recorded diagnostics (the certificate does not depend on the solver)",
+   "the PCG stagnation rule ignores infinite certificates",
+   "each solve's raw result is written as it completes (revision 1 could discard a completed level-2 C solve)",
+   "the level-0 consistency verdict has its own scope and is written as soon as level 0 completes, so a later failure cannot forfeit it",
+   "the second moment is named H only if the level-0 check is CONSISTENT; otherwise Sprime_static_identity_not_confirmed",
+   "the identity is described as verified on the project's own dense-pencil model, not against Palace; delta_0 >= 6.585e-4 is a prediction under it",
+   "class reasons corrected (R < 2 and R > 4 are 'not classified', not 'slower than theory' or 'faster than any order'); delta's class is descriptive with no bracket; C', S and H classes are declared dependent on C's",
+   "the one-attempt ledger binds the approved commit, this checkout's path, a validity window of at most 7 days, and ATTEMPT-SPENT.json",
+   "only the four bound repository files are executed (the manifest module is loaded by path); the verified library versions and single-threaded BLAS are required",
+   "the failure path disarms the budget signals and raises its own soft limits; SIGTERM and SIGHUP reach it; the uncatchable SIGKILL paths are disclosed",
+   "non-finite values are written as null (strict JSON)",
+   "the eta derivation distinguishes backward from forward error",
+   "the resource figures are quoted exactly from the committed dry_run.json"
+  ]
+ },
+ "environment": {
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "threads_env": {
+   "OPENBLAS_NUM_THREADS": "1",
+   "OMP_NUM_THREADS": "1",
+   "MKL_NUM_THREADS": "1"
+  },
+  "longdouble_eps_below": 1e-18,
+  "rule": "The versions the solver verification, preflight and dry run ran on. execute() refuses before spending the attempt if any differs, if a thread variable is not '1', or if np.longdouble is not wider than float64 (x86-64 80-bit)."
+ },
+ "diagnostics_not_integrity": {
+  "pcg_status": "CERTIFIED, STAGNATED, MAXITER or BREAKDOWN. Recorded only: a solve certified to 1e-9 is valid however it stopped, and one that is not certified fails the certificate check anyway.",
+  "gauss_seidel_probes": "The forward and backward triangular solves reproduce a probe vector. The reference value is GS_PROBE_TOL = 1e-10. Recorded only, because the certificate does not depend on the preconditioner.",
+  "gauss_seidel_probe_rel_tol_reference": 1e-10
+ },
+ "one_attempt": {
+  "ledger": "The approval names the commit a human reviewed (source_commit, which must be this checkout's HEAD), this checkout's absolute path (repository_path), and a validity window of at most 7 days (not_before_utc, not_after_utc). It also states attempt 1 and prior_records []. Before any solve, execute() creates experiments/static-refinement-study/ATTEMPT-SPENT.json exclusively (O_EXCL), then the record directory. It refuses if either already exists. Both are left in place and committed with the record.",
+  "residual_risk": "The ledger is local to the named checkout. Deliberately deleting ATTEMPT-SPENT.json and the record, or rewriting HEAD, would defeat it. Both are prohibited: CLAUDE.md section 1 for the evidence, section 9 for rewriting history. A checkout at another path, a different commit, or an expired window is refused.",
+  "why_reproduction_is_inside_the_attempt": "Every QMHP solve must happen inside a recorded attempt, including the solves that reproduce C_0 and C_1. A reproduction failure is therefore recorded as UNQUALIFIED, not refused."
+ },
+ "synthetic_expectations": {
+  "what": "Classes observed on synthetic QMHP-like cells, recorded before any QMHP solve. They are NOT predictions of the QMHP values, and the rules were not tuned to them.",
+  "C": "R = 2.76 and 2.93 on two cells (solver_verification.json V2), and 2.60 on the dry-run cell (dry_run.json): CONVERGING. Observed orders 1.38-1.55, inside the [1, 2] window but above the leading order 1: pre-asymptotic contamination by higher-order terms.",
+  "Cprime": "It follows C (R = 2.62 on the dry-run cell), as the dependence note says.",
+  "delta": "On the dry-run cell delta GREW under refinement: 3.3e-4, 1.0e-3, 1.7e-3, R = 0.98, so NON-CONVERGENT at levels 0-2. A port face resolved by few elements barely constrains the potential at level 0, and constrains it more as refinement adds nodes. The same class is expected on the QMHP ladder. It says nothing about the limit."
+ }
 }

@@ -1,17 +1,35 @@
 {
  "DRAFT": "NOT AN APPROVAL. This is the approval a human would grant for the static-only nested refinement study, prepared for review. The driver reads only STUDY-APPROVAL.json, and this file authorises nothing. The study is PREPARED, NOT APPROVED, NOT EXECUTED.",
- "how_to_grant_it": "A human who approves writes experiments/static-refinement-study/STUDY-APPROVAL.json containing every field below except DRAFT and how_to_grant_it, unchanged. The driver refuses if any digest differs from the files as they are at execution, so a change to the pre-declaration, the mesh or any code file after review voids the approval.",
+ "how_to_grant_it": "A human who approves writes experiments/static-refinement-study/STUDY-APPROVAL.json. It contains every field below except DRAFT and how_to_grant_it. source_commit is replaced by the full SHA of the commit the human reviewed, which must be the checkout's HEAD at execution. not_before_utc and not_after_utc are replaced by ISO-8601 UTC times at most 7 days apart. Every other field is copied unchanged. The driver refuses if any digest, the environment, the invocation, the budget, the checkout path, HEAD or the time differs from what is written there. A change to the pre-declaration, the mesh or any executed code file after review therefore voids the approval.",
  "authorises": "one execution of the static-only nested refinement study",
  "run_label": "static-only nested refinement study, attempt 1 of 1",
+ "attempt": 1,
+ "prior_records": [],
+ "source_commit": "<the full SHA of the reviewed commit; must equal HEAD at execution>",
+ "repository_path": "/home/user/QMHP-CEM",
+ "not_before_utc": "<ISO-8601 UTC, e.g. 2026-09-23T00:00:00+00:00>",
+ "not_after_utc": "<ISO-8601 UTC, at most 7 days after not_before_utc>",
  "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
- "predeclaration_sha256": "8dd72c51faec8e1b5462756b78f78bd30e5098007d7f7ee6a0ac6c8fb8797da9",
+ "predeclaration_sha256": "b09f524104daa42a8d7cfecf1729842f0854fda4d97efab3c5b9fcc432c44e21",
  "code_sha256": {
-  "study_driver.py": "6e90d4dc979e41fb0693e8c0b442e9ad45112e066675cb0ba8ba8d49d6c8dd38",
-  "nested_solver.py": "051304f2bf755caadddc190ef2f145626e2bd84382150d3edb841f8f9611ebe3",
+  "study_driver.py": "75c04e729176e386460f89342f65f3f6676aaaecba2279da733eb81a240d6727",
+  "nested_solver.py": "4b4e233ef993ced8b71bfed00335dabcfc21b2c3de4399c418c78464654f0180",
   "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
   "orchestrator/manifest.py": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f"
  },
- "invocation": "from the repository root, locally, no workflow, no network: timeout --signal=KILL 3660 .venv/bin/python experiments/static-refinement-study/study_driver.py",
+ "environment": {
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "threads_env": {
+   "OPENBLAS_NUM_THREADS": "1",
+   "OMP_NUM_THREADS": "1",
+   "MKL_NUM_THREADS": "1"
+  },
+  "longdouble_eps_below": 1e-18,
+  "rule": "The versions the solver verification, preflight and dry run ran on. execute() refuses before spending the attempt if any differs, if a thread variable is not '1', or if np.longdouble is not wider than float64 (x86-64 80-bit)."
+ },
+ "invocation": "from the repository root, locally, no workflow, no network: env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 timeout --signal=KILL 3660 .venv/bin/python experiments/static-refinement-study/study_driver.py",
  "budget": {
   "cpu_minutes": 60,
   "memory_GB": 12,
@@ -21,9 +39,11 @@
  },
  "does_not_authorise": [
   "a second attempt, whatever the first one's outcome (any class, a failure, a timeout, a budget limit or an integrity failure)",
+  "running from another checkout, another commit or outside the validity window",
+  "removing or editing ATTEMPT-SPENT.json or the record",
   "a level 3, another mesh, another refinement method, or any change to the solver settings, tolerances, windows or rules",
-  "reading the consistency window more widely than declared",
-  "combining C_h, C'_h, S_h, H_h or delta_h with g, f_R or any Route A output",
+  "reading the consistency window more widely than declared, or reading S'_h as H_h unless the level-0 check is CONSISTENT",
+  "combining C_h, C'_h, S_h, S'_h or delta_h with g, f_R or any Route A output",
   "reporting any value as E_C,F1F1",
   "any Palace solve or workflow dispatch",
   "any change to the withdrawn paired test or to the executed static-anchor record"

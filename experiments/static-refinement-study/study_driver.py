@@ -12,65 +12,97 @@ principle (nested_solver.py):
     C_h    island at 1, every other conductor at 0            (the static-anchor quantity)
     C'_h   the same, with the port-face potential also held linear along the port
 
-and from them S_h = 1/((2 pi)^2 L_F C_h), delta_h = C'_h / C_h - 1 and, by the verified
-sheet-port identity S_h = (1 + delta_h) H_h, H_h = 1/((2 pi)^2 L_F C'_h): the complete
-harmonic moment Palace's pencil would have on that mesh (derived, not measured by Palace).
+and from them S_h = 1/((2 pi)^2 L_F C_h), delta_h = C'_h / C_h - 1 and
+S'_h = 1/((2 pi)^2 L_F C'_h). Under the sheet-port identity (verified on the project's own
+dense-pencil model of Palace's port, not yet against Palace), S'_h = H_h would be the
+complete harmonic moment Palace's pencil has on that mesh. The level-0 consistency check
+is the first test of that identity against Palace's own eigensolver; the second moment is
+reported under the name H only if that check is CONSISTENT.
 
 Levels 0 and 1 are solved directly (SuperLU), exactly as the executed static-anchor test,
 whose C_0 and C_1 must be reproduced. Level 2 is solved by two-grid preconditioned
 conjugate gradients; level 1 is ALSO solved that way as an in-run cross-check on the real
-operator. Every energy carries a rigorous a-posteriori bound (nested_solver.certificate).
+operator. Every energy carries a rigorous a-posteriori bound relative to the assembled
+operator (nested_solver.certificate and nested_solver.energy).
 
 It does not report E_C,F1F1 or g, reads no Route A output, and combines nothing with them.
 
 Modes
 -----
 ``--preflight``  QMHP mesh, GEOMETRY AND ASSEMBLY ONLY: digests of levels 0-2, topology, the
-                 certificate's and the identity's preconditions, Galerkin identities, sizes,
-                 the certificate's round-off floor. No linear solve, no capacitance.
-``--dry-run``    the exact execution path, on the QMHP-sized synthetic cell, under the
+                 tiling, certificate and identity preconditions, Galerkin identities, sizes,
+                 round-off proxies. No linear solve, no capacitance.
+``--dry-run``    the exact execution path on the QMHP-sized synthetic cell, under the
                  declared budget. No QMHP data.
 (default)        THE STUDY. Refuses unless STUDY-APPROVAL.json binds the mesh, the
-                 pre-declaration and every code file by sha256. One attempt: the record
-                 directory is created before any solve and its existence spends it. Raw
-                 levels are written as each completes; summary.json (or failure.json) next;
-                 manifest.sha256 last, by orchestrator.manifest.write_verified, on every path.
+                 pre-declaration, every executed code file, the environment, the approved
+                 commit, this checkout and a validity window. One attempt: ATTEMPT-SPENT.json
+                 and the record directory are created before any solve and spend it.
+                 provenance.json is written first, then each solve's raw result as it
+                 completes, then summary.json (or failure.json), then manifest.sha256 by
+                 orchestrator/manifest.py's write_verified. A kernel or outer SIGKILL (the
+                 hard CPU limit, the outer timeout, the OOM killer) cannot be caught: it
+                 leaves the spent record with no failure.json and no manifest, to be
+                 quarantined by content.
 """
 from __future__ import annotations
 
 import argparse
 import csv
+import gc
+import importlib.util
 import json
 import math
+import os
 import platform
+import re
 import resource
 import signal
 import sys
 import time
 import traceback
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
 import scipy
 
+_T_START = time.monotonic()
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 sys.path.insert(0, str(HERE))
-sys.path.insert(0, str(REPO))
 import nested_solver as ns  # noqa: E402
-from orchestrator import manifest  # noqa: E402
 
 af = ns.af
+
+
+def _load_by_path(name: str, path: Path):
+    """Load one repository module without executing its package __init__, so that exactly
+    the files the approval binds are the repository code this process runs."""
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+manifest = _load_by_path("qmhp_orchestrator_manifest", REPO / "orchestrator" / "manifest.py")
+
 PREDECLARATION = HERE / "predeclaration.json"
 APPROVAL = HERE / "STUDY-APPROVAL.json"
+ATTEMPT_MARKER = HERE / "ATTEMPT-SPENT.json"
 RESULTS_ROOT = REPO / "results"
 RECORD_PREFIX = "STATIC-REFINEMENT-STUDY-"
+#: every repository file this process executes on the execution path; a test and
+#: execute() itself check that no other repository module is loaded
 CODE_FILES = {"study_driver.py": HERE / "study_driver.py",
               "nested_solver.py": HERE / "nested_solver.py",
               "anchor_fem.py": HERE.parent / "static-anchor-hypothesis" / "anchor_fem.py",
               "orchestrator/manifest.py": REPO / "orchestrator" / "manifest.py"}
 LEVELS = (0, 1, 2)
+#: RLIMIT_AS hard limit above the soft one, so the failure path can raise its own soft limit
+AS_HEADROOM_BYTES = 1024 ** 3
+MAX_APPROVAL_WINDOW = timedelta(days=7)
 
 #: The configuration. predeclaration.json repeats it and a test binds the two.
 CONFIG = {
@@ -84,17 +116,16 @@ DRY_RUN_CELL = {"h0": 0.02, "q": 1.6, "hmax": 0.5}
 
 
 class Refusal(RuntimeError):
-    """Raised instead of computing anything."""
+    """Raised instead of computing anything, before the attempt is spent."""
 
 
 class BudgetExceeded(RuntimeError):
-    """A declared budget limit was reached. The attempt is spent; the record says so."""
+    """A declared budget limit or a termination signal was reached inside the attempt."""
 
 
 class AttemptFailed(RuntimeError):
-    """Anything that went wrong AFTER the record directory existed: the one attempt is spent,
-    failure.json and a verified manifest are written, and nothing is retried. Distinct from
-    Refusal, which is raised only before the attempt is spent."""
+    """Anything that went wrong AFTER the attempt was spent: failure.json and a verified
+    manifest are written where possible, and nothing is retried."""
 
 
 def _model(cfg: dict = CONFIG) -> dict:
@@ -116,6 +147,25 @@ def _usage(t0: float) -> dict:
             "max_rss_MB": ru.ru_maxrss / 1024.0, "peak_address_space_MB": peak_vm}
 
 
+def _clean(o):
+    """JSON-safe copy: non-finite floats become null (strict JSON), numpy scalars plain."""
+    if isinstance(o, (bool, np.bool_)):
+        return bool(o)
+    if isinstance(o, (float, np.floating)):
+        return float(o) if math.isfinite(o) else None
+    if isinstance(o, np.integer):
+        return int(o)
+    if isinstance(o, dict):
+        return {k: _clean(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_clean(v) for v in o]
+    return o
+
+
+def _dump(path: Path, obj) -> None:
+    path.write_text(json.dumps(_clean(obj), indent=1, allow_nan=False) + "\n")
+
+
 # --- the execution path (shared by the study and the dry run) ----------------------------
 
 def ladder(mesh0: dict) -> list[dict]:
@@ -128,42 +178,49 @@ def ladder(mesh0: dict) -> list[dict]:
 
 _CROSS_KEYS = ("energy_nd", "total_error_bound_nd", "total_error_bound_rel", "C_fF",
                "port_voltage", "cpu_s", "wall_s")
+_FACT_KEYS = ("max_face_multiplicity", "boundary_faces", "every_boundary_face_is_tagged",
+              "every_boundary_face_on_the_box_surface",
+              "every_interior_face_separates_its_tetrahedra", "volume_sum_over_box_minus_1")
 
 
 def run_levels(meshes: list[dict], model: dict, write, t0: float,
-               levels: list | None = None) -> list[dict]:
-    """Solve both problems on every level, writing each level's raw record as it completes.
-    Completed levels are appended to ``levels`` as they finish, so a caller that passes its
-    own list still sees them if a later level raises."""
+               levels: list | None = None, after_level=None) -> list[dict]:
+    """Solve both problems on every level. Each level's facts are written before its first
+    solve and each solve's raw result as soon as it completes (``write(name, obj)``), so a
+    later failure never discards a completed solve. Completed levels are appended to
+    ``levels`` and passed to ``after_level(h, level)``."""
     levels = [] if levels is None else levels
     prev, prev_phi = None, {}
     for h, mesh in zip(LEVELS, meshes):
         L = ns.Level(mesh, model)
-        bf = ns.boundary_facts(mesh)
+        bf = ns.boundary_facts(mesh, L.xyz)
         geo = L.dd["C"]["geo"]
-        rec = {"level": h, "mesh_digest": ns.mesh_digest(mesh), "n_tets": int(len(mesh["tets"])),
-               "n_nodes": int(len(mesh["xyz"])),
-               "conductor_nodes": [int(len(L.dd["C"]["ground"])), int(len(L.dd["C"]["island"]))],
-               "boundary": {k: bf[k] for k in ("max_face_multiplicity", "boundary_faces",
-                                               "every_boundary_face_is_tagged")},
-               "preconditions_failed": ns.certificate_preconditions(L, bf),
-               "poincare": L.poincare,
-               "port": {k: geo[k] for k in geo if k not in ("port_nodes", "t")},
-               "problems": {}}
+        facts = {"level": h, "mesh_digest": ns.mesh_digest(mesh), "n_tets": int(len(mesh["tets"])),
+                 "n_nodes": int(len(mesh["xyz"])),
+                 "conductor_nodes": [int(len(L.dd["C"]["ground"])), int(len(L.dd["C"]["island"]))],
+                 "mesh_facts": {k: bf[k] for k in _FACT_KEYS},
+                 "preconditions_failed": ns.certificate_preconditions(L, bf),
+                 "poincare": L.poincare,
+                 "port": {k: geo[k] for k in geo if k not in ("port_nodes", "t")}}
         del bf
+        write(f"level{h}.json", facts)
+        rec = {**facts, "problems": {}}
         phis = {}
         for kind in ns.KINDS:
             method = "direct" if h < 2 else "twogrid"
             r, phi = ns.solve(L, kind, method, coarse=prev, coarse_phi=prev_phi.get(kind))
+            write(f"level{h}-{kind}.json", r)
             if h == 1:
                 rx, _ = ns.solve(L, kind, "twogrid", coarse=prev, coarse_phi=prev_phi[kind])
-                r["twogrid_cross_check"] = {**{k: rx[k] for k in _CROSS_KEYS},
-                                            "solver": rx["solver"]}
+                write(f"level1-{kind}-crosscheck.json", rx)
+                r = {**r, "twogrid_cross_check": {**{k: rx[k] for k in _CROSS_KEYS},
+                                                  "solver": rx["solver"]}}
             rec["problems"][kind] = r
             phis[kind] = phi
         rec["resources_so_far"] = _usage(t0)
-        write(h, rec)
         levels.append(rec)
+        if after_level is not None:
+            after_level(h, rec)
         prev, prev_phi = L, phis
     return levels
 
@@ -175,55 +232,50 @@ def _finite_real(v) -> bool:
             and math.isfinite(v))
 
 
-def numerical_validity(levels) -> list[str]:
-    """Missing, non-finite or non-physical values. Empty means every required value is
-    present, finite and of the admissible sign; nothing is compared with a threshold first."""
-    if not isinstance(levels, list) or len(levels) != len(LEVELS):
-        n = len(levels) if isinstance(levels, list) else type(levels).__name__
-        return [f"expected exactly the {len(LEVELS)} declared levels, got {n}"]
+def _level_validity(lv, h: int) -> list[str]:
+    """Missing, non-finite or non-physical values on one level; nothing is compared with a
+    threshold before this is empty."""
+    if not isinstance(lv, dict) or lv.get("level") != h:
+        return [f"level {h}: missing or mislabelled"]
+    probs = lv.get("problems")
+    if not isinstance(probs, dict):
+        return [f"level {h}: no problems block"]
     bad = []
-    for h, lv in zip(LEVELS, levels):
-        if not isinstance(lv, dict) or lv.get("level") != h:
-            bad.append(f"level {h}: missing or mislabelled")
+    for kind in ns.KINDS:
+        r = probs.get(kind)
+        if not isinstance(r, dict):
+            bad.append(f"level {h} {kind}: missing")
             continue
-        probs = lv.get("problems")
-        if not isinstance(probs, dict):
-            bad.append(f"level {h}: no problems block")
-            continue
-        for kind in ns.KINDS:
-            r = probs.get(kind)
-            if not isinstance(r, dict):
-                bad.append(f"level {h} {kind}: missing")
-                continue
-            blocks = [(f"{kind}", r)]
-            if h == 1:
-                x = r.get("twogrid_cross_check")
-                if not isinstance(x, dict):
-                    bad.append(f"level 1 {kind}: cross-check missing")
-                else:
-                    blocks.append((f"{kind} cross-check", x))
-            for name, b in blocks:
-                for key in ("energy_nd", "C_fF"):
-                    v = b.get(key)
-                    if not (_finite_real(v) and v > 0):
-                        bad.append(f"level {h} {name}: {key} = {v!r} is not a finite positive number")
-                for key in ("total_error_bound_nd", "total_error_bound_rel"):
-                    v = b.get(key)
-                    if not (_finite_real(v) and v >= 0):
-                        bad.append(f"level {h} {name}: {key} = {v!r} is not a finite non-negative number")
-                if not _finite_real(b.get("port_voltage")):
-                    bad.append(f"level {h} {name}: port_voltage = {b.get('port_voltage')!r}")
-            if not (_finite_real(r.get("S_GHz2")) and r["S_GHz2"] > 0):
-                bad.append(f"level {h} {kind}: S_GHz2 = {r.get('S_GHz2')!r}")
+        blocks = [(kind, r)]
+        if h == 1:
+            x = r.get("twogrid_cross_check")
+            if not isinstance(x, dict):
+                bad.append(f"level 1 {kind}: cross-check missing")
+            else:
+                blocks.append((f"{kind} cross-check", x))
+        for name, b in blocks:
+            for key in ("energy_nd", "C_fF"):
+                v = b.get(key)
+                if not (_finite_real(v) and v > 0):
+                    bad.append(f"level {h} {name}: {key} = {v!r} is not a finite positive number")
+            for key in ("total_error_bound_nd", "total_error_bound_rel"):
+                v = b.get(key)
+                if not (_finite_real(v) and v >= 0):
+                    bad.append(f"level {h} {name}: {key} = {v!r} is not a finite non-negative number")
+            if not _finite_real(b.get("port_voltage")):
+                bad.append(f"level {h} {name}: port_voltage = {b.get('port_voltage')!r}")
+        for key in ("S_GHz2", "C_F"):
+            if not (_finite_real(r.get(key)) and r[key] > 0):
+                bad.append(f"level {h} {kind}: {key} = {r.get(key)!r}")
     return bad
 
 
 def _solver_problems(tag: str, solver: dict, t: dict) -> list[str]:
+    """Nesting checks of a two-grid solve. Its PCG status and Gauss-Seidel probes are
+    diagnostics: the certificate, checked separately, does not depend on the solver."""
     bad = []
     if solver.get("method") != "twogrid":
         return bad
-    if solver.get("status") != "CERTIFIED":
-        bad.append(f"{tag}: two-grid status {solver.get('status')!r}")
     g = solver.get("galerkin_identity_rel")
     if not (_finite_real(g) and g <= t["galerkin_identity_rel_tol"]):
         bad.append(f"{tag}: Galerkin identity {g!r}")
@@ -232,50 +284,58 @@ def _solver_problems(tag: str, solver: dict, t: dict) -> list[str]:
     return bad
 
 
-def integrity(levels, pre: dict, anchor: dict | None) -> list[str]:
-    """Every failure makes the record UNQUALIFIED. None of these is a scientific outcome."""
-    invalid = numerical_validity(levels)
+def level_integrity(lv, h: int, pre: dict, anchor: dict | None) -> list[str]:
+    """Every integrity item that needs only level h."""
+    invalid = _level_validity(lv, h)
     if invalid:
-        return invalid                        # no threshold is compared with an invalid number
+        return invalid
     t = pre["integrity"]
     bad = []
-    want = pre["configuration"]["level_mesh_digests"]
+    if lv["mesh_digest"] != pre["configuration"]["level_mesh_digests"][str(h)]:
+        bad.append(f"level {h}: mesh digest differs from the pre-declared one")
+    bad += [f"level {h}: {p}" for p in lv["preconditions_failed"]]
+    for kind in ns.KINDS:
+        r = lv["problems"][kind]
+        checked = [(f"level {h} {kind}", r)]
+        if h == 1:
+            checked.append((f"level 1 {kind} cross-check", r["twogrid_cross_check"]))
+        for tag, b in checked:
+            if b["total_error_bound_rel"] > t["certificate_rel_tol"]:
+                bad.append(f"{tag}: certified error {b['total_error_bound_rel']!r} exceeds "
+                           f"{t['certificate_rel_tol']}")
+            if abs(b["port_voltage"] - 1.0) > t["port_voltage_abs_tol"]:
+                bad.append(f"{tag}: port voltage {b['port_voltage']!r} is not 1")
+            bad += _solver_problems(tag, b["solver"], t)
+        if h == 1:
+            x = r["twogrid_cross_check"]
+            if abs(x["energy_nd"] - r["energy_nd"]) > x["total_error_bound_nd"] + r["total_error_bound_nd"]:
+                bad.append(f"level 1 {kind}: direct and two-grid disagree beyond their bounds")
+    e, ep = lv["problems"]["C"], lv["problems"]["Cprime"]
+    if ep["energy_nd"] < e["energy_nd"] - e["total_error_bound_nd"] - ep["total_error_bound_nd"]:
+        bad.append(f"level {h}: C' < C, which more constraints forbid")
+    if anchor is not None and h in (0, 1):
+        new, old = lv["problems"]["C"]["C_F"], anchor[f"C{h}_F"]
+        if abs(new - old) > t["reproduction_rel_tol"] * old:
+            bad.append(f"level {h}: C_h {new!r} does not reproduce the executed static-anchor "
+                       f"record {old!r}")
+    return bad
+
+
+def integrity(levels, pre: dict, anchor: dict | None) -> list[str]:
+    """Every failure makes the record UNQUALIFIED. None of these is a scientific outcome."""
+    if not isinstance(levels, list) or len(levels) != len(LEVELS):
+        n = len(levels) if isinstance(levels, list) else type(levels).__name__
+        return [f"expected exactly the {len(LEVELS)} declared levels, got {n}"]
+    bad = []
     for h, lv in zip(LEVELS, levels):
-        if lv["mesh_digest"] != want[str(h)]:
-            bad.append(f"level {h}: mesh digest differs from the pre-declared one")
-        bad += [f"level {h}: {p}" for p in lv["preconditions_failed"]]
-        for kind in ns.KINDS:
-            r = lv["problems"][kind]
-            if r["total_error_bound_rel"] > t["certificate_rel_tol"]:
-                bad.append(f"level {h} {kind}: certified error {r['total_error_bound_rel']!r} "
-                           f"exceeds {t['certificate_rel_tol']}")
-            if abs(r["port_voltage"] - 1.0) > t["port_voltage_abs_tol"]:
-                bad.append(f"level {h} {kind}: port voltage {r['port_voltage']!r} is not 1")
-            bad += _solver_problems(f"level {h} {kind}", r["solver"], t)
-            if h == 1:
-                x = r["twogrid_cross_check"]
-                bad += _solver_problems(f"level 1 {kind} cross-check", x["solver"], t)
-                if x["total_error_bound_rel"] > t["certificate_rel_tol"]:
-                    bad.append(f"level 1 {kind} cross-check: certified error "
-                               f"{x['total_error_bound_rel']!r}")
-                if abs(x["energy_nd"] - r["energy_nd"]) > (x["total_error_bound_nd"]
-                                                          + r["total_error_bound_nd"]):
-                    bad.append(f"level 1 {kind}: direct and two-grid disagree beyond their bounds")
-        # C' >= C on every level (more constraints), within the two bounds
-        e, ep = lv["problems"]["C"], lv["problems"]["Cprime"]
-        if ep["energy_nd"] < e["energy_nd"] - e["total_error_bound_nd"] - ep["total_error_bound_nd"]:
-            bad.append(f"level {h}: C' < C, which more constraints forbid")
+        bad += level_integrity(lv, h, pre, anchor)
+    if bad:
+        return bad
     for kind in ns.KINDS:                      # nested refinement cannot raise the energy
         for h in LEVELS[1:]:
             a, b = levels[h - 1]["problems"][kind], levels[h]["problems"][kind]
             if b["energy_nd"] > a["energy_nd"] + a["total_error_bound_nd"] + b["total_error_bound_nd"]:
                 bad.append(f"{kind}: energy rose from level {h - 1} to {h}, which nesting forbids")
-    if anchor is not None:                     # the executed record must be reproduced
-        for h in (0, 1):
-            new, old = levels[h]["problems"]["C"]["C_F"], anchor[f"C{h}_F"]
-            if abs(new - old) > t["reproduction_rel_tol"] * old:
-                bad.append(f"level {h}: C_h {new!r} does not reproduce the executed static-anchor "
-                           f"record {old!r}")
     return bad
 
 
@@ -284,54 +344,86 @@ def _interval(lv: dict, kind: str) -> tuple[float, float, float]:
     return r["energy_nd"], r["energy_nd"] - r["total_error_bound_nd"], r["energy_nd"] + r["total_error_bound_nd"]
 
 
-def classify(values, lows, highs, w: dict, *, signed: bool = False) -> dict:
-    """The frozen convergence rule for a three-level sequence X_0, X_1, X_2 (predeclaration
-    'classification'). d1 = X0 - X1, d2 = X1 - X2, R = d1 / d2; each X_h is known only to
-    lie in [low_h, high_h] (its certificate), and the rule is applied to those ranges.
-
-    UNRESOLVED      a difference within its certified error of zero; differences of opposite
-                    sign that shrink (oscillation); R outside [R_min, R_max] but above 1; or
-                    the certified range of R straddling a class edge (1, R_min, R_max).
-    NON-CONVERGENT  |d2| >= |d1|: the differences do not shrink.
-    CONVERGING      R_min <= R <= R_max: consistent with leading order 1 plus higher orders up
-                    to 2 with coefficients of one sign. The limit is bracketed, MODEL-BASED and
-                    not rigorous, by X2 - d2 (order 1) and X2 - d2 / (R - 1) (observed order).
-    CONVERGED       CONVERGING and |d2| / |X2 - d2| <= tau (the bracket's conservative end).
-    UNQUALIFIED     (monotone sequences) a difference certainly negative: nesting forbids it.
-    """
+def _differences(values, lows, highs):
     X0, X1, X2 = values
     d1, d2 = X0 - X1, X1 - X2
     d1r = (lows[0] - highs[1], highs[0] - lows[1])
     d2r = (lows[1] - highs[2], highs[1] - lows[2])
+    return d1, d2, d1r, d2r
+
+
+def classify(values, lows, highs, w: dict) -> dict:
+    """The frozen convergence rule for the energies of C or C' at levels 0, 1, 2
+    (predeclaration 'classification'). d1 = X0 - X1, d2 = X1 - X2, R = d1 / d2; each X_h
+    is known only to lie in [low_h, high_h] (its certificate) and the rule uses those ranges.
+
+    UNQUALIFIED     a difference certainly negative: nesting forbids it.
+    UNRESOLVED      a difference within its certified error of zero; 1 < R < R_min; R > R_max;
+                    or the certified range of R touching 1, R_min or R_max (fail-safe).
+    NON-CONVERGENT  R < 1: the differences do not shrink.
+    CONVERGING      R_min <= R <= R_max. The limit is bracketed, MODEL-BASED (two terms of
+                    orders 1 and q in (1, 2], coefficients of one sign - an assumption the
+                    theory does not supply), by X2 - d2 and X2 - d2 / (R - 1).
+    CONVERGED       CONVERGING and |d2| / |X2 - d2| <= tau (the bracket's conservative end).
+    """
+    d1, d2, d1r, d2r = _differences(values, lows, highs)
     out = {"values": list(values), "d1": d1, "d2": d2,
            "d1_certified_range": list(d1r), "d2_certified_range": list(d2r)}
-    if not signed and (d1r[1] < 0 or d2r[1] < 0):
+    if d1r[1] < 0 or d2r[1] < 0:
         return {**out, "cls": "UNQUALIFIED", "reason": "a difference is negative, which nesting forbids"}
     if d1r[0] <= 0 <= d1r[1] or d2r[0] <= 0 <= d2r[1]:
         return {**out, "cls": "UNRESOLVED", "reason": "a difference is within its certified error of zero"}
-    if (d1 > 0) != (d2 > 0):
-        if abs(d2) >= abs(d1):
-            return {**out, "cls": "NON-CONVERGENT", "reason": "the differences do not shrink"}
-        return {**out, "cls": "UNRESOLVED", "reason": "the differences change sign (oscillation)"}
-    a1 = sorted(abs(v) for v in d1r)
-    a2 = sorted(abs(v) for v in d2r)
-    R, Rs = d1 / d2, [a1[0] / a2[1], a1[1] / a2[0]]
+    R, Rs = d1 / d2, [d1r[0] / d2r[1], d1r[1] / d2r[0]]
     out.update(R=R, R_certified_range=Rs, p_obs=math.log2(R))
     if any(Rs[0] <= e <= Rs[1] for e in (1.0, w["R_min"], w["R_max"])):
         return {**out, "cls": "UNRESOLVED", "reason": "R is within its certified error of a class edge"}
     if R < 1.0:
         return {**out, "cls": "NON-CONVERGENT", "reason": "the differences do not shrink"}
     if R < w["R_min"]:
-        return {**out, "cls": "UNRESOLVED", "reason": "slower than the theoretical leading order 1"}
+        return {**out, "cls": "UNRESOLVED",
+                "reason": "observed order below 1: consistent with a leading order of 1 and a "
+                          "negative next term, or pre-asymptotic; not classified"}
     if R > w["R_max"]:
-        return {**out, "cls": "UNRESOLVED", "reason": "faster than any order a P1 energy error can have"}
+        return {**out, "cls": "UNRESOLVED",
+                "reason": "observed order above 2: pre-asymptotic; not classified"}
+    X2 = values[2]
     lim1, lim_obs = X2 - d2, X2 - d2 / (R - 1.0)
-    remaining_hi = abs(d2) / abs(lim1)
-    out.update(limit_bracket_model_based=sorted([lim1, lim_obs]),
-               remaining_rel_error_at_level2_bracket=[abs(d2) / (R - 1.0) / abs(lim_obs), remaining_hi])
+    remaining_hi = d2 / lim1
+    out.update(limit_bracket_model_based=[lim1, lim_obs],
+               remaining_rel_error_at_level2_bracket=[d2 / (R - 1.0) / lim_obs, remaining_hi],
+               bracket_assumption="two terms, orders 1 and q in (1, 2], coefficients of one sign")
     if remaining_hi <= w["tau_converged"]:
-        return {**out, "cls": "CONVERGED", "reason": "rate consistent with theory; level 2 within tau"}
-    return {**out, "cls": "CONVERGING", "reason": "rate consistent with theory; level 2 not yet within tau"}
+        return {**out, "cls": "CONVERGED",
+                "reason": "observed order within [1, 2]; level 2 within tau of the model limit"}
+    return {**out, "cls": "CONVERGING",
+            "reason": "observed order within [1, 2]; level 2 not within tau of the model limit"}
+
+
+def classify_delta(values, lows, highs) -> dict:
+    """DESCRIPTIVE only: no rate theory exists for delta, so no bracket and no CONVERGED.
+
+    UNRESOLVED             a difference within its certified error of zero; oscillation
+                           (differences of opposite sign that shrink); or a certified ratio
+                           range touching 1.
+    NON-CONVERGENT         |d2| >= |d1|: the differences do not shrink at levels 0-2.
+    DIFFERENCES-SHRINKING  |d2| < |d1| with one sign; R reported, nothing extrapolated.
+    """
+    d1, d2, d1r, d2r = _differences(values, lows, highs)
+    out = {"values": list(values), "d1": d1, "d2": d2,
+           "d1_certified_range": list(d1r), "d2_certified_range": list(d2r)}
+    if d1r[0] <= 0 <= d1r[1] or d2r[0] <= 0 <= d2r[1]:
+        return {**out, "cls": "UNRESOLVED", "reason": "a difference is within its certified error of zero"}
+    a1, a2 = sorted(abs(v) for v in d1r), sorted(abs(v) for v in d2r)
+    Rs = [a1[0] / a2[1], a1[1] / a2[0]]
+    out.update(R=d1 / d2, abs_R_certified_range=Rs)
+    if Rs[0] <= 1.0 <= Rs[1]:
+        return {**out, "cls": "UNRESOLVED", "reason": "|R| is within its certified error of 1"}
+    if abs(d2) >= abs(d1):
+        return {**out, "cls": "NON-CONVERGENT", "reason": "the differences do not shrink at levels 0-2"}
+    if (d1 > 0) != (d2 > 0):
+        return {**out, "cls": "UNRESOLVED", "reason": "the differences change sign (oscillation)"}
+    return {**out, "cls": "DIFFERENCES-SHRINKING",
+            "reason": "descriptive: the differences shrink; no rate theory, nothing extrapolated"}
 
 
 def band_baseline(pre: dict) -> dict:
@@ -359,8 +451,8 @@ def anchor_values(pre: dict) -> dict:
 
 
 def consistency(levels, pre: dict, band: dict) -> dict:
-    """The level-0 cross-code check (predeclaration 'consistency_check'). Not an acceptance
-    criterion: it decides only whether H_h may be read as Palace's complete harmonic moment."""
+    """The level-0 cross-code check (predeclaration 'consistency_check'). Reads level 0 only.
+    Not an acceptance criterion: it decides only whether S'_h may be read as H_h."""
     c = pre["consistency_check"]
     E, El, Eh = _interval(levels[0], "C")
     Ep, Epl, Eph = _interval(levels[0], "Cprime")
@@ -379,54 +471,69 @@ def consistency(levels, pre: dict, band: dict) -> dict:
         verdict = "UNRESOLVED"
     return {"verdict": verdict, "delta0": delta, "delta0_certified_range": [lo, hi],
             "delta_band_lower": d_band, "tail_bound": tail, "window": w,
-            "H0_static_GHz2": levels[0]["problems"]["Cprime"]["S_GHz2"],
-            "H_band_GHz2": band["H_band_GHz2"],
-            "meaning": c["consequence"][verdict]}
+            "Sprime0_static_GHz2": levels[0]["problems"]["Cprime"]["S_GHz2"],
+            "H_band_GHz2": band["H_band_GHz2"], "meaning": c["consequence"][verdict]}
+
+
+def level0_consistency(levels, pre: dict, band: dict | None, anchor: dict | None) -> dict:
+    """The consistency verdict with its own scope: it needs level 0 only, so it is qualified
+    by the level-0 integrity items alone and survives any failure at levels 1-2."""
+    if band is None:
+        return {"verdict": "NOT APPLICABLE", "reason": "synthetic run: no Palace band"}
+    if not levels:
+        return {"verdict": "UNQUALIFIED", "reason": "level 0 did not complete"}
+    bad = level_integrity(levels[0], 0, pre, anchor)
+    if bad:
+        return {"verdict": "UNQUALIFIED", "level0_integrity_failures": bad}
+    return {**consistency(levels, pre, band), "level0_integrity_failures": []}
 
 
 def analyse(levels, pre: dict, band: dict | None, anchor: dict | None) -> dict:
+    level0 = level0_consistency(levels, pre, band, anchor)
     bad = integrity(levels, pre, anchor)
-    out = {"integrity_failures": bad}
+    out = {"consistency_check_level0": level0, "integrity_failures": bad}
     if bad:
-        out["outcome"] = {"verdict": "UNQUALIFIED", "reason": "; ".join(bad)}
+        out["outcome"] = {"verdict": "UNQUALIFIED", "reason": "; ".join(bad),
+                          "consistency_check_level0": level0["verdict"]}
         return out
     w = pre["classification"]
     cls = {}
     for kind in ns.KINDS:
         iv = [_interval(lv, kind) for lv in levels]
         cls[kind] = classify([v[0] for v in iv], [v[1] for v in iv], [v[2] for v in iv], w)
-    # delta = C'/C - 1 on each level, with its certified range
     dv, dl, dh = [], [], []
     for lv in levels:
         E, El, Eh = _interval(lv, "C")
         Ep, Epl, Eph = _interval(lv, "Cprime")
         dv.append(Ep / E - 1.0); dl.append(Epl / Eh - 1.0); dh.append(Eph / El - 1.0)
-    cls["delta"] = classify(dv, dl, dh, w, signed=True)
-    cls["delta"]["max_delta"] = max(dv)
-    cls["delta"]["S_and_H_within_1_percent_on_every_level"] = bool(max(dv) <= w["delta_small"])
-    unit = lambda kind: levels[0]["problems"][kind]["S_GHz2"] * levels[0]["problems"][kind]["energy_nd"]
-    for kind, name in (("C", "S"), ("Cprime", "H")):
-        k = unit(kind)                         # S = k / E on every level (same L_F and Lc)
-        c = cls[kind]
+    cls["delta"] = classify_delta(dv, dl, dh)
+    cls["delta"]["max_delta_levels_0_to_2"] = max(dv)
+    cls["delta"]["S_and_Sprime_within_1_percent_at_levels_0_to_2"] = bool(max(dv) <= w["delta_small"])
+    identity_confirmed = level0["verdict"] == "CONSISTENT"
+    hname = "H" if identity_confirmed else (
+        "Sprime_static_identity_not_tested" if band is None else "Sprime_static_identity_not_confirmed")
+    for kind, name in (("C", "S"), ("Cprime", hname)):
+        k = levels[0]["problems"][kind]["S_GHz2"] * levels[0]["problems"][kind]["energy_nd"]
         r2 = levels[2]["problems"][kind]
+        c = cls[kind]
         cls[name] = {"cls": c["cls"], "values_GHz2": [lv["problems"][kind]["S_GHz2"] for lv in levels],
-                     "rigorous_lower_bound_GHz2": r2["S_GHz2"] / (1.0 + r2["total_error_bound_rel"])}
+                     "lower_bound_GHz2": r2["S_GHz2"] / (1.0 + r2["total_error_bound_rel"]),
+                     "bound_basis": pre["classification"]["bound_basis"]}
         if "limit_bracket_model_based" in c:
             cls[name]["limit_bracket_model_based_GHz2"] = sorted(k / e for e in c["limit_bracket_model_based"])
-    for kind in ns.KINDS:                      # C <= C_2 (Dirichlet principle), widened by its bound
+    for kind in ns.KINDS:                      # C <= C_2 (Dirichlet principle)
         r2 = levels[2]["problems"][kind]
-        cls[kind]["rigorous_upper_bound_fF"] = r2["C_fF"] * (1.0 + r2["total_error_bound_rel"])
+        cls[kind]["upper_bound_fF"] = r2["C_fF"] * (1.0 + r2["total_error_bound_rel"])
+        cls[kind]["bound_basis"] = pre["classification"]["bound_basis"]
     out["classes"] = cls
-    out["consistency_check"] = (consistency(levels, pre, band) if band is not None
-                                else "not applicable (synthetic dry run)")
-    out["outcome"] = {"verdict": "QUALIFIED", "C": cls["C"]["cls"], "Cprime_and_H": cls["Cprime"]["cls"],
-                      "delta": cls["delta"]["cls"],
-                      "consistency_check": (out["consistency_check"]["verdict"]
-                                            if band is not None else None)}
+    out["outcome"] = {"verdict": "QUALIFIED", "C": cls["C"]["cls"], "Cprime": cls["Cprime"]["cls"],
+                      "delta": cls["delta"]["cls"], "consistency_check_level0": level0["verdict"],
+                      "second_moment_name": hname,
+                      "note": pre["classification"]["dependence_note"]}
     return out
 
 
-# --- QMHP modes -------------------------------------------------------------------------
+# --- provenance, approval and the one attempt ----------------------------------------------
 
 def load_pre() -> dict:
     return json.loads(PREDECLARATION.read_text())
@@ -439,28 +546,290 @@ def qmhp_mesh(cfg: dict = CONFIG) -> dict:
     return af.read_gmsh22(path)
 
 
+def git_head(repo: Path = REPO) -> str:
+    """The commit this checkout has checked out, read from .git without running git."""
+    g = repo / ".git"
+    if g.is_file():                                        # a linked worktree
+        gitdir = Path(g.read_text().split("gitdir:", 1)[1].strip())
+        gitdir = gitdir if gitdir.is_absolute() else (repo / gitdir).resolve()
+    else:
+        gitdir = g
+    head = (gitdir / "HEAD").read_text().strip()
+    if not head.startswith("ref:"):
+        return head
+    ref = head[4:].strip()
+    common = gitdir
+    if (gitdir / "commondir").is_file():
+        common = (gitdir / (gitdir / "commondir").read_text().strip()).resolve()
+    for base in (gitdir, common):
+        if (base / ref).is_file():
+            return (base / ref).read_text().strip()
+    packed = common / "packed-refs"
+    if packed.is_file():
+        for line in packed.read_text().splitlines():
+            if line and not line.startswith(("#", "^")):
+                sha, name = line.split(" ", 1)
+                if name.strip() == ref:
+                    return sha
+    raise Refusal(f"cannot resolve HEAD ({ref})")
+
+
+def unbound_repo_modules() -> list[str]:
+    """Repository files loaded in this process that the approval does not bind. The
+    interpreter's own environment (sys.prefix, e.g. the repository's .venv) is excluded:
+    its libraries are bound by the verified versions instead (environment_problems)."""
+    bound = {p.resolve() for p in CODE_FILES.values()}
+    envs = {Path(sys.prefix).resolve(), Path(sys.base_prefix).resolve()}
+    out = []
+    for mod in list(sys.modules.values()):
+        f = getattr(mod, "__file__", None)
+        if not f:
+            continue
+        p = Path(f).resolve()
+        if REPO not in p.parents or p in bound or any(e == p or e in p.parents for e in envs):
+            continue
+        out.append(str(p.relative_to(REPO)))
+    return sorted(set(out))
+
+
+def environment_problems(pre: dict) -> list[str]:
+    """Differences between this process and the verified environment."""
+    want = pre["environment"]
+    have = {"python": platform.python_version(), "numpy": np.__version__, "scipy": scipy.__version__}
+    bad = [f"{k} is {have[k]}, verified {want[k]}" for k in ("python", "numpy", "scipy")
+           if have[k] != want[k]]
+    for var, val in want["threads_env"].items():
+        if os.environ.get(var) != val:
+            bad.append(f"environment variable {var} is {os.environ.get(var)!r}, required {val!r}")
+    if not float(np.finfo(np.longdouble).eps) < want["longdouble_eps_below"]:
+        bad.append("no extended-precision long double")
+    return bad
+
+
+def _parse_utc(s) -> datetime:
+    try:
+        t = datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise Refusal(f"{s!r} is not an ISO time") from exc
+    if t.tzinfo is None:
+        raise Refusal(f"{s!r} carries no time zone")
+    return t.astimezone(timezone.utc)
+
+
+def require_approval(pre: dict, now: datetime | None = None) -> dict:
+    if not APPROVAL.is_file():
+        raise Refusal("no STUDY-APPROVAL.json: the static-only nested refinement study is "
+                      "PREPARED, NOT APPROVED. A human grants it by writing the approval that "
+                      "binds the mesh, the pre-declaration, the code, the environment, the "
+                      "approved commit, this checkout and a validity window.")
+    ap = json.loads(APPROVAL.read_text())
+    b = pre["budget"]
+    want = {"authorises": "one execution of the static-only nested refinement study",
+            "attempt": 1, "prior_records": [],
+            "mesh_sha256": CONFIG["mesh_sha256"],
+            "predeclaration_sha256": af.sha256(PREDECLARATION),
+            "code_sha256": {name: af.sha256(path) for name, path in CODE_FILES.items()},
+            "environment": pre["environment"], "invocation": b["invocation"],
+            "budget": {k: b[k] for k in ("cpu_minutes", "memory_GB", "wall_cap_minutes",
+                                         "attempts", "retry")},
+            "repository_path": str(REPO)}
+    for key, value in want.items():
+        if ap.get(key) != value:
+            raise Refusal(f"approval {key} does not match: the reviewed state has changed")
+    if not re.fullmatch(r"[0-9a-f]{40}", str(ap.get("source_commit"))):
+        raise Refusal("approval source_commit is not a full commit SHA")
+    head = git_head(REPO)
+    if head != ap["source_commit"]:
+        raise Refusal(f"approval source_commit {ap['source_commit']} is not HEAD {head}")
+    nb, na = _parse_utc(ap.get("not_before_utc")), _parse_utc(ap.get("not_after_utc"))
+    if not (nb < na <= nb + MAX_APPROVAL_WINDOW):
+        raise Refusal("the approval window is empty or longer than 7 days")
+    now = datetime.now(timezone.utc) if now is None else now
+    if not nb <= now <= na:
+        raise Refusal("the approval is outside its validity window")
+    return ap
+
+
+def _on_limit(signum, _frame):
+    raise BudgetExceeded(f"{signal.Signals(signum).name}: a declared budget limit or a "
+                         "termination signal was reached")
+
+
+def _require_enforceable_budget(pre: dict) -> None:
+    b = pre["budget"]
+    wanted = {resource.RLIMIT_CPU: int(b["cpu_minutes"] * 60) + 60,
+              resource.RLIMIT_AS: int(b["memory_GB"] * 1024 ** 3) + AS_HEADROOM_BYTES}
+    for rlim, value in wanted.items():
+        hard = resource.getrlimit(rlim)[1]
+        if hard != resource.RLIM_INFINITY and hard < value:
+            raise Refusal(f"this environment's hard limit {hard} is below the declared "
+                          f"budget {value}; the budget cannot be applied as declared")
+
+
+def _enforce_budget(pre: dict) -> dict:
+    """CPU: SIGXCPU raises BudgetExceeded; the hard limit 60 CPU-s later is a kernel kill.
+    Memory: RLIMIT_AS soft limit (an allocation beyond it fails), with a hard limit 1 GiB
+    above so the failure path can raise its own soft limit. Wall: SIGALRM at the wall cap
+    measured from module import, so the outer kill 60 s beyond the cap really is 60 s
+    later. SIGTERM and SIGHUP also raise, so they reach the failure path."""
+    b = pre["budget"]
+    cpu_s = int(b["cpu_minutes"] * 60)
+    wall_s = max(1, int(b["wall_cap_minutes"] * 60 - (time.monotonic() - _T_START)))
+    mem = int(b["memory_GB"] * 1024 ** 3)
+    resource.setrlimit(resource.RLIMIT_CPU, (cpu_s, cpu_s + 60))
+    resource.setrlimit(resource.RLIMIT_AS, (mem, mem + AS_HEADROOM_BYTES))
+    for sig in (signal.SIGXCPU, signal.SIGALRM, signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, _on_limit)
+    signal.alarm(wall_s)
+    return {"cpu_s": cpu_s, "cpu_hard_kill_s": cpu_s + 60, "address_space_bytes": mem,
+            "address_space_hard_bytes": mem + AS_HEADROOM_BYTES, "wall_alarm_s": wall_s,
+            "wall_cap_from_start_s": int(b["wall_cap_minutes"] * 60)}
+
+
+def _disarm() -> None:
+    """First thing on the way out: no further signal can interrupt the evidence writes,
+    and the soft limits rise to the hard ones so the writes can allocate and run."""
+    signal.alarm(0)
+    for sig in (signal.SIGXCPU, signal.SIGALRM, signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, signal.SIG_IGN)
+    for rlim in (resource.RLIMIT_CPU, resource.RLIMIT_AS):
+        try:
+            hard = resource.getrlimit(rlim)[1]
+            resource.setrlimit(rlim, (hard, hard))
+        except (ValueError, OSError):
+            pass
+
+
+def _environment(files: dict = CODE_FILES) -> dict:
+    return {"python": platform.python_version(), "numpy": np.__version__,
+            "scipy": scipy.__version__, "platform": platform.platform(),
+            "longdouble_eps": float(np.finfo(np.longdouble).eps),
+            "threads_env": {v: os.environ.get(v) for v in
+                            ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")},
+            "code_sha256": {name: af.sha256(path) for name, path in files.items()}}
+
+
+def execute(results_root: Path | None = None) -> Path:
+    t0 = time.monotonic()
+    results_root = RESULTS_ROOT if results_root is None else results_root
+    pre = load_pre()
+    if ATTEMPT_MARKER.exists():
+        raise Refusal(f"{ATTEMPT_MARKER.name} exists: the one attempt is spent")
+    existing = sorted(p.name for p in results_root.glob(RECORD_PREFIX + "*")) if results_root.exists() else []
+    if existing:
+        raise Refusal(f"{existing[0]} exists: the one attempt is spent")
+    approval = require_approval(pre)
+    unbound = unbound_repo_modules()
+    if unbound:
+        raise Refusal(f"repository code the approval does not bind is loaded: {unbound}")
+    env_bad = environment_problems(pre)
+    if env_bad:
+        raise Refusal(f"the environment differs from the verified one: {env_bad}")
+    band = band_baseline(pre)                  # digests checked before anything is spent
+    anchor = anchor_values(pre)
+    meshes = ladder(qmhp_mesh())
+    digests = {str(h): ns.mesh_digest(m) for h, m in zip(LEVELS, meshes)}
+    if digests != pre["configuration"]["level_mesh_digests"]:
+        raise Refusal("a refined mesh differs from the pre-declared one")
+    _require_enforceable_budget(pre)
+    provenance = {"predeclaration_sha256": af.sha256(PREDECLARATION),
+                  "approval_sha256": af.sha256(APPROVAL), "approval": approval,
+                  "source_commit_measured": git_head(REPO), "repository_path": str(REPO),
+                  "mesh_sha256": CONFIG["mesh_sha256"], "level_mesh_digests": digests,
+                  "band_baseline": band, "static_anchor_values": anchor,
+                  "environment": _environment(),
+                  "started_utc": datetime.now(timezone.utc).isoformat()}
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    rec = results_root / f"{RECORD_PREFIX}{stamp}"
+    try:                                       # the marker spends the attempt, fail-closed
+        fd = os.open(ATTEMPT_MARKER, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        raise Refusal(f"{ATTEMPT_MARKER.name} exists: the one attempt is spent") from None
+    with os.fdopen(fd, "w") as fh:
+        fh.write(json.dumps({"record": rec.name, "approval_sha256": provenance["approval_sha256"],
+                             "source_commit": provenance["source_commit_measured"],
+                             "spent_utc": provenance["started_utc"]}, indent=1) + "\n")
+    results_root.mkdir(exist_ok=True)
+    rec.mkdir(exist_ok=False)
+    levels, written, limits = [], [], None
+
+    def write(name, obj):
+        _dump(rec / name, obj)
+        written.append(name)
+
+    def after_level(h, lv):
+        if h == 0:
+            write("consistency-level0.json", level0_consistency([lv], pre, band, anchor))
+
+    try:
+        limits = _enforce_budget(pre)
+        write("provenance.json", {**provenance, "limits": limits})
+        run_levels(meshes, _model(), write, t0, levels, after_level)
+        _disarm()
+        write("summary.json", {"provenance": "provenance.json", "resources": _usage(t0),
+                               "C_fF": [lv["problems"]["C"]["C_fF"] for lv in levels],
+                               "Cprime_fF": [lv["problems"]["Cprime"]["C_fF"] for lv in levels],
+                               **analyse(levels, pre, band, anchor),
+                               "not_reported": "E_C,F1F1 and g; no coupling, readout frequency "
+                                               "or Route A output is read or combined"})
+        manifest.write_verified(rec)
+    except BaseException as exc:               # the failure is the recorded outcome
+        _disarm()
+        tb = traceback.format_exc()
+        traceback.clear_frames(exc.__traceback__)
+        gc.collect()
+        try:
+            _dump(rec / "failure.json", {
+                "verdict": "FAILED - the one attempt is spent; no retry",
+                "levels_completed": [lv["level"] for lv in levels], "files_written": written,
+                "consistency_check_level0": (level0_consistency(levels[:1], pre, band, anchor)
+                                             if levels else None),
+                "error": repr(exc), "traceback": tb, "limits": limits, "resources": _usage(t0),
+                "provenance": provenance})
+            manifest.write_verified(rec)
+        except BaseException as exc2:
+            raise AttemptFailed(f"{rec.name}: {exc!r}; the failure record could not be "
+                                f"completed: {exc2!r}") from exc
+        raise AttemptFailed(f"{rec.name}: {exc!r} (recorded in failure.json; the one attempt "
+                            "is spent; no retry)") from exc
+    return rec
+
+
+# --- preflight and dry run -----------------------------------------------------------------
+
+#: every file whose code produced the committed preparation evidence
+EVIDENCE_CODE = {**CODE_FILES, "synthetic_cells.py": HERE / "synthetic_cells.py",
+                 "verify_solver.py": HERE / "verify_solver.py"}
+
+
 def _preflight_level(L: "ns.Level", bf: dict, prev: "ns.Level | None", Pfull) -> dict:
     out = {"mesh_digest": ns.mesh_digest(L.mesh), "n_tets": int(len(L.mesh["tets"])),
-           "n_nodes": int(len(L.mesh["xyz"])),
-           "boundary": {k: bf[k] for k in ("max_face_multiplicity", "boundary_faces",
-                                           "every_boundary_face_is_tagged")},
+           "n_nodes": int(len(L.mesh["xyz"])), "mesh_facts": {k: bf[k] for k in _FACT_KEYS},
            "preconditions_failed": ns.certificate_preconditions(L, bf),
            "poincare": L.poincare, "element_quality": ns.element_quality(L.mesh, L.xyz),
            "port": {k: v for k, v in L.dd["C"]["geo"].items() if k not in ("port_nodes", "t")},
            "problems": {}}
+    Kc = L.K.tocsr()
+    k = int(np.diff(Kc.indptr).max())
+    abs_row = abs(Kc) @ np.ones(Kc.shape[0])
+    used = np.unique(L.mesh["tets"])
     for kind in ns.KINDS:
         dd = L.dd[kind]
         sysm = ns.system(L.K, dd)
         A = sysm["A"]
-        # the certificate's floor if the solve were exact, with |x| <= 1 as the proxy
+        ones = np.ones(A.shape[0])
+        # proxies with |x| <= 1, NO solve: the residual term's floor if the solve were exact,
+        # and the evaluation bound's matrix-vector term
         kA = int(np.diff(A.indptr).max())
-        g = (ns.gamma(kA + 1) * (np.abs(sysm["b"]) + abs(A) @ np.ones(A.shape[0]))
-             + ns.gamma(int(np.diff(sysm["KfD"].indptr).max())) * (abs(sysm["KfD"]) @ np.abs(sysm["phiD"])))
+        g = (ns.gamma(kA + 1) * (np.abs(sysm["b"]) + abs(A) @ ones)
+             + ns.gamma(int(np.diff(sysm["KfD"].indptr).max())) * (abs(sysm["KfD"]) @ np.abs(sysm["phiD"]))
+             + 0.5 * (sysm["A_asym_abs"] @ ones + sysm["D_asym_abs"] @ np.abs(sysm["phiD"])))
         row = {"n_unknowns": int(A.shape[0]), "nnz_A": int(A.nnz),
-               "n_port_nodes_constrained_off_conductors": int(dd["fixed"].sum()
-                                                              - L.dd["C"]["fixed"].sum()),
-               "certificate_floor_nd": ns.BOUND_SAFETY * float((g * g / L.m[dd["free"]]).sum())
-               / L.poincare["c"]}
+               "n_port_nodes_constrained_off_conductors": int(dd["fixed"].sum() - L.dd["C"]["fixed"].sum()),
+               "certificate_floor_proxy_nd": ns.BOUND_SAFETY * float((g * g / L.m[dd["free"]]).sum())
+               / L.poincare["c"],
+               "evaluation_matvec_term_proxy_nd": ns.gamma(k, ns.ULD) * float(abs_row[used].sum()),
+               "evaluation_dot_term_factor": ns.gamma(len(L.xyz), ns.ULD)}
         if prev is not None:
             cd = prev.dd[kind]
             leak = Pfull[np.flatnonzero(dd["fixed"])][:, cd["free"]]
@@ -483,126 +852,13 @@ def preflight() -> dict:
     prev = None
     for h, mesh in zip(LEVELS, meshes):
         L = ns.Level(mesh, model)
-        bf = ns.boundary_facts(mesh)
+        bf = ns.boundary_facts(mesh, L.xyz)
         Pfull = ns.prolongation(meshes[h - 1], mesh) if h else None
         out["levels"][str(h)] = _preflight_level(L, bf, prev, Pfull)
         prev = L
     out["resources"] = _usage(t0)
     out["environment"] = _environment(EVIDENCE_CODE)
     return out
-
-
-def require_approval(pre: dict) -> dict:
-    if not APPROVAL.is_file():
-        raise Refusal("no STUDY-APPROVAL.json: the static-only nested refinement study is "
-                      "PREPARED, NOT APPROVED. A human grants it by writing the approval that "
-                      "binds the mesh, the pre-declaration and every code file by sha256.")
-    ap = json.loads(APPROVAL.read_text())
-    want = {"authorises": "one execution of the static-only nested refinement study",
-            "mesh_sha256": CONFIG["mesh_sha256"],
-            "predeclaration_sha256": af.sha256(PREDECLARATION),
-            "code_sha256": {name: af.sha256(path) for name, path in CODE_FILES.items()}}
-    for key, value in want.items():
-        if ap.get(key) != value:
-            raise Refusal(f"approval {key} does not match: the reviewed state has changed")
-    return ap
-
-
-def _on_limit(signum, _frame):
-    raise BudgetExceeded(f"{signal.Signals(signum).name}: a declared budget limit was reached")
-
-
-def _require_enforceable_budget(pre: dict) -> None:
-    b = pre["budget"]
-    wanted = {resource.RLIMIT_CPU: int(b["cpu_minutes"] * 60) + 60,
-              resource.RLIMIT_AS: int(b["memory_GB"] * 1024 ** 3)}
-    for rlim, value in wanted.items():
-        hard = resource.getrlimit(rlim)[1]
-        if hard != resource.RLIM_INFINITY and hard < value:
-            raise Refusal(f"this environment's hard limit {hard} is below the declared "
-                          f"budget {value}; the budget cannot be applied as declared")
-
-
-def _enforce_budget(pre: dict) -> dict:
-    """CPU: SIGXCPU raises BudgetExceeded, the hard limit 60 s later is a kernel kill.
-    Memory: RLIMIT_AS makes an allocation beyond it fail. Wall: SIGALRM raises. Python
-    handles signals between bytecodes, so the approved command also carries an outer
-    ``timeout`` hard kill."""
-    b = pre["budget"]
-    cpu_s, wall_s = int(b["cpu_minutes"] * 60), int(b["wall_cap_minutes"] * 60)
-    mem = int(b["memory_GB"] * 1024 ** 3)
-    resource.setrlimit(resource.RLIMIT_CPU, (cpu_s, cpu_s + 60))
-    resource.setrlimit(resource.RLIMIT_AS, (mem, mem))
-    signal.signal(signal.SIGXCPU, _on_limit)
-    signal.signal(signal.SIGALRM, _on_limit)
-    signal.alarm(wall_s)
-    return {"cpu_s": cpu_s, "cpu_hard_kill_s": cpu_s + 60, "address_space_bytes": mem,
-            "wall_s": wall_s}
-
-
-#: every file whose code produced the committed preparation evidence
-EVIDENCE_CODE = {**CODE_FILES, "synthetic_cells.py": HERE / "synthetic_cells.py",
-                 "verify_solver.py": HERE / "verify_solver.py"}
-
-
-def _environment(files: dict = CODE_FILES) -> dict:
-    return {"python": platform.python_version(), "numpy": np.__version__,
-            "scipy": scipy.__version__, "platform": platform.platform(),
-            "longdouble_eps": float(np.finfo(np.longdouble).eps),
-            "code_sha256": {name: af.sha256(path) for name, path in files.items()}}
-
-
-def _dump(path: Path, obj) -> None:
-    path.write_text(json.dumps(obj, indent=1, default=float) + "\n")
-
-
-def execute(results_root: Path | None = None) -> Path:
-    t0 = time.monotonic()
-    results_root = RESULTS_ROOT if results_root is None else results_root
-    pre = load_pre()
-    approval = require_approval(pre)
-    ns.require_extended_precision()
-    band = band_baseline(pre)                  # digests checked before anything is spent
-    anchor = anchor_values(pre)
-    meshes = ladder(qmhp_mesh())
-    digests = {str(h): ns.mesh_digest(m) for h, m in zip(LEVELS, meshes)}
-    if digests != pre["configuration"]["level_mesh_digests"]:
-        raise Refusal("a refined mesh differs from the pre-declared one")
-    results_root.mkdir(exist_ok=True)
-    for existing in results_root.glob(RECORD_PREFIX + "*"):
-        raise Refusal(f"{existing.name} exists: the one attempt is spent")
-    _require_enforceable_budget(pre)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    rec = results_root / f"{RECORD_PREFIX}{stamp}"
-    rec.mkdir(exist_ok=False)                  # spends the attempt before any solve
-    limits = _enforce_budget(pre)
-    levels: list = []
-    try:
-        run_levels(meshes, _model(), lambda h, r: _dump(rec / f"level{h}.json", r), t0, levels)
-        signal.alarm(0)
-        summary = {"predeclaration_sha256": af.sha256(PREDECLARATION),
-                   "approval_sha256": af.sha256(APPROVAL),
-                   "approval_run_label": approval.get("run_label"),
-                   "mesh_sha256": CONFIG["mesh_sha256"], "level_mesh_digests": digests,
-                   "band_baseline": band, "static_anchor_values": anchor,
-                   "environment": _environment(), "limits": limits, "resources": _usage(t0),
-                   "C_fF": [lv["problems"]["C"]["C_fF"] for lv in levels],
-                   "Cprime_fF": [lv["problems"]["Cprime"]["C_fF"] for lv in levels],
-                   **analyse(levels, pre, band, anchor),
-                   "not_reported": "E_C,F1F1 and g; no coupling, readout frequency or Route A "
-                                   "output is read or combined"}
-        _dump(rec / "summary.json", summary)
-    except BaseException as exc:               # the failure is the recorded outcome
-        signal.alarm(0)
-        _dump(rec / "failure.json", {
-            "verdict": "FAILED - the one attempt is spent; no retry",
-            "levels_completed": [lv["level"] for lv in levels], "error": repr(exc),
-            "traceback": traceback.format_exc(), "limits": limits, "resources": _usage(t0)})
-        manifest.write_verified(rec)
-        raise AttemptFailed(f"{rec.name}: {exc!r} (recorded in failure.json; the one attempt "
-                            "is spent; no retry)") from exc
-    manifest.write_verified(rec)
-    return rec
 
 
 def dry_run(budget: dict | None = None) -> dict:
@@ -612,34 +868,39 @@ def dry_run(budget: dict | None = None) -> dict:
     limits = _enforce_budget({"budget": budget}) if budget else None
     mesh, model = syn.chip_cell(**DRY_RUN_CELL)
     quality = ns.element_quality(mesh, af.scales(mesh, model["L0_m"], model["L_H"])["xyz_nd"])
-    levels = run_levels(ladder(mesh), model, lambda h, r: None, t0)
-    signal.alarm(0)
-    pre = {"integrity": load_pre()["integrity"], "classification": load_pre()["classification"],
-           "configuration": {"level_mesh_digests": {str(lv["level"]): lv["mesh_digest"] for lv in levels}}}
-    per_iteration = {}
+    levels = run_levels(ladder(mesh), model, lambda name, obj: None, t0)
+    _disarm()
+    pre = load_pre()
+    fake = {"integrity": pre["integrity"], "classification": pre["classification"],
+            "configuration": {"level_mesh_digests": {str(lv["level"]): lv["mesh_digest"] for lv in levels}}}
+    timing, histories = {}, {}
     for kind in ns.KINDS:
         sv = levels[2]["problems"][kind]["solver"]
-        hist = sv["history_iter_residual_relcert_wall"]
-        per_iteration[kind] = {"setup_wall_s": sv["setup_wall_s"],
-                               "iterations": sv["iterations"],
-                               "pcg_wall_s": hist[-1][3],
-                               "wall_s_per_iteration": hist[-1][3] / max(1, sv["iterations"])}
-    return {"cell": DRY_RUN_CELL, "element_quality_level0": quality,
-            "level2_pcg_timing": per_iteration, "limits": limits, "resources": _usage(t0),
+        timing[kind] = {"setup_wall_s": sv["setup_wall_s"], "iterations": sv["iterations"],
+                        "status": sv["status"], "pcg_wall_s": sv["history"][-1]["wall_s"],
+                        "wall_s_per_iteration": sv["history"][-1]["wall_s"] / max(1, sv["iterations"])}
+        histories[f"level2-{kind}"] = sv["history"]
+        histories[f"level1-{kind}-crosscheck"] = levels[1]["problems"][kind]["twogrid_cross_check"]["solver"]["history"]
+    return {"cell": DRY_RUN_CELL, "element_quality_level0": quality, "limits": limits,
+            "resources": _usage(t0), "level2_pcg_timing": timing, "pcg_histories": histories,
             "per_level": [{"level": lv["level"], "n_tets": lv["n_tets"], "n_nodes": lv["n_nodes"],
                            "resources_so_far": lv["resources_so_far"],
                            "problems": {k: {"n_unknowns": r["n_unknowns"], "C_fF": r["C_fF"],
                                             "bound_rel": r["total_error_bound_rel"],
+                                            "evaluation_bound_terms_nd": r["evaluation_bound_terms_nd"],
+                                            "certificate_error_bound_nd": r["certificate"]["error_bound_nd"],
                                             "solver": {kk: r["solver"].get(kk) for kk in
                                                        ("method", "status", "iterations",
-                                                        "galerkin_identity_rel")},
+                                                        "galerkin_identity_rel",
+                                                        "gauss_seidel_probe_rel",
+                                                        "gauss_seidel_probe_backward_rel")},
                                             "cross_check": ({kk: r["twogrid_cross_check"]["solver"].get(kk)
                                                              for kk in ("status", "iterations")}
                                                             if "twogrid_cross_check" in r else None),
                                             "cpu_s": r["cpu_s"], "wall_s": r["wall_s"]}
                                         for k, r in lv["problems"].items()}}
                           for lv in levels],
-            "analysis_of_the_synthetic_levels": analyse(levels, pre, None, None),
+            "analysis_of_the_synthetic_levels": analyse(levels, fake, None, None),
             "environment": _environment(EVIDENCE_CODE), "qmhp_data_read": False}
 
 
@@ -659,7 +920,7 @@ def main(argv=None) -> int:
         else:
             print(execute())
             return 0
-        text = json.dumps(res, indent=1, default=float)
+        text = json.dumps(_clean(res), indent=1, allow_nan=False)
         if args.out:
             Path(args.out).write_text(text + "\n")
         print(text)
