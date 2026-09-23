@@ -22,6 +22,9 @@ This is **revision 3** of the preparation.
 - Every finding is addressed below, before approval and before any QMHP solve, so no result
   can have informed the changes.
 - Both reviews are kept verbatim in `review/`.
+- A targeted closure check of the round-2 majors, run on the frozen revision-3 commit
+  `3270469` with `9aa951f` as the pre-fix control, found every mechanism reproduced before
+  the fix and absent after it, with two minor residuals (`review/closure_3270469.json`).
 
 Record: `experiments/static-refinement-study/`. The frozen statement is `predeclaration.json`;
 this page summarises it.
@@ -470,6 +473,6 @@ It cannot establish:
 | `study_driver.py` | preflight, dry run, invocation check, and the gated one-attempt execution |
 | `synthetic_cells.py`, `verify_solver.py` | the synthetic cells (including the folded-mesh control) and the verification V1–V7 |
 | `solver_verification.json`, `preflight.json`, `dry_run.json` | the committed evidence of the preparation, each bound to the code and environment that produced it |
-| `review/review_864c0ba.json`, `review/review_9aa951f.json` | the adversarial reviews of revisions 1 and 2, verbatim |
+| `review/review_864c0ba.json`, `review/review_9aa951f.json`, `review/closure_3270469.json` | the adversarial reviews of revisions 1 and 2, verbatim, and the targeted closure check of revision 3, with its raw outputs and harness sources |
 | `STUDY-APPROVAL.draft.json` | the approval a human would grant, with the commit and window left to fill; **not** an approval |
 | `tests/test_static_refinement_study.py` | rules, integrity, gate, invocation, ledger, failure paths, signals, budget, evidence, pins |
