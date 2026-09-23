@@ -1361,8 +1361,10 @@ def test_a_stop_signal_delivered_twice_to_the_process_group_still_leaves_a_seale
         assert manifest.verify(rec) == [], trial
         f = _strict_json(rec / "failure.json")
         got = [e["signal"] for e in f["signals_received"]]
-        # two deliveries (timeout forwards the group signal) unless the kernel merged them
-        assert sig in f["error"] and got in ([sig], [sig, sig]), (trial, got)
+        # up to three deliveries: ours, then GNU timeout's forward to the child and again to
+        # the whole process group (coreutils cleanup(): send_sig(child), send_sig(0)); the
+        # interpreter merges deliveries that arrive before its handler runs
+        assert sig in f["error"] and 1 <= len(got) <= 3 and set(got) == {sig}, (trial, got)
 
 
 def test_the_evidence_writes_are_atomic_and_strict(tmp_path, monkeypatch):
