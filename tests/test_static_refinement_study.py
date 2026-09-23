@@ -1,8 +1,10 @@
 # Copyright (c) 2026 Brodie Duncan. All rights reserved.
 # Proprietary QMHP-CEM source. No licence is granted except by explicit written agreement.
-"""The static-only nested refinement study: PREPARED, NOT APPROVED, NOT EXECUTED.
+"""The static-only nested refinement study: EXECUTED ONCE (attempt 1 of 1, approved at
+8480db6), record results/STATIC-REFINEMENT-STUDY-20260923T062048Z, QUALIFIED.
 
-Tested here on synthetic data only: no test solves anything on the QMHP mesh.
+Tested here on synthetic data only: no test solves anything on the QMHP mesh. The executed
+record is read, never written; tests/test_frozen_evidence.py pins it by its manifest.
 
 - the solver and its certificate against known answers and negative controls;
 - the frozen classification and consistency rules;
@@ -862,14 +864,44 @@ def test_without_an_approval_the_study_refuses_and_writes_nothing(tmp_path, monk
     assert sorted(p.name for p in tmp_path.iterdir()) == []
 
 
-def test_the_real_invocation_refuses_today():
-    assert not sd.APPROVAL.exists(), "an approval exists: this study is no longer NOT APPROVED"
-    assert not sd.APPROVAL_CONSUMED.exists(), "an approval has been consumed: the attempt was spent"
-    assert not sd.ATTEMPT_MARKER.exists(), "the attempt has been spent"
-    assert not sd.common_ledger_path().exists(), "the attempt has been spent (git common directory)"
-    assert not list((REPO / "results").glob(sd.RECORD_PREFIX + "*")), "the attempt has been spent"
-    assert sd.spent_state() == []
+EXECUTED_RECORD = "STATIC-REFINEMENT-STUDY-20260923T062048Z"
+APPROVED_COMMIT = "8480db691e4e9081059a08ae821c34af8f936454"
+
+
+def test_the_one_attempt_is_spent_and_a_second_is_refused():
+    """After the one approved execution: the tracked ledger (the marker and the consumed
+    approval, committed with the record) names the executed record, no usable approval
+    exists, and the real invocation refuses with nothing spent. The git-common-directory
+    entry is local to the executing clone and is not required here (CI checks out fresh)."""
+    rec = REPO / "results" / EXECUTED_RECORD
+    assert [p.name for p in (REPO / "results").glob(sd.RECORD_PREFIX + "*")] == [EXECUTED_RECORD]
+    assert not sd.APPROVAL.exists(), "a usable approval exists after the attempt was spent"
+    marker = _strict_json(sd.ATTEMPT_MARKER)
+    assert marker["record"] == EXECUTED_RECORD and marker["source_commit"] == APPROVED_COMMIT
+    consumed = _strict_json(sd.APPROVAL_CONSUMED)
+    assert consumed["source_commit"] == APPROVED_COMMIT and consumed["attempt"] == 1
+    prov = _strict_json(rec / "provenance.json")
+    assert prov["approval_sha256"] == _sha(sd.APPROVAL_CONSUMED) == marker["approval_sha256"]
+    assert prov["source_commit_measured"] == APPROVED_COMMIT
+    assert sd.spent_state()[:2] == ["ATTEMPT-SPENT.json", "STUDY-APPROVAL.consumed.json"]
     assert sd.main([]) == 2
+
+
+def test_the_executed_record_is_the_one_reported():
+    """The committed summary and the report state the same outcome; nothing here writes."""
+    s = _strict_json(REPO / "results" / EXECUTED_RECORD / "summary.json")
+    o = s["outcome"]
+    assert s["integrity_failures"] == [] and o["verdict"] == "QUALIFIED"
+    assert (o["C"], o["Cprime"], o["delta"]) == ("CONVERGING", "CONVERGING", "NON-CONVERGENT")
+    assert o["consistency_check_level0"] == "CONSISTENT" and o["second_moment_name"] == "H"
+    assert s["consistency_check_level0"]["nesting_0_to_1"]["status"] == "PASSED"
+    for kind in ("C", "Cprime"):
+        c = s["classes"][kind]
+        assert c["bracket_assumption"].startswith("two terms") and c["cls"] != "CONVERGED"
+    text = DOC.read_text()
+    for phrase in ("EXECUTED", EXECUTED_RECORD, "QUALIFIED", "CONVERGING", "NON-CONVERGENT", "CONSISTENT",
+                   "model-based", "67.9755", "not CONVERGED"):
+        assert phrase in text, phrase
 
 
 def test_a_granted_attempt_writes_every_solve_then_a_summary_and_a_verified_manifest(tmp_path, monkeypatch, pre):
@@ -1781,7 +1813,7 @@ def test_every_new_source_file_carries_the_approved_header():
 
 def test_the_report_states_the_status_and_keeps_proof_and_model_apart():
     text = DOC.read_text()
-    assert "PREPARED, NOT APPROVED, NOT EXECUTED" in text
+    assert "EXECUTED ONCE" in text and "NOT EXECUTED" not in text.split("\n", 3)[0]
     for h in ("## 1.", "## 2.", "## 3.", "## 4.", "## 5.", "## 6.", "## 7.", "## 8."):
         assert h in text, h
     for phrase in ("model-based", "relative to the assembled operator", "UNAVAILABLE",

@@ -71,7 +71,17 @@ MANIFESTED_RECORDS = frozenset({
     "PALACE-VERIFY-20260915T065055Z", "PALACE-VERIFY-20260915T091242Z",
     "PALACE-VERIFY-20260915T115901Z",
     "ROUTE-A-SYNTHETIC-20260915T231055Z",
+    # the static-only nested refinement study, attempt 1 of 1, approved at 8480db6 and
+    # executed once; its manifest was written by its driver (write_verified) at execution
+    # time and is pinned below (STATIC_REFINEMENT_STUDY_MANIFEST_SHA256)
+    "STATIC-REFINEMENT-STUDY-20260923T062048Z",
 })
+
+#: The static refinement study record's manifest.sha256, as its driver wrote it at
+#: execution time (also stated in the preserving commit 2e3973d). Pinned on its own so
+#: that the executed evidence, not just the aggregate, is frozen by name.
+STATIC_REFINEMENT_STUDY_RECORD = "STATIC-REFINEMENT-STUDY-20260923T062048Z"
+STATIC_REFINEMENT_STUDY_MANIFEST_SHA256 = "e3e447068dea6b4c2790c29de7a34be77f971717fa6e40964f6e31fdee193622"
 
 #: QUARANTINE, not an exemption. This record has NO manifest.sha256, so `verify()`
 #: cannot check it. That is a recorded failure of the run that produced it, not drift
@@ -120,7 +130,7 @@ QUARANTINED = {UNMANIFESTED_RECORD: UNMANIFESTED_DIGESTS,
 #: sha256 over the canonical {record: sha256(its manifest.sha256)} map. Per-record
 #: verification cannot catch a file that was mutated AND its manifest rewritten to
 #: agree; this can, because the manifest's own bytes change.
-MANIFEST_INDEX_DIGEST = "e880cc16f0453fb95e2011c2f8a9d5ac1a6c85f169899cd2f23788589b4661c2"
+MANIFEST_INDEX_DIGEST = "06419d8362d84be27f26e6629dfe9f3b70556ec00e1fb501a1376526775bbee6"
 
 #: Not evidence. The campaign index lives beside the records and is ordinary
 #: documentation; it is outside every record directory and is never manifested.
@@ -169,7 +179,7 @@ def evidence_mismatches(root: Path = RESULTS, *,
 # --- the committed evidence ----------------------------------------------------------
 
 def test_every_committed_record_verifies_against_its_own_manifest():
-    """The gap this increment closes. 32 records, each checked by the verifier its own
+    """The gap this increment closes. 33 records, each checked by the verifier its own
     driver's manifest was written for, in both directions."""
     assert evidence_mismatches() == []
 
@@ -179,7 +189,7 @@ def test_the_record_set_is_exactly_the_pinned_one():
     assert present == MANIFESTED_RECORDS | set(QUARANTINED), {
         "unincorporated": sorted(present - MANIFESTED_RECORDS - set(QUARANTINED)),
         "missing": sorted((MANIFESTED_RECORDS | set(QUARANTINED)) - present)}
-    assert len(MANIFESTED_RECORDS) == 32 and len(QUARANTINED) == 2
+    assert len(MANIFESTED_RECORDS) == 33 and len(QUARANTINED) == 2
 
 
 def test_the_manifests_themselves_cannot_be_rewritten():
@@ -188,6 +198,7 @@ def test_the_manifests_themselves_cannot_be_rewritten():
     index = manifest_index()
     assert set(index) == MANIFESTED_RECORDS
     assert index_digest(index) == MANIFEST_INDEX_DIGEST
+    assert index[STATIC_REFINEMENT_STUDY_RECORD] == STATIC_REFINEMENT_STUDY_MANIFEST_SHA256
 
 
 @pytest.mark.parametrize("name", sorted(QUARANTINED))

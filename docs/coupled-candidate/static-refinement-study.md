@@ -1,7 +1,110 @@
-# The static-only nested refinement study — PREPARED, NOT APPROVED, NOT EXECUTED
+# The static-only nested refinement study — EXECUTED ONCE: QUALIFIED
 
-**Status: PREPARED, NOT APPROVED, NOT EXECUTED.** No linear solve has been run on the QMHP
-mesh for this study, and no attempt has been spent. The following have run:
+**Status: EXECUTED ONCE, attempt 1 of 1 — QUALIFIED.** A human approved one execution at
+`8480db691e4e9081059a08ae821c34af8f936454`. The exact approved command ran once, on 23
+September 2026 from 06:20:39 to 06:22:40 UTC, and exited 0. The record is
+`results/STATIC-REFINEMENT-STUDY-20260923T062048Z`: written and sealed by its driver, preserved
+unchanged in commit `2e3973d`, and pinned by `tests/test_frozen_evidence.py`. The one attempt
+is spent. There is no retry, and none of the following may be run under this approval: level 3,
+another mesh, Palace or Route A. The result is in §0. Sections 1–8 are the preparation as
+frozen before the run.
+
+## 0. The result of the one execution
+
+**Integrity: QUALIFIED, with no integrity failure.**
+
+- The three level-mesh digests match the pre-declared ones.
+- Every certificate precondition held on every level: the tiling, the tagged and constrained
+  boundary, and the port-face rectangle.
+- `C_0` and `C_1` reproduce the executed static-anchor record bit for bit.
+- Every port voltage is 1 to 12 digits, and every long-double arithmetic probe passed.
+- `C′ ≥ C` at every level, and no energy rose under refinement.
+- No stop signal was received.
+
+| level | tets | C (fF) | C′ (fF) | S (GHz²) | S′ = H (GHz²) | δ |
+|---|---|---|---|---|---|---|
+| 0 | 64,434 | 114.3387597 | 114.4142675 | 2.141353 | 2.139940 | 6.6039e-4 |
+| 1 | 515,472 | 82.2021777 | 82.2602594 | 2.978506 | 2.976403 | 7.0657e-4 |
+| 2 | 4,123,776 | 67.9755387 | 68.0454625 | 3.601879 | 3.598178 | 1.02866e-3 |
+
+**Frozen classifications (§4).**
+
+| quantity | class | detail |
+|---|---|---|
+| `C` | **CONVERGING — not CONVERGED** | R = 2.2589, observed order 1.18. `C_2` = 67.9755 fF lies inside the pre-declared CONVERGING interval of 66.134–74.168 fF. |
+| `C′` | **CONVERGING — not CONVERGED** | R = 2.2620, observed order 1.18. |
+| `S` | CONVERGING | follows `C`; not independent evidence |
+| `H` | CONVERGING | follows `C′`; not independent evidence |
+| `δ` | **NON-CONVERGENT** | δ grew at every level (\|R\| = 0.143). The class is descriptive only, and the synthetic analogue predicted it before the run. |
+
+- **Why not CONVERGED.** The certified conservative remaining error at level 2 is 0.2647 for
+  `C` and 0.2641 for `C′`. Both are far above τ = 0.05, and CONVERGED was declared unreachable
+  in advance.
+- **Model-based limit brackets.** These are not rigorous. Each rests on an assumption the
+  theory does not supply: two error terms, of orders 1 and `q ∈ (1, 2]`, with coefficients of
+  one sign.
+  - `C` in 53.75–56.68 fF, and `C′` in 53.83–56.78 fF;
+  - `S` in 4.320–4.555 GHz², and `H` in 4.312–4.548 GHz²;
+  - the level-2 remaining relative error is 19.9–26.5 %.
+- **Rigorous bounds.** By the Dirichlet principle:
+  - `C ≤ 67.9755386760 fF` and `C′ ≤ 68.0454624672 fF`;
+  - `S ≥ 3.601879 GHz²` and `H ≥ 3.598178 GHz²`.
+
+  They are rigorous relative to the assembled operator, up to `ρ` (estimated at ≤ 4.9e-7 of
+  `c`). Beside them sits the uncertified assembly-term estimate of 9.6e-11 relative.
+- **What the brackets are not.** They are not a continuum value, and they say nothing about
+  the device's capacitance.
+
+**Level-0 Palace consistency: CONSISTENT.**
+
+- `δ_0` = 6.60387e-4, certified to ±3e-15. It lies inside the frozen window
+  [6.58517e-4, 6.76222e-4], with η = 1e-8.
+- `S′_0` = 2.139940 GHz², against the L2 band's H = 2.139944 GHz².
+- The 0-to-1 nesting check PASSED.
+- So `S′_h` is reported under the name **H**. **Scope:** this is a cross-code test at level 0
+  only. At level 0, `S′_0` is Palace's complete harmonic moment under the sheet-port identity.
+  At levels 1 and 2 it is the moment Palace *would* have on those meshes, which Palace has
+  never been run on; the identity is tested nowhere else.
+- The consistency check is not an acceptance criterion. It decides nothing about the classes
+  of `C`, `C′` or `δ`.
+
+**Certificates and resources.**
+
+| solve | certified relative error | solver |
+|---|---|---|
+| level 0, direct | 1.3e-15 and 1.5e-15 | — |
+| level 1, direct | 7.3e-15 and 7.5e-15 | two-grid cross-checks: 35 iterations, CERTIFIED, agreeing within 1.8e-15 |
+| level 2, two-grid preconditioned CG | 1.43e-13 and 1.42e-13 | 60 iterations each, CERTIFIED; Galerkin identity 2.3e-14; no coarse leak |
+
+- Every solve is inside the 1e-9 tolerance by more than 7,000×.
+- Resources: 119.5 s wall, 119.2 s CPU, 3.67 GB resident, 4.68 GB peak address space. The
+  caps were 60 min wall, 60 min CPU and 12 GiB.
+- `provenance.json` records the measured invocation, which was exactly the approved one, and
+  the verified environment.
+
+**Preservation.** Step 2 of the preservation procedure applied, because the record directory
+exists.
+
+- The record, `ATTEMPT-SPENT.json` and `STUDY-APPROVAL.consumed.json` were committed
+  unchanged in `2e3973d` and pushed before any analysis.
+- The ledger entry in the git common directory stays local and is byte-identical to the
+  marker.
+- No ledger-only failure occurred.
+
+**Unavailable or not established.**
+
+- `E_C,F1F1` and `g` stay **UNAVAILABLE**. Nothing is combined with Route A.
+- The continuum limit of `C`: the brackets are model-based.
+- Convergence of `δ`.
+- `H` beyond level 0's cross-code check.
+- The device's capacitance.
+- The assembly round-off, which is estimated, not certified.
+- The residuals C-1, C-2 and C-3, the fresh-clone risk, SIGKILL and source-between-import-and-
+  digest stay as disclosed in §6. None was triggered in the execution.
+
+## The preparation, as frozen before the run
+
+Before the run, the following had run:
 
 - the solver verification, on synthetic cases only;
 - a dry run of the solve path and its per-solve evidence writes, on a synthetic stand-in
@@ -495,9 +598,9 @@ It bounds time and memory, not the certified error.
   15 min wall and about the same CPU. The caps allow about 4.1 times that.
 - **Attempts.** 1. No retry.
 
-**Proposed command, from the repository root, locally, with no workflow and no network.** It
-runs only once `STUDY-APPROVAL.json` exists, filled in from `STUDY-APPROVAL.draft.json`. The
-driver measures that it was started exactly this way:
+**The command, from the repository root, locally, with no workflow and no network.** It ran
+exactly once, under the approval for `8480db6` (§0). The driver measured that it was started
+exactly this way:
 
     env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 timeout --signal=KILL 3660 .venv/bin/python experiments/static-refinement-study/study_driver.py
 
