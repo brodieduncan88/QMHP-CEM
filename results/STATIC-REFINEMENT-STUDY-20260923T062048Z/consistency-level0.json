@@ -1,0 +1,18 @@
+{
+ "verdict": "CONSISTENT",
+ "delta0": 0.0006603870074095575,
+ "delta0_certified_range": [
+  0.0006603870074066709,
+  0.000660387007412444
+ ],
+ "delta_band_lower": 0.000658526684468308,
+ "tail_bound": 1.768574651809676e-05,
+ "window": [
+  0.0006585166844683079,
+  0.0006762224309864047
+ ],
+ "Sprime0_static_GHz2": 2.1399402708491486,
+ "H_band_GHz2": 2.139944249209271,
+ "meaning": "The static code and Palace's eigensolver agree on the same mesh within the predicted window. In a QUALIFIED record, S'_h is then reported under the name H_h, Palace's complete harmonic moment on the nested meshes under the identity; for levels 1 and 2 it is the moment Palace would have if given those meshes.",
+ "level0_integrity_failures": []
+}
