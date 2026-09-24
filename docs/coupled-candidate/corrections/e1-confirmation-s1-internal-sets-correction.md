@@ -37,7 +37,7 @@
 
   No S1 energy, capacitance or bound value, and no `/tmp` Confirmation value, is known to have been read. That includes the energy, bound and capacitance values of the prototype's E1.1, E1.1-half and E1.2 sets. Their per-set rounding counts, solver paths and `force_fail` settings were read.
 
-  One exception concerns synthetic proxies. The review of `28f6ca3` displayed the first 400 bytes of the prototype's `cert8_results.jsonl`. They show two non-selected configurations' proxy values: charge Q, enclosure width per unit of c, and g_E. Their islands are not S1's. The same command printed the selected configuration's g_E, the value already committed.
+  One exception concerns synthetic proxies. The review of `28f6ca3` displayed the first 400 bytes of the prototype's `cert8_results.jsonl`. They show two non-selected configurations' proxy values: the enclosure width per unit of c and g_E for both, and the charge Q for the first only, because the second row's Q starts after byte 400. Their islands are not S1's. The same command printed the selected configuration's g_E, the value already committed.
 
   This is an author/accounting statement derived from session command history and is not independently verifiable from the repository alone. The reads are listed below.
   - **How the list was made.** The session record's tool-call inputs were searched: every command, file path, search pattern, and the text of every file written. They cover the main session and every reviewer and helper agent.
@@ -50,11 +50,15 @@
     - **Paths not counted as reads:** these rounds' own working files, which are review scratch, harness outputs and worktrees of committed code.
     - **What was read to make the list:** the session record itself was read only for its tool-call inputs and for the reports the rounds' reviewers returned.
     - **Limit:** a read that reaches a file without naming it or its directory would not be found.
+    - **A gap in the search itself:** the search script dropped any path equal to the scratch root itself. So it missed two listings of the whole scratch area, both of names and times only. The review of `b8b24ee` found them. Both belong under "Names across the session scratch area" below:
+      - in the review of `22c9585` (05:36 UTC), a `find` over the scratch area and `/tmp` for files named `internal-sets.json`, `sigma-E1.1*.json`, `pass-E1.1*.json` or `*confirmation*`, which printed their modification times and paths;
+      - in the review of `e87373f` (10:03 UTC), a `find` over the scratch area for files modified between 02:55 and 03:10 UTC, which printed their paths.
   - **The `/tmp` Confirmation directories.** Their names, file names, file counts, byte sizes and times only.
   - **Names across the session scratch area:** directory listings and file searches.
   - **Source code.** The following source was read:
     - the revision-8 prototype's source (`next/e1/rev8/cost/*.py`, including `ldk8.py`, and the review's copy);
     - the configuration studies' scripts (`next/e1/cfg/*.py`);
+    - the revision-7 and revision-8 configuration reviews' scripts (`next/e1/rev7-review/configuration/*.py` and `next/e1/rev8-review/configuration/*.py`): their source lines that match a search pattern, in the review of `22c9585`;
     - a verification script (`next/verify/s3/x1_s1.py`).
 
     The prototype's stand-in generator was run for geometry only (§2).
@@ -71,6 +75,7 @@
     - In the cleanup that produced `da4338a` and in its review, the shapes of the log lines those greps matched. Their digits were masked, and only line shapes or counts were printed.
   - **The prototype's configuration-certification file** `cert8_results.jsonl`, in the review of `28f6ca3`:
     - the selected configuration's row: its parameters, N, solver path and proxy-A g_E. That g_E is the value committed in the contract and in `proxyA-gE.json`;
+    - the file's line count;
     - the file's first 400 bytes. They show the whole row of the configuration n = 32, q = 1.5, κ = 1.5, h = 1.25, w = 0.4, and most of the row of the configuration that differs from it only in q = 2.0:
       - their proxy A's N, solver path, pivot ratio and g_E;
       - the enclosure width per unit of c;
@@ -88,10 +93,10 @@
   - **The uncommitted pre-declaration drafts** `next/e1/frozen/E1-PREDECLARATION.rev4*` to `rev6*`: in the review of `28f6ca3`, their text around "q =" and "grading exponent".
   - **Other session files:**
     - the smoke Confirmation's `next/e1/smoke/conf-nominal.json`: its `code_sha256` hashes only;
-    - `next/e1/evidence/code-at-evidence-start.json`: its key names;
+    - `next/e1/evidence/code-at-evidence-start.json`: its key names, and whether five code hashes of `90bf9eb` appear in it (true or false only);
     - the evidence-run script `next/e1/evidence/run.sh`;
     - the start and exit lines of `next/e1/evidence/run2.log`;
-    - the manifests `REV8-MANIFEST.sha256` and the selection study's `SELECTION-MANIFEST.sha256`: their own hashes, their line counts and the file names of some of their entries;
+    - the manifests `REV8-MANIFEST.sha256` and the selection study's `SELECTION-MANIFEST.sha256`: their own hashes and the file names of some of their entries, and the line count of `SELECTION-MANIFEST.sha256` only (no line count of `REV8-MANIFEST.sha256` was read);
     - cached S1 geometry: geometry only.
 - **No S1 numerics (the author's account, from the same commands).** No S1 matrix was assembled or factorised for this record, and no S1 energy, bound or capacitance was formed. The rounds and reviews above ran only:
   - geometry-only comparisons: the S1 geometry phase, which assembles no matrix, and the prototype's stand-in generator;
@@ -327,6 +332,7 @@ The fifth version (committed at `da4338a`) said the following (review of `da4338
 | "both cleanups;" (the search's coverage) | the search stopped at the start of the cleanup that produced `da4338a`, so that cleanup's own reads were not listed | the header ("How the list was made") |
 | "No S1 energy, bound or capacitance value was read for this record." | stated more firmly than a search of commands can support | the header ("What was read") |
 | "In particular, none of the E1.1, E1.1-half or E1.2 quantities in the prototype's output files was read, and no value of a `/tmp` Confirmation file was read." | too broad: their per-set rounding counts, solver paths and `force_fail` settings were read. Only their energy, bound and capacitance values were not | the header ("What was read") |
-| "the manifests `REV8-MANIFEST.sha256` and the selection study's `SELECTION-MANIFEST.sha256`: their hashes and entries (file names with hashes);" | overstated: only the manifests' own hashes, their line counts and the file names of some entries were printed | the header ("Other session files") |
+| "the manifests `REV8-MANIFEST.sha256` and the selection study's `SELECTION-MANIFEST.sha256`: their hashes and entries (file names with hashes);" | overstated: only the manifests' own hashes, the line count of `SELECTION-MANIFEST.sha256` and the file names of some entries were printed | the header ("Other session files") |
 | "the selection study's result files: their names and times;" | incomplete: their sizes, access times and line counts, and match counts, were also read | the header ("The selection study's result files") |
 | "`run8_small` used a 500-panel draw of the same sheet: N = 1,524, with N_x = 1,324." (§2) | stated without its basis: N comes from the prototype's source, and that the run used it is the author's account | §2 |
+| "**Source code.** This covers the revision-8 prototype's source (`next/e1/rev8/cost/*.py` and the review's copy) and the configuration studies' scripts. The source was read." | incomplete: it did not name the verification script `next/verify/s3/x1_s1.py`, whose source was also read (review of `28f6ca3`). It was replaced in the sixth version (committed at `b8b24ee`) without being kept here (review of `b8b24ee`) | the header ("Source code") |
