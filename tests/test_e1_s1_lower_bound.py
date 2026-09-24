@@ -1111,9 +1111,26 @@ def test_without_an_approval_the_attempt_refuses_and_writes_nothing(tmp_path, mo
     assert sorted(tmp_path.iterdir()) == []
 
 
-def test_the_repository_holds_no_approval_no_ledger_and_no_E1_record():
-    assert not dr.APPROVAL.exists() and not dr.APPROVAL_CONSUMED.exists() and not dr.ATTEMPT_MARKER.exists()
-    assert list((REPO / "results").glob(dr.RECORD_PREFIX + "*")) == []
+#: The one approved attempt (approval sha256 below, source commit 4baeb67), executed on
+#: 2026-09-24; committed with its markers in 40b8069 (experiments/e1-s1-lower-bound/EXECUTION-LOG.json).
+E1_EXECUTED_RECORD = "E1-S1-LOWER-BOUND-20260924T222847Z"
+E1_APPROVAL_SHA256 = "b8f6883b6fa431aaca5778e135667bd5cfa0afd830822f908e263db263b8ee7d"
+
+
+def test_the_repository_holds_exactly_the_one_executed_E1_attempt():
+    """Before execution this asserted that no approval, ledger marker or record existed. After
+    the one approved execution it asserts the spent state instead: exactly that record, no
+    approval left to consume, the consumed approval and the marker of that attempt, and a
+    driver that refuses any further run before reading anything else (contract section 8)."""
+    assert [p.name for p in (REPO / "results").glob(dr.RECORD_PREFIX + "*")] == [E1_EXECUTED_RECORD]
+    assert not dr.APPROVAL.exists() and dr.APPROVAL_CONSUMED.is_file() and dr.ATTEMPT_MARKER.is_file()
+    assert hashlib.sha256(dr.APPROVAL_CONSUMED.read_bytes()).hexdigest() == E1_APPROVAL_SHA256
+    marker = _strict_json(dr.ATTEMPT_MARKER)
+    assert (marker["record"], marker["approval_sha256"], marker["source_commit"]) == \
+        (E1_EXECUTED_RECORD, E1_APPROVAL_SHA256, "4baeb67e5c135a97eb23d5e0057a086baa681f4e")
+    assert {"ATTEMPT-SPENT.json", "E1-APPROVAL.consumed.json", E1_EXECUTED_RECORD} <= set(dr.spent_state())
+    with pytest.raises(dr.Refusal, match="the one attempt is spent"):
+        dr.execute()
 
 
 def test_a_granted_attempt_writes_every_file_in_order_then_a_verified_manifest(tmp_path, monkeypatch, sets):

@@ -1,12 +1,15 @@
 # E1 — the static-capacitance lower-bound certificate for the S1 island (problem C)
 
-**Status: IMPLEMENTED; CORRECTED AFTER THREE FROZEN-CODE REVIEWS (contract revision 8.5). PREPARED,
-NOT APPROVED, NOT EXECUTED. PRE-APPROVAL EVIDENCE REGENERATED AND FROZEN (revision 8.5: the rehearsal and both
-Confirmations).**
+**Status: IMPLEMENTED; CORRECTED AFTER THREE FROZEN-CODE REVIEWS (contract revision 8.5). PRE-APPROVAL
+EVIDENCE REGENERATED AND FROZEN (revision 8.5: the rehearsal and both Confirmations). APPROVED AND EXECUTED
+ONCE (attempt 1 of 1, 2026-09-24): QUALIFIED.**
 
-- **E1 has not been executed.** The one attempt is unspent. Execution needs a separate human approval (`E1-APPROVAL.json`, written from `E1-APPROVAL.draft.json`).
+- **E1 has been executed once, and the one attempt is spent.**
+  - It ran on a human approval at `4baeb67` (`E1-APPROVAL.consumed.json`).
+  - Its record is `results/E1-S1-LOWER-BOUND-20260924T222847Z/`, committed with `ATTEMPT-SPENT.json` and `EXECUTION-LOG.json`. See "Execution" below.
+  - There is no retry, and E1 is the last capacitance computation on S1 (contract §8).
 - **What has and has not been computed on S1 panels.** The full account of the runs before the revision-8.5 regeneration, with every run, is in [`corrections/e1-confirmation-s1-internal-sets-correction.md`](corrections/e1-confirmation-s1-internal-sets-correction.md). The revision-8.5 runs are the last item below.
-  - No set equal to S1's E1.2 or E1.2-excl-R1, and no set containing an image of either, has been assembled, factorised or used in any energy.
+  - Before E1's execution, no set equal to S1's E1.2 or E1.2-excl-R1, and no set containing an image of either, had been assembled, factorised or used in any energy. E1's one approved attempt then did so.
   - The revision-8 prototype, and the Confirmation runs made with the `90bf9eb` implementation and with one pre-freeze build, did assemble, factorise and form energies and internal lower bounds for S1's island-only internal sets E1.1 and E1.1-half. Their stand-in's island was S1's island (D-1).
   - The E1.2 of those Confirmations and of the prototype's full-size runs (N = 9,995) also held 534 ground panels bit-identical to S1 E1.2 ground panels (476 of them in S1's E1.2-excl-R1). The E1.2 of the prototype's reduced run `run8_small` (N = 1,524) held 32 such panels. The stand-in's ground is synthetic, but it uses S1's lattice, window and merge rules.
   - Proxy A of the configuration selection contains S1's E1.1 translated by +0.6 mm in x. So every proxy-A Cholesky factorisation contains the factor of that translated E1.1 as its leading block. The same holds for proxies B and C of the selected configuration.
@@ -17,7 +20,7 @@ Confirmations).**
   - It is revision 8.4 (sha256 `cdf6cced…71740`, kept byte-unchanged beside it, as are revisions 8.3 and 8.2) with the two text corrections of D16.
   - Revision 8.4 was revision 8.3 with the structural separation rule and the corrected statements of D15.
   - The physics, the configuration, the thresholds, the Q2/C_br behaviour and the scope are unchanged.
-- **What E1 would certify, and only that.** `C_static ∈ [C_lo^static, C_hi]` fF for the meshed S1 model (problem C, contract §1).
+- **What E1 certifies, and only that.** `C_static ∈ [C_lo^static, C_hi]` fF for the meshed S1 model (problem C, contract §1).
   - `C_lo^static` is a certified Thomson/Galerkin lower bound under the libm ASSUMPTION of contract §4.4.
   - `C_hi` = 67.9755386760262 fF, copied bit-exactly from the frozen static study.
 - **Fixed statements in every state.**
@@ -42,12 +45,48 @@ Confirmations).**
 | `rehearsal.json`, `proxyA-gE.json`, `confirmation-nominal.json`, `confirmation-forced.json` | the pre-approval evidence of `90bf9eb`: SUPERSEDED, kept byte-unchanged (see below) |
 | `preapproval-confirmation-rev8.5/` | the revision-8.5 Confirmations, nominal and forced fallback: predeclaration, run script, outputs, logs, run records, the driver's sealed evidence directories, index and `MANIFEST.sha256` |
 | `preapproval-rehearsal-rev8.5/` | the revision-8.5 rehearsal: predeclaration, run script, acceptance check script, output, logs, run records, index and `MANIFEST.sha256` |
+| `ATTEMPT-SPENT.json`, `E1-APPROVAL.consumed.json`, `EXECUTION-LOG.json` | the spent attempt: its marker (byte-identical to the git-common-directory ledger entry), the consumed human approval and the operator's execution log. The record is `results/E1-S1-LOWER-BOUND-20260924T222847Z/` |
 | `c2-stop-signal-test-diagnosis/` | why the C-2 stop-signal test was intermittent (its timing, not the implementation), and the evidence for its deterministic replacement |
 | `APPROVAL-PACKAGE.rev8.5.json`, `APPROVAL-PACKAGE.rev8.5.md` | the approval candidate: every sha256 the approver is asked to approve, checked by a test; it authorises nothing |
 
-The attempt would be run once, from the repository root, exactly as contract §6 states:
+The attempt was run once, from the repository root, exactly as contract §6 states:
 
     env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 timeout --signal=KILL 1260 .venv/bin/python experiments/e1-s1-lower-bound/driver.py
+
+## Execution (attempt 1 of 1): QUALIFIED
+
+- **Approval.** A human approved one execution at `4baeb67` on 2026-09-24.
+  - The approval is `E1-APPROVAL.consumed.json`, sha256 `b8f6883b6fa431aaca5778e135667bd5cfa0afd830822f908e263db263b8ee7d`.
+  - It records `tolerance_scope_decision` `COPIED_NUMBERS_WITHIN_SCOPE` and `q2_within_D5` true, with tolerance set T0 and γ = 1e-6.
+- **Run.** 2026-09-24T22:28:47Z–22:34:19Z, from `4baeb67`, with the declared invocation.
+  - It exited 0 with stderr empty.
+  - It used 331.4 s CPU and 1.43 GiB peak address space (budget 900 s and 4 GiB).
+  - No stop signal arrived, and the provenance re-measurement was equal.
+- **Record.** `results/E1-S1-LOWER-BOUND-20260924T222847Z/`.
+  - It is sealed by its driver's `manifest.sha256`, sha256 `8d70ee11252c96fbbb0de5a666e963d8886273bafc7ad1aab4f36110f7f067ad`, which is pinned in the frozen-evidence guard.
+  - It was committed with `ATTEMPT-SPENT.json`, `E1-APPROVAL.consumed.json` and the operator's `EXECUTION-LOG.json`.
+
+| reported (`summary.json`) | value |
+|---|---|
+| outcome | QUALIFIED |
+| C_static, problem C, the meshed S1 model | ∈ [57.220910, 67.975539] fF (C_lo^static rounded down, C_hi rounded up) |
+| C_lo^static | 57.220910660500294 fF: the certified Thomson/Galerkin lower bound for E1.2, under the libm ASSUMPTION of contract §4.4, in the model's ε₀ convention |
+| C_hi | 67.9755386760262 fF, copied bit-exactly from the frozen static study |
+| Q2 | `MODEL_BRACKET_PREMISE_REFUTED` for this model, conditional on the libm ASSUMPTION: C_lo^static·(1 − 10⁻⁶) > C_br = 56.67470653023562 fF |
+
+- **Diagnostics.**
+  - All four sets ran on the Cholesky path, and K4 inequalities 1–3 PASS.
+  - Check (g) is ≤ 3.2e-10 (limit 1e-7), and every relative enclosure width is ≤ 4.5e-8.
+- **Fixed statements.** They hold in this state as in every other:
+  - `E_C,F1F1` is `EC_NOT_EVALUATED_BY_E1`;
+  - correspondence is NOT_ESTABLISHED, deviation NOT_EVALUATED and suitability SUITABILITY_NOT_ASSESSED;
+  - there is no quantity in frequency units;
+  - `E_C` and `g` stay UNAVAILABLE.
+- **Tolerances.** The §7 scope decision is `COPIED_NUMBERS_WITHIN_SCOPE`, and no T1–T4 criterion was adopted before approval. So no tolerance may ever be applied to any number in, or derived from, any E1 file. That includes C_hi and anything formed from C_lo^static or C_hi.
+- **Q2.** Contract §1 requires a separate correction record for the frozen study's model bracket. It has not been written yet, and the frozen study is not edited.
+- **Not blind.** E1 was not blind (contract §8): exploratory S1 values existed before it. Its Q2 label is not an independent reproduction of those exploratory statements; see reason F of [`corrections/e1-exploratory-claims-correction.md`](corrections/e1-exploratory-claims-correction.md).
+- **Internal values.** The internal sets' values (E1.1, E1.1-half, E1.2-excl-R1) are in `internal-sets.json` for audit only. They are not results (D2, D10).
+- **The attempt is spent.** There is no retry, and E1 is the last capacitance computation on S1 (the contract §8 stop rule).
 
 ## Pre-approval evidence (revision 8.5): REGENERATED AND FROZEN
 
@@ -147,7 +186,8 @@ The contract leaves the implementation mechanics to the frozen code (contract D8
 
 ## What is NOT established
 
-- Any S1 E1.2 or E1.2-excl-R1 quantity: E1 has not been executed.
+- Anything beyond the reported static interval. E1.2-excl-R1, E1.1 and E1.1-half are internal (K4 only), and no E_C, g, deviation, suitability or correspondence statement follows from any E1 number.
+- That the Q2 label independently reproduces the exploratory values that preceded E1. E1 was not blind (contract §8).
 - Any use of the S1 E1.1 or E1.1-half quantities formed unintentionally before approval. They are not results (D14).
 - That the Confirmation's resources on the synthetic stand-in are those of the attempt on S1: they are measured on the stand-in.
 - That the separation rule excludes approximate reproductions beyond its tolerance (D15).

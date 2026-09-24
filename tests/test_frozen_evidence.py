@@ -75,6 +75,10 @@ MANIFESTED_RECORDS = frozenset({
     # executed once; its manifest was written by its driver (write_verified) at execution
     # time and is pinned below (STATIC_REFINEMENT_STUDY_MANIFEST_SHA256)
     "STATIC-REFINEMENT-STUDY-20260923T062048Z",
+    # E1, the static-capacitance lower-bound certificate (contract revision 8.5), attempt 1
+    # of 1, approved at 4baeb67 and executed once; its manifest was written by its driver
+    # (write_verified) at execution time and is pinned below (E1_MANIFEST_SHA256)
+    "E1-S1-LOWER-BOUND-20260924T222847Z",
 })
 
 #: The static refinement study record's manifest.sha256, as its driver wrote it at
@@ -82,6 +86,11 @@ MANIFESTED_RECORDS = frozenset({
 #: that the executed evidence, not just the aggregate, is frozen by name.
 STATIC_REFINEMENT_STUDY_RECORD = "STATIC-REFINEMENT-STUDY-20260923T062048Z"
 STATIC_REFINEMENT_STUDY_MANIFEST_SHA256 = "e3e447068dea6b4c2790c29de7a34be77f971717fa6e40964f6e31fdee193622"
+
+#: The E1 record's manifest.sha256, as its driver wrote it at execution time (also stated
+#: in the preserving commit 40b8069 and in experiments/e1-s1-lower-bound/EXECUTION-LOG.json).
+E1_RECORD = "E1-S1-LOWER-BOUND-20260924T222847Z"
+E1_MANIFEST_SHA256 = "8d70ee11252c96fbbb0de5a666e963d8886273bafc7ad1aab4f36110f7f067ad"
 
 #: QUARANTINE, not an exemption. This record has NO manifest.sha256, so `verify()`
 #: cannot check it. That is a recorded failure of the run that produced it, not drift
@@ -130,7 +139,7 @@ QUARANTINED = {UNMANIFESTED_RECORD: UNMANIFESTED_DIGESTS,
 #: sha256 over the canonical {record: sha256(its manifest.sha256)} map. Per-record
 #: verification cannot catch a file that was mutated AND its manifest rewritten to
 #: agree; this can, because the manifest's own bytes change.
-MANIFEST_INDEX_DIGEST = "06419d8362d84be27f26e6629dfe9f3b70556ec00e1fb501a1376526775bbee6"
+MANIFEST_INDEX_DIGEST = "d4d65eeee16f8de540b3e28b88232630330112d3762cea9e799a10b6e43ab1fa"
 
 #: Not evidence. The campaign index lives beside the records and is ordinary
 #: documentation; it is outside every record directory and is never manifested.
@@ -189,7 +198,7 @@ def test_the_record_set_is_exactly_the_pinned_one():
     assert present == MANIFESTED_RECORDS | set(QUARANTINED), {
         "unincorporated": sorted(present - MANIFESTED_RECORDS - set(QUARANTINED)),
         "missing": sorted((MANIFESTED_RECORDS | set(QUARANTINED)) - present)}
-    assert len(MANIFESTED_RECORDS) == 33 and len(QUARANTINED) == 2
+    assert len(MANIFESTED_RECORDS) == 34 and len(QUARANTINED) == 2
 
 
 def test_the_manifests_themselves_cannot_be_rewritten():
@@ -199,6 +208,7 @@ def test_the_manifests_themselves_cannot_be_rewritten():
     assert set(index) == MANIFESTED_RECORDS
     assert index_digest(index) == MANIFEST_INDEX_DIGEST
     assert index[STATIC_REFINEMENT_STUDY_RECORD] == STATIC_REFINEMENT_STUDY_MANIFEST_SHA256
+    assert index[E1_RECORD] == E1_MANIFEST_SHA256
 
 
 @pytest.mark.parametrize("name", sorted(QUARANTINED))
