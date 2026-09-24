@@ -1,0 +1,17 @@
+bfce7ac8a25d6ce0432c46ab87785e1e02384fe880b8dbed46ac387788b1a412  ./DONE
+d87e43acd0eb2026e5a44b344f6e9c48e4e22f5277b724d3256f1e18e561a06e  ./PREDECLARATION.md
+e98cb92299eafc01ecd5070be17b5b307a1f55b8ed9aee50dc166a33c2627637  ./README.md
+122fb2b54e7bef2a804c20b6795c0f9b7b8a0dcad73fd1f76d09ed9faeae3992  ./check_rehearsal.py
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./part1-driver/check-rehearsal.err
+cfeb85ede1d625fc08f3515d17fe7be2446e52b6d824e4a7dc81a5f98fd399f4  ./part1-driver/check-rehearsal.exit
+1feccb800e25ecc96dd882323c2675f8e174124d9c48733d191e87106262042a  ./part1-driver/check-rehearsal.out.json
+4f6b56ed8b58693837811e54effdcb78ba7936f01c0b13ec90e0358064628170  ./part1-driver/rehearsal.json
+32a099579358ff7dc064145cff7e35a638d8ba4957414bed0c0e5b62816d5c77  ./part1-driver/run-driver.record
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./part1-driver/stderr-driver.log
+4f6b56ed8b58693837811e54effdcb78ba7936f01c0b13ec90e0358064628170  ./part1-driver/stdout-driver.log
+1f7c31eca96803c1cd40f0be7e3c54d5df4d539c47c5f7f7dcf51e56e29b8738  ./part1-driver/time-driver.txt
+2d0b1e8ac7208d89a37465c1e64664835f552820d85af5dd668c147c0b7410e5  ./part2-test/run-test.record
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./part2-test/stderr-test.log
+6a98e2bc4bf41e8035e54a98ec81c586393ead7fcb2461ecdb7e5d392adb6358  ./part2-test/stdout-test.log
+c86de48261d0847f9297a00f95897385989bfe01377634a8441ddc282ee61b02  ./part2-test/time-test.txt
+7b6369069e3e5ef3499b6652d5a8c441d10e0f43de4bbf9b2aead50b52c9598c  ./run.sh

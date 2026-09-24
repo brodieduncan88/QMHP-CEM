@@ -1,0 +1,12 @@
+============================= test session starts ==============================
+platform linux -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0 -- /home/user/QMHP-CEM/.venv/bin/python
+rootdir: /home/user/QMHP-CEM
+configfile: pyproject.toml
+collecting ... collected 1 item
+
+tests/test_e1_s1_lower_bound.py::test_the_rehearsal_runs_the_real_controls_and_the_S1_geometry_phase_and_assembles_nothing_on_S1 PASSED [100%]
+
+==================================== PASSES ====================================
+=========================== short test summary info ============================
+PASSED tests/test_e1_s1_lower_bound.py::test_the_rehearsal_runs_the_real_controls_and_the_S1_geometry_phase_and_assembles_nothing_on_S1
+======================== 1 passed in 140.16s (0:02:20) =========================

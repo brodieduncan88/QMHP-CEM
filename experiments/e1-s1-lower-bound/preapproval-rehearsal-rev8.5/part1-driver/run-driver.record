@@ -1,0 +1,10 @@
+part=1 driver --rehearsal
+start_utc=2026-09-24T21:10:46Z
+head=017f90e8ab492f3d1ef31685dc6f6fc86b4bfb60
+git_status_porcelain_lines=0
+loadavg_before=0.17 0.65 0.79 4/102 7165
+invocation=env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 timeout --signal=KILL 1260 .venv/bin/python experiments/e1-s1-lower-bound/driver.py --rehearsal --out /tmp/claude-0/-home-user-QMHP-CEM/7e301b81-9cc3-5878-8c8a-f1390dcdb988/scratchpad/next/e1/r87/rehearsal/rehearsal.json
+exit_code=0
+end_utc=2026-09-24T21:13:10Z
+loadavg_after=0.99 0.81 0.83 1/105 7248
+git_status_porcelain_lines_after=0

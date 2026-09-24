@@ -1,0 +1,10 @@
+part=2 contract section 5 rehearsal test
+start_utc=2026-09-24T21:13:10Z
+head=017f90e8ab492f3d1ef31685dc6f6fc86b4bfb60
+git_status_porcelain_lines=0
+loadavg_before=0.99 0.81 0.83 1/105 7261
+invocation=env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 timeout --signal=KILL 1260 .venv/bin/python -m pytest -p no:cacheprovider -rA -v --basetemp /tmp/claude-0/-home-user-QMHP-CEM/7e301b81-9cc3-5878-8c8a-f1390dcdb988/scratchpad/next/e1/r87/rehearsal/pytest-tmp tests/test_e1_s1_lower_bound.py::test_the_rehearsal_runs_the_real_controls_and_the_S1_geometry_phase_and_assembles_nothing_on_S1
+exit_code=0
+end_utc=2026-09-24T21:15:31Z
+loadavg_after=1.09 0.92 0.87 1/108 7409
+git_status_porcelain_lines_after=0
