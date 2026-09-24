@@ -50,7 +50,7 @@
     - **Paths not counted as reads:** these rounds' own working files, which are review scratch, harness outputs and worktrees of committed code.
     - **What was read to make the list:** the session record itself was read only for its tool-call inputs and for the reports the rounds' reviewers returned.
     - **Limit:** a read that reaches a file without naming it or its directory would not be found.
-    - **A gap in the search itself:** the search script dropped any path equal to the scratch root itself. So it missed two listings of the whole scratch area, both of names and times only. The review of `b8b24ee` found them. Both belong under "Names across the session scratch area" below:
+    - **A gap in the search itself:** when a command named the scratch root itself directly as a path, for example as an argument to `find`, the search script dropped that path. A `cd` to the scratch root was still found. So it missed two listings of the whole scratch area, both of names and times only. The review of `b8b24ee` found them. Both belong under "Names across the session scratch area" below:
       - in the review of `22c9585` (05:36 UTC), a `find` over the scratch area and `/tmp` for files named `internal-sets.json`, `sigma-E1.1*.json`, `pass-E1.1*.json` or `*confirmation*`, which printed their modification times and paths;
       - in the review of `e87373f` (10:03 UTC), a `find` over the scratch area for files modified between 02:55 and 03:10 UTC, which printed their paths.
   - **The `/tmp` Confirmation directories.** Their names, file names, file counts, byte sizes and times only.
