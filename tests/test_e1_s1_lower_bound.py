@@ -2,7 +2,8 @@
 # Proprietary QMHP-CEM source. No licence is granted except by explicit written agreement.
 """E1 - the static-capacitance lower-bound certificate for the S1 island: tests of the frozen
 implementation (experiments/e1-s1-lower-bound) against the frozen contract
-E1-CONTRACT.rev8.2.md (sha256 24ffff7d92c93757a13f9f6ba4505598be83b1628f4c5d6912c6abbbbdaf504c).
+E1-CONTRACT.rev8.3.md (revision 8.2 plus the stand-in separation of D14; its sha256 is pinned
+below and in the driver).
 
 Synthetic data only, apart from the S1 GEOMETRY phase, which reads the pinned mesh and
 assembles no matrix. No test computes an S1 capacitance, assembles an S1 matrix, runs
@@ -42,9 +43,25 @@ import driver as dr  # noqa: E402
 import e1_controls as ec  # noqa: E402
 import e1_geometry as eg  # noqa: E402
 import e1_numerics as nm  # noqa: E402
+import e1_standin as es  # noqa: E402
 
 manifest = dr.manifest
-CONTRACT_TEXT = (HERE / "E1-CONTRACT.rev8.2.md").read_text()
+REAL_REQUIRE_APPROVAL = dr.require_approval
+CONTRACT_TEXT = (HERE / "E1-CONTRACT.rev8.3.md").read_text()
+CONTRACT_8_2 = HERE / "E1-CONTRACT.rev8.2.md"
+CONTRACT_8_3_SHA256 = "2b9b9357bb438987723914727a851161201a7a9f477aa66ae674fb0ed9d6b296"
+#: the implementation reviewed at 90bf9eb (frozen against revision 8.2); its committed pre-approval
+#: evidence is superseded (the Confirmation's stand-in island was S1's island, finding D-1) and is
+#: kept unchanged pending regeneration after the corrected separation has passed review
+FROZEN_90BF9EB = {"driver.py": "d2bcff929f6c09f8d897a82ceb0ecd470d63a055093ab17551c2fdef1d8cd43d",
+                  "e1_numerics.py": "513c0ddfbdf3927bee0e4d025b9e3537a55488a63eeed8402f35c01861ec26be",
+                  "e1_geometry.py": "fb88d72d3a3e28ed27bb040eb083b8b7344a85f82c8a9a45c8d361e03489c772",
+                  "e1_controls.py": "bb3ae0c8dff4bd8e7e715281c18d8639bcaf7ef2013f4b640def8a907f2625fa",
+                  "e1_standin.py": "af183c6342b986c0cd2a3743d35974555c15319bc6be8185a2cd26e3176ddda2"}
+EVIDENCE_90BF9EB = {"rehearsal.json": "3b6e31b198ae81b0d8a6a6ab24116457fb04c9d195f3fd373451f9856d45c2b8",
+                    "proxyA-gE.json": "83f442794e5020732a68942e790f42b9715d078ba9c1feb12cb0f94a0139d222",
+                    "confirmation-nominal.json": "522be6f04455aed92b1532558fd6110a340440dd4e33d2845c3ace2b9c32b2aa",
+                    "confirmation-forced.json": "7a18cc98540e9fada6a5ee72d7e9c2ab9e1ad32c5a118532e212a5433a26564a"}
 THREADS = {"OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"}
 LD = np.longdouble
 U = Fraction(1, 2 ** 64)
@@ -118,12 +135,36 @@ def sets():
 
 # === frozen inputs ================================================================================
 
-def test_the_contract_in_the_directory_is_the_frozen_revision_8_2():
-    assert dr.CONTRACT_SHA256 == "24ffff7d92c93757a13f9f6ba4505598be83b1628f4c5d6912c6abbbbdaf504c"
+def test_the_contract_in_the_directory_is_the_frozen_revision_8_3_and_8_2_is_kept():
+    assert dr.CONTRACT_SHA256 == CONTRACT_8_3_SHA256 and dr.CONTRACT.name == "E1-CONTRACT.rev8.3.md"
     assert _sha(dr.CONTRACT) == dr.CONTRACT_SHA256
-    assert CONTRACT_TEXT.startswith("# E1 ") and "revision 8.2" in CONTRACT_TEXT.splitlines()[0]
+    assert CONTRACT_TEXT.startswith("# E1 ") and "revision 8.3" in CONTRACT_TEXT.splitlines()[0]
+    assert _sha(CONTRACT_8_2) == "24ffff7d92c93757a13f9f6ba4505598be83b1628f4c5d6912c6abbbbdaf504c"
     for name in ("e1_numerics.py", "e1_geometry.py", "e1_controls.py", "e1_standin.py", "driver.py"):
-        assert "rev8.2" in (HERE / name).read_text(), name
+        assert "rev8.3" in (HERE / name).read_text(), name
+
+
+def test_revision_8_3_changes_only_the_stand_in_separation_d14_and_bookkeeping():
+    """The diff from the frozen revision 8.2 is three replaced bookkeeping lines (title, status,
+    superseded range) and added lines that are all about the stand-in separation, D14, the
+    revision-8.2 row of section 9 or section 13. No line of physics, configuration, thresholds,
+    controls, Q2/C_br or scope is removed or changed."""
+    import difflib
+    old, new = CONTRACT_8_2.read_text().splitlines(), CONTRACT_TEXT.splitlines()
+    removed, added = [], []
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(a=old, b=new, autojunk=False).get_opcodes():
+        if tag in ("replace", "delete"):
+            removed += old[i1:i2]
+        if tag in ("replace", "insert"):
+            added += new[j1:j2]
+    assert removed == [old[0], old[2], "- **Superseded drafts.** Revisions 1–8.1."], removed
+    markers = ("revision 8.3", "Revision 8.2 is frozen", "D14", "Separation (revision 8.3", "stand-in", "Stand-in",
+               "x_k = −0.6 + s_k(0.075)", "Everything else (the ground sheet", "frozen revision 8.2 (implemented at",
+               "## 13.", "| finding (frozen-code review", "|---|---|", "Nothing else changes from revision 8.2", "",
+               "- **Superseded drafts.** Revisions 1–8.2.", "**Status: revision 8.3")
+    stray = [ln for ln in added if not any(m in ln for m in markers)]
+    assert stray == [], stray
+    assert len(added) == 19, len(added)
 
 
 def test_every_new_source_file_carries_the_proprietary_header():
@@ -776,7 +817,7 @@ def test_the_attempt_path_loads_only_bound_repository_code_and_the_stand_in_is_d
     assert not any("e1_standin" in ast.dump(n) for n in top)
     for fn in (n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)):
         if any(isinstance(x, ast.Import) and any(a.name == "e1_standin" for a in x.names) for x in ast.walk(fn)):
-            assert fn.name in ("confirmation", "proxy_a_ge"), fn.name
+            assert fn.name in ("rehearsal", "confirmation", "proxy_a_ge"), fn.name
 
 
 def test_nothing_in_the_E1_code_can_launch_a_process_or_a_solver():
@@ -840,6 +881,9 @@ def test_a_complete_approval_is_accepted():
     ({"source_commit": "0" * 40}, "is not HEAD"),
     ({"not_after_utc": "2026-01-01T00:00:00"}, "no time zone"),
     ({"not_before_utc": "2020-01-01T00:00:00+00:00", "not_after_utc": "2020-01-02T00:00:00+00:00"}, "outside"),
+    ({"note": "anything"}, "fields the driver does not bind"),
+    ({"DRAFT": "NOT AN APPROVAL"}, "fields the driver does not bind"),
+    ({"does_not_authorise": ["nothing"]}, "does_not_authorise differs"),
 ])
 def test_a_stale_incomplete_or_misbound_approval_is_refused(over, needle):
     raw = json.loads(_approval())
@@ -893,7 +937,9 @@ def _gate(tmp_path, monkeypatch, sets, controls=None, geometry=None):
     monkeypatch.setattr(dr, "geometry_phase", geometry or (lambda mesh: {"facts": {"synthetic": True},
                                                                          "failures": [], **sets}))
     monkeypatch.setattr(dr, "_enforce_budget", lambda: {"synthetic": "no limits in pytest"})
+    monkeypatch.setattr(dr, "_budget_enforcement_problems", lambda: [])
     monkeypatch.setattr(dr, "_disarm", lambda: None)
+    monkeypatch.setattr(dr, "_SIGNALS", {"stopping": False, "received": []})   # what _enforce_budget resets
 
 
 RAW_FILES = ["provenance.json", "controls.json", "geometry.json"] + [f"sigma-{s}.json" for s in dr.SETS] + \
@@ -919,8 +965,9 @@ def test_the_repository_holds_no_approval_no_ledger_and_no_E1_record():
 def test_a_granted_attempt_writes_every_file_in_order_then_a_verified_manifest(tmp_path, monkeypatch, sets):
     _gate(tmp_path, monkeypatch, sets)
     order = []
-    real = dr._guarded_dump
+    real, real_text = dr._guarded_dump, dr._write_text
     monkeypatch.setattr(dr, "_guarded_dump", lambda p, o: (order.append(p.name), real(p, o)))
+    monkeypatch.setattr(dr, "_write_text", lambda p, t: (order.append(p.name), real_text(p, t)))
     rec = dr.execute()
     assert rec.parent == tmp_path / "results" and rec.name.startswith(dr.RECORD_PREFIX)
     assert order == RAW_FILES + ["internal-sets.json", "summary.json"]
@@ -1285,6 +1332,457 @@ def test_a_real_process_runs_the_small_synthetic_attempt_end_to_end_under_the_re
     assert (lim["cpu_soft_s"], lim["cpu_hard_s"], lim["address_space_bytes"]) == (900, 960, 4 * 1024 ** 3)
 
 
+# === revision 8.3: separation of every pre-approval numeric set from the S1 attempt sets (D14) ======
+
+S1_ISLAND_SETS = {"E1.1": eg.island_panels(32, 3.5), "E1.1-half": eg.island_panels(32, 3.5, step=2)}
+
+
+def test_the_stand_in_island_is_the_revision_8_3_construction():
+    """Contract section 6 (revision 8.3): x_k = -0.6 + s_k(0.075), y_k = s_k(0.0625), s_k(a) the
+    section 3.1 formula with n = 32, q = 3.5; the nested grid uses the even k. Recomputed here
+    independently with libm pow."""
+    def s_k(a):
+        return [math.copysign(1.0, k) * (a - 1e-12) * (1 - math.pow(1 - abs(k) / 16, 3.5)) if k else 0.0
+                for k in range(-16, 17)]
+    sx, sy = s_k(0.075), s_k(0.0625)
+    want = np.array([(-0.6 + sx[i], -0.6 + sx[i + 1], sy[j], sy[j + 1]) for i in range(32) for j in range(32)])
+    assert (es.standin_island() == want).all()
+    ex, ey = sx[::2], sy[::2]
+    half = np.array([(-0.6 + ex[i], -0.6 + ex[i + 1], ey[j], ey[j + 1]) for i in range(16) for j in range(16)])
+    assert (es.standin_island(step=2) == half).all()
+    assert (es.ISLAND_HALF_X, es.ISLAND_HALF_Y) == (0.075, 0.0625)
+    assert "y_k = s_k(0.0625)" in CONTRACT_TEXT and "x_k = −0.6 + s_k(0.075)" in CONTRACT_TEXT
+
+
+def test_the_stand_in_keeps_the_selected_sizes_and_the_frozen_ground_rules():
+    st = es.standin()
+    R, ni, nx = st["R_E1_2"], st["n_island"], st["n_excl"]
+    assert (len(R), nx, ni, len(st["R_E1_1_half"]), st["sheet_panels"]) == (9995, 6710, 1024, 256, 58116)
+    assert (R[:ni] == es.standin_island()).all() and (st["R_E1_1_half"] == es.standin_island(step=2)).all()
+    ground = R[ni:]
+    side = np.round((ground[:, 1] - ground[:, 0]) * 1000, 6)
+    assert int((np.abs(side - 20) < 1e-3).sum()) == 36 and int((np.abs(side - 40) < 1e-3).sum()) == 9
+    c = np.stack([(ground[:, 0] + ground[:, 1]) / 2, (ground[:, 2] + ground[:, 3]) / 2], axis=1)
+    key = [tuple(v) for v in c]
+    assert max(key[:nx - ni]) < min(key[nx - ni:])            # R1 = the last 3,285 by ascending x, then y
+
+
+def test_the_stand_in_numeric_sets_are_separated_from_the_S1_island_sets():
+    st = es.standin()
+    sets = es.numeric_sets(st)
+    assert es.separation_problems(sets, S1_ISLAND_SETS) == []
+    for k, T in sets.items():
+        for A in S1_ISLAND_SETS.values():
+            assert T.shape != A.shape or T.tobytes() != A.tobytes(), k
+    # the aspect-ratio multisets differ, so the island sets are not similar under any allowed map
+    assert not np.allclose(es._aspects(sets["E1.1"]), es._aspects(S1_ISLAND_SETS["E1.1"]))
+
+
+@pytest.mark.parametrize("transform, expect", [
+    ("identical", "byte-identical"), ("rows permuted", "similar"), ("translated", "similar"),
+    ("scaled and translated", "similar"), ("x and y exchanged", "similar"), ("reflected in x", "similar"),
+    ("reflected in y", "similar"), ("revision-8.3 stand-in island", None), ("one panel perturbed by 1e-6", None),
+])
+def test_the_separation_rule_detects_every_coincidence_and_only_those(transform, expect):
+    A = S1_ISLAND_SETS["E1.1"]
+    T = {"identical": A.copy(), "rows permuted": A[::-1].copy(),
+         "translated": A + np.array([0.3137, 0.3137, -0.011, -0.011]),
+         "scaled and translated": A * 1.7 + 0.01, "x and y exchanged": A[:, [2, 3, 0, 1]],
+         "reflected in x": np.stack([-A[:, 1], -A[:, 0], A[:, 2], A[:, 3]], 1),
+         "reflected in y": np.stack([A[:, 0], A[:, 1], -A[:, 3], -A[:, 2]], 1),
+         "revision-8.3 stand-in island": es.standin_island()}.get(transform)
+    if T is None:
+        T = A.copy()
+        T[500, 1] += 1e-6
+    bad = es.separation_problems({"T": T}, {"E1.1": A})
+    assert (bad == []) if expect is None else (len(bad) == 1 and expect in bad[0]), bad
+
+
+def test_every_rehearsal_control_set_and_proxy_A_are_separated_from_the_S1_island_sets():
+    cs = ec.control_numeric_sets()
+    assert len(cs) == 1 + 24 + 10096 + 3
+    assert es.separation_problems(cs, S1_ISLAND_SETS) == []
+    assert es.separation_problems({"proxy A": es.proxy_a()["R"]}, S1_ISLAND_SETS) == []
+
+
+def _other_sets():
+    """A synthetic family that is not similar to small_sets(): its island's y coordinates are
+    scaled by 0.8 (it plays the stand-in against small_sets() playing S1)."""
+    o = small_sets()
+    R = o["R_E1_2"].copy()
+    R[:o["n_island"], 2:] *= 0.8
+    H = o["R_E1_1_half"].copy()
+    H[:, 2:] *= 0.8
+    return {**o, "R_E1_2": R, "R_E1_1_half": H}
+
+
+@pytest.mark.parametrize("case", ["coinciding stand-in", "no check supplied"])
+def test_run_phases_computes_nothing_on_a_stand_in_it_cannot_separate(monkeypatch, sets, case):
+    monkeypatch.setattr(dr, "controls_phase", lambda c0: {"failures": []})
+    monkeypatch.setattr(dr, "geometry_phase", lambda mesh: {"facts": {}, "failures": [], **sets})
+    monkeypatch.setattr(dr, "capacitance_phase", lambda *a, **k: pytest.fail("a stand-in matrix was assembled"))
+    check = (lambda geo: es.separation_problems(es.numeric_sets(sets), es.numeric_sets(geo))) \
+        if case == "coinciding stand-in" else None
+    out = dr.run_phases(lambda n, o: None, mesh={}, c0=nm.derive_c0()["c0"], standin=sets, check_standin=check)
+    assert out["outcome"] == "UNQUALIFIED" and out["separation"] and all(p.startswith("separation:") for p in out["problems"])
+
+
+def _confirmation_gate(monkeypatch, tmp_path, *, usage=None, stand=None, controls_fail=False, geometry=None):
+    s1 = small_sets()
+    monkeypatch.setattr(es, "standin", lambda: stand if stand is not None else _other_sets())
+    monkeypatch.setattr(dr, "preflight_problems", lambda: {"problems": [], "digests": DIG, "baseline": {},
+                                                           "probes": {}, "c0": nm.derive_c0()})
+    monkeypatch.setattr(dr, "controls_phase",
+                        lambda c0: {"failures": ["K3"] if controls_fail else [], "K3": {"pass": not controls_fail}})
+    monkeypatch.setattr(dr, "geometry_phase", geometry or (lambda mesh: {"facts": {}, "failures": [], **s1}))
+    monkeypatch.setattr(dr, "qmhp_mesh", lambda: {})
+    monkeypatch.setattr(dr, "_enforce_budget", lambda: {"synthetic": "no limits in pytest"})
+    monkeypatch.setattr(dr, "_budget_enforcement_problems", lambda: [])
+    monkeypatch.setattr(dr, "_disarm", lambda: None)
+    monkeypatch.setattr(dr, "_SIGNALS", {"stopping": False, "received": []})   # what _enforce_budget resets
+    if usage is not None:
+        monkeypatch.setattr(dr, "_usage", lambda t0: dict(usage))
+    return tmp_path / "evidence"
+
+
+def test_the_confirmation_refuses_a_stand_in_that_coincides_with_an_S1_set(monkeypatch, tmp_path):
+    ev = _confirmation_gate(monkeypatch, tmp_path, stand=small_sets(), usage={"cpu_s": 1.0, "peak_address_space_bytes": 1})
+    monkeypatch.setattr(dr, "capacitance_phase", lambda *a, **k: pytest.fail("a stand-in matrix was assembled"))
+    r = dr.confirmation(False, ev)
+    assert r["confirmation_pass"] is False and r["checks"]["separated_from_s1"] is False
+    assert any("byte-identical" in p for p in r["separation_problems"]) and r["paths"] is None
+
+
+# === anticipated numerical abnormalities are UNQUALIFIED, never FAILED (B-1) ======================
+
+def _wrap_entry_block(monkeypatch, edit):
+    real = nm.entry_block
+
+    def wrapped(R, i0, i1, j0, j1, dt, want_b=False):
+        S, B = real(R, i0, i1, j0, j1, dt, want_b)
+        if dt is LD and want_b and i0 == 0 and j0 == 0:
+            edit(S, B)
+        return S, B
+
+    monkeypatch.setattr(nm, "entry_block", wrapped)
+
+
+def _wrap_ld_pass(monkeypatch, **fields):
+    real = nm.ld_pass
+
+    def wrapped(R, sigmas, **k):
+        p = real(R, sigmas, **k)
+        for key, value in fields.items():
+            p[key] = [value] * len(sigmas) if key in ("E", "W", "G") else value
+        return p
+
+    monkeypatch.setattr(nm, "ld_pass", wrapped)
+
+
+def _nan_k1_controls(monkeypatch):
+    real = nm.entry
+    monkeypatch.setattr(nm, "entry", lambda a, b, dt=LD, want_b=False:
+                        ((dt(np.nan), dt(np.nan)) if want_b else dt(np.nan)) if a == (0.0, 1.0, 0.0, 1.0)
+                        else real(a, b, dt, want_b))
+
+    def controls(c0):
+        k = ec.k1()
+        return {"K1": k, "failures": [] if k["pass"] else ["K1"]}
+    return controls
+
+
+ABNORMAL = {
+    "NaN entry in the long-double pass": lambda mp: _wrap_entry_block(mp, lambda S, B: S.__setitem__((0, 0), np.nan)),
+    "infinite entry bound": lambda mp: _wrap_entry_block(mp, lambda S, B: B.__setitem__((0, 0), np.inf)),
+    "negative entry bound": lambda mp: _wrap_entry_block(mp, lambda S, B: B.__setitem__((0, 1), -1.0)),
+    "E^ exactly zero": lambda mp: _wrap_ld_pass(mp, E=LD(0)),
+    "E^ negative": lambda mp: _wrap_ld_pass(mp, E=LD(-1)),
+    "W^ negative": lambda mp: _wrap_ld_pass(mp, W=LD(-1e-30)),
+    "G^ not finite": lambda mp: _wrap_ld_pass(mp, G=LD(np.inf)),
+    "no-underflow requirement fails": lambda mp: _wrap_ld_pass(mp, min_abs_S=LD(2) ** -16350),
+    "smallest entry not finite": lambda mp: _wrap_ld_pass(mp, min_abs_S=LD(np.nan)),
+    "sigma^T S64 sigma not finite": lambda mp: mp.setattr(nm, "energy64", lambda *a, **k: float("nan")),
+    "all-zero sigma (Q = 0)": lambda mp: mp.setattr(nm, "solve_sigma", lambda S, ni, force_fail=0: {
+        "sigma": np.zeros(S.shape[0]), "path": "cholesky", "d": np.diag(S).copy(), "Q": Fraction(0),
+        "in_place": True, "pivot_ratio_squared": 1.0, "attempts": []}),
+    "last-resort sigma invalid": lambda mp: mp.setattr(nm, "solve_sigma", lambda *a, **k: (_ for _ in ()).throw(
+        nm.LastResortInvalid("the last-resort sigma has Q <= 0"))),
+}
+
+
+@pytest.mark.parametrize("kind", sorted(ABNORMAL) + ["NaN in control K1"])
+def test_an_anticipated_numerical_abnormality_is_unqualified_never_failed(tmp_path, monkeypatch, sets, kind):
+    """Contract sections 4.3, 5 and 8: a non-finite or non-positive quantity, a failed requirement
+    or an invalid last-resort sigma is UNQUALIFIED - summary.json, no failure.json, no value -
+    through the real attempt path, with every raw file already written kept and sealed."""
+    if kind == "NaN in control K1":
+        _gate(tmp_path, monkeypatch, sets, controls=_nan_k1_controls(monkeypatch))
+    else:
+        _gate(tmp_path, monkeypatch, sets)
+        ABNORMAL[kind](monkeypatch)
+    rec = dr.execute()
+    names = sorted(p.name for p in rec.iterdir())
+    assert "failure.json" not in names and "summary.json" in names, names
+    s = _strict_json(rec / "summary.json")
+    assert s["outcome"] == "UNQUALIFIED" and s["unqualified_reasons"] and _numbers_fF(s) == []
+    assert "internal-sets.json" not in names and manifest.verify(rec) == []
+    for p in rec.glob("*.json"):
+        _strict_json(p)
+
+
+def test_non_finite_control_values_fail_the_control_without_raising(monkeypatch):
+    with monkeypatch.context() as mp:
+        _nan_k1_controls(mp)
+        k = ec.k1()
+        assert k["pass"] is False and k["rel_long_double"] is None and k["rel_float64"] is None
+    pairs = ec.k2b_pairs()[:3]
+    with monkeypatch.context() as mp:
+        mp.setattr(ec, "k2b_pairs", lambda: pairs)
+        mp.setattr(nm, "entry", lambda a, b, dt=LD, want_b=False: (dt(np.nan), dt(np.inf)) if want_b else dt(np.nan))
+        r = ec.k2b(nm.derive_c0()["c0"])
+        assert r["pass"] is False and r["non_finite_pairs"] == 3 and r["violations_of_B"] == 3
+    kf = Fraction(nm.KAPPA_FREE_PQ)
+    with monkeypatch.context() as mp:
+        mp.setattr(nm, "solve_sigma", lambda *a, **k: (_ for _ in ()).throw(nm.LastResortInvalid("Q <= 0")))
+        assert ec.n3(kf, dr.af.EPSILON0)["pass"] is False
+        assert ec.certify_single(ec.disk(4), kf)["ok"] is False
+        mp.setattr(ec, "disk", lambda n, a=0.1: np.array([(0, 0.01, 0, 0.01), (0.02, 0.03, 0, 0.01)], dtype=float))
+        assert ec.k3(kf)["pass"] is False
+    with monkeypatch.context() as mp:
+        real = nm.assemble64
+        mp.setattr(nm, "assemble64", lambda R, *a, **k: real(R, *a, **k) * np.nan)
+        assert ec.n3(kf, dr.af.EPSILON0)["pass"] is False
+    with monkeypatch.context() as mp:
+        _wrap_entry_block(mp, lambda S, B: B.__setitem__((0, 1), -1.0))
+        r = ec.certify_single(ec.disk(4), kf)
+        assert r["ok"] is False and "C_lo_fF" not in r and r["requirements"]["B_finite_nonnegative"] is False
+
+
+def test_the_numerics_never_raise_on_non_finite_or_non_positive_values():
+    kap = Fraction(nm.KAPPA_LO_PQ)
+    assert nm.enclosure(Fraction(1), LD(0), LD(1e-30), LD(1), 512, kap)["ok"] is False
+    assert nm.enclosure(Fraction(1), LD(np.nan), LD(0), LD(1), 512, kap)["ok"] is False
+    assert nm.underflow_check([np.zeros(4)], LD(1), LD(1))["ok"] is False
+    assert nm.underflow_check([np.ones(4)], LD(np.nan), LD(1))["ok"] is False
+    assert nm.underflow_check([np.ones(4)], LD(np.inf), LD(np.inf))["ok"] is False
+    assert nm.check_g(Fraction(1), 1.0, LD(1), 0.0, kap)["rel"] is None
+    assert nm.check_g(Fraction(1), 1.0, LD(0), 1.0, kap)["ok"] is False
+    assert nm.pq_or_label(LD(np.nan)).startswith("non-finite") and nm.pq_or_label(LD(0.5)) == "1/2"
+    assert nm.finite(None) is False and nm.finite(LD(np.inf)) is False and nm.finite(1.0) is True
+
+
+# === an accepted approval can never spend the attempt and then lose provenance (C-1, C-3) ==========
+
+def _full_approval(**over):
+    now = datetime.now(timezone.utc)
+    ap = {k: v for k, v in dr.draft_approval().items() if k not in ("DRAFT", "how_to_grant_it")}
+    ap.update(source_commit=dr.git_head(REPO), not_before_utc=(now - timedelta(hours=1)).isoformat(),
+              not_after_utc=(now + timedelta(days=6)).isoformat(),
+              tolerance_scope_decision="COPIED_NUMBERS_EXCLUDED", q2_within_D5=True)
+    ap.update(over)
+    return dr._clean(ap)
+
+
+APPROVAL_VARIANTS = {
+    "the full draft, with does_not_authorise": lambda: _full_approval(),
+    "without does_not_authorise": lambda: {k: v for k, v in _full_approval().items() if k != "does_not_authorise"},
+    "does_not_authorise edited to say GHz": lambda: _full_approval(
+        does_not_authorise=_full_approval()["does_not_authorise"] + ["any 5 GHz statement"]),
+    "an extra note saying MHz": lambda: _full_approval(note="valid to 5 MHz"),
+    "the DRAFT field kept": lambda: _full_approval(DRAFT="NOT AN APPROVAL"),
+    "an E_C field": lambda: _full_approval(E_C_F1F1=1.0),
+}
+
+
+@pytest.mark.parametrize("variant", sorted(APPROVAL_VARIANTS))
+def test_an_approval_either_refuses_with_nothing_spent_or_the_record_has_its_provenance(tmp_path, monkeypatch, sets,
+                                                                                         variant):
+    """The property behind C-1: for every approval, with the REAL require_approval and the real
+    provenance and ledger rendering, either the run refuses with nothing spent, or the record
+    holds provenance.json. The attempt is never spent with its provenance lost to the guard."""
+    _gate(tmp_path, monkeypatch, sets)
+    monkeypatch.setattr(dr, "require_approval", REAL_REQUIRE_APPROVAL)
+    dr.APPROVAL.write_text(json.dumps(APPROVAL_VARIANTS[variant]()))
+    try:
+        rec = dr.execute()
+    except dr.Refusal:
+        assert dr.spent_state() == [] and dr.APPROVAL.exists() and not (tmp_path / "results").exists()
+        assert variant not in ("the full draft, with does_not_authorise", "without does_not_authorise")
+        return
+    prov = _strict_json(rec / "provenance.json")
+    assert prov["approval"]["q2_within_D5"] is True and manifest.verify(rec) == []
+    assert _strict_json(rec / "summary.json")["outcome"] == "QUALIFIED"
+
+
+@pytest.mark.parametrize("poison", ["argv text", "not JSON-serialisable"])
+def test_provenance_the_guard_or_json_would_refuse_refuses_before_spending(tmp_path, monkeypatch, sets, poison):
+    _gate(tmp_path, monkeypatch, sets)
+    monkeypatch.setattr(dr, "require_approval", REAL_REQUIRE_APPROVAL)
+    dr.APPROVAL.write_text(json.dumps(_full_approval()))
+    if poison == "argv text":
+        real = dr.measure_invocation
+        monkeypatch.setattr(dr, "measure_invocation", lambda: {**real(), "argv": ["driver.py", "5 MHz"]})
+    else:
+        monkeypatch.setattr(dr.nm, "longdouble_facts", lambda: {"unserialisable": {1, 2}})
+    with pytest.raises(dr.Refusal, match="nothing was spent"):
+        dr.execute()
+    assert dr.spent_state() == [] and dr.APPROVAL.exists() and not (tmp_path / "results").exists()
+
+
+def test_the_provenance_is_rendered_and_guarded_before_the_first_ledger_entry():
+    tree = ast.parse((HERE / "driver.py").read_text())
+    ex = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "execute")
+    calls = [(n.lineno, n.func.id) for n in ast.walk(ex) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)]
+    render = [ln for ln, f in calls if f == "_render_for_record"]
+    create = [ln for ln, f in calls if f == "_create_exclusive"]
+    enforce = [ln for ln, f in calls if f == "_budget_enforcement_problems"]
+    assert len(render) == 2 and create and enforce and max(render) < min(create) and max(enforce) < min(create)
+
+
+@pytest.mark.parametrize("failures", [1, 99])
+def test_a_provenance_write_that_fails_after_spending_is_recovered_or_declared(tmp_path, monkeypatch, sets, failures):
+    """C-3: the failure path writes the in-memory provenance when provenance.json is missing, and
+    says so; if it cannot, failure.json says NOT WRITTEN. Either way the record is sealed."""
+    _gate(tmp_path, monkeypatch, sets)
+    real, left = dr._write_text, [failures]
+
+    def flaky(path, text):
+        if path.name == "provenance.json" and left[0] > 0:
+            left[0] -= 1
+            raise OSError("disk full")
+        return real(path, text)
+
+    monkeypatch.setattr(dr, "_write_text", flaky)
+    with pytest.raises(dr.AttemptFailed, match="disk full"):
+        dr.execute()
+    (rec,) = (tmp_path / "results").iterdir()
+    f = _strict_json(rec / "failure.json")
+    assert manifest.verify(rec) == []
+    if failures == 1:
+        assert f["provenance"] == "provenance.json (written by the failure path)"
+        assert _strict_json(rec / "provenance.json")["contract_sha256"] == dr.CONTRACT_SHA256
+    else:
+        assert f["provenance"].startswith("NOT WRITTEN") and not (rec / "provenance.json").exists()
+
+
+def test_a_ledger_only_failure_keeps_the_provenance_in_the_ledger_note(tmp_path, monkeypatch, sets):
+    _gate(tmp_path, monkeypatch, sets)
+    (tmp_path / "results").write_text("not a directory")
+    with pytest.raises(dr.AttemptFailed, match="no record could be created"):
+        dr.execute()
+    note = _strict_json(dr.common_ledger_path())
+    assert note["provenance"]["contract_sha256"] == dr.CONTRACT_SHA256 and note["record_created"] is False
+
+
+# === stop signals: the failure path survives them and the budget is really enforced (C-2, C-4) =====
+
+@pytest.mark.parametrize("delay_s", [0.02, 0.05, 0.1])
+def test_a_stop_signal_pending_when_a_C_level_exception_propagates_still_leaves_a_sealed_record(tmp_path, delay_s):
+    """C-2: a stop signal delivered during a C call that then raises a C-level exception is
+    pending when the failure path starts. It must be recorded, not raised: exit 3, failure.json,
+    provenance.json and a verified manifest. zlib raises zlib.error from C after ~0.5 s."""
+    code = _child(tmp_path, f"""
+        import signal, zlib
+        blob = zlib.compress(bytes(200_000_000), 1)
+        bad = blob[:-4] + bytes([(blob[-4] + 1) % 256]) + blob[-3:]
+        def boom(mesh):
+            signal.setitimer(signal.ITIMER_REAL, {delay_s})
+            zlib.decompress(bad)
+        dr.geometry_phase = boom
+    """)
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=180,
+                         env={**os.environ, **THREADS}, cwd=str(REPO))
+    assert out.returncode == 3, (out.returncode, out.stderr[-1500:])
+    (rec,) = (tmp_path / "results").glob(dr.RECORD_PREFIX + "*")
+    f = _strict_json(rec / "failure.json")
+    assert "incorrect data check" in f["error"] and [e["signal"] for e in f["signals_received"]] == ["SIGALRM"]
+    assert (rec / "provenance.json").is_file() and manifest.verify(rec) == []
+
+
+def test_a_stop_signal_recorded_before_the_attempt_ends_makes_it_FAILED_with_evidence(tmp_path, monkeypatch, sets):
+    _gate(tmp_path, monkeypatch, sets)
+    monkeypatch.setattr(dr, "_shutdown", lambda: dr._SIGNALS["received"].append({"signal": "SIGXCPU", "at_s": 1.0}))
+    with pytest.raises(dr.AttemptFailed, match="SIGXCPU"):
+        dr.execute()
+    (rec,) = (tmp_path / "results").iterdir()
+    assert (rec / "failure.json").is_file() and not (rec / "summary.json").exists() and manifest.verify(rec) == []
+
+
+def test_stop_signals_blocked_by_the_parent_are_unblocked_and_the_budget_still_raises(tmp_path):
+    """C-4: GNU timeout passes the parent's signal mask on. The budget unblocks the stop signals,
+    so SIGXCPU raises BudgetExceeded (a FAILED record) instead of ending in the hard kill."""
+    import signal as sg
+    code = (f"import sys\nsys.path.insert(0, {str(HERE)!r})\nimport driver as dr\n"
+            "dr.BUDGET = {**dr.BUDGET, 'cpu_soft_s': 1, 'cpu_hard_s': 4}\ndr._enforce_budget()\n"
+            "print('PROBLEMS', dr._budget_enforcement_problems(), flush=True)\nwhile True: pass\n")
+    block = {sg.SIGALRM, sg.SIGXCPU, sg.SIGTERM, sg.SIGHUP, sg.SIGINT}
+    out = subprocess.run(["timeout", "--signal=KILL", "60", sys.executable, "-c", code], capture_output=True, text=True,
+                         timeout=90, env={**os.environ, **THREADS}, preexec_fn=lambda: sg.pthread_sigmask(sg.SIG_BLOCK, block))
+    assert "PROBLEMS []" in out.stdout and "BudgetExceeded: SIGXCPU" in out.stderr, (out.returncode, out.stderr[-600:])
+
+
+def test_budget_enforcement_that_cannot_be_verified_refuses_before_spending(tmp_path, monkeypatch, sets):
+    out = _python(f"""
+        import sys, signal
+        sys.path.insert(0, {str(HERE)!r})
+        import driver as dr
+        dr._enforce_budget()
+        signal.pthread_sigmask(signal.SIG_BLOCK, {{signal.SIGTERM}})
+        signal.signal(signal.SIGHUP, signal.SIG_DFL)
+        print(dr._budget_enforcement_problems())
+    """)
+    assert "stop signals are blocked: ['SIGTERM']" in out.stdout and "SIGHUP" in out.stdout, out.stderr[-500:]
+    _gate(tmp_path, monkeypatch, sets)
+    monkeypatch.setattr(dr, "_budget_enforcement_problems", lambda: ["stop signals are blocked: ['SIGTERM']"])
+    with pytest.raises(dr.Refusal, match="budget enforcement is unavailable"):
+        dr.execute()
+    assert dr.spent_state() == [] and dr.APPROVAL.exists()
+
+
+# === the Confirmation fails closed: a missing measurement is a failure (D-2) =======================
+
+@pytest.mark.parametrize("usage, forced, controls_fail, passes", [
+    ({"cpu_s": 10.0, "peak_address_space_bytes": 10 ** 9}, False, False, True),
+    ({"cpu_s": 10.0, "peak_address_space_bytes": 10 ** 9}, True, False, True),
+    ({"cpu_s": 10.0, "peak_address_space_bytes": None}, False, False, False),
+    ({"cpu_s": None, "peak_address_space_bytes": 10 ** 9}, False, False, False),
+    ({"cpu_s": float("nan"), "peak_address_space_bytes": 10 ** 9}, False, False, False),
+    ({"cpu_s": 10.0, "peak_address_space_bytes": float("inf")}, False, False, False),
+    ({"cpu_s": 451.0, "peak_address_space_bytes": 10 ** 9}, False, False, False),
+    ({"cpu_s": 10.0, "peak_address_space_bytes": 2 * 1024 ** 3 + 1}, False, False, False),
+    ({"cpu_s": 10.0, "peak_address_space_bytes": 10 ** 9}, False, True, False),
+])
+def test_the_confirmation_fails_closed(monkeypatch, tmp_path, usage, forced, controls_fail, passes):
+    ev = _confirmation_gate(monkeypatch, tmp_path, usage=usage, controls_fail=controls_fail)
+    r = dr.confirmation(forced, ev)
+    assert r["confirmation_pass"] is passes, r["checks"]
+    assert r["cpu_within_limit"] is (usage["cpu_s"] is not None and usage["cpu_s"] == usage["cpu_s"]
+                                     and usage["cpu_s"] <= 450)
+    if passes:
+        assert r["separation_problems"] == [] and r["checks"]["capacitance_phase_ran_on_expected_paths"]
+        if forced:
+            assert r["paths"]["E1.2"] == r["paths"]["E1.2-excl-R1"] == "last_resort"
+    json.dumps(dr._clean(r), allow_nan=False)
+
+
+def test_a_confirmation_that_raises_or_is_signalled_reports_a_failure_instead_of_crashing(monkeypatch, tmp_path):
+    def stop(mesh):
+        raise dr.BudgetExceeded("SIGXCPU: a declared budget limit or a termination signal was reached")
+
+    ev = _confirmation_gate(monkeypatch, tmp_path, usage={"cpu_s": 1.0, "peak_address_space_bytes": 1}, geometry=stop)
+    r = dr.confirmation(False, ev)
+    assert r["confirmation_pass"] is False and "SIGXCPU" in r["error"] and r["checks"]["no_error"] is False
+
+
+@pytest.mark.parametrize("peak, code", [(10 ** 9, 0), (None, 4)])
+def test_the_confirmation_mode_exits_nonzero_unless_it_passes(monkeypatch, tmp_path, capsys, peak, code):
+    _confirmation_gate(monkeypatch, tmp_path, usage={"cpu_s": 1.0, "peak_address_space_bytes": peak})
+    real = dr.confirmation
+    monkeypatch.setattr(dr, "confirmation", lambda forced: real(forced, tmp_path / "ev"))
+    assert dr.main(["--confirmation", "nominal", "--out", str(tmp_path / "c.json")]) == code
+    assert _strict_json(tmp_path / "c.json")["confirmation_pass"] is (code == 0)
+
+
 # === geometry =======================================================================================
 
 def test_the_island_nodes_are_the_section_3_1_formula_and_the_frozen_sides():
@@ -1349,6 +1847,7 @@ def test_the_rehearsal_runs_the_real_controls_and_the_S1_geometry_phase_and_asse
 
     monkeypatch.setattr(dr, "geometry_phase", geo_spy)
     r = dr.rehearsal()
+    assert r["separation_pass"] and r["separation_problems"] == []
     assert r["controls_pass"] and r["controls"]["failures"] == [], r["controls"]["failures"]
     assert r["geometry_pass"] and r["geometry"]["failures"] == [], r["geometry"]["failures"]
     assert sorted(sizes) == sorted([3080, 732, 256, 256])      # K3 (two disks) and N3 (twice): synthetic only
@@ -1362,6 +1861,30 @@ def test_the_rehearsal_runs_the_real_controls_and_the_S1_geometry_phase_and_asse
     for name in ("N1", "N2", "N3b", "N3c"):
         assert r["geometry"]["controls"][name]["pass"], name
     assert 0.97 <= r["controls"]["K3"]["ratio_to_D"] <= 1 and r["controls"]["N3"]["ratio"] > 10
+
+
+@pytest.mark.slow
+def test_no_confirmation_or_rehearsal_numeric_set_coincides_with_an_S1_attempt_set():
+    """Section 3.2 item 2 (revision 8.3): the four S1 attempt sets from the real geometry phase
+    (geometry only, no matrix) against every numeric set of the Confirmation (the stand-in's four
+    sets), the rehearsal (every control set) and proxy A: none is byte-identical or similar. The
+    revision-8.2 stand-in (the S1 island) is the positive control: it coincides."""
+    import e1_standin as es
+    geo = eg.geometry_phase(dr.qmhp_mesh())
+    assert geo["failures"] == []
+    s1 = es.numeric_sets(geo)
+    stand = es.standin()
+    synthetic = {**{f"stand-in {k}": v for k, v in es.numeric_sets(stand).items()},
+                 **ec.control_numeric_sets(), "proxy A": es.proxy_a()["R"]}
+    assert es.separation_problems(synthetic, s1) == []
+    for k, T in synthetic.items():
+        for A in s1.values():
+            assert T.shape != A.shape or T.tobytes() != A.tobytes(), k
+    old = {**stand, "R_E1_2": np.concatenate([eg.island_panels(), stand["R_E1_2"][1024:]]),
+           "R_E1_1_half": eg.island_panels(step=2)}
+    bad = es.separation_problems({f"8.2 stand-in {k}": v for k, v in es.numeric_sets(old).items()}, s1)
+    assert sorted(bad) == ["8.2 stand-in E1.1 is byte-identical to the S1 set E1.1",
+                           "8.2 stand-in E1.1-half is byte-identical to the S1 set E1.1-half"]
 
 
 def test_the_expected_counts_are_the_contract_section_3_3_numbers():
@@ -1379,7 +1902,7 @@ def test_the_expected_counts_are_the_contract_section_3_3_numbers():
             eg.CONFIG["blocks"]) == (32, 3.5, 800, 0.48, 1.25, (32, 16, 8, 4, 2))
 
 
-# === the committed evidence (produced by the committed code) ========================================
+# === the committed pre-approval evidence: produced at 90bf9eb, superseded, kept unchanged ==========
 
 def _evidence(name):
     path = HERE / name
@@ -1388,46 +1911,29 @@ def _evidence(name):
     return _strict_json(path)
 
 
-def test_the_committed_rehearsal_was_produced_by_the_committed_code_and_passed():
-    r = _evidence("rehearsal.json")
-    assert r["code_sha256"] == {n: _sha(p) for n, p in dr.CODE_FILES.items()}
-    assert r["mode"] == "rehearsal" and r["controls_pass"] and r["geometry_pass"]
-    assert r["s1_matrices_assembled"] == 0 and r["s1_capacitances_computed"] == 0
-    assert r["preflight_problems_on_this_host"] == [] and r["inputs"]["contract"] == dr.CONTRACT_SHA256
-    assert r["environment"]["threads_env"] == THREADS
-
-
-@pytest.mark.parametrize("name, forced", [("confirmation-nominal.json", False), ("confirmation-forced.json", True)])
-def test_the_committed_confirmation_meets_the_limits_on_the_committed_code(name, forced):
+@pytest.mark.parametrize("name", sorted(EVIDENCE_90BF9EB))
+def test_the_90bf9eb_evidence_is_kept_byte_unchanged_and_is_not_the_current_codes(name):
+    """The rehearsal, proxy-A and Confirmation evidence committed at 90bf9eb was produced by that
+    code. Its Confirmations ran the stand-in whose island was S1's island (finding D-1), so it is
+    superseded; it is kept byte-unchanged (append-only) and is regenerated only after the
+    corrected separation has passed review. No current test treats it as the current code's."""
+    assert _sha(HERE / name) == EVIDENCE_90BF9EB[name]
     r = _evidence(name)
-    code = {n: _sha(p) for n, p in dr.CODE_FILES.items()}
-    code["e1_standin.py"] = _sha(HERE / "e1_standin.py")
-    assert r["code_sha256"] == code
-    assert r["mode"] == "confirmation-" + ("forced-fallback" if forced else "nominal")
-    assert r["resources"]["cpu_s"] <= 450 and r["resources"]["peak_address_space_bytes"] <= 2 * 1024 ** 3
-    assert r["cpu_within_limit"] and r["peak_within_limit"] and r["preflight_problems_on_this_host"] == []
-    assert r["limits"]["cpu_soft_s"] == 900 and r["limits"]["address_space_bytes"] == 4 * 1024 ** 3
-    assert r["stand_in"]["N"] == 9995 and r["stand_in"]["N_x"] == 6710 and r["s1_capacitance_computed"] is False
-    assert r["evidence_writes"]["manifest_verify"] == [] and r["problems_on_stand_in"] == []
-    k4 = [o["status"] for o in r["K4"]["inequalities"]]
-    if forced:
-        assert r["paths"]["E1.2"] == r["paths"]["E1.2-excl-R1"] == "last_resort"
-        assert k4 == ["PASS", "NOT_EVALUATED_LAST_RESORT", "NOT_EVALUATED_LAST_RESORT"]
-    else:
-        assert set(r["paths"].values()) == {"cholesky"} and k4 == ["PASS"] * 3
+    assert {k: v for k, v in r["code_sha256"].items() if k in FROZEN_90BF9EB} == \
+        {k: v for k, v in FROZEN_90BF9EB.items() if k in r["code_sha256"]}
+    current = {n: _sha(p) for n, p in {**dr.CODE_FILES, "e1_standin.py": HERE / "e1_standin.py"}.items()}
+    assert any(r["code_sha256"].get(k) != current[k] for k in FROZEN_90BF9EB if k in r["code_sha256"])
 
 
-def test_the_committed_proxy_A_g_E_is_within_1e_minus_9_on_the_committed_code():
-    r = _evidence("proxyA-gE.json")
-    code = {n: _sha(p) for n, p in dr.CODE_FILES.items()}
-    code["e1_standin.py"] = _sha(HERE / "e1_standin.py")
-    assert r["code_sha256"] == code and r["g_E"] <= 1e-9 and r["g_E_within_1e-9"] and r["path"] == "cholesky"
-    assert r["N"] == 4080
+def test_the_doc_states_that_the_pre_approval_evidence_is_pending_regeneration():
+    doc = (REPO / "docs" / "coupled-candidate" / "e1-s1-lower-bound.md").read_text()
+    assert "PENDING REGENERATION" in doc and "90bf9eb" in doc and "unintended pre-execution computation" in doc
+    assert "no S1 Galerkin matrix has been assembled or factorised, and no S1\nenergy has been formed" not in doc
 
 
 @pytest.mark.skipif(os.environ.get("E1_RUN_CONFIRMATION") != "1",
-                    reason="the ~5-minute Confirmation runs re-run only with E1_RUN_CONFIRMATION=1; the committed "
-                           "evidence from the committed code is checked above")
+                    reason="the ~5-minute Confirmation runs re-run only with E1_RUN_CONFIRMATION=1, and not before "
+                           "the corrected stand-in separation has passed review")
 @pytest.mark.parametrize("mode", ["nominal", "forced"])
 def test_the_confirmation_re_runs_within_the_limits(mode, tmp_path):
     out = subprocess.run(["timeout", "--signal=KILL", "1260", sys.executable, "experiments/e1-s1-lower-bound/driver.py",
@@ -1435,4 +1941,5 @@ def test_the_confirmation_re_runs_within_the_limits(mode, tmp_path):
                          capture_output=True, text=True, timeout=1300, env={**os.environ, **THREADS})
     assert out.returncode == 0, out.stderr[-1500:]
     r = _strict_json(tmp_path / "c.json")
-    assert r["cpu_within_limit"] and r["peak_within_limit"] and r["problems_on_stand_in"] == []
+    assert r["confirmation_pass"] is True and all(r["checks"].values()) and r["separation_problems"] == []
+    assert r["resources"]["cpu_s"] <= 450 and r["resources"]["peak_address_space_bytes"] <= 2 * 1024 ** 3

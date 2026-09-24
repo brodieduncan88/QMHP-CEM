@@ -1,11 +1,13 @@
 # Copyright (c) 2026 Brodie Duncan. All rights reserved.
 # Proprietary QMHP-CEM source. No licence is granted except by explicit written agreement.
 """E1 synthetic known-answer and negative controls K1, K2, K2b, K3, N3 and N4, exactly as the
-frozen contract E1-CONTRACT.rev8.2.md specifies them in section 5. SYNTHETIC GEOMETRY ONLY:
+frozen contract E1-CONTRACT.rev8.3.md specifies them in section 5. SYNTHETIC GEOMETRY ONLY:
 nothing here reads the S1 mesh. (N1, N2, N3b and N3c need S1 geometry and live in
 e1_geometry.geometry_phase; K4 needs the S1 enclosures and lives in the driver.)
 
-Every control is evaluated as isfinite(value) and <inequality>; a non-finite quantity fails.
+Every control is evaluated as isfinite(value) and <inequality>; a non-finite quantity fails the
+control (UNQUALIFIED) and never raises: finiteness is checked before any exact conversion, and a
+last-resort sigma that is not finite or has Q <= 0 inside K3 or N3 fails that control.
 """
 from __future__ import annotations
 
@@ -104,12 +106,15 @@ def quadrature(a, b) -> dict:
 
 # --- K1 ---------------------------------------------------------------------------------------
 
+def _rel_to_reference(v, ref: Fraction):
+    """|v - ref|/ref exactly for a finite v; None (a failure) for a non-finite one."""
+    return float(abs(nm.to_fr(v) - ref) / ref) if nm.finite(v) else None
+
+
 def k1() -> dict:
     sq = (0.0, 1.0, 0.0, 1.0)
-    ld = nm.to_fr(nm.entry(sq, sq, LD))
-    f64 = Fraction(float(nm.entry(sq, sq, np.float64)))
-    rel_ld = float(abs(ld - K1_REFERENCE) / K1_REFERENCE)
-    rel_64 = float(abs(f64 - K1_REFERENCE) / K1_REFERENCE)
+    rel_ld = _rel_to_reference(nm.entry(sq, sq, LD), K1_REFERENCE)
+    rel_64 = _rel_to_reference(nm.entry(sq, sq, np.float64), K1_REFERENCE)
     ok = _fin(rel_ld) and rel_ld <= 1e-17 and _fin(rel_64) and rel_64 <= 1e-13
     return {"rel_long_double": rel_ld, "rel_float64": rel_64, "pass": bool(ok)}
 
@@ -143,13 +148,14 @@ def k2(routine=None, quad_refs: list | None = None) -> dict:
         refs.append(q)
         vld = float(routine(a, b)) if routine is not None else float(nm.entry(a, b, LD))
         v64 = float(nm.entry(a, b, np.float64))
-        rel_q = abs(vld - q["value"]) / abs(vld) if vld != 0 else math.inf
-        rel_64 = abs(v64 - vld) / abs(vld) if vld != 0 else math.inf
+        with np.errstate(all="ignore"):
+            rel_q = float(np.float64(abs(vld - q["value"])) / np.float64(abs(vld))) if vld != 0 else math.inf
+            rel_64 = float(np.float64(abs(v64 - vld)) / np.float64(abs(vld))) if vld != 0 else math.inf
+            est = float(np.float64(abs(q["error_estimate"])) / np.float64(abs(q["value"])))
         good = _fin(rel_q) and rel_q <= 1e-9 and _fin(rel_64) and rel_64 <= 1e-6
         ok &= good
         rows.append({"pair": name, "a": list(a), "b": list(b), "rel_ld_vs_quad": rel_q, "rel_f64_vs_ld": rel_64,
-                     "quad_warnings": q["warnings"], "quad_error_estimate_rel": abs(q["error_estimate"] / q["value"]),
-                     "pass": bool(good)})
+                     "quad_warnings": q["warnings"], "quad_error_estimate_rel": est, "pass": bool(good)})
     return {"pairs": rows, "max_rel_ld_vs_quad": max(r["rel_ld_vs_quad"] for r in rows),
             "max_rel_f64_vs_ld": max(r["rel_f64_vs_ld"] for r in rows),
             "quad_warnings_total": sum(r["quad_warnings"] for r in rows), "pass": bool(ok), "_refs": refs}
@@ -226,12 +232,17 @@ def k2b(c0: Fraction) -> dict:
     sha = k2b_pairs_sha256(pairs)
     u = Decimal(1) / Decimal(2 ** 64)
     c0_dec = Decimal(c0.numerator) / Decimal(c0.denominator)
-    viol_b = viol_c0 = overlapping = 0
+    viol_b = viol_c0 = overlapping = nonfinite = 0
     implied_max = 0.0
     for a, b in pairs:
         if max(a[0], b[0]) < min(a[1], b[1]) and max(a[2], b[2]) < min(a[3], b[3]):
             overlapping += 1
         S, B = nm.entry(a, b, LD, want_b=True)
+        if not (nm.finite(S) and nm.finite(B)):
+            nonfinite += 1                           # a non-finite entry or bound fails both criteria
+            viol_b += 1
+            viol_c0 += 1
+            continue
         with localcontext() as ctx:
             ctx.prec = 60
             ref, r3AA = reference_dec(a, b, 60)
@@ -248,6 +259,7 @@ def k2b(c0: Fraction) -> dict:
     frozen = sha == K2B_PAIRS_SHA256
     return {"pairs": len(pairs), "overlapping_pairs": overlapping, "pair_list_sha256": sha,
             "pair_list_matches_frozen": frozen, "violations_of_B": viol_b, "violations_of_c0_bound": viol_c0,
+            "non_finite_pairs": nonfinite,
             "largest_implied_constant": implied_max, "c0": float(c0), "pass": bool(ok and frozen)}
 
 
@@ -269,19 +281,31 @@ def disk(n: int, a: float = 0.1) -> np.ndarray:
 def certify_single(R: np.ndarray, kappa_: Fraction) -> dict:
     """The E1 certificate for one synthetic set whose panels are all charged (island = all),
     through the same routines as the attempt: S64, sigma with fallbacks, the long-double pass,
-    E_up and C_lo."""
+    E_up and C_lo, with the section 4.3 requirements (B~ finite and non-negative, the
+    no-underflow requirement). An invalid last-resort sigma or a failed requirement gives
+    ok = False and no C_lo, never an exception."""
     S = nm.assemble64(R)
-    sol = nm.solve_sigma(S, len(R))
+    try:
+        sol = nm.solve_sigma(S, len(R))
+    except nm.LastResortInvalid as exc:
+        return {"N": len(R), "path": "last_resort_invalid", "m": nm.m_count(len(R)), "ok": False, "reason": str(exc)}
     del S
     p = nm.ld_pass(R, [sol["sigma"]])
+    uf = nm.underflow_check([sol["sigma"]], p["min_abs_S"], p["min_B"])
     enc = nm.enclosure(sol["Q"], p["E"][0], p["W"][0], p["G"][0], p["m"], kappa_)
-    return {"N": len(R), "path": sol["path"], "m": p["m"], **enc}
+    reqs = {"B_finite_nonnegative": p["B_finite_nonneg"], "no_underflow": uf["ok"], "enclosure_ok": enc["ok"]}
+    out = {"N": len(R), "path": sol["path"], "m": p["m"], **enc, "requirements": reqs}
+    if not all(reqs.values()):
+        out["ok"] = False
+        out.pop("C_lo_fF", None)
+    return out
 
 
 def k3(kappa_free: Fraction) -> dict:
     d32, d16 = disk(32), disk(16)
     r32, r16 = certify_single(d32, kappa_free), certify_single(d16, kappa_free)
-    c32, c16 = r32.get("C_lo_fF"), r16.get("C_lo_fF")
+    c32 = r32.get("C_lo_fF") if r32.get("ok") else None
+    c16 = r16.get("C_lo_fF") if r16.get("ok") else None
     ratio = c32 / K3_D_FF if _fin(c32) else None
     ok = (len(d32) == 3080 and len(d16) == 732 and _fin(ratio) and 0.97 <= ratio <= 1
           and _fin(c16) and c16 <= c32)
@@ -295,15 +319,40 @@ def n3(kappa_free: Fraction, epsilon0: float, a: float = 0.1, n: int = 16) -> di
     floor at d = 10a) has exact capacitance eps0 a/10. The free-space Galerkin value must
     exceed it by more than 10x (the bound needs grounded walls)."""
     R = np.array([(a * i / n, a * (i + 1) / n, a * j / n, a * (j + 1) / n) for i in range(n) for j in range(n)])
-    S = nm.assemble64(R)
-    sol = nm.solve_sigma(S, len(R))
-    S = nm.assemble64(R)
-    E64 = float(sol["sigma"] @ S @ sol["sigma"])
-    c_gal = float(sol["Q"] * sol["Q"] * kappa_free / Fraction(E64))
     c_exact = float(Fraction(epsilon0) * Fraction(a) / 1000 / 10 * 10 ** 15)
+    S = nm.assemble64(R)
+    try:
+        sol = nm.solve_sigma(S, len(R))
+    except nm.LastResortInvalid as exc:
+        return {"C_galerkin_free_space_fF": None, "C_exact_fF": c_exact, "ratio": None, "reason": str(exc),
+                "pass": False}
+    S = nm.assemble64(R)
+    with np.errstate(all="ignore"):
+        E64 = float(sol["sigma"] @ S @ sol["sigma"])
+    if not (nm.finite(E64) and E64 > 0):
+        return {"C_galerkin_free_space_fF": None, "C_exact_fF": c_exact, "ratio": None,
+                "reason": "sigma^T S sigma is not finite and positive", "pass": False}
+    c_gal = float(sol["Q"] * sol["Q"] * kappa_free / Fraction(E64))
     ratio = c_gal / c_exact
     return {"C_galerkin_free_space_fF": c_gal, "C_exact_fF": c_exact, "ratio": ratio,
             "pass": bool(_fin(ratio) and ratio > 10)}
+
+
+def control_numeric_sets() -> dict:
+    """Every panel set on which a synthetic control forms an entry, a matrix or an energy: K1's
+    unit square (its self entry), the K2/N4 pairs, the K2b pairs, K3's two disks and N3's plate.
+    The rehearsal checks them against the S1 attempt sets (section 3.2 item 2 separation)."""
+    out = {"K1 unit square": np.array([(0.0, 1.0, 0.0, 1.0)])}
+    for k, (name, a, b) in enumerate(k2_pairs()):
+        out[f"K2/N4 pair {k} ({name})"] = np.array([a, b], dtype=np.float64)
+    for k, (a, b) in enumerate(k2b_pairs()):
+        out[f"K2b pair {k}"] = np.array([a, b], dtype=np.float64)
+    out["K3 disk a/32"] = disk(32)
+    out["K3 disk a/16"] = disk(16)
+    a, n = 0.1, 16
+    out["N3 plate"] = np.array([(a * i / n, a * (i + 1) / n, a * j / n, a * (j + 1) / n)
+                                for i in range(n) for j in range(n)], dtype=np.float64)
+    return out
 
 
 def synthetic_controls(c0: Fraction, epsilon0: float, stop=None) -> dict:

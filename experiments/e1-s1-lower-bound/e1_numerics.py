@@ -1,9 +1,10 @@
 # Copyright (c) 2026 Brodie Duncan. All rights reserved.
 # Proprietary QMHP-CEM source. No licence is granted except by explicit written agreement.
 """E1 numerics: the Galerkin entries, the rigorous energy enclosure, the trial vector and
-the float64 consistency check, exactly as the frozen contract E1-CONTRACT.rev8.2.md
-(sha256 24ffff7d92c93757a13f9f6ba4505598be83b1628f4c5d6912c6abbbbdaf504c) specifies them
-in sections 4.3-4.5. Section numbers below refer to that contract.
+the float64 consistency check, exactly as the frozen contract E1-CONTRACT.rev8.3.md (its
+sha256 is pinned in driver.py) specifies them in sections 4.3-4.5. Section numbers below refer
+to that contract. A non-finite or non-positive quantity never raises here: it makes the
+requirement it belongs to fail, so the attempt is UNQUALIFIED, never FAILED (section 8).
 
 Nothing here reads the S1 mesh or any result. The functions work on any list of
 axis-aligned rectangles on z = 0 (R, an (N, 4) float64 array of x0, x1, y0, y1 in mm).
@@ -82,6 +83,19 @@ def gamma(m: int) -> Fraction:
 
 def pq(x: Fraction) -> str:
     return f"{x.numerator}/{x.denominator}"
+
+
+def finite(x) -> bool:
+    """True for a finite float64 or long-double number (no exception for any input value)."""
+    try:
+        return bool(np.isfinite(LD(x)))
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
+def pq_or_label(x) -> str:
+    """The exact p/q string of a finite value; 'non-finite: <repr>' otherwise (raw files)."""
+    return pq(to_fr(x)) if finite(x) else f"non-finite: {float(x)!r}"
 
 
 def eps_avg_lo() -> Fraction:
@@ -296,7 +310,13 @@ def underflow_check(sigmas: list, min_abs_S, min_B) -> dict:
     """The no-underflow requirement of section 4.3, per pass: with s = min nonzero |sigma_i|
     over the pass's sigmas and e = min(|S~|, B~) over nonzero values, s e >= 2^-16300 and
     s^2 e 2^-64 >= 2^-16300."""
-    s = min(float(np.abs(v[v != 0]).min()) for v in sigmas if np.any(v != 0))
+    nz = [np.abs(v[v != 0]) for v in sigmas if np.any(v != 0)]
+    vals = (min_abs_S, min_B)
+    if not nz or not all(np.isfinite(a).all() for a in nz) or not all(finite(v) for v in vals):
+        return {"min_abs_sigma": None, "min_abs_S": float(min_abs_S), "min_B": float(min_B),
+                "first_product_bound": None, "second_product_bound_log2": None, "ok": False,
+                "reason": "no nonzero sigma, or a non-finite smallest |sigma|, |S~| or B~"}
+    s = min(float(a.min()) for a in nz)
     e = min(to_fr(min_abs_S), to_fr(min_B))
     s_f = Fraction(s)
     first = s_f * e
@@ -313,19 +333,22 @@ def island_charge(sigma: np.ndarray, n_island: int) -> Fraction:
 
 
 def enclosure(Q: Fraction, E, W, G, m: int, kappa_: Fraction) -> dict:
-    """E_up, C_lo = RD(Q^2 kappa/E_up), C~ = Q^2 kappa/E^ and w = C~ - C_lo (section 4.3, K4)."""
-    finite = all(np.isfinite(v) for v in (E, W, G))
-    Eup = e_up(E, W, G, m) if finite else None          # exact arithmetic only on finite values
-    ok = bool(finite and to_fr(W) >= 0 and to_fr(G) >= 0 and Eup > 0 and Q > 0)
+    """E_up, C_lo = RD(Q^2 kappa/E_up), C~ = Q^2 kappa/E^ and w = C~ - C_lo (section 4.3, K4).
+    Not ok, without raising, when E^, W^ or G^ is not finite, W^ or G^ is negative, E^ or E_up
+    is not positive (a non-positive energy, section 8), or Q <= 0."""
+    fin = all(finite(v) for v in (E, W, G))
+    Eup = e_up(E, W, G, m) if fin else None             # exact arithmetic only on finite values
+    ok = bool(fin and to_fr(E) > 0 and to_fr(W) >= 0 and to_fr(G) >= 0 and Eup > 0 and Q > 0)
     if not ok:
         return {"ok": False, "E_hat": float(E), "W_hat": float(W), "G_hat": float(G), "m": m,
-                "Q": float(Q), "E_up_positive": bool(finite and Eup > 0)}
+                "Q": float(Q), "E_up_positive": bool(fin and Eup > 0), "E_hat_positive": bool(fin and to_fr(E) > 0)}
     C_lo = rd(Q * Q * kappa_ / Eup)
     C_t = Q * Q * kappa_ / to_fr(E)
     return {"ok": True, "m": m, "gamma_m": pq(gamma(m)), "E_hat_pq": pq(to_fr(E)), "W_hat_pq": pq(to_fr(W)),
             "G_hat_pq": pq(to_fr(G)), "E_up_pq": pq(Eup), "Q_pq": pq(Q), "E_hat": float(E), "W_hat": float(W),
             "G_hat": float(G), "E_up": float(Eup), "Q": float(Q), "C_lo_fF": C_lo, "C_tilde_fF": float(C_t),
-            "w_fF": float(C_t - Fraction(C_lo)), "width_rel": float((C_t - Fraction(C_lo)) / Fraction(C_lo))}
+            "w_fF": float(C_t - Fraction(C_lo)),
+            "width_rel": float((C_t - Fraction(C_lo)) / Fraction(C_lo)) if C_lo > 0 else None}
 
 
 # --- float64 assembly, the trial vector and its fallbacks (section 4.5) ------------------------
@@ -468,13 +491,15 @@ def solve_sigma(S: np.ndarray, n_island: int, *, force_fail: int = 0) -> dict:
 def check_g(Q: Fraction, E64: float, E_hat, C_lo: float, kappa_: Fraction) -> dict:
     """Check (g) of section 4.5: |C64 - C~| <= 1e-7 C_lo, with C64 = Q^2 kappa/(sigma^T S64 sigma)
     and C~ = Q^2 kappa/E^. The enclosure width is not part of it."""
-    if not (math.isfinite(E64) and E64 > 0):
+    if not (finite(E64) and E64 > 0):
         return {"ok": False, "E64": E64, "reason": "sigma^T S64 sigma is not finite and positive"}
+    if not (finite(E_hat) and to_fr(E_hat) > 0 and finite(C_lo) and C_lo >= 0):
+        return {"ok": False, "E64": E64, "reason": "E^ is not finite and positive, or C_lo is not finite"}
     C64 = Q * Q * kappa_ / Fraction(E64)
     Ct = Q * Q * kappa_ / to_fr(E_hat)
     lhs = abs(C64 - Ct)
     return {"ok": bool(lhs <= Fraction(1, 10 ** 7) * Fraction(C_lo)), "E64": E64, "C64_fF": float(C64),
-            "C_tilde_fF": float(Ct), "rel": float(lhs / Fraction(C_lo)),
+            "C_tilde_fF": float(Ct), "rel": float(lhs / Fraction(C_lo)) if C_lo > 0 else None,
             "g_E": float(abs(Fraction(E64) - to_fr(E_hat)) / to_fr(E_hat))}
 
 

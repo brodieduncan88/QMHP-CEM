@@ -1,18 +1,18 @@
 {
  "DRAFT": "NOT AN APPROVAL. This is the approval a human would grant for E1, prepared for review. The driver reads only E1-APPROVAL.json, and this file authorises nothing. E1 is PREPARED, NOT APPROVED, NOT EXECUTED.",
- "how_to_grant_it": "A human who approves writes experiments/e1-s1-lower-bound/E1-APPROVAL.json containing every field below except DRAFT, how_to_grant_it and does_not_authorise. source_commit is replaced by the full SHA of the reviewed commit, which must be HEAD at execution. not_before_utc and not_after_utc are replaced by ISO-8601 UTC times at most 7 days apart. tolerance_scope_decision is replaced by one of ['COPIED_NUMBERS_WITHIN_SCOPE', 'COPIED_NUMBERS_EXCLUDED'] (contract section 7: whether numbers E1 only copies from the frozen static study are within the section 7 rule). q2_within_D5 is replaced by true (Q2 stays, contract section 1) or false (Q2 is dropped before execution). Every other field is copied unchanged. The driver refuses, spending nothing, if any digest, the environment, the invocation, the budget, the checkout path, HEAD or the time differs. Running it spends the one attempt before any control runs: it creates <git common directory>/qmhp-attempts/E1-S1-LOWER-BOUND.json and ATTEMPT-SPENT.json exclusively and renames E1-APPROVAL.json to E1-APPROVAL.consumed.json. After the run, whatever the outcome, the record, ATTEMPT-SPENT.json and E1-APPROVAL.consumed.json are committed together before the environment is discarded; if no record directory exists, the git-common-directory entry is first copied byte for byte to experiments/e1-s1-lower-bound/ATTEMPT-LEDGER-NOTE.json and committed with them.",
+ "how_to_grant_it": "A human who approves writes experiments/e1-s1-lower-bound/E1-APPROVAL.json containing every field below except DRAFT and how_to_grant_it; does_not_authorise may be kept unchanged or left out, and any other field refuses. Approve only a commit whose pre-approval evidence in this directory (rehearsal.json, proxyA-gE.json, confirmation-nominal.json, confirmation-forced.json) carries the code_sha256 below. source_commit is replaced by the full SHA of the reviewed commit, which must be HEAD at execution. not_before_utc and not_after_utc are replaced by ISO-8601 UTC times at most 7 days apart. tolerance_scope_decision is replaced by one of ['COPIED_NUMBERS_WITHIN_SCOPE', 'COPIED_NUMBERS_EXCLUDED'] (contract section 7: whether numbers E1 only copies from the frozen static study are within the section 7 rule). q2_within_D5 is replaced by true (Q2 stays, contract section 1) or false (Q2 is dropped before execution). Every other field is copied unchanged. The driver refuses, spending nothing, if any digest, the environment, the invocation, the budget, the checkout path, HEAD or the time differs. Running it spends the one attempt before any control runs: it creates <git common directory>/qmhp-attempts/E1-S1-LOWER-BOUND.json and ATTEMPT-SPENT.json exclusively and renames E1-APPROVAL.json to E1-APPROVAL.consumed.json. After the run, whatever the outcome, the record, ATTEMPT-SPENT.json and E1-APPROVAL.consumed.json are committed together before the environment is discarded; if no record directory exists, the git-common-directory entry is first copied byte for byte to experiments/e1-s1-lower-bound/ATTEMPT-LEDGER-NOTE.json and committed with them.",
  "authorises": "one execution of E1, the static-capacitance lower-bound certificate for the S1 island (problem C)",
  "attempt": 1,
  "prior_records": [],
- "contract_sha256": "24ffff7d92c93757a13f9f6ba4505598be83b1628f4c5d6912c6abbbbdaf504c",
+ "contract_sha256": "2b9b9357bb438987723914727a851161201a7a9f477aa66ae674fb0ed9d6b296",
  "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
  "baseline_manifest_sha256": "e3e447068dea6b4c2790c29de7a34be77f971717fa6e40964f6e31fdee193622",
  "baseline_summary_sha256": "7eca21f3688a662f0324003093de2902cfbd67503fa0de71f5c028df13181298",
  "code_sha256": {
-  "driver.py": "d2bcff929f6c09f8d897a82ceb0ecd470d63a055093ab17551c2fdef1d8cd43d",
-  "e1_numerics.py": "513c0ddfbdf3927bee0e4d025b9e3537a55488a63eeed8402f35c01861ec26be",
-  "e1_geometry.py": "fb88d72d3a3e28ed27bb040eb083b8b7344a85f82c8a9a45c8d361e03489c772",
-  "e1_controls.py": "bb3ae0c8dff4bd8e7e715281c18d8639bcaf7ef2013f4b640def8a907f2625fa",
+  "driver.py": "6dce736bb9c0416ab5463b3d3f16b31a829b7fa9409581479c16680471f266d8",
+  "e1_numerics.py": "b3d5c739062dad67fce9fc83356a0d730421da1d379e854da1a9e1b59cd193dc",
+  "e1_geometry.py": "1aebafd9801e1e5b5a0e8aba1dd1155d4dc91abd53a492e955089bac3e00c87b",
+  "e1_controls.py": "f7398152ccc657f8399047d72240527ab2f193feeb62ee55d2a60b480ef1530b",
   "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
   "orchestrator/manifest.py": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f"
  },
@@ -52,7 +52,7 @@
   "running from another checkout, another commit or outside the validity window",
   "removing or editing ATTEMPT-SPENT.json, the git-common-directory ledger entry, E1-APPROVAL.consumed.json or the record",
   "any further capacitance computation on S1 after E1 (contract section 8 stop rule)",
-  "any E_C, g, GHz, MHz, deviation or suitability statement from any E1 number",
+  "any E_C, g, deviation or suitability statement, or any statement in frequency units, from any E1 number",
   "any tolerance T1-T4 not adopted by a recorded human decision before this approval",
   "any Palace solve, Route A inversion, workflow dispatch or physical extraction"
  ]
