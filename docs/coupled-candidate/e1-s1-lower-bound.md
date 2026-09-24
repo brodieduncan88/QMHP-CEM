@@ -1,16 +1,18 @@
 # E1 — the static-capacitance lower-bound certificate for the S1 island (problem C)
 
 **Status: IMPLEMENTED; CORRECTED AFTER THREE FROZEN-CODE REVIEWS (contract revision 8.5). PREPARED,
-NOT APPROVED, NOT EXECUTED. PRE-APPROVAL EVIDENCE PENDING REGENERATION.**
+NOT APPROVED, NOT EXECUTED. PRE-APPROVAL EVIDENCE REGENERATED AND FROZEN (revision 8.5: the rehearsal and both
+Confirmations).**
 
 - **E1 has not been executed.** The one attempt is unspent. Execution needs a separate human approval (`E1-APPROVAL.json`, written from `E1-APPROVAL.draft.json`).
-- **What has and has not been computed on S1 panels.** The full account, with every run, is in [`corrections/e1-confirmation-s1-internal-sets-correction.md`](corrections/e1-confirmation-s1-internal-sets-correction.md).
+- **What has and has not been computed on S1 panels.** The full account of the runs before the revision-8.5 regeneration, with every run, is in [`corrections/e1-confirmation-s1-internal-sets-correction.md`](corrections/e1-confirmation-s1-internal-sets-correction.md). The revision-8.5 runs are the last item below.
   - No set equal to S1's E1.2 or E1.2-excl-R1, and no set containing an image of either, has been assembled, factorised or used in any energy.
   - The revision-8 prototype, and the Confirmation runs made with the `90bf9eb` implementation and with one pre-freeze build, did assemble, factorise and form energies and internal lower bounds for S1's island-only internal sets E1.1 and E1.1-half. Their stand-in's island was S1's island (D-1).
   - The E1.2 of those Confirmations and of the prototype's full-size runs (N = 9,995) also held 534 ground panels bit-identical to S1 E1.2 ground panels (476 of them in S1's E1.2-excl-R1). The E1.2 of the prototype's reduced run `run8_small` (N = 1,524) held 32 such panels. The stand-in's ground is synthetic, but it uses S1's lattice, window and merge rules.
   - Proxy A of the configuration selection contains S1's E1.1 translated by +0.6 mm in x. So every proxy-A Cholesky factorisation contains the factor of that translated E1.1 as its leading block. The same holds for proxies B and C of the selected configuration.
   - All of this was an **unintended pre-execution computation, not approved behaviour** (D14). Proxy A is kept as **historical** configuration-selection evidence only, and is not re-run (D15).
   - The two opt-in Confirmation tests of the suite (run only with `E1_RUN_CONFIRMATION=1`) were among those runs. The default test selection and CI use only small synthetic sets, apart from the S1 geometry phase, which assembles no matrix.
+  - The revision-8.5 Confirmations (below) ran on the separated stand-in, whose island is synthetic. Its ground shares 534 individual panels with S1's E1.2, which D15 permits. No S1 attempt set, and no image of one, was assembled, factorised or used in an energy by them or by the revision-8.5 rehearsal.
 - **Contract.** `experiments/e1-s1-lower-bound/E1-CONTRACT.rev8.5.md`, sha256 `2db93be49ee455f1da952acbe300f370d7614a8986c4151a9563adf805f00150`.
   - It is revision 8.4 (sha256 `cdf6cced…71740`, kept byte-unchanged beside it, as are revisions 8.3 and 8.2) with the two text corrections of D16.
   - Revision 8.4 was revision 8.3 with the structural separation rule and the corrected statements of D15.
@@ -38,12 +40,29 @@ NOT APPROVED, NOT EXECUTED. PRE-APPROVAL EVIDENCE PENDING REGENERATION.**
 | `e1_standin.py` | the stand-in of contract §6, the §3.2 item 2 separation rule, and proxy A of §3.2 item 5. The attempt never loads it and refuses if it is loaded, but the approval binds its sha256 (`preapproval_code_sha256`). |
 | `E1-APPROVAL.draft.json` | the approval a human would grant, with the human's fields as placeholders; it authorises nothing |
 | `rehearsal.json`, `proxyA-gE.json`, `confirmation-nominal.json`, `confirmation-forced.json` | the pre-approval evidence of `90bf9eb`: SUPERSEDED, kept byte-unchanged (see below) |
+| `preapproval-confirmation-rev8.5/` | the revision-8.5 Confirmations, nominal and forced fallback: predeclaration, run script, outputs, logs, run records, the driver's sealed evidence directories, index and `MANIFEST.sha256` |
+| `preapproval-rehearsal-rev8.5/` | the revision-8.5 rehearsal: predeclaration, run script, acceptance check script, output, logs, run records, index and `MANIFEST.sha256` |
+| `c2-stop-signal-test-diagnosis/` | why the C-2 stop-signal test was intermittent (its timing, not the implementation), and the evidence for its deterministic replacement |
 
 The attempt would be run once, from the repository root, exactly as contract §6 states:
 
     env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 timeout --signal=KILL 1260 .venv/bin/python experiments/e1-s1-lower-bound/driver.py
 
-## Pre-approval evidence: PENDING REGENERATION
+## Pre-approval evidence (revision 8.5): REGENERATED AND FROZEN
+
+The pre-approval evidence of contract §5 was regenerated from the corrected code on human instructions of 2026-09-24, each part under its own committed predeclaration, one run each, no retry. The files the approval binds (`code_sha256`, `preapproval_code_sha256`, the contract and the approval draft) are byte-identical to those of the reviewed implementation `88988d4`.
+
+| evidence | directory | run from | result |
+|---|---|---|---|
+| Confirmation, nominal | `preapproval-confirmation-rev8.5/nominal/` | `ca19ece` | passed: 332.8 s CPU and 1.427 GiB peak address space (limits 450 s and 2 GiB); all four sets on Cholesky; K4 inequalities 1–3 PASS; stand-in outcome QUALIFIED |
+| Confirmation, forced fallback | `preapproval-confirmation-rev8.5/forced/` | `ca19ece` | passed: 388.9 s CPU and 1.451 GiB; E1.2 and E1.2-excl-R1 on the last resort; K4 inequality 1 PASS, 2 and 3 NOT_EVALUATED_LAST_RESORT; QUALIFIED |
+| rehearsal | `preapproval-rehearsal-rev8.5/` | `017f90e` | passed: every control (K1, K2, K2b, K3, N3, N4), every §3.3 geometry fact, N1, N2, N3b, N3c and the separation of every control set; 142.9 s CPU and 0.69 GB peak address space. The contract §5 test with the assembly spy passed: the S1 geometry phase assembled no matrix |
+
+- The Confirmations' stand-in is synthetic (N = 9,995). Its `summary.json` carries S1's frozen C_hi, copied and not computed, and its QUALIFIED outcome includes the check C_lo^static ≤ C_hi against that copied value. The Confirmation index said otherwise; the correction is [`corrections/e1-preapproval-confirmation-rev8.5-readme-correction.md`](corrections/e1-preapproval-confirmation-rev8.5-readme-correction.md).
+- The forced run's CPU margin to the 450 s limit is 13.6 %. The Confirmation measures the attempt path on the stand-in, not on S1.
+- The rehearsal's output carries S1 geometry facts and, copied from the frozen static study, C_hi and C_br with their bit-exactness checks. It computes nothing on S1 beyond geometry.
+
+### The superseded evidence of `90bf9eb`
 
 The four evidence files in the directory were produced by the code reviewed at `90bf9eb`, and each carries that code's sha256. They are superseded and kept byte-unchanged, for three reasons:
 
@@ -60,10 +79,7 @@ What they recorded at `90bf9eb`:
 | Confirmation, nominal | 288.0 s CPU and 1.43 GiB peak address space, on the revision-8.2 stand-in (which contained S1's island). |
 | Confirmation, forced fallback | 312.6 s CPU and 1.45 GiB. The same stand-in. |
 
-The rehearsal and both Confirmation runs are regenerated from the corrected code only after the revision-8.5 correction has passed review, and only on a human instruction. Proxy A is not regenerated. Until then:
-
-- no Confirmation margin is claimed for the corrected code;
-- the draft approval tells the approver to approve only a commit whose regenerated evidence carries its `code_sha256` and `preapproval_code_sha256`.
+Proxy A is not regenerated. The draft approval tells the approver to approve only a commit whose regenerated evidence carries its `code_sha256` and `preapproval_code_sha256`. The revision-8.5 evidence carries them; it was run from `ca19ece` and `017f90e`, whose bound files are byte-identical to those of `88988d4`.
 
 ## Implementation interpretations for the reviewer and the approver
 
@@ -73,7 +89,7 @@ The contract leaves the implementation mechanics to the frozen code (contract D8
    - `RLIMIT_AS` has a soft limit of 4 GiB, which every allocation of the attempt obeys. The hard limit is 1 GiB above it, as in the static refinement study, only so that the failure path can lift its own soft limit to write `failure.json` and the manifest.
    - `RLIMIT_CPU` is soft 900 s and hard 960 s.
    - The stop signals are unblocked, and the enforcement is read back (handlers, both limits, the wall alarm) before anything is spent. If it cannot be confirmed, the run refuses.
-2. **Stop signals.** A stop signal received at any point before the attempt ends makes it FAILED, with `failure.json` and a verified manifest. The failure path marks itself stopping before any call, so a signal pending when it starts is recorded, not raised.
+2. **Stop signals.** A stop signal received at any point before the attempt ends makes it FAILED, with `failure.json` and a verified manifest. The failure path marks itself stopping before any call, so a signal pending when it starts is recorded, not raised. The test (C-2) delivers each stop signal inside one C-level call chain that then raises, so no wall-clock race decides where it lands; its earlier timed version was intermittent because of its own timing (`c2-stop-signal-test-diagnosis/`).
 3. **The approval** is strict JSON with an exact field set.
    - A repeated member (at any depth), a non-standard constant (NaN, Infinity), or a number that overflows float64 (such as 1e400) refuses. So does any other parser error, such as an integer beyond Python's digit limit. None of these raises past the approval check.
    - The bound fields must match with their JSON types: `true` is not `1`, and `1.0` is not `1`. The bound fields include `code_sha256` and `preapproval_code_sha256` (the stand-in and separation code).
@@ -131,7 +147,7 @@ The contract leaves the implementation mechanics to the frozen code (contract D8
 
 - Any S1 E1.2 or E1.2-excl-R1 quantity: E1 has not been executed.
 - Any use of the S1 E1.1 or E1.1-half quantities formed unintentionally before approval. They are not results (D14).
-- The corrected code's Confirmation resources: the evidence is pending regeneration.
+- That the Confirmation's resources on the synthetic stand-in are those of the attempt on S1: they are measured on the stand-in.
 - That the separation rule excludes approximate reproductions beyond its tolerance (D15).
 - That the separation check finds an image within the tolerance whose scaled fitting baseline is below 2·(2⁻²² + 2⁻⁴⁴)·M (D16).
 - Anything listed in contract §10.

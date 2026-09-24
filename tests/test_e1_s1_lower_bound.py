@@ -57,7 +57,7 @@ CONTRACT_8_4_SHA256 = "cdf6cced13e1965bbf017a4a7d3d4af0f661df0ca921e6dd69335b4a6
 CONTRACT_8_5_SHA256 = "2db93be49ee455f1da952acbe300f370d7614a8986c4151a9563adf805f00150"
 #: the implementation reviewed at 90bf9eb (frozen against revision 8.2); its committed pre-approval
 #: evidence is superseded (the Confirmation's stand-in island was S1's island, finding D-1) and is
-#: kept unchanged pending regeneration after the corrected separation has passed review
+#: kept unchanged; the revision-8.5 rehearsal and Confirmations regenerated it (preapproval-*-rev8.5/)
 FROZEN_90BF9EB = {"driver.py": "d2bcff929f6c09f8d897a82ceb0ecd470d63a055093ab17551c2fdef1d8cd43d",
                   "e1_numerics.py": "513c0ddfbdf3927bee0e4d025b9e3537a55488a63eeed8402f35c01861ec26be",
                   "e1_geometry.py": "fb88d72d3a3e28ed27bb040eb083b8b7344a85f82c8a9a45c8d361e03489c772",
@@ -2833,16 +2833,23 @@ def test_no_active_document_repeats_a_statement_the_correction_record_corrects()
     assert "The test suite and CI." not in body and "The default test selection and CI." in body
 
 
-def test_the_doc_and_README_state_what_was_computed_and_that_the_evidence_is_pending():
+def test_the_doc_and_README_state_what_was_computed_and_that_the_evidence_is_regenerated():
     doc = _norm((REPO / "docs" / "coupled-candidate" / "e1-s1-lower-bound.md").read_text())
     readme = (REPO / "docs" / "coupled-candidate" / "README.md").read_text()
     row = _norm(next(ln for ln in readme.splitlines() if ln.startswith("| [`e1-s1-lower-bound.md`]")))
     for text in (doc, row):
-        assert "PENDING REGENERATION" in text and "unintended pre-execution computation" in text
+        assert "PENDING REGENERATION" not in text and "REGENERATED AND FROZEN" in text          # revision-8.5 evidence
+        assert "unintended pre-execution computation" in text
         assert "534" in text and "revision 8.5" in text and "historical" in text
         assert "32" in text and ("reduced run" in text)                                        # T1
     assert "E1-CONTRACT.rev8.5.md" in doc and dr.CONTRACT_SHA256 in doc
     assert "N = 1,524" in doc and "`run8_small`" in doc
+    for name in ("preapproval-confirmation-rev8.5/", "preapproval-rehearsal-rev8.5/", "c2-stop-signal-test-diagnosis/",
+                 "corrections/e1-preapproval-confirmation-rev8.5-readme-correction.md"):
+        assert name in doc, name
+    # the S1 internal sets were formed by the 90bf9eb Confirmations, not by the revision-8.5 ones
+    assert "the `90bf9eb` Confirmation runs formed S1's island-only internal sets" in row and "S1's copied C_hi" in row
+    assert "No S1 attempt set, and no image of one, was assembled, factorised or used in an energy" in doc
     record = _norm((REPO / "docs" / "coupled-candidate" / "corrections" / "e1-confirmation-s1-internal-sets-correction.md")
                    .read_text())
     assert "reduced run `run8_small` (N = 1,524)" in record and "32 S1 ground panels" in record          # T1
