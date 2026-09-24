@@ -2804,7 +2804,14 @@ def test_the_doc_and_README_state_what_was_computed_and_that_the_evidence_is_pen
     assert "m = [532, 521, 512]" in body and "does not determine it" in body and "It is not derived from the rounding count" in body
     for wrong in ("gives its set size N = 1,524", "Its N follows from its rounding count"):
         assert wrong not in body and wrong in record
-    assert "No S1 energy, bound or capacitance value was read for this record." in body
+    # record-only round after the review of da4338a: the widened list, stated no more firmly than the commands support
+    new_lead = "No S1 energy, capacitance or bound value, and no `/tmp` Confirmation value, is known to have been read."
+    old_lead = "No S1 energy, bound or capacitance value was read for this record."
+    assert new_lead in body and old_lead not in body and old_lead in record
+    for read in ("How the list was made", "`next/e1/cfg/*.jsonl`", "E1-PREDECLARATION.rev4", "`next/verify/s3/x1_s1.py`",
+                 "the file names of some of their entries", "not independently verifiable from the repository alone"):
+        assert read in body, read
+    assert "their hashes and entries (file names with hashes)" not in body
     assert "No energy, bound or capacitance value of those uncommitted files was read for this record." in record
     assert "No energy, bound or capacitance value of those uncommitted files was read for this record." not in body
     for read in ("`force_fail`", "`cert8_results.jsonl`", "`code_sha256`", "evidence/run2.log`", "the K2b pair count 10,096"):
