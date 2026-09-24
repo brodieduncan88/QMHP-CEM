@@ -19,6 +19,20 @@ network access. It binds to the loopback interface unless `--host` says otherwis
 > SOLVED, ANALYSIS, DECLARATION, MEASURED or UNCLASSIFIED, and which rule
 > assigned the label.
 
+## Design
+
+An editorial, product-page layout: a full-bleed hero on the overview, numbered
+section eyebrows, oversized display type, spec-table rows, alternating light and
+dark bands, a hardware-boundary ticker, scroll reveals, a light parallax and
+count-up figures. It follows the system colour scheme (light or dark) and turns
+all motion off under `prefers-reduced-motion`. Everything is local: system fonts,
+no external requests, and the same strict CSP (no inline script or style).
+
+**Imagery** in `static/img/` is decorative, third-party photography of cryogenic
+hardware supplied by the repository owner; see `static/img/SOURCES.md`. Every
+image is captioned as illustrative, not QMHP hardware and not evidence. Its
+licence for public use has not been established here.
+
 ## What it will not do
 
 | Not available | Why |
@@ -48,7 +62,7 @@ browser ──GET──▶ server.py ──▶ adapter.py ──▶ repo_fs.py �
 | `classify.py` | The labelling rules, stated as data and shown verbatim in the UI. |
 | `adapter.py` | Parses `results/`, `experiments/`, approval files, manifests, `master/` and documents into views. Re-hashing a manifest is a read. |
 | `server.py` | `http.server` handler with `do_GET` and `do_HEAD` only; the standard library answers every other verb with `501`. All routes are in `ROUTES`. Repository content is returned as JSON strings and rendered as text, so a committed HTML/SVG file cannot run in the viewer's origin. Strict CSP, including `form-action 'none'`. |
-| `static/` | A vanilla-JS single page. One `fetch` helper, `method: "GET"`. No forms, no storage, no inline script. |
+| `static/` | A vanilla-JS single page. One `fetch` helper, `method: "GET"`. No forms, no storage, no inline script. Decorative images are served only as `img/<name>.webp`. |
 
 ## Information architecture
 

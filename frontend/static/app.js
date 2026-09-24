@@ -279,79 +279,190 @@ function head(title, lead, crumbs, extra) {
     extra || null);
 }
 
+// ---------------------------------------------------------- editorial
+// Decorative photography. Every image is labelled where it appears: it shows
+// third-party cryogenic hardware, not QMHP hardware, and it is never evidence.
+const CAPTION = "Illustrative photograph · third-party cryogenic hardware · not QMHP hardware · not evidence";
+const IMG = {
+  cryostat: { src: "/static/img/cryostat-interior.webp", alt: "Gold-plated interior of a dilution-refrigerator cryostat (illustrative)", ratio: "1 / 1" },
+  assembly: { src: "/static/img/qcage-assembly.webp", alt: "Sample-holder assembly with coaxial wiring on a mixing-chamber mount (illustrative)", ratio: "1 / 1" },
+  holder: { src: "/static/img/sample-holder.webp", alt: "Sample holder with four connector banks (illustrative)", ratio: "3 / 2" },
+  wiring: { src: "/static/img/wiring-stage.webp", alt: "Coaxial wiring and attenuators between cryostat plates (illustrative)", ratio: "16 / 9" },
+  panel: { src: "/static/img/connector-panel.webp", alt: "Gold-plated coaxial connector panel (illustrative)", ratio: "16 / 9" },
+};
+function plate(key, opts) {
+  const im = IMG[key];
+  const o = opts || {};
+  const fig = el("figure", { class: `plate reveal${o.dark ? " dark" : ""}${o.cls ? " " + o.cls : ""}` },
+    el("div", { class: "frame" }, el("img", { src: im.src, alt: im.alt, loading: o.eager ? "eager" : "lazy", decoding: "async" })),
+    el("figcaption", null, el("span", null, o.label ? el("b", null, o.label) : null), el("span", null, CAPTION)));
+  fig.style.setProperty("--ratio", o.ratio || im.ratio);
+  return fig;
+}
+function lines(text, cls) {
+  return el("h1", { class: cls }, String(text).split("\n").map((ln) => el("span", { class: "line" }, el("span", null, ln))));
+}
+function eyebrow(n, label) {
+  return el("p", { class: "eyebrow" }, n ? el("span", { class: "num" }, n) : null, label);
+}
+function pageHero(n, title, lead, img, extra) {
+  const copy = el("div", null, eyebrow(n, SECTION_NAMES[n] || ""), lines(title, "title"),
+    lead ? el("p", { class: "lead" }, lead) : null, extra || null);
+  return el("header", { class: `page-hero${img ? " has-media" : ""}` }, copy, img ? plate(img, { eager: true }) : null);
+}
+const SECTION_NAMES = {
+  "02": "Experiments & contracts", "03": "Evidence records", "04": "Candidates & runs", "05": "Gate status",
+  "06": "Provenance & hashes", "07": "Execution & audit trail", "08": "Corrections", "09": "Evidence classification",
+  "10": "Documents", "11": "Unavailable actions",
+};
+function arrow() { return el("span", { class: "arr", "aria-hidden": "true" }, "→"); }
+
+// Motion: reveal on scroll, count up, header state and a light parallax. All of it is
+// presentation; it reads nothing and requests nothing.
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function countUp(node) {
+  const target = Number(node.dataset.count);
+  if (!Number.isFinite(target) || reducedMotion || target === 0) { node.textContent = String(target); return; }
+  const t0 = performance.now(), dur = 1400;
+  const tick = (t) => {
+    const k = Math.min(1, (t - t0) / dur);
+    node.textContent = String(Math.round(target * (1 - Math.pow(1 - k, 4))));
+    if (k < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+let revealObserver = null;
+function enhance(root) {
+  const targets = root.querySelectorAll(".reveal, [data-count]");
+  if (!("IntersectionObserver" in window) || reducedMotion) {
+    targets.forEach((t) => { t.classList.add("in"); if (t.dataset.count) countUp(t); });
+    return;
+  }
+  if (revealObserver) revealObserver.disconnect();
+  revealObserver = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      e.target.classList.add("in");
+      if (e.target.dataset.count) countUp(e.target);
+      revealObserver.unobserve(e.target);
+    }
+  }, { rootMargin: "0px 0px -8% 0px", threshold: 0.12 });
+  targets.forEach((t) => revealObserver.observe(t));
+}
+function onScroll() {
+  let last = window.scrollY, ticking = false;
+  const update = () => {
+    const y = window.scrollY;
+    document.body.classList.toggle("scrolled", y > 40);
+    document.body.classList.toggle("head-hidden", y > 480 && y > last + 2);
+    if (y < last - 2 || y < 480) document.body.classList.remove("head-hidden");
+    last = y;
+    const hero = document.querySelector(".hero");
+    if (hero && !reducedMotion) {
+      hero.style.setProperty("--hero-shift", `${Math.min(y, 1200) * 0.18}px`);
+      hero.style.setProperty("--hero-scale", String(1.08 + Math.min(y, 1200) / 12000));
+    }
+    ticking = false;
+  };
+  window.addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
+  update();
+}
+
 // ================================================================== views
 async function viewOverview() {
-  const d = await get("/api/overview");
-  const co = d.checkout;
-  const frag = [];
-  frag.push(head("Current project status",
-    "What this checkout of the repository states about itself, labelled by kind of evidence. Nothing on this page was computed except hash checks; every status is quoted from a record.",
-    null));
-  frag.push(...computationalNotice("SOLVED"));
-  frag.push(el("div", { class: "notice info", role: "note" }, el("span", { class: "ico" }, "MEASURED"),
-    el("div", { class: "body" }, d.measured_statement)));
-  for (const n of d.notes) frag.push(el("div", { class: "notice warn" }, el("span", { class: "ico" }, "NOTE"), el("div", { class: "body" }, n)));
+  const [d, cls] = await Promise.all([get("/api/overview"), get("/api/classification")]);
+  const legend = Object.fromEntries(cls.families.map((f) => [f.family, f]));
+  const measuredCount = d.by_basis.MEASURED || 0;
+  const out = [];
 
-  const stats = [["Result records", d.counts.records, "#/records"], ["Experiments", d.counts.experiments, "#/experiments"],
-    ["Approval files", d.counts.approvals, "#/audit"], ["Candidates evaluated", d.counts.candidates, "#/candidates"],
-    ["Correction entries", d.counts.corrections, "#/corrections"]];
-  frag.push(el("div", { class: "grid cols-4 mt" },
-    stats.map(([k, v, href]) => el("a", { class: "panel stat", href },
-      el("div", { class: "v" }, String(v)), el("div", { class: "k" }, k)))));
+  // 01 - hero
+  out.push(el("section", { class: "hero bleed" },
+    el("div", { class: "hero-media", "aria-hidden": "true" },
+      el("img", { src: IMG.cryostat.src, alt: "", decoding: "async", fetchpriority: "high" })),
+    el("div", { class: "wrap hero-inner" },
+      eyebrow("(01)", "QMHP-CEM — Computational Engineering Model"),
+      el("h1", { class: "display" },
+        el("span", { class: "line" }, el("span", null, "Evidence,")),
+        el("span", { class: "line" }, el("span", null, "not")),
+        el("span", { class: "line" }, el("span", null, el("em", null, "assertion.")))),
+      el("p", { class: "hero-lead" }, "A read-only window onto every record, gate and hash in this checkout: what was computed, what was only declared, and what still waits on hardware. Each label names the rule that put it there."),
+      el("div", { class: "hero-ctas" },
+        el("a", { class: "btn solid", href: "#/records" }, "Explore evidence records", arrow()),
+        el("a", { class: "btn", href: "#/classification" }, "How labels are assigned", arrow())),
+      el("div", { class: "hero-stats" },
+        [[d.counts.records, "Result records", "#/records"], [d.counts.candidates, "Candidates evaluated", "#/candidates"],
+          [d.hardware_gated_gates.length, "Hardware-gated gates", "#/gates"], [measuredCount, "Measured records", "#/classification"]]
+          .map(([v, k, href]) => el("a", { href }, el("span", { class: "v", "data-count": String(v) }, String(v)), el("span", { class: "k" }, k)))),
+      el("p", { class: "hero-caption" }, CAPTION))));
 
-  const basisRow = el("div", { class: "row" });
-  for (const [b, n] of Object.entries(d.by_basis)) {
-    basisRow.append(el("a", { href: `#/records?basis=${b}` }, basisBadge(b)), el("span", { class: "count" }, ` ${n}  `));
-  }
-  const famRow = el("div", { class: "row" });
-  const legend = Object.fromEntries((await get("/api/classification")).families.map((f) => [f.family, f]));
-  for (const [f, n] of Object.entries(d.by_status_family)) {
-    famRow.append(el("a", { href: `#/records?status=${q(f)}` }, badge(f, (legend[f] || {}).tone, (legend[f] || {}).meaning)),
-      el("span", { class: "count" }, ` ${n}  `));
-  }
-  frag.push(el("div", { class: "grid cols-2 mt" },
-    el("div", { class: "panel" }, el("h3", null, "Records by evidence basis"), basisRow,
-      el("p", { class: "small muted mt-s" }, "Assigned by the explicit rules on the Evidence classification page. MEASURED is never inferred.")),
-    el("div", { class: "panel" }, el("h3", null, "Headline status families"), famRow,
-      el("p", { class: "small muted mt-s" }, "Counts of records whose own headline fields carry a token in that family. Hover a badge for its meaning."))));
+  // 02 - the boundary, stated
+  const basisRows = Object.entries(d.by_basis).map(([b, n]) => el("a", { class: "spec-row", href: `#/records?basis=${b}` },
+    el("span", { class: "k" }, basisBadge(b)), el("span", { class: "v" }, (cls.bases.find((x) => x.basis === b) || {}).explanation || ""),
+    el("span", { class: "n", "data-count": String(n) }, String(n))));
+  out.push(el("section", { class: "section bleed" }, el("div", { class: "wrap split" },
+    el("div", { class: "reveal" }, eyebrow("(02)", "The hardware boundary"),
+      el("h2", { class: "statement" }, "A computational PASS is ", el("em", null, "not"), " hardware validation.")),
+    el("div", { class: "reveal d1" },
+      el("p", { class: "copy" }, d.measured_statement, " Every record carries an evidence basis assigned by an explicit, ordered rule, and every status badge quotes the record's own words."),
+      ...d.notes.map((n) => el("div", { class: "notice warn" }, el("span", { class: "ico" }, "NOTE"), el("div", { class: "body" }, n))),
+      el("div", { class: "spec mt" }, basisRows)))));
 
-  const latestRows = d.latest_by_family.map((r) => el("tr", null,
-    el("td", null, r.family), el("td", { class: "id" }, link(recordHref(r.id), r.id)),
-    el("td", { class: "nowrap small" }, fmtTs(r.timestamp)), el("td", null, basisBadge(r.basis)),
-    el("td", null, el("div", { class: "row" }, statusBadges(r.headline, 6)))));
-  frag.push(el("h2", null, "Latest record in each family"),
-    table(["Family", "Latest record", "Recorded", "Basis", "Headline status (as recorded)"], latestRows));
+  // 03 - gates only hardware can close
+  const hwRows = d.hardware_gated_gates.map((g) => el("div", { class: "spec-row" },
+    el("span", { class: "k" }, g.gate_id), el("span", { class: "v" }, g.title),
+    el("span", null, badge("HARDWARE-GATED", "gated", g.pass_permitted ? "PASS permitted" : "PASS is not in this gate's frozen allowed statuses"))));
+  out.push(el("section", { class: "section band-dark bleed" }, el("div", { class: "wrap split media-left" },
+    plate("assembly", { dark: true, label: "Fig. 01" }),
+    el("div", { class: "reveal d1" }, eyebrow("(03)", "Gates only hardware can close"),
+      el("h2", { class: "statement" }, "Some questions only a ", el("em", null, "cold"), " measurement answers."),
+      el("p", { class: "copy mt" }, "From master/validation_gates.yaml. These gates omit PASS from their frozen allowed statuses, so no simulated or model-derived result in this repository can close them."),
+      el("div", { class: "spec mt" }, hwRows.length ? hwRows : el("p", { class: "empty" }, "No frozen gate definitions in this checkout."))))));
 
-  const hw = d.hardware_gated_gates.map((g) => el("tr", null,
-    el("td", { class: "id" }, g.gate_id), el("td", null, g.title), el("td", null, badge("HARDWARE-GATED", "gated")),
-    el("td", { class: "small" }, g.pass_permitted ? "PASS permitted" : "PASS not in the frozen allowed statuses")));
-  frag.push(el("h2", null, "Gates that only hardware can close"),
-    el("p", { class: "muted" }, "From master/validation_gates.yaml. No computational result in this repository can make these PASS."),
-    table(["Gate", "Title", "Status", "Frozen rule"], hw));
+  // 04 - latest evidence per family
+  out.push(el("section", { class: "section bleed" }, el("div", { class: "wrap" },
+    el("div", { class: "sec-head reveal" }, el("div", null, eyebrow("(04)", "Latest evidence"), el("h2", null, "The newest record in each family")),
+      el("p", null, "Status badges are quoted verbatim from each record's headline fields. Hover one for its JSON path.")),
+    el("div", { class: "cards reveal d1" }, d.latest_by_family.map((r) => el("a", { class: "card", href: recordHref(r.id) },
+      el("span", { class: "fam" }, r.family), el("span", { class: "rid" }, r.id), el("span", { class: "when" }, fmtTs(r.timestamp)),
+      el("div", { class: "row" }, basisBadge(r.basis), statusBadges(r.headline, 5)),
+      el("div", { class: "foot" }, el("span", { class: "small muted" }, trunc(r.statement || "", 110)), el("span", { class: "go", "aria-hidden": "true" }, "→"))))))));
 
+  // 05 - status families as figures
+  const figs = Object.entries(d.by_status_family).map(([f, n]) => el("a", { class: "figure", href: `#/records?status=${q(f)}` },
+    el("div", { class: "v", "data-count": String(n) }, String(n)), el("div", { class: "k" }, badge(f, (legend[f] || {}).tone, (legend[f] || {}).meaning))));
+  out.push(el("section", { class: "section tight band-plate bleed" }, el("div", { class: "wrap" },
+    el("div", { class: "sec-head reveal" }, el("div", null, eyebrow("(05)", "Status at a glance"), el("h2", null, "Headline status families")),
+      el("p", null, "Records whose own headline fields carry a token in that family. A family only picks the colour; the token is always the record's.")),
+    el("div", { class: "figures reveal d1" }, figs))));
+
+  // 06 - frozen master and checkout
   const m = d.master || {};
-  frag.push(el("h2", null, "Frozen master"),
-    el("div", { class: "panel" }, kv([["Revision", m.revision], ["Status", m.status], ["Date", m.date]]),
-      (m.issues || []).length ? el("div", { class: "mt-s" },
-        (m.issues || []).map((iss) => el("div", { class: "row my-xs" },
-          badge(iss.status || "?", "caution"), el("span", { class: "mono small" }, iss.field),
-          el("span", { class: "small muted" }, trunc(iss.statement, 240))))) : null,
-      el("p", { class: "small mt-s" }, link("#/provenance", "Master digests, re-measured →"))));
+  const co = d.checkout;
+  out.push(el("section", { class: "section bleed" }, el("div", { class: "wrap split" },
+    el("div", { class: "reveal" }, eyebrow("(06)", "Frozen master"),
+      el("div", { class: "spec" },
+        [["Revision", m.revision], ["Status", m.status], ["Date", m.date]].map(([k, v]) => el("div", { class: "spec-row" }, el("span", { class: "k" }, k), el("span", { class: "v" }, v || "—"), el("span"))),
+        (m.issues || []).map((iss) => el("div", { class: "spec-row" }, el("span", { class: "k" }, String(iss.field).replace(/_/g, " ")), el("span", { class: "v small" }, trunc(iss.statement, 220)), badge(iss.status || "?", "caution")))),
+      el("p", { class: "mt" }, link("#/provenance", "Master digests, re-measured →", "link"))),
+    el("div", { class: "reveal d1" }, eyebrow("(07)", "This checkout"),
+      el("div", { class: "spec" },
+        co.available ? [["Branch", co.branch || (co.detached ? "(detached HEAD)" : "?")], ["HEAD", el("span", { class: "hash" }, co.head_sha)],
+          ["Read from", "git's own HEAD and ref files; no git command is run"]].map(([k, v]) => el("div", { class: "spec-row" }, el("span", { class: "k" }, k), el("span", { class: "v" }, v), el("span")))
+          : el("p", { class: "muted" }, `Commit identity unavailable: ${co.reason || "no git metadata"}.`))))));
 
-  frag.push(el("h2", null, "Checkout"), el("div", { class: "panel" },
-    co.available ? kv([["Branch", co.branch || (co.detached ? "(detached HEAD)" : "?")], ["HEAD", el("span", { class: "hash" }, co.head_sha)],
-      ["Read from", "git's own HEAD and ref files. No git command is run."]])
-      : el("p", { class: "muted" }, `Commit identity unavailable: ${co.reason || "no git metadata"}.`)));
-
-  frag.push(el("h2", null, "Not available in this viewer"),
-    el("div", { class: "panel locked" }, d.capabilities.unavailable.slice(0, 5).map((u) => lockedAction(u.action, u.reason)),
-      el("p", { class: "small" }, link("#/unavailable", `All ${d.capabilities.unavailable.length} unavailable actions →`))));
-  return frag;
+  // 08 - what the viewer will never do
+  out.push(el("section", { class: "section band-dark bleed" }, el("div", { class: "wrap split" },
+    el("div", { class: "reveal" }, eyebrow("(08)", "Unavailable by design"),
+      el("h2", { class: "statement" }, "What this viewer will ", el("em", null, "never"), " do."),
+      el("p", { class: "copy mt" }, "Not hidden, not behind a flag, not an admin mode. The code for these actions does not exist."),
+      el("a", { class: "btn mt", href: "#/unavailable" }, "All unavailable actions", arrow())),
+    el("div", { class: "locked reveal d1" }, d.capabilities.unavailable.map((u) => lockedAction(u.action, u.reason))))));
+  return out;
 }
 
 async function viewUnavailable() {
   const c = await get("/api/capabilities");
-  return [head("Unavailable actions", "This viewer is a display surface only. Anything below would change scientific or repository state, or start an execution, so it is not implemented - not hidden, not behind a flag, not an admin mode."),
+  return [pageHero("11", "Unavailable\nby design.", "This viewer is a display surface only. Anything below would change scientific or repository state, or start an execution, so it is not implemented - not hidden, not behind a flag, not an admin mode."),
     el("div", { class: "panel" }, kv([["HTTP methods served", c.http_methods.join(", ")], ["Writes", c.writes]])),
     el("div", { class: "panel locked" }, c.unavailable.map((u) => lockedAction(u.action, u.reason)))];
 }
@@ -393,7 +504,7 @@ async function viewRecords(params) {
         el("td", { class: "small" }, r.manifests.length ? `${r.manifests.length} manifest` : el("span", { class: "muted" }, "none"))))));
   }
   render();
-  return [head("Evidence records", "Every directory under results/, newest first. Status badges are tokens quoted from each record's own headline fields; hover for the JSON path and the full text."),
+  return [pageHero("03", "Evidence\nrecords.", "Every directory under results/, newest first. Status badges are tokens quoted from each record's own headline fields; hover for the JSON path and the full text."),
     el("div", { class: "filters" }, input, sel("basis", ["SYNTHETIC", "SOLVED", "MEASURED", "ANALYSIS", "DECLARATION", "UNCLASSIFIED"], "bases"),
       sel("status", statusFams, "status families"), sel("family", families, "families"), count),
     holder];
@@ -537,7 +648,7 @@ function runTable(runs) {
 }
 async function viewCandidates() {
   const d = await get("/api/candidates");
-  return [head("Candidate runs and results", "Candidates evaluated against the frozen gates, and the named runs each record lists. Candidate geometry is ENGINEERING-SEED throughout."),
+  return [pageHero("04", "Candidates\n& runs.", "Candidates evaluated against the frozen gates, and the named runs each record lists. Candidate geometry is ENGINEERING-SEED throughout.", "holder"),
     ...computationalNotice("SOLVED"),
     el("h2", null, `Candidates (${d.candidates.length})`), candidateTable(d.candidates),
     el("h2", null, `Runs (${d.runs.length})`), runTable(d.runs)];
@@ -547,7 +658,7 @@ async function viewCandidates() {
 async function viewGates() {
   const d = await get("/api/gates");
   const defs = d.definitions.gates || [];
-  const out = [head("Gate status and reasons", "The frozen gate definitions, every gate result the records carry with its recorded reason, and each record's own headline verdicts."), ...computationalNotice("SOLVED")];
+  const out = [pageHero("05", "Gates and\ntheir reasons.", "The frozen gate definitions, every gate result the records carry with its recorded reason, and each record's own headline verdicts.", "assembly"), ...computationalNotice("SOLVED")];
   out.push(el("h2", null, "Frozen gate definitions"),
     el("p", { class: "muted" }, d.definitions.path ? ["From ", link(fileHref(d.definitions.path), d.definitions.path), ". Allowed statuses are frozen data; hardware gates omit PASS."] : "master/validation_gates.yaml is not present in this checkout."),
     table(["Gate", "Title", "Kind", "Severity", "Required evidence", "Allowed statuses", "Hardware"], defs.map((g) => el("tr", null,
@@ -600,7 +711,7 @@ async function viewGates() {
 async function viewProvenance() {
   const d = await get("/api/provenance");
   const m = d.master;
-  const out = [head("Provenance and hashes", d.note)];
+  const out = [pageHero("06", "Provenance\n& hashes.", d.note, "panel")];
   if (m.present) {
     out.push(el("h2", null, "Frozen master layer"),
       el("div", { class: "panel" }, kv([["Revision", m.revision], ["Status", m.status], ["Date", m.date], ["Provenance file", link(fileHref(m.path), m.path)]]),
@@ -643,7 +754,7 @@ async function viewProvenance() {
 // ------------------------------------------------------------ experiments
 async function viewExperiments() {
   const d = await get("/api/experiments");
-  const out = [head("Experiments and frozen contracts", "The frozen requirements layer and data contracts, then each experiment directory with its execution state as its own files state it.")];
+  const out = [pageHero("02", "Experiments &\nfrozen contracts.", "The frozen requirements layer and data contracts, then each experiment directory with its execution state as its own files state it.", "wiring")];
   out.push(el("h2", null, "Frozen contracts"), el("div", { class: "grid cols-2" }, d.frozen_contracts.map((g) => el("div", { class: "panel" },
     el("h3", null, g.label), el("ul", null, g.files.map((f) => el("li", null, link(fileHref(f.path), f.path, "mono"), el("span", { class: "muted small" }, `  ${fmtSize(f.size)}`))))))));
   out.push(el("h2", null, `Experiments (${d.experiments.length})`));
@@ -708,7 +819,7 @@ async function viewExperiment(id) {
 // ------------------------------------------------------------------ audit
 async function viewAudit() {
   const [d, ap] = await Promise.all([get("/api/audit"), get("/api/approvals")]);
-  const out = [head("Execution state and audit trail", d.note)];
+  const out = [pageHero("07", "Execution &\naudit trail.", d.note)];
   if (d.experiment_states.length) {
     out.push(el("h2", null, "Execution state by experiment"), table(["Experiment", "State (as stated)", "Why", "Source"], d.experiment_states.map((s) => el("tr", null,
       el("td", { class: "id" }, link(`#/experiments/${q(s.experiment)}`, s.experiment)), el("td", null, badge(s.label, s.tone)),
@@ -763,7 +874,7 @@ async function viewCorrections() {
   };
   sel.addEventListener("change", render);
   render();
-  return [head("Correction records", "Corrections in this repository are made as new linked records; the originals are preserved."),
+  return [pageHero("08", "Corrections,\non the record.", "Corrections in this repository are made as new linked records; the originals are preserved."),
     el("div", { class: "notice info" }, el("span", { class: "ico" }, "SCOPE"), el("div", { class: "body" }, d.statement)),
     el("div", { class: "filters mt" }, sel, el("span", { class: "count" }, `${d.items.length} entries`)), holder];
 }
@@ -771,7 +882,7 @@ async function viewCorrections() {
 // --------------------------------------------------------- classification
 async function viewClassification() {
   const d = await get("/api/classification");
-  const out = [head("Synthetic vs solved vs measured", "Two questions are kept apart: what kind of evidence a record is (its basis), and what the record says about itself (its status tokens). Neither is invented by the viewer.")];
+  const out = [pageHero("09", "Synthetic, solved,\nmeasured.", "Two questions are kept apart: what kind of evidence a record is (its basis), and what the record says about itself (its status tokens). Neither is invented by the viewer.")];
   out.push(...computationalNotice("SOLVED"));
   out.push(el("div", { class: "notice info" }, el("span", { class: "ico" }, "MEASURED"), el("div", { class: "body" }, d.measured_statement)));
   out.push(el("div", { class: "grid cols-3 mt" }, d.bases.map((b) => el("div", { class: "panel" },
@@ -807,7 +918,7 @@ async function viewDocuments() {
   };
   input.addEventListener("input", render);
   render();
-  return [head("Documents", "Markdown documents and record reports in this checkout, rendered as text."), el("div", { class: "filters" }, input), holder];
+  return [pageHero("10", "Documents.", "Markdown documents and record reports in this checkout, rendered as text."), el("div", { class: "filters" }, input), holder];
 }
 
 // ------------------------------------------------------------------ files
@@ -898,25 +1009,43 @@ async function route() {
     const m = re.exec(path);
     if (!m) continue;
     clear(view);
-    view.append(el("p", { class: "loading" }, "Loading…"));
+    view.append(el("p", { class: "loading wrap" }, "Loading…"));
     try {
       const nodes = await fn(m, params);
       if (seq !== routeSeq) return;
-      clear(view);
-      view.append(...[nodes].flat(Infinity).filter(Boolean));
+      render([nodes].flat(Infinity).filter(Boolean), section === "overview");
     } catch (e) {
       if (seq !== routeSeq) return;
-      clear(view);
-      view.append(el("h1", null, e.status === 404 ? "Not found" : e.status === 403 ? "Refused" : "Could not load"),
+      render([el("div", { class: "page-head" }, el("div", null,
+        el("h1", null, e.status === 404 ? "Not found" : e.status === 403 ? "Refused" : "Could not load"),
         el("p", { class: "error" }, e.message), e.detail ? el("p", { class: "muted" }, e.detail) : null,
-        el("p", null, link("#/overview", "Back to the overview")));
+        el("p", null, link("#/overview", "Back to the overview", "link"))))], false);
     }
     view.focus({ preventScroll: true });
     window.scrollTo(0, 0);
     return;
   }
+  render([el("div", { class: "page-head" }, el("div", null, el("h1", null, "No such page"),
+    el("p", null, link("#/overview", "Back to the overview", "link"))))], false);
+}
+
+// Full-bleed sections go straight into <main>; everything else is grouped into the
+// centred page column.
+function render(nodes, onHero) {
   clear(view);
-  view.append(el("h1", null, "No such page"), el("p", null, link("#/overview", "Back to the overview")));
+  document.body.classList.toggle("on-hero", onHero);
+  document.body.classList.remove("head-hidden");
+  let column = null;
+  for (const node of nodes) {
+    if (node.classList && node.classList.contains("bleed")) {
+      column = null;
+      view.append(node);
+    } else {
+      if (!column) { column = el("div", { class: "wrap page-body" }); view.append(column); }
+      column.append(node);
+    }
+  }
+  enhance(view);
 }
 
 async function boot() {
@@ -926,13 +1055,13 @@ async function boot() {
   });
   try {
     const co = await get("/api/checkout");
-    const chip = document.getElementById("checkout-chip");
-    chip.textContent = co.available ? `${co.branch || "detached"} @ ${shortSha(co.head_sha)}` : "checkout: no git metadata";
-    chip.title = co.available ? `HEAD ${co.head_sha}, read from git's files (no git command run)` : (co.reason || "");
+    const where = co.available ? `Checkout ${co.branch || "detached"} @ ${shortSha(co.head_sha)}` : "Checkout: no git metadata";
+    document.querySelectorAll(".checkout-text").forEach((n) => { n.textContent = where; });
     const cls = await get("/api/classification");
-    document.getElementById("measured-strip").textContent = cls.measured_statement;
-  } catch (_) { /* the page still works without the chip */ }
+    document.querySelectorAll(".measured-text").forEach((n) => { n.textContent = cls.measured_statement; });
+  } catch (_) { /* the page still works without the ticker text */ }
   window.addEventListener("hashchange", route);
+  onScroll();
   route();
 }
 boot();

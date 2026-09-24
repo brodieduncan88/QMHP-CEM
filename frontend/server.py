@@ -27,7 +27,10 @@ from .repo_fs import AccessDenied, NotFound, TooLarge
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 STATIC_TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
-                ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml"}
+                ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".webp": "image/webp"}
+#: The viewer's own assets: flat names, plus decorative photographs under img/. No
+#: other subdirectory, no dot-segments, no repository file is ever reachable here.
+STATIC_NAME = re.compile(r"[a-z0-9_\-]+\.(html|js|css|svg)|img/[a-z0-9_\-]+\.webp")
 _ID = r"(?P<id>[A-Za-z0-9][A-Za-z0-9._\-]{0,199})"
 
 #: (pattern, adapter method, takes) - the complete route table. All are GET/HEAD.
@@ -126,7 +129,7 @@ class ReadOnlyHandler(BaseHTTPRequestHandler):
             name = path[len("/static/"):]
         else:
             return HTTPStatus.NOT_FOUND, "text/plain; charset=utf-8", b"not found"
-        if not re.fullmatch(r"[a-z0-9_\-]+\.(html|js|css|svg)", name):
+        if not STATIC_NAME.fullmatch(name):
             return HTTPStatus.NOT_FOUND, "text/plain; charset=utf-8", b"not found"
         full = os.path.join(STATIC_DIR, name)
         if not os.path.isfile(full):

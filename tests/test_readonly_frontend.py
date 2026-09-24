@@ -399,6 +399,23 @@ def test_exercising_every_route_changes_nothing_in_the_repository(live_repo_serv
     assert git_meta_snapshot(REPO_ROOT) == git_before
 
 
+def test_static_route_serves_only_the_viewers_own_assets(live_repo_server):
+    """Decorative images are served from frontend/static/img/ as image/webp; nothing else
+    under that prefix, and no dot-segment or repository path, is reachable."""
+    images = sorted((FRONTEND / "static" / "img").glob("*.webp"))
+    assert images, "the viewer ships its decorative images"
+    for img in images:
+        status, headers, body = live_repo_server.request("GET", f"/static/img/{img.name}")
+        assert status == 200 and headers["Content-Type"] == "image/webp", img.name
+        assert body[:4] == b"RIFF" and body[8:12] == b"WEBP", img.name
+    for bad in ("/static/img/../app.js", "/static/img/%2e%2e/app.js", "/static/img/x.jpg",
+                "/static/img/sub/x.webp", "/static/img/", "/static/../frontend/server.py",
+                "/static/img/..%2f..%2fREADME.md", "/static/README.md", "/results/README.md"):
+        status, _h, body = live_repo_server.request("GET", bad)
+        assert status == 404, (bad, status)
+        assert b"import" not in body and b"QMHP-CEM" not in body, bad
+
+
 def test_file_endpoint_is_confined_to_the_repository(fixture_repo):
     server = Server(fixture_repo)
     try:
