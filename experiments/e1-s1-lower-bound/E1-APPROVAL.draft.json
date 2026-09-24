@@ -1,0 +1,59 @@
+{
+ "DRAFT": "NOT AN APPROVAL. This is the approval a human would grant for E1, prepared for review. The driver reads only E1-APPROVAL.json, and this file authorises nothing. E1 is PREPARED, NOT APPROVED, NOT EXECUTED.",
+ "how_to_grant_it": "A human who approves writes experiments/e1-s1-lower-bound/E1-APPROVAL.json containing every field below except DRAFT, how_to_grant_it and does_not_authorise. source_commit is replaced by the full SHA of the reviewed commit, which must be HEAD at execution. not_before_utc and not_after_utc are replaced by ISO-8601 UTC times at most 7 days apart. tolerance_scope_decision is replaced by one of ['COPIED_NUMBERS_WITHIN_SCOPE', 'COPIED_NUMBERS_EXCLUDED'] (contract section 7: whether numbers E1 only copies from the frozen static study are within the section 7 rule). q2_within_D5 is replaced by true (Q2 stays, contract section 1) or false (Q2 is dropped before execution). Every other field is copied unchanged. The driver refuses, spending nothing, if any digest, the environment, the invocation, the budget, the checkout path, HEAD or the time differs. Running it spends the one attempt before any control runs: it creates <git common directory>/qmhp-attempts/E1-S1-LOWER-BOUND.json and ATTEMPT-SPENT.json exclusively and renames E1-APPROVAL.json to E1-APPROVAL.consumed.json. After the run, whatever the outcome, the record, ATTEMPT-SPENT.json and E1-APPROVAL.consumed.json are committed together before the environment is discarded; if no record directory exists, the git-common-directory entry is first copied byte for byte to experiments/e1-s1-lower-bound/ATTEMPT-LEDGER-NOTE.json and committed with them.",
+ "authorises": "one execution of E1, the static-capacitance lower-bound certificate for the S1 island (problem C)",
+ "attempt": 1,
+ "prior_records": [],
+ "contract_sha256": "24ffff7d92c93757a13f9f6ba4505598be83b1628f4c5d6912c6abbbbdaf504c",
+ "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+ "baseline_manifest_sha256": "e3e447068dea6b4c2790c29de7a34be77f971717fa6e40964f6e31fdee193622",
+ "baseline_summary_sha256": "7eca21f3688a662f0324003093de2902cfbd67503fa0de71f5c028df13181298",
+ "code_sha256": {
+  "driver.py": "d2bcff929f6c09f8d897a82ceb0ecd470d63a055093ab17551c2fdef1d8cd43d",
+  "e1_numerics.py": "513c0ddfbdf3927bee0e4d025b9e3537a55488a63eeed8402f35c01861ec26be",
+  "e1_geometry.py": "fb88d72d3a3e28ed27bb040eb083b8b7344a85f82c8a9a45c8d361e03489c772",
+  "e1_controls.py": "bb3ae0c8dff4bd8e7e715281c18d8639bcaf7ef2013f4b640def8a907f2625fa",
+  "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
+  "orchestrator/manifest.py": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f"
+ },
+ "environment": {
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "glibc": "2.39",
+  "longdouble_nmant": 63,
+  "threads_env": {
+   "OPENBLAS_NUM_THREADS": "1",
+   "OMP_NUM_THREADS": "1",
+   "MKL_NUM_THREADS": "1"
+  }
+ },
+ "invocation": "env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 timeout --signal=KILL 1260 .venv/bin/python experiments/e1-s1-lower-bound/driver.py",
+ "budget": {
+  "cpu_soft_s": 900,
+  "cpu_hard_s": 960,
+  "address_space_bytes": 4294967296,
+  "address_space_hard_headroom_bytes": 1073741824,
+  "wall_alarm_s": 1200,
+  "outer_kill_s": 1260,
+  "attempts": 1,
+  "retry": "none"
+ },
+ "gamma": "1e-6",
+ "tolerance_set": "T0",
+ "repository_path": "/home/user/QMHP-CEM",
+ "source_commit": "<the full SHA of the reviewed commit; must equal HEAD at execution>",
+ "not_before_utc": "<ISO-8601 UTC>",
+ "not_after_utc": "<ISO-8601 UTC, at most 7 days after not_before_utc>",
+ "tolerance_scope_decision": "<one of ['COPIED_NUMBERS_WITHIN_SCOPE', 'COPIED_NUMBERS_EXCLUDED']>",
+ "q2_within_D5": "<true or false>",
+ "does_not_authorise": [
+  "a second attempt, whatever the first one's outcome",
+  "running from another checkout, another commit or outside the validity window",
+  "removing or editing ATTEMPT-SPENT.json, the git-common-directory ledger entry, E1-APPROVAL.consumed.json or the record",
+  "any further capacitance computation on S1 after E1 (contract section 8 stop rule)",
+  "any E_C, g, GHz, MHz, deviation or suitability statement from any E1 number",
+  "any tolerance T1-T4 not adopted by a recorded human decision before this approval",
+  "any Palace solve, Route A inversion, workflow dispatch or physical extraction"
+ ]
+}

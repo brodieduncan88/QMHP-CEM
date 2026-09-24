@@ -1,0 +1,31 @@
+{
+ "mode": "proxy-A g_E",
+ "configuration": {
+  "h_um": 1.25,
+  "w_mm": 0.48,
+  "n": 32,
+  "q": 3.5,
+  "kappa": 1.25
+ },
+ "N": 4080,
+ "path": "cholesky",
+ "pivot_ratio_squared": 8.68007994366439e-05,
+ "g_E": 9.239134501341698e-11,
+ "g_E_within_1e-9": true,
+ "width_rel_c64": 3.853149975272861e-08,
+ "resources": {
+  "wall_s": 34.371013733999916,
+  "cpu_s": 35.182074,
+  "max_rss_bytes": 260612096,
+  "peak_address_space_bytes": 465313792
+ },
+ "code_sha256": {
+  "driver.py": "d2bcff929f6c09f8d897a82ceb0ecd470d63a055093ab17551c2fdef1d8cd43d",
+  "e1_numerics.py": "513c0ddfbdf3927bee0e4d025b9e3537a55488a63eeed8402f35c01861ec26be",
+  "e1_geometry.py": "fb88d72d3a3e28ed27bb040eb083b8b7344a85f82c8a9a45c8d361e03489c772",
+  "e1_controls.py": "bb3ae0c8dff4bd8e7e715281c18d8639bcaf7ef2013f4b640def8a907f2625fa",
+  "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
+  "orchestrator/manifest.py": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f",
+  "e1_standin.py": "af183c6342b986c0cd2a3743d35974555c15319bc6be8185a2cd26e3176ddda2"
+ }
+}

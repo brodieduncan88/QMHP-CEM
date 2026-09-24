@@ -1,0 +1,125 @@
+{
+ "mode": "confirmation-nominal",
+ "limits": {
+  "cpu_soft_s": 900,
+  "cpu_hard_s": 960,
+  "address_space_bytes": 4294967296,
+  "address_space_hard_bytes": 5368709120,
+  "wall_alarm_s": 1199,
+  "wall_alarm_from_start_s": 1200,
+  "stop_signals": [
+   "SIGXCPU",
+   "SIGALRM",
+   "SIGTERM",
+   "SIGHUP",
+   "SIGINT"
+  ]
+ },
+ "resources": {
+  "wall_s": 288.99532348799994,
+  "cpu_s": 287.952927,
+  "max_rss_bytes": 1338753024,
+  "peak_address_space_bytes": 1532497920
+ },
+ "confirmation_limits": {
+  "cpu_s": 450.0,
+  "peak_address_space_bytes": 2147483648
+ },
+ "cpu_within_limit": true,
+ "peak_within_limit": true,
+ "stand_in": {
+  "N": 9995,
+  "N_x": 6710,
+  "n_island": 1024,
+  "sheet_panels": 58116
+ },
+ "outcome_on_stand_in": "QUALIFIED",
+ "problems_on_stand_in": [],
+ "paths": {
+  "E1.2": "cholesky",
+  "E1.2-excl-R1": "cholesky",
+  "E1.1": "cholesky",
+  "E1.1-half": "cholesky"
+ },
+ "K4": {
+  "inequalities": [
+   {
+    "inequality": "1",
+    "larger_set": "E1.1",
+    "smaller_set": "E1.1-half",
+    "status": "PASS"
+   },
+   {
+    "inequality": "2",
+    "larger_set": "E1.2-excl-R1",
+    "smaller_set": "E1.1",
+    "status": "PASS"
+   },
+   {
+    "inequality": "3",
+    "larger_set": "E1.2",
+    "smaller_set": "E1.2-excl-R1",
+    "status": "PASS"
+   }
+  ],
+  "failed": []
+ },
+ "per_set": {
+  "E1.2": {
+   "path": "cholesky",
+   "m": 1331,
+   "width_rel": 7.581850187517755e-08,
+   "check_g_rel": 2.7710553389662626e-10,
+   "g_E": 2.77105512810114e-10
+  },
+  "E1.2-excl-R1": {
+   "path": "cholesky",
+   "m": 1331,
+   "width_rel": 6.729275873034593e-08,
+   "check_g_rel": 2.4815499592602894e-10,
+   "g_E": 2.481549791654149e-10
+  },
+  "E1.1": {
+   "path": "cholesky",
+   "m": 521,
+   "width_rel": 1.91317969412181e-08,
+   "check_g_rel": 1.7772945105872064e-10,
+   "g_E": 1.777294476268492e-10
+  },
+  "E1.1-half": {
+   "path": "cholesky",
+   "m": 512,
+   "width_rel": 2.8718214920556896e-10,
+   "check_g_rel": 1.8925857383655808e-12,
+   "g_E": 1.8925857378184824e-12
+  }
+ },
+ "evidence_writes": {
+  "files": [
+   "controls.json",
+   "geometry.json",
+   "sigma-E1.2.json",
+   "sigma-E1.2-excl-R1.json",
+   "sigma-E1.1.json",
+   "sigma-E1.1-half.json",
+   "pass-E1.2+E1.2-excl-R1.json",
+   "pass-E1.1.json",
+   "pass-E1.1-half.json",
+   "internal-sets.json",
+   "summary.json"
+  ],
+  "manifest_verify": []
+ },
+ "summary_outcome_on_stand_in": "QUALIFIED",
+ "preflight_problems_on_this_host": [],
+ "s1_capacitance_computed": false,
+ "code_sha256": {
+  "driver.py": "d2bcff929f6c09f8d897a82ceb0ecd470d63a055093ab17551c2fdef1d8cd43d",
+  "e1_numerics.py": "513c0ddfbdf3927bee0e4d025b9e3537a55488a63eeed8402f35c01861ec26be",
+  "e1_geometry.py": "fb88d72d3a3e28ed27bb040eb083b8b7344a85f82c8a9a45c8d361e03489c772",
+  "e1_controls.py": "bb3ae0c8dff4bd8e7e715281c18d8639bcaf7ef2013f4b640def8a907f2625fa",
+  "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
+  "orchestrator/manifest.py": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f",
+  "e1_standin.py": "af183c6342b986c0cd2a3743d35974555c15319bc6be8185a2cd26e3176ddda2"
+ }
+}
