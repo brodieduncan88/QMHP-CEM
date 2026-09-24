@@ -2,8 +2,9 @@
 # Proprietary QMHP-CEM source. No licence is granted except by explicit written agreement.
 """E1 - the static-capacitance lower-bound certificate for the S1 island: tests of the frozen
 implementation (experiments/e1-s1-lower-bound) against the frozen contract
-E1-CONTRACT.rev8.4.md (revision 8.3 with the structural separation rule and the corrected
-statements of D15; its sha256 is pinned below and in the driver).
+E1-CONTRACT.rev8.5.md (revision 8.4, which is revision 8.3 with the structural separation rule
+and the corrected statements of D15, with the two text corrections of D16; its sha256 is pinned
+below and in the driver).
 
 Synthetic data only, apart from the S1 GEOMETRY phase, which reads the pinned mesh and
 assembles no matrix. No test computes an S1 capacitance, assembles an S1 matrix, runs
@@ -47,11 +48,13 @@ import e1_standin as es  # noqa: E402
 
 manifest = dr.manifest
 REAL_REQUIRE_APPROVAL = dr.require_approval
-CONTRACT_TEXT = (HERE / "E1-CONTRACT.rev8.4.md").read_text()
+CONTRACT_TEXT = (HERE / "E1-CONTRACT.rev8.5.md").read_text()
 CONTRACT_8_2 = HERE / "E1-CONTRACT.rev8.2.md"
 CONTRACT_8_3 = HERE / "E1-CONTRACT.rev8.3.md"
 CONTRACT_8_3_SHA256 = "2b9b9357bb438987723914727a851161201a7a9f477aa66ae674fb0ed9d6b296"
+CONTRACT_8_4 = HERE / "E1-CONTRACT.rev8.4.md"
 CONTRACT_8_4_SHA256 = "cdf6cced13e1965bbf017a4a7d3d4af0f661df0ca921e6dd69335b4a68971740"
+CONTRACT_8_5_SHA256 = "2db93be49ee455f1da952acbe300f370d7614a8986c4151a9563adf805f00150"
 #: the implementation reviewed at 90bf9eb (frozen against revision 8.2); its committed pre-approval
 #: evidence is superseded (the Confirmation's stand-in island was S1's island, finding D-1) and is
 #: kept unchanged pending regeneration after the corrected separation has passed review
@@ -137,14 +140,63 @@ def sets():
 
 # === frozen inputs ================================================================================
 
-def test_the_contract_in_the_directory_is_the_frozen_revision_8_4_and_8_3_and_8_2_are_kept():
-    assert dr.CONTRACT_SHA256 == CONTRACT_8_4_SHA256 and dr.CONTRACT.name == "E1-CONTRACT.rev8.4.md"
+def test_the_contract_in_the_directory_is_the_frozen_revision_8_5_and_8_4_8_3_8_2_are_kept():
+    assert dr.CONTRACT_SHA256 == CONTRACT_8_5_SHA256 and dr.CONTRACT.name == "E1-CONTRACT.rev8.5.md"
     assert _sha(dr.CONTRACT) == dr.CONTRACT_SHA256
-    assert CONTRACT_TEXT.startswith("# E1 ") and "revision 8.4" in CONTRACT_TEXT.splitlines()[0]
+    assert CONTRACT_TEXT.startswith("# E1 ") and "revision 8.5" in CONTRACT_TEXT.splitlines()[0]
+    assert _sha(CONTRACT_8_4) == CONTRACT_8_4_SHA256
     assert _sha(CONTRACT_8_3) == CONTRACT_8_3_SHA256
     assert _sha(CONTRACT_8_2) == "24ffff7d92c93757a13f9f6ba4505598be83b1628f4c5d6912c6abbbbdaf504c"
     for name in E1_SOURCES:
-        assert "rev8.4" in (HERE / name).read_text(), name
+        assert "rev8.5" in (HERE / name).read_text(), name
+
+
+def _contract_diff(old_path: Path, new_text: str) -> tuple[list, list]:
+    import difflib
+    old, new = old_path.read_text().splitlines(), new_text.splitlines()
+    removed, added = [], []
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(a=old, b=new, autojunk=False).get_opcodes():
+        if tag in ("replace", "delete"):
+            removed += old[i1:i2]
+        if tag in ("replace", "insert"):
+            added += new[j1:j2]
+    return removed, added
+
+
+#: every line of the frozen revision 8.4 that revision 8.5 replaces (by its start): the three
+#: bookkeeping lines, the Tolerance bullet of section 3.2 item 2 (F1) and the section 6 ground
+#: bullets (T1)
+REPLACED_8_4 = [
+    "# E1 — static-capacitance lower-bound certificate", "**Status: revision 8.4 (revision 8.3 with",
+    "- **Superseded drafts.** Revisions 1–8.3.", "       - **Tolerance.** Bounds agree if they differ by at most",
+    "  - **The stand-in's ground (D15).** The ground is synthetic", "    - So the E1.2 of the prototype and of the `90bf9eb`",
+]
+
+
+def test_revision_8_5_changes_only_the_prototype_ground_statement_and_the_completeness_claim_of_d16():
+    """The diff from the frozen revision 8.4 replaces exactly the REPLACED_8_4 lines, and every
+    added line belongs to D16: the prototype's reduced run (T1), the proven completeness of the
+    separation check (F1), the revision-8.4 row of section 9 or section 15. Every section of
+    physics, configuration, thresholds, controls, Q2/C_br and scope is byte-identical."""
+    removed, added = _contract_diff(CONTRACT_8_4, CONTRACT_TEXT)
+    assert len(removed) == len(REPLACED_8_4) and all(any(r.startswith(m) for r in removed) for m in REPLACED_8_4), removed
+    markers = ("revision 8.5", "Revision 8.4 is frozen", "D16", "Superseded drafts", "Status: revision 8.5",
+               "prototype's reduced run", "`run8_small`", "full-size", "**Tolerance.**", "What the frozen check is proven",
+               "δ is the baseline", "For M of the order of 1 mm", "It may also refuse", "The stand-in's ground (D15)",
+               "frozen revision 8.4", "## 15.", "| finding", "|---|---|", "| T1", "| F1", "Nothing else changes",
+               "**The other findings**", "approval number", "test suite", "separation tests", "", "confirmed findings",
+               "The separation check's completeness", "The approval parsing", "The physics, the configuration")
+    stray = [ln for ln in added if not any(m in ln for m in markers)]
+    assert stray == [], stray
+    def section(text, head, nxt):
+        return text[text.index(head):text.index(nxt)]
+    old = CONTRACT_8_4.read_text()
+    for head, nxt in (("## 1. The quantity", "## 3. Geometry"), ("### 3.1 Fixed geometric", "### 3.2 Selection"),
+                      ("### 3.3 Expected counts", "## 6. Resources"), ("## 7. Tolerance rule", "## 9. Inputs"),
+                      ("## 10. What E1 cannot", "## 14.")):
+        assert section(CONTRACT_TEXT, head, nxt) == section(old, head, nxt), head
+    assert "The frozen check finds every image within that tolerance." in old
+    assert "The frozen check finds every image within that tolerance." not in CONTRACT_TEXT
 
 
 #: every line of the frozen revision 8.3 that revision 8.4 replaces (by its start): the three
@@ -164,19 +216,14 @@ REPLACED_8_3 = [
 ]
 
 
-def test_revision_8_4_changes_only_the_separation_rule_the_proxy_A_clause_and_the_statements_of_d15():
-    """The diff from the frozen revision 8.3 replaces exactly the REPLACED_8_3 lines, and every
-    added line belongs to D15: the separation rule, proxy A, the corrected statements of what was
-    computed, the revision-8.3 row of section 9 or section 14. No line of physics,
-    configuration, thresholds, controls, Q2/C_br or scope is removed or changed."""
-    import difflib
-    old, new = CONTRACT_8_3.read_text().splitlines(), CONTRACT_TEXT.splitlines()
-    removed, added = [], []
-    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(a=old, b=new, autojunk=False).get_opcodes():
-        if tag in ("replace", "delete"):
-            removed += old[i1:i2]
-        if tag in ("replace", "insert"):
-            added += new[j1:j2]
+def test_the_kept_revision_8_4_changed_only_the_separation_rule_the_proxy_A_clause_and_the_statements_of_d15():
+    """History (revision 8.4 is kept byte-unchanged): its diff from the frozen revision 8.3
+    replaces exactly the REPLACED_8_3 lines, and every added line belongs to D15: the separation
+    rule, proxy A, the corrected statements of what was computed, the revision-8.3 row of
+    section 9 or section 14. No line of physics, configuration, thresholds, controls, Q2/C_br or
+    scope is removed or changed."""
+    text_8_4 = CONTRACT_8_4.read_text()
+    removed, added = _contract_diff(CONTRACT_8_3, text_8_4)
     assert len(removed) == len(REPLACED_8_3) and all(any(r.startswith(m) for r in removed) for m in REPLACED_8_3), removed
     markers = ("revision 8.4", "Revision 8.3 is frozen", "D15", "D14", "synthetic", "Synthetic", "Separation",
                "**Image.**", "**Tolerance.**", "**Permitted.**", "**When the check runs.**", "control sets are checked",
@@ -190,7 +237,7 @@ def test_revision_8_4_changes_only_the_separation_rule_the_proxy_A_clause_and_th
                "No exploratory S1 capacitance value", "Meaning of", "prototype's stand-in", "Each proxy of item 5")
     stray = [ln for ln in added if not any(m in ln for m in markers)]
     assert stray == [], stray
-    for text in (CONTRACT_TEXT, CONTRACT_8_3.read_text()):
+    for text in (text_8_4, CONTRACT_8_3.read_text()):
         for sec in ("## 1. The quantity", "### 3.1 Fixed geometric", "### 3.3 Expected counts", "### 4.4 Assumption",
                     "### 4.5 Trial vector", "## 7. Tolerance rule", "## 8. One attempt", "## 10. What E1 cannot"):
             assert sec in text
@@ -199,7 +246,7 @@ def test_revision_8_4_changes_only_the_separation_rule_the_proxy_A_clause_and_th
     for head, nxt in (("## 1. The quantity", "## 3. Geometry"), ("### 3.1 Fixed geometric", "### 3.2 Selection"),
                       ("### 3.3 Expected counts", "### 4.3 Entries"), ("### 4.4 Assumption", "## 5. Controls"),
                       ("## 7. Tolerance rule", "## 9. Inputs"), ("## 10. What E1 cannot", "## 13.")):
-        assert section(CONTRACT_TEXT, head, nxt) == section(CONTRACT_8_3.read_text(), head, nxt), head
+        assert section(text_8_4, head, nxt) == section(CONTRACT_8_3.read_text(), head, nxt), head
 
 
 def test_every_new_source_file_carries_the_proprietary_header():
@@ -966,6 +1013,43 @@ def test_a_repeated_member_inside_a_bound_object_and_a_non_standard_constant_are
     assert dr.require_approval(raw=text.encode())["attempt"] == 1          # the control: accepted
 
 
+def _approval_text_with(where: str, literal: str) -> str:
+    text = json.dumps(json.loads(_approval(does_not_authorise=dr.draft_approval()["does_not_authorise"])))
+    if where == "attempt":
+        return text.replace('"attempt": 1', f'"attempt": {literal}', 1)
+    if where == "does_not_authorise element":
+        return text.replace('"does_not_authorise": [', f'"does_not_authorise": [{literal}, ', 1)
+    if where == "budget.cpu_soft_s":
+        return text.replace('"cpu_soft_s": 900', f'"cpu_soft_s": {literal}', 1)
+    return text[:-1] + f', "note": {literal}}}'
+
+
+@pytest.mark.parametrize("where, literal, needle", [
+    ("attempt", "1e400", "overflows float64"), ("attempt", "-1e400", "overflows float64"),
+    ("attempt", "1E309", "overflows float64"), ("does_not_authorise element", "1e400", "overflows float64"),
+    ("budget.cpu_soft_s", "2e308", "overflows float64"), ("an unknown member", "1e999", "overflows float64"),
+    ("attempt", "9" * 5000, "not JSON the driver can read"),
+    ("an unknown member", "[" * 200000 + "]" * 200000, "not JSON the driver can read"),
+    ("attempt", "1e308", "attempt does not match"),                     # the control: finite, and not 1
+])
+def test_an_approval_number_that_overflows_or_cannot_be_read_is_refused_never_raised(where, literal, needle):
+    """R1-M1: a number literal that overflows float64 (1e400 parses to inf) refuses, as do an
+    integer beyond Python's digit limit and nesting beyond the recursion limit. Nothing raises
+    past require_approval as another exception type."""
+    with pytest.raises(dr.Refusal, match=needle):
+        dr.require_approval(raw=_approval_text_with(where, literal).encode())
+
+
+def test_an_overflowing_approval_number_is_refused_by_main_with_nothing_spent(tmp_path, monkeypatch, sets, capsys):
+    _gate(tmp_path, monkeypatch, sets)
+    monkeypatch.setattr(dr, "require_approval", REAL_REQUIRE_APPROVAL)
+    dr.APPROVAL.write_text(json.dumps(_full_approval()).replace('"attempt": 1', '"attempt": 1e400', 1))
+    assert dr.main([]) == 2
+    err = capsys.readouterr().err
+    assert "REFUSED (nothing spent)" in err and "overflows float64" in err
+    assert dr.spent_state() == [] and dr.APPROVAL.exists() and not (tmp_path / "results").exists()
+
+
 def test_an_approval_window_longer_than_seven_days_or_unparseable_is_refused():
     now = datetime.now(timezone.utc)
     with pytest.raises(dr.Refusal, match="longer than 7 days"):
@@ -1132,7 +1216,7 @@ def test_a_failure_before_the_first_ledger_entry_spends_nothing(tmp_path, monkey
 
 @pytest.mark.parametrize("patch, needle", [
     ("preflight", "section 8 refusal condition"), ("invocation", "invocation differs"),
-    ("unbound", "does not bind"), ("budget", "hard limit"), ("contract", "not the frozen E1-CONTRACT.rev8.4.md (sha256"),
+    ("unbound", "does not bind"), ("budget", "hard limit"), ("contract", "not the frozen E1-CONTRACT.rev8.5.md (sha256"),
 ])
 def test_every_pre_attempt_refusal_spends_nothing(tmp_path, monkeypatch, sets, patch, needle):
     _gate(tmp_path, monkeypatch, sets)
@@ -1569,6 +1653,143 @@ def test_a_set_that_contains_no_image_of_an_S1_set_passes(case):
     non-symmetry map is not an image; and a near-copy beyond the tolerance is outside the rule
     (D15), which makes no claim about it."""
     assert es.separation_problems({"X": NEGATIVE[case]()}, S1_ISLAND_SETS) == []
+
+
+# --- revision 8.5 (T3): an asymmetric E1.2 case that exercises the symmetry handling, the
+# matching and the second-anchor logic each on its own, so that removing any one is detected.
+# E1.1 and E1.1-half are invariant under every symmetry up to translation, so they cannot.
+
+#: the eight symmetries, listed here independently of es._SYMMETRIES (the code under test)
+EIGHT = [(False, 1, 1), (False, -1, 1), (False, 1, -1), (False, -1, -1),
+         (True, 1, 1), (True, -1, 1), (True, 1, -1), (True, -1, -1)]
+
+
+def _asymmetric_e12() -> np.ndarray:
+    """A synthetic E1.2 case with no symmetry (never S1): an 8 x 8 graded island at (-0.6, 0)
+    (the section 3.1 formula with n = 8, q = 2) with its y coordinates scaled by 0.8, so no
+    exchange of x and y or rotation maps it to itself; 20 um ground squares on a 40 um pitch
+    around it, with one corner block left out, so no reflection does. Order: island, ground."""
+    isl = eg.island_panels(8, 2.0).copy()
+    isl[:, 2:] *= 0.8
+    g = []
+    for i in range(-12, 12):
+        for j in range(-12, 12):
+            x0, y0 = -0.6 + 0.04 * i, 0.04 * j
+            if max(abs(x0 + 0.01 + 0.6), abs(y0 + 0.01)) < 0.12 or (i >= 6 and j >= 6):
+                continue
+            g.append((x0, x0 + 0.02, y0, y0 + 0.02))
+    return np.concatenate([isl, np.array(g)])
+
+
+E12 = _asymmetric_e12()
+
+
+def _eps(X) -> float:
+    M = float(np.abs(es.normalised(X)).max())
+    return es.SEPARATION_RHO * M + 2.0 ** -44 * M
+
+
+def test_the_asymmetric_E1_2_case_has_no_symmetry(monkeypatch):
+    """The precondition of the tests below: with the symmetry handling reduced to the identity,
+    no non-identity symmetric image of the case is found in it (so only the right symmetry can
+    find such an image)."""
+    monkeypatch.setattr(es, "_SYMMETRIES", [(False, 1, 1)])
+    assert es.find_embedding(E12, E12) is not None
+    for sym in EIGHT[1:]:
+        assert es.find_embedding(_symmetry(E12, *sym) + 0.37, E12) is None, sym
+
+
+@pytest.mark.parametrize("sym", EIGHT)
+def test_every_symmetric_image_of_an_asymmetric_E1_2_is_found_with_its_own_symmetry(sym):
+    """Symmetry handling (T3): the image under each of the eight symmetries, scaled, translated,
+    permuted, with some bounds reversed and embedded among other panels, is found, and only with
+    the symmetry that made it (the case has no symmetry). Dropping any symmetry from the code
+    under test fails its case."""
+    X = _symmetry(E12, *sym) * 0.7 + np.array([0.31, 0.31, -0.17, -0.17])
+    X = X[_RNG.permutation(len(X))]
+    X[::3] = X[::3][:, [1, 0, 3, 2]]
+    X = np.concatenate([_extra_ground()[:50], X])
+    bad = es.separation_problems({"X": X}, {"E1.2": E12})
+    assert len(bad) == 1 and "contains, as an embedded subset, an image of the S1 set E1.2" in bad[0], bad
+    hit = es.find_embedding(X, E12)
+    got = hit["symmetry"]
+    assert (got["exchange_x_y"], got["x_sign"], got["y_sign"]) == sym and hit["scale"] == pytest.approx(0.7)
+    _verify_map(X, E12, hit)
+
+
+def test_the_matching_step_refuses_a_set_that_cannot_give_every_panel_its_own_panel():
+    """Matching (T3): the case with a near-duplicate panel added (within the tolerance of its
+    twin). S1's attempt sets have no such pair, so without one the matching step never decides.
+    The full image is found. The image missing the twin (and padded with a far panel to the same
+    size) is NOT: both twins' rows have only the one remaining panel as a candidate, and no
+    one-to-one assignment exists. Without the matching step it would be refused wrongly."""
+    k = 0                                     # the island's corner panel: never an anchor (the anchor is a
+    twin = E12[k] + np.array([0.0, 1e-7, 0.0, 0.0])      # central island panel, the second a far ground square)
+    A = np.concatenate([E12, [twin]])
+    t = np.array([0.05, 0.05, 0.02, 0.02])
+    full = A + t
+    assert es.find_embedding(full, A) is not None
+    short = np.concatenate([E12 + t, [[0.9, 0.91, 0.9, 0.91]]])
+    assert len(short) == len(A)
+    V = es.find_embedding(full, A)["tolerance"]
+    assert np.abs((twin + t) - short[k]).max() <= V                 # the twin's row does have a candidate
+    assert es.find_embedding(short, A) is None
+    assert es.separation_problems({"X": short}, {"E1.2": A}) == []
+
+
+def test_the_second_anchor_loop_tries_every_candidate_in_its_window():
+    """Second anchor (T3): a decoy panel inside the second anchor's window, just before the true
+    second anchor, for every ground square (the second anchor is the ground square farthest from
+    the island's central anchor). The first candidate in the window is then a decoy, whose fit
+    fails; the image is found only by trying the next one. The island has no decoys, so the
+    decoys do not form a second copy of the case."""
+    img = E12 + np.array([0.31, 0.31, -0.17, -0.17])
+    e = _eps(img)
+    decoys = img[64:] - 15 * e                                     # inside the window, beyond the fit's tolerance
+    X = np.concatenate([decoys, img])
+    assert es.find_embedding(X, E12) is not None
+    assert es.separation_problems({"X": X}, {"E1.2": E12})
+
+
+def test_the_scale_is_fitted_on_the_long_baseline():
+    """The fit (T3): every bound of the image perturbed by up to 0.9 tol. The scale from the
+    anchor's size alone is then off by up to about 4 tol/(w_a + h_a), too much for the panels far
+    from the anchor; the long-baseline fit keeps every panel within the tolerance, and the image
+    is found."""
+    rng = np.random.default_rng(85)
+    img = E12 * 1.3 + np.array([0.2, 0.2, 0.1, 0.1])
+    t = 0.9 * es.SEPARATION_RHO * float(np.abs(img).max())
+    X = img + rng.uniform(-t, t, img.shape)
+    X[:64] = img[:64] + np.array([-t, t, -t, t])      # every island panel (the anchor among them) widened by 0.9 tol
+    hit = es.find_embedding(X, E12)
+    assert hit is not None and hit["scale"] == pytest.approx(1.3, rel=1e-5)
+    _verify_map(X, E12, hit)
+
+
+def test_the_completeness_claim_is_only_the_proven_one():
+    """F1 (revision 8.5): the contract, the page and the module claim completeness only for an
+    image whose scaled fitting baseline s delta exceeds 2 (2^-22 + 2^-44) M. The documented
+    limit: an image scaled by 1e-6 whose bounds were moved within the tolerance (every
+    lower-left corner collapsed to the minimum) is not found, and no claim is made for it.
+    (Images whose panels are far below the tolerance make the search slow: an exact image of
+    E1.1 scaled by 1e-4 takes minutes. The pre-approval runs check only the frozen sets.)"""
+    page = _norm((REPO / "docs" / "coupled-candidate" / "e1-s1-lower-bound.md").read_text())
+    for text in (_norm(CONTRACT_TEXT), page, _norm((HERE / "e1_standin.py").read_text())):
+        assert "every image within that tolerance" not in text.lower() and "every image whose bounds agree" not in text
+    assert "s·δ > 2·(2⁻²² + 2⁻⁴⁴)·M" in CONTRACT_TEXT and "s·δ > 2·(2⁻²² + 2⁻⁴⁴)·M" in page
+    assert "Every image within that tolerance is found." in _norm(CONTRACT_8_4.read_text()) or \
+        "The frozen check finds every image within that tolerance." in CONTRACT_8_4.read_text()
+    img = A11 * 1e-6 + 1.0
+    col = img.copy()
+    col[:, 0], col[:, 2] = img[:, 0].min(), img[:, 2].min()
+    assert np.abs(col - img).max() <= es.SEPARATION_RHO * float(np.abs(img).max())
+    assert es.find_embedding(img, A11) is not None and es.find_embedding(col, A11) is None
+    # on the proven side: an image scaled by 0.1 with every bound moved within 0.9 tol is found
+    rng = np.random.default_rng(1)
+    img = A11 * 0.1 + 1.0
+    t = 0.9 * es.SEPARATION_RHO * float(np.abs(img).max())
+    X = img + rng.uniform(0, t, img.shape) * np.array([-1, 1, -1, 1])      # widened within 0.9 tol, never reversed
+    assert 0.1 * 0.083 > 2 * _eps(X) and es.find_embedding(X, A11) is not None
 
 
 def test_the_tolerance_is_complete_within_tol_and_refuses_nothing_beyond_the_fit_bound():
@@ -2297,6 +2518,23 @@ def test_no_confirmation_or_rehearsal_numeric_set_contains_an_image_of_an_S1_att
     assert sum(r.tobytes() in rows for r in es.proxy_a()["R"]) == 162
     assert sum(r.tobytes() in rows for v in ec.control_numeric_sets().values() for r in np.asarray(v, dtype=float)) == 0
     assert "534 of its 8,971 ground panels are bit-identical to S1 E1.2 ground panels (476 of them" in CONTRACT_TEXT
+    # T3 on the real, asymmetric S1 E1.2 (geometry only): the image under each symmetry is found with
+    # that symmetry; decoys in the second anchor's window do not hide an image; nor does a perturbation
+    # within 0.9 tol with the anchors widened (the long-baseline fit)
+    E = s1["E1.2"]
+    for sym in EIGHT:
+        hit = es.find_embedding(_symmetry(E, *sym) * 0.5 + np.array([0.2, 0.2, -0.1, -0.1]), E)
+        assert hit is not None, sym
+        assert (hit["symmetry"]["exchange_x_y"], hit["symmetry"]["x_sign"], hit["symmetry"]["y_sign"]) == sym
+    img = E + np.array([0.31, 0.31, -0.17, -0.17])
+    m = np.minimum(E[:, 1] - E[:, 0], E[:, 3] - E[:, 2])
+    big = (m >= m.max() / 8) & (np.arange(len(E)) >= 1024)          # ground panels only: no second copy
+    assert es.find_embedding(np.concatenate([img[big] - 15 * _eps(img), img]), E) is not None
+    t = 0.9 * es.SEPARATION_RHO * float(np.abs(img).max())
+    X = img + np.random.default_rng(12).uniform(-t, t, img.shape)
+    X[m == m.max()] = img[m == m.max()] + np.array([-t, t, -t, t])
+    hit = es.find_embedding(X, E)
+    assert hit is not None and hit["scale"] == pytest.approx(1.0, rel=1e-6)
 
 
 def test_the_expected_counts_are_the_contract_section_3_3_numbers():
@@ -2355,6 +2593,18 @@ FALSE_STATEMENTS = [
     "c₀ derivation; synthetic, and S1 geometry only)",
     "Tightness order on generic synthetic proxies (not S1).",
 ]
+#: statements of 28f6ca3 shown false by the review of 28f6ca3 (T1, T2; D16), each quoted
+#: (normalised) in the correction record's S-13 or section 8; none may remain in the active
+#: contract, the E1 page or the README
+FALSE_STATEMENTS_28F6CA3 = [
+    "So the E1.2 of every Confirmation in §3 and of the prototype held S1's island plus these 534 panels.",
+    "The prototype's ground is byte-identical to the implementation's, so the same holds for the prototype.",
+    "their E1.2 also contained 534 panels bit-identical to S1 E1.2 ground panels;",
+    "their stand-in's E1.2 also held 534 panels bit-identical to S1 ground panels",
+    "Their stand-in's E1.2 also held 534 ground panels bit-identical to S1 E1.2 ground panels (476 of them in S1's E1.2-excl-R1).",
+    "So the E1.2 of the prototype and of the `90bf9eb` Confirmations contained S1's island and these 534 panels.",
+    "**The test suite and CI.** They use only small synthetic sets, apart from the S1 geometry phase, which assembles no matrix.",
+]
 
 
 def test_no_active_document_repeats_a_statement_the_correction_record_corrects():
@@ -2371,6 +2621,14 @@ def test_no_active_document_repeats_a_statement_the_correction_record_corrects()
             assert st not in text, f"{name} still says: {st}"
     old = _norm(CONTRACT_8_3.read_text())            # the positive control: the frozen 8.3 does say them
     assert all(_norm(st) in old for st in FALSE_STATEMENTS[5:])
+    body = record[:record.index("## 8. Revision history")] if "## 8. Revision history" in record else record
+    for st in FALSE_STATEMENTS_28F6CA3:
+        st = _norm(st)
+        assert st in record, f"the correction record does not quote: {st}"
+        for name, text in (("the E1 page", doc), ("the README row", row), ("revision 8.5", contract)):
+            assert st not in text, f"{name} still says: {st}"
+    assert _norm(FALSE_STATEMENTS_28F6CA3[5]) in _norm(CONTRACT_8_4.read_text())      # positive control (8.4)
+    assert "The test suite and CI." not in body and "The default test selection and CI." in body
 
 
 def test_the_doc_and_README_state_what_was_computed_and_that_the_evidence_is_pending():
@@ -2379,8 +2637,14 @@ def test_the_doc_and_README_state_what_was_computed_and_that_the_evidence_is_pen
     row = _norm(next(ln for ln in readme.splitlines() if ln.startswith("| [`e1-s1-lower-bound.md`]")))
     for text in (doc, row):
         assert "PENDING REGENERATION" in text and "unintended pre-execution computation" in text
-        assert "534" in text and "revision 8.4" in text and "historical" in text
-    assert "E1-CONTRACT.rev8.4.md" in doc and dr.CONTRACT_SHA256 in doc
+        assert "534" in text and "revision 8.5" in text and "historical" in text
+        assert "32" in text and ("reduced run" in text)                                        # T1
+    assert "E1-CONTRACT.rev8.5.md" in doc and dr.CONTRACT_SHA256 in doc
+    assert "N = 1,524" in doc and "`run8_small`" in doc
+    record = _norm((REPO / "docs" / "coupled-candidate" / "corrections" / "e1-confirmation-s1-internal-sets-correction.md")
+                   .read_text())
+    assert "reduced run `run8_small` (N = 1,524)" in record and "32 S1 ground panels" in record          # T1
+    assert "The two opt-in Confirmation tests" in record and "E1_RUN_CONFIRMATION=1" in record            # T2
 
 
 @pytest.mark.skipif(os.environ.get("E1_RUN_CONFIRMATION") != "1",

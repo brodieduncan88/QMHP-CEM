@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Brodie Duncan. All rights reserved.
 # Proprietary QMHP-CEM source. No licence is granted except by explicit written agreement.
 """E1 synthetic known-answer and negative controls K1, K2, K2b, K3, N3 and N4, exactly as the
-frozen contract E1-CONTRACT.rev8.4.md specifies them in section 5. SYNTHETIC GEOMETRY ONLY:
+frozen contract E1-CONTRACT.rev8.5.md specifies them in section 5. SYNTHETIC GEOMETRY ONLY:
 nothing here reads the S1 mesh. (N1, N2, N3b and N3c need S1 geometry and live in
 e1_geometry.geometry_phase; K4 needs the S1 enclosures and lives in the driver.)
 

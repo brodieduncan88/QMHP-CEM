@@ -1,12 +1,12 @@
 # Copyright (c) 2026 Brodie Duncan. All rights reserved.
 # Proprietary QMHP-CEM source. No licence is granted except by explicit written agreement.
 """SYNTHETIC panel sets for the resource Confirmation of the frozen contract
-E1-CONTRACT.rev8.4.md (section 3.2 item 2, section 6), the section 3.2 item 2 separation rule,
+E1-CONTRACT.rev8.5.md (section 3.2 item 2, section 6), the section 3.2 item 2 separation rule,
 and proxy A of section 3.2 item 5. "Synthetic" means generated here without reading the S1
 mesh; it does not mean that no panel coincides with an S1 panel (D15). Nothing here is ever
 used by the attempt.
 
-The stand-in (section 6, revisions 8.3 and 8.4) is the revision-8 prototype's, except its
+The stand-in (section 6, revisions 8.3 to 8.5) is the revision-8 prototype's full-size one, except its
 island: 32 x 32 panels at (-0.6, 0) mm with x_k = -0.6 + s_k(0.075) and y_k = s_k(0.0625),
 s_k(a) the section 3.1 node formula with n = 32 and q = 3.5 at half-width a. The prototype's
 island was the selected island itself, so its E1.1 and E1.1-half were S1's internal sets (D14).
@@ -16,7 +16,7 @@ ascending centroid x, then ascending centroid y, form its R1 set. Because the sh
 lattice, window and merge rules, 534 of these ground panels are bit-identical to S1 E1.2
 ground panels; individual coincidences are permitted (D15).
 
-separation_problems() is the section 3.2 item 2 rule (revision 8.4, D15): no numeric set of a
+separation_problems() is the section 3.2 item 2 rule (revisions 8.4 and 8.5, D15, D16): no numeric set of a
 pre-approval run may contain an image of an S1 attempt set (E1.2, E1.2-excl-R1, E1.1 or
 E1.1-half), as the whole set or as an embedded subset, under the symmetries of the square,
 uniform scaling and translation, with the panels in any order and their bounds in either
@@ -226,10 +226,13 @@ def _embed_under(X, wX, hX, Ah, tol, M):
       - a' must then have an image b' near s0 (a' - a) + b; s is fitted on the long baseline
         a -> a' (length delta) and t from b;
       - every panel of s Ah + t must have its own panel of X within V (a perfect matching).
-    If X contains an image of Ah whose bounds agree to within tol, this finds it: the anchor
-    windows contain the true images of a and a', and the fitted image lies within
-    V = tol (2 + 2 L/delta) of that image's panels (L the extent of Ah); rounding is covered by
-    the 2^-44 M added to tol."""
+    What is proven (section 3.2 item 2, revision 8.5): if X contains an image of Ah with scale s
+    whose bounds agree to within tol, AND s delta > 2 eps (eps = tol + 2^-44 M), this finds it:
+    the anchor windows contain the true images of a and a'; the fitted scale then lies within
+    2 eps/delta of s, so it is positive; and the fitted image lies within
+    V = eps (2 + 2 L/delta) of that image's panels (L the extent of Ah). For a smaller image
+    (s delta <= 2 eps) the fitted scale can be <= 0 for every anchor pair, and the image can be
+    missed: no claim is made for it."""
     w, h = Ah[:, 1] - Ah[:, 0], Ah[:, 3] - Ah[:, 2]
     m = np.minimum(w, h)
     ia = _first(np.flatnonzero(m == m.max()), Ah)
@@ -272,9 +275,10 @@ def find_embedding(X, A) -> dict | None:
     maps (the eight symmetries of the square, uniform scaling s > 0, translation; panels in any
     order and with their bounds in either order), as the whole set or as an embedded subset.
     Returns the map found, or None. With tol = SEPARATION_RHO * M, M the largest coordinate
-    magnitude of X: every image whose bounds agree to within tol is found, and a map is
-    returned only if every panel of its image has its own panel of X within the returned
-    tolerance (at most tol (2 + 2 L/delta), plus rounding)."""
+    magnitude of X: an image whose bounds agree to within tol is found whenever its scaled
+    fitting baseline s delta exceeds 2 (tol + 2^-44 M) (see _embed_under; a smaller image is
+    not guaranteed to be found), and a map is returned only if every panel of its image has its
+    own panel of X within the returned tolerance (at most (tol + 2^-44 M)(2 + 2 L/delta))."""
     X, A = normalised(X), normalised(A)
     if len(A) == 0 or len(X) < len(A):
         return None

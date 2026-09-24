@@ -4,10 +4,11 @@
 """E1 - THE STATIC-CAPACITANCE LOWER-BOUND CERTIFICATE FOR THE S1 ISLAND (PROBLEM C).
 PREPARED, NOT APPROVED, NOT EXECUTED.
 
-The scientific contract is E1-CONTRACT.rev8.4.md in this directory (its sha256 is
-CONTRACT_SHA256 below), frozen with this code. Revision 8.4 is revision 8.3 with the
-structural separation rule of D15 and the corrected statements of what was computed. This file
-implements it and does not restate it; section numbers refer to it.
+The scientific contract is E1-CONTRACT.rev8.5.md in this directory (its sha256 is
+CONTRACT_SHA256 below), frozen with this code. Revision 8.5 is revision 8.4 (the structural
+separation rule of D15 and the corrected statements of what was computed) with the two text
+corrections of D16. This file implements it and does not restate it; section numbers refer to
+it.
 
 E1 certifies only the static problem-C capacitance bound C_static in [C_lo^static, C_hi].
 It makes no E_C and no suitability claim: E_C,F1F1 is the constant EC_NOT_EVALUATED_BY_E1,
@@ -101,8 +102,8 @@ import e1_controls as ec  # noqa: E402
 import e1_geometry as eg  # noqa: E402
 import e1_numerics as nm  # noqa: E402
 
-CONTRACT = HERE / "E1-CONTRACT.rev8.4.md"
-CONTRACT_SHA256 = "cdf6cced13e1965bbf017a4a7d3d4af0f661df0ca921e6dd69335b4a68971740"
+CONTRACT = HERE / "E1-CONTRACT.rev8.5.md"
+CONTRACT_SHA256 = "2db93be49ee455f1da952acbe300f370d7614a8986c4151a9563adf805f00150"
 APPROVAL = HERE / "E1-APPROVAL.json"
 APPROVAL_CONSUMED = HERE / "E1-APPROVAL.consumed.json"
 APPROVAL_DRAFT = HERE / "E1-APPROVAL.draft.json"
@@ -527,6 +528,15 @@ def _no_constant(token: str):
     raise Refusal(f"E1-APPROVAL.json holds the non-standard JSON constant {token}")
 
 
+def _finite_number(token: str) -> float:
+    """parse_float: a number literal whose value overflows float64 (1e400 parses to inf)
+    refuses, as NaN and Infinity do (R1-M1)."""
+    value = float(token)
+    if not math.isfinite(value):
+        raise Refusal(f"E1-APPROVAL.json holds the number {token[:40]}, which overflows float64")
+    return value
+
+
 def _same_json(a, b) -> bool:
     """Equality of two JSON values including their types: true is not 1, and 1.0 is not 1."""
     return json.dumps(a, sort_keys=True, allow_nan=False) == json.dumps(b, sort_keys=True, allow_nan=False)
@@ -536,13 +546,15 @@ def require_approval(now: datetime | None = None, *, raw: bytes | None = None) -
     """The approval (section 8): bound to this contract, the code, the mesh and the inputs;
     carrying gamma = 1e-6, tolerance set T0, the human's section 7 scope decision and the
     Q2 decision of section 1; for HEAD; inside a window of at most 7 days. Strict JSON: a
-    repeated member or a non-standard constant refuses, and bound values compare with their
-    JSON types."""
+    repeated member, a non-standard constant or a number that overflows float64 refuses, and
+    bound values compare with their JSON types. Any other parser error (an integer literal
+    beyond Python's digit limit, nesting beyond the recursion limit) refuses as well: the
+    approval is never raised past as an uncaught error (R1-M1)."""
     try:
         ap = json.loads(_read_approval() if raw is None else raw, object_pairs_hook=_members_once,
-                        parse_constant=_no_constant)
-    except json.JSONDecodeError as exc:
-        raise Refusal(f"E1-APPROVAL.json is not JSON: {exc}") from exc
+                        parse_constant=_no_constant, parse_float=_finite_number)
+    except (ValueError, RecursionError) as exc:          # json.JSONDecodeError is a ValueError
+        raise Refusal(f"E1-APPROVAL.json is not JSON the driver can read: {type(exc).__name__}: {str(exc)[:200]}") from exc
     if not isinstance(ap, dict):
         raise Refusal("E1-APPROVAL.json is not an object")
     want = approval_want()

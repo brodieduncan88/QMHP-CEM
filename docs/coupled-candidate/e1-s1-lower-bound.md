@@ -1,17 +1,19 @@
 # E1 — the static-capacitance lower-bound certificate for the S1 island (problem C)
 
-**Status: IMPLEMENTED; CORRECTED AFTER TWO FROZEN-CODE REVIEWS (contract revision 8.4). PREPARED,
+**Status: IMPLEMENTED; CORRECTED AFTER THREE FROZEN-CODE REVIEWS (contract revision 8.5). PREPARED,
 NOT APPROVED, NOT EXECUTED. PRE-APPROVAL EVIDENCE PENDING REGENERATION.**
 
 - **E1 has not been executed.** The one attempt is unspent. Execution needs a separate human approval (`E1-APPROVAL.json`, written from `E1-APPROVAL.draft.json`).
 - **What has and has not been computed on S1 panels.** The full account, with every run, is in [`corrections/e1-confirmation-s1-internal-sets-correction.md`](corrections/e1-confirmation-s1-internal-sets-correction.md).
   - No set equal to S1's E1.2 or E1.2-excl-R1, and no set containing an image of either, has been assembled, factorised or used in any energy.
   - The revision-8 prototype, and the Confirmation runs made with the `90bf9eb` implementation and with one pre-freeze build, did assemble, factorise and form energies and internal lower bounds for S1's island-only internal sets E1.1 and E1.1-half. Their stand-in's island was S1's island (D-1).
-  - Their stand-in's E1.2 also held 534 ground panels bit-identical to S1 E1.2 ground panels (476 of them in S1's E1.2-excl-R1). The stand-in's ground is synthetic, but it uses S1's lattice, window and merge rules.
+  - The E1.2 of those Confirmations and of the prototype's full-size runs (N = 9,995) also held 534 ground panels bit-identical to S1 E1.2 ground panels (476 of them in S1's E1.2-excl-R1). The E1.2 of the prototype's reduced run `run8_small` (N = 1,524) held 32 such panels. The stand-in's ground is synthetic, but it uses S1's lattice, window and merge rules.
   - Proxy A of the configuration selection contains S1's E1.1 translated by +0.6 mm in x. So every proxy-A Cholesky factorisation contains the factor of that translated E1.1 as its leading block. The same holds for proxies B and C of the selected configuration.
   - All of this was an **unintended pre-execution computation, not approved behaviour** (D14). Proxy A is kept as **historical** configuration-selection evidence only, and is not re-run (D15).
-- **Contract.** `experiments/e1-s1-lower-bound/E1-CONTRACT.rev8.4.md`, sha256 `cdf6cced13e1965bbf017a4a7d3d4af0f661df0ca921e6dd69335b4a68971740`.
-  - It is revision 8.3 (sha256 `2b9b9357…6b296`, kept byte-unchanged beside it, as is revision 8.2) with the structural separation rule and the corrected statements of D15.
+  - The two opt-in Confirmation tests of the suite (run only with `E1_RUN_CONFIRMATION=1`) were among those runs. The default test selection and CI use only small synthetic sets, apart from the S1 geometry phase, which assembles no matrix.
+- **Contract.** `experiments/e1-s1-lower-bound/E1-CONTRACT.rev8.5.md`, sha256 `2db93be49ee455f1da952acbe300f370d7614a8986c4151a9563adf805f00150`.
+  - It is revision 8.4 (sha256 `cdf6cced…71740`, kept byte-unchanged beside it, as are revisions 8.3 and 8.2) with the two text corrections of D16.
+  - Revision 8.4 was revision 8.3 with the structural separation rule and the corrected statements of D15.
   - The physics, the configuration, the thresholds, the Q2/C_br behaviour and the scope are unchanged.
 - **What E1 would certify, and only that.** `C_static ∈ [C_lo^static, C_hi]` fF for the meshed S1 model (problem C, contract §1).
   - `C_lo^static` is a certified Thomson/Galerkin lower bound under the libm ASSUMPTION of contract §4.4.
@@ -27,8 +29,8 @@ NOT APPROVED, NOT EXECUTED. PRE-APPROVAL EVIDENCE PENDING REGENERATION.**
 
 | file | content |
 |---|---|
-| `E1-CONTRACT.rev8.4.md` | the frozen contract the code implements |
-| `E1-CONTRACT.rev8.3.md`, `E1-CONTRACT.rev8.2.md` | the superseded revisions, byte-unchanged |
+| `E1-CONTRACT.rev8.5.md` | the frozen contract the code implements |
+| `E1-CONTRACT.rev8.4.md`, `E1-CONTRACT.rev8.3.md`, `E1-CONTRACT.rev8.2.md` | the superseded revisions, byte-unchanged |
 | `driver.py` | the attempt (contract §8), and the pre-approval modes `--rehearsal` and `--confirmation nominal\|forced`. The mode `--proxy-a-ge` refuses, computing nothing (proxy A is historical), and `--show-invocation` shows the measured invocation |
 | `e1_numerics.py` | the entries in x87 long double; the derived entry-error constant `c0` and `q_B`; `m(N)`; the symmetric block-pair pass; `E_up` and RD; the no-underflow requirement; the in-place trial vector with its §4.5 fallbacks; check (g); the dispatch and arithmetic probes. A non-finite or non-positive quantity fails its requirement and never raises. So does a finite quantity outside the float64 range. |
 | `e1_geometry.py` | the §4.1 model checks, island, R1 cut, candidates, merge, exact containment, the §3.3 counts, and N1, N2, N3b and N3c. It assembles no matrix. |
@@ -47,7 +49,7 @@ The four evidence files in the directory were produced by the code reviewed at `
 
 - the Confirmation's stand-in island was S1's island (finding D-1);
 - proxy A is now historical selection evidence (D15);
-- the code has changed twice since.
+- the code has changed three times since.
 
 What they recorded at `90bf9eb`:
 
@@ -58,7 +60,7 @@ What they recorded at `90bf9eb`:
 | Confirmation, nominal | 288.0 s CPU and 1.43 GiB peak address space, on the revision-8.2 stand-in (which contained S1's island). |
 | Confirmation, forced fallback | 312.6 s CPU and 1.45 GiB. The same stand-in. |
 
-The rehearsal and both Confirmation runs are regenerated from the corrected code only after the revision-8.4 separation has passed review, and only on a human instruction. Proxy A is not regenerated. Until then:
+The rehearsal and both Confirmation runs are regenerated from the corrected code only after the revision-8.5 correction has passed review, and only on a human instruction. Proxy A is not regenerated. Until then:
 
 - no Confirmation margin is claimed for the corrected code;
 - the draft approval tells the approver to approve only a commit whose regenerated evidence carries its `code_sha256` and `preapproval_code_sha256`.
@@ -73,7 +75,7 @@ The contract leaves the implementation mechanics to the frozen code (contract D8
    - The stop signals are unblocked, and the enforcement is read back (handlers, both limits, the wall alarm) before anything is spent. If it cannot be confirmed, the run refuses.
 2. **Stop signals.** A stop signal received at any point before the attempt ends makes it FAILED, with `failure.json` and a verified manifest. The failure path marks itself stopping before any call, so a signal pending when it starts is recorded, not raised.
 3. **The approval** is strict JSON with an exact field set.
-   - A repeated member (at any depth) or a non-standard constant (NaN, Infinity) refuses.
+   - A repeated member (at any depth), a non-standard constant (NaN, Infinity), or a number that overflows float64 (such as 1e400) refuses. So does any other parser error, such as an integer beyond Python's digit limit. None of these raises past the approval check.
    - The bound fields must match with their JSON types: `true` is not `1`, and `1.0` is not `1`. The bound fields include `code_sha256` and `preapproval_code_sha256` (the stand-in and separation code).
    - The human fields are `source_commit`, `not_before_utc`, `not_after_utc`, `tolerance_scope_decision` (the §7 scope decision: `COPIED_NUMBERS_WITHIN_SCOPE` or `COPIED_NUMBERS_EXCLUDED`) and `q2_within_D5` (the Q2 decision of §1: true or false).
    - The optional `does_not_authorise` must equal the draft's list.
@@ -106,7 +108,11 @@ The contract leaves the implementation mechanics to the frozen code (contract D8
    - The K2b pair-list sha256 is `9f47657181725147b14f3c2d05034d9bbde2d9f5e2f7419fcf9704cf38a6cb9e`.
 10. **The separation rule** (contract §3.2 item 2, D15) is structural, not panel by panel. It refuses a numeric set that contains an image of an S1 attempt set, as the whole set or as an embedded subset.
     - **What counts as an image.** The maps are the eight symmetries of the square, uniform scaling s > 0 and translation. The panels may be in any order, and each panel's bounds in either order.
-    - **Tolerance.** Bounds agree to within 2⁻²²·M, M being the largest coordinate magnitude of the set checked. Every image within that tolerance is found. A set is refused only if a fitted map gives every panel of the S1 set its own panel within (2 + 2L/δ)·(2⁻²² + 2⁻⁴⁴)·M; L/δ ≤ 1.8 for the S1 sets, and 2⁻⁴⁴·M covers rounding.
+    - **Tolerance.** Bounds agree to within 2⁻²²·M, M being the largest coordinate magnitude of the set checked.
+    - **What is proven to be found (revision 8.5).** An image within that tolerance is found whenever its scaled fitting baseline is resolvable: s·δ > 2·(2⁻²² + 2⁻⁴⁴)·M.
+      - δ ≥ 0.80 mm for E1.2 and E1.2-excl-R1, 0.0835 mm for E1.1 and 0.0964 mm for E1.1-half.
+      - For M of the order of 1 mm, this covers images scaled by more than about 10⁻⁵. A smaller image is not guaranteed to be found.
+    - **What is refused.** A set is refused only if a fitted map gives every panel of the S1 set its own panel within (2 + 2L/δ)·(2⁻²² + 2⁻⁴⁴)·M; L/δ ≤ 1.8 for the S1 sets, and 2⁻⁴⁴·M covers rounding.
     - **The fit.** An anchor panel and a far second anchor fix the map. A perfect matching then assigns the panels one to one.
     - **Permitted.** Individual coincident panels, and proper subsets of an S1 set, are permitted. A near-copy beyond the tolerance is outside the rule (D15).
     - **When it runs.** The Confirmation and the rehearsal check every control set against S1's E1.1 and E1.1-half (from the §3.1 formula) before any control runs. That is enough for all four attempt sets, since E1.1 is a subset of E1.2 and of E1.2-excl-R1. The Confirmation checks the stand-in's four sets against the S1 geometry phase's four sets before any stand-in matrix. A coincidence, or a missing check, computes nothing further.
@@ -119,7 +125,7 @@ The contract leaves the implementation mechanics to the frozen code (contract D8
     - the capacitance phase ran on the expected paths;
     - no stop signal arrived and nothing raised;
     - the evidence directory verifies.
-13. **The Confirmation in the test suite** (contract §5) re-runs only with `E1_RUN_CONFIRMATION=1`, and only on a human instruction after the revision-8.4 separation has passed review.
+13. **The Confirmation in the test suite** (contract §5) re-runs only with `E1_RUN_CONFIRMATION=1`, and only on a human instruction after the revision-8.5 correction has passed review.
 
 ## What is NOT established
 
@@ -127,4 +133,5 @@ The contract leaves the implementation mechanics to the frozen code (contract D8
 - Any use of the S1 E1.1 or E1.1-half quantities formed unintentionally before approval. They are not results (D14).
 - The corrected code's Confirmation resources: the evidence is pending regeneration.
 - That the separation rule excludes approximate reproductions beyond its tolerance (D15).
+- That the separation check finds an image within the tolerance whose scaled fitting baseline is below 2·(2⁻²² + 2⁻⁴⁴)·M (D16).
 - Anything listed in contract §10.

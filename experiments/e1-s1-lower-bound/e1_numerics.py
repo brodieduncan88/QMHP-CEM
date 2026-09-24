@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Brodie Duncan. All rights reserved.
 # Proprietary QMHP-CEM source. No licence is granted except by explicit written agreement.
 """E1 numerics: the Galerkin entries, the rigorous energy enclosure, the trial vector and
-the float64 consistency check, exactly as the frozen contract E1-CONTRACT.rev8.4.md (its
+the float64 consistency check, exactly as the frozen contract E1-CONTRACT.rev8.5.md (its
 sha256 is pinned in driver.py) specifies them in sections 4.3-4.5. Section numbers below refer
 to that contract. A non-finite or non-positive quantity never raises here: it makes the
 requirement it belongs to fail, so the attempt is UNQUALIFIED, never FAILED (section 8). The
