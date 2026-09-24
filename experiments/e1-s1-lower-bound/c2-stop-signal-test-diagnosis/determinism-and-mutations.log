@@ -1,0 +1,30 @@
+frozen HEAD b0fec36515016946c6225e2a18d5cd6379439fa2
+plain 0: 13 passed in 7.40s
+plain 1: 13 passed in 7.68s
+plain 2: 13 passed in 7.48s
+plain 3: 13 passed in 7.23s
+plain 4: 13 passed in 7.14s
+plain 5: 13 passed in 7.29s
+plain 6: 13 passed in 7.38s
+plain 7: 13 passed in 7.58s
+plain 8: 13 passed in 7.42s
+plain 9: 13 passed in 7.51s
+plain 10: 13 passed in 7.47s
+plain 11: 13 passed in 7.52s
+plain 12: 13 passed in 7.52s
+plain 13: 13 passed in 7.36s
+plain 14: 13 passed in 7.22s
+plain 15: 13 passed in 7.23s
+plain 16: 13 passed in 7.37s
+plain 17: 13 passed in 7.37s
+plain 18: 13 passed in 7.19s
+plain 19: 13 passed in 7.21s
+loaded (4 busy loops, load 1.00) 0: 13 passed in 8.79s
+loaded (4 busy loops, load 1.62) 1: 13 passed in 9.13s
+loaded (4 busy loops, load 2.14) 2: 13 passed in 8.63s
+loaded (4 busy loops, load 2.58) 3: 13 passed in 8.98s
+loaded (4 busy loops, load 2.77) 4: 13 passed in 8.82s
+M0: 13 passed, 301 deselected in 7.65s
+M1 (the handler raises even while stopping): 6 failed, 7 passed, 301 deselected in 8.33s
+M2 (failure.json drops the received signals): 6 failed, 7 passed, 301 deselected in 8.29s
+M3 (stopping is set only after _shutdown): 6 failed, 7 passed, 301 deselected in 7.84s
