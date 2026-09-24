@@ -6,15 +6,20 @@
 
 **Revised again in the revision-8.5 round (D16).** The second version (committed at `28f6ca3`) stated the prototype's full-size ground overlap for all its runs (review finding T1). It also said the test suite used only small synthetic sets (T2). Both are corrected below, and each wrong sentence of the second version is kept verbatim in §8.
 
+**Corrected in the cleanup after the review of `2f752cd`.** The third version (committed at `2f752cd`) said that only the names and timestamps of the uncommitted files were read, although §2 cites `run8_small`'s rounding count (review finding REC-1). The statement of what was read is corrected below, and the wrong sentence is kept verbatim in §8.
+
 - **What this record changes.** It rewrites no historical record. These stay as they are:
-  - the commits `90bf9eb`, `22c9585` and `28f6ca3` and their messages;
+  - the commits `90bf9eb`, `22c9585`, `28f6ca3` and `2f752cd` and their messages;
   - their committed evidence files;
-  - contract revisions 8.2, 8.3 and 8.4;
+  - contract revisions 8.2, 8.3, 8.4 and 8.5;
   - the uncommitted scratch and `/tmp` files listed in §3.
-- **Values not read.** The values of those uncommitted files were not read for this record. Only their names and timestamps were.
-- **No S1 numerics.** No S1 numerics were run for this record. The revision-8.4 round ran only:
-  - geometry-only comparisons: the S1 geometry phase, which assembles no matrix;
-  - synthetic tests.
+- **What was read.** No energy, bound or capacitance value of those uncommitted files was read for this record.
+  - Of the `/tmp` Confirmation files, only their names and timestamps were read.
+  - Of the revision-8 prototype's session output files (`run8_*`, and the review's `rr_*`), only the following were read, in the revision-8.4 and 8.5 rounds: their names and timestamps, their key names, the set sizes N, n_island and N_x printed in their logs, and the rounding counts m in their JSON files.
+  - `run8_small` has no log. Its rounding count m = 532 was read, and gives its set size N = 1,524 (§2).
+- **No S1 numerics.** No S1 numerics were run for this record. The revision-8.4 and 8.5 rounds and the cleanup after the review of `2f752cd` ran only:
+  - geometry-only comparisons: the S1 geometry phase, which assembles no matrix, and the prototype's stand-in generator;
+  - synthetic tests, including mutation tests of the separation check.
 
   The panel counts in §2 come from those comparisons.
 - **Status of the computation (D14).** The computation described below is acknowledged as an **unintended pre-execution computation, not approved behaviour**.
@@ -180,7 +185,7 @@ The same dimensionless diagnostics were shown in session reports.
   - negative controls: individual panels, proper subsets, non-symmetry maps and near-copies beyond the tolerance;
   - the ordering of the checks;
   - proxy A, and the revision-8.2 stand-in, as positive controls on the real S1 sets (geometry only).
-- **The 90bf9eb evidence is superseded but kept.** The pre-approval evidence committed at `90bf9eb` stays byte-unchanged. It is regenerated only on a human instruction, after the revision-8.4 separation has passed review. Proxy A's evidence is not regenerated.
+- **The 90bf9eb evidence is superseded but kept.** The pre-approval evidence committed at `90bf9eb` stays byte-unchanged. It is regenerated only on a human instruction, after the revision-8.5 correction has passed review. Proxy A's evidence is not regenerated.
 - **History is kept.** The commit messages of `90bf9eb` and `22c9585` are not rewritten; this record supersedes their statements.
 
 ## 7. What is not established
@@ -213,3 +218,9 @@ The second version (committed at `28f6ca3`) said the following (review of `28f6c
 | "So the E1.2 of every Confirmation in §3 and of the prototype held S1's island plus these 534 panels." | the same as the first row | §2 |
 | "their E1.2 also contained 534 panels bit-identical to S1 E1.2 ground panels;" | the same as the first row | §5 |
 | "**The test suite and CI.** They use only small synthetic sets, apart from the S1 geometry phase, which assembles no matrix." (listed under "Not affected") | the two opt-in Confirmation tests are part of the suite, and when run they formed S1's E1.1 and E1.1-half quantities | §3 |
+
+The third version (committed at `2f752cd`) said the following (review of `2f752cd`, finding REC-1).
+
+| third version (verbatim) | why it is wrong | corrected in |
+|---|---|---|
+| "**Values not read.** The values of those uncommitted files were not read for this record. Only their names and timestamps were." | the revision-8.4 and 8.5 rounds also read the prototype files' key names, set sizes and rounding counts, and §2 cites `run8_small`'s m = 532. No energy, bound or capacitance value was read | the header ("What was read") |

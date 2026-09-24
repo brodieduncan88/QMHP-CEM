@@ -1751,6 +1751,65 @@ def test_the_second_anchor_loop_tries_every_candidate_in_its_window():
     assert es.separation_problems({"X": X}, {"E1.2": E12})
 
 
+def test_the_second_anchor_loop_tries_more_than_the_last_candidate():
+    """Second anchor (T3-R1): a decoy just AFTER the true second anchor inside its window (at
+    +15 eps, listed after the image), for every ground square. The last candidate in the window is
+    then a decoy, whose fit fails: a loop that tried only the last candidate would miss the image."""
+    img = E12 + np.array([0.31, 0.31, -0.17, -0.17])
+    X = np.concatenate([img, img[64:] + 15 * _eps(img)])
+    assert es.find_embedding(X, E12) is not None
+    assert es.separation_problems({"X": X}, {"E1.2": E12})
+
+
+def _anchor_index(A: np.ndarray) -> int:
+    """The anchor of contract section 3.2 item 2's fit, by its documented rule: the panel of
+    largest smallest side, the lexicographically smallest (x0, x1, y0, y1) on a tie."""
+    m = np.minimum(A[:, 1] - A[:, 0], A[:, 3] - A[:, 2])
+    idx = np.flatnonzero(m == m.max())
+    return int(idx[np.lexsort(A[idx].T[::-1])[0]])
+
+
+def test_the_second_anchor_loop_does_not_trust_the_candidate_nearest_the_prediction():
+    """Second anchor (T3-R1): the island (the anchor among it) widened by 0.9 tol, so the scale
+    from the anchor's size is off and the prediction for a far second anchor misses its true
+    corner by tens of tol (still inside the window, which is sized for this). A decoy sits
+    exactly at the prediction, for every ground square. The candidate nearest the prediction is
+    then a decoy, whose fit fails: a loop that tried only the nearest would miss the image."""
+    img = E12 + np.array([0.31, 0.31, -0.17, -0.17])
+    t = 0.9 * es.SEPARATION_RHO * float(np.abs(img).max())
+    X = img.copy()
+    X[:64] = img[:64] + np.array([-t, t, -t, t])
+    a = _anchor_index(E12)
+    assert a < 64                                                     # the anchor is an island panel
+    s0 = ((X[a, 1] - X[a, 0]) + (X[a, 3] - X[a, 2])) / ((E12[a, 1] - E12[a, 0]) + (E12[a, 3] - E12[a, 2]))
+    g = E12[64:]
+    px = X[a, 0] + s0 * (g[:, 0] - E12[a, 0])
+    py = X[a, 2] + s0 * (g[:, 2] - E12[a, 2])
+    decoys = np.stack([px, px + (g[:, 1] - g[:, 0]), py, py + (g[:, 3] - g[:, 2])], axis=1)
+    miss = np.maximum(np.abs(px - img[64:, 0]), np.abs(py - img[64:, 2])).max() / t
+    assert 10 < miss < 34                                             # the far predictions miss by tens of tol
+    X = np.concatenate([X, decoys])
+    assert es.find_embedding(X, E12) is not None
+    assert es.separation_problems({"X": X}, {"E1.2": E12})
+
+
+def test_the_matching_is_one_to_one_not_a_global_count():
+    """Matching (T3-R1): the case with a near-duplicate twin of its island corner panel. The image
+    without the twin, plus a spare near-copy of another island panel, has as many panels as the
+    case, and every row has a candidate: the union of the candidates is large enough. But the
+    corner panel and its twin have only one candidate between them, so no one-to-one assignment
+    exists (Hall's condition fails locally) and the set holds no image. A check that only counted
+    the candidates globally would refuse it wrongly."""
+    twin = E12[0] + np.array([0.0, 1e-7, 0.0, 0.0])
+    A = np.concatenate([E12, [twin]])
+    t = np.array([0.05, 0.05, 0.02, 0.02])
+    spare = E12[5] + t + np.array([0.0, 1e-7, 0.0, 0.0])            # within the tolerance of row 5's image only
+    X = np.concatenate([E12 + t, [spare]])
+    assert len(X) == len(A) and es.find_embedding(A + t, A) is not None
+    assert es.find_embedding(X, A) is None
+    assert es.separation_problems({"X": X}, {"E1.2": A}) == []
+
+
 def test_the_scale_is_fitted_on_the_long_baseline():
     """The fit (T3): every bound of the image perturbed by up to 0.9 tol. The scale from the
     anchor's size alone is then off by up to about 4 tol/(w_a + h_a), too much for the panels far
@@ -1792,7 +1851,7 @@ def test_the_completeness_claim_is_only_the_proven_one():
     assert 0.1 * 0.083 > 2 * _eps(X) and es.find_embedding(X, A11) is not None
 
 
-def test_the_tolerance_is_complete_within_tol_and_refuses_nothing_beyond_the_fit_bound():
+def test_single_bound_nudges_within_tol_are_found_and_beyond_the_fit_bound_are_not():
     t = _tol(A11)
     assert es.separation_problems({"X": _nudge(500, 1, 0.99 * t)}, S1_ISLAND_SETS)
     assert es.separation_problems({"X": _nudge(0, 0, -0.99 * t)}, S1_ISLAND_SETS)
@@ -2645,6 +2704,10 @@ def test_the_doc_and_README_state_what_was_computed_and_that_the_evidence_is_pen
                    .read_text())
     assert "reduced run `run8_small` (N = 1,524)" in record and "32 S1 ground panels" in record          # T1
     assert "The two opt-in Confirmation tests" in record and "E1_RUN_CONFIRMATION=1" in record            # T2
+    body = record[:record.index("## 8. Revision history")]                                              # REC-1
+    assert "Its rounding count m = 532 was read" in body and "No energy, bound or capacitance value" in body
+    assert "Only their names and timestamps were." not in body and "Only their names and timestamps were." in record
+    assert "revision-8.4 separation has passed review" not in body
 
 
 @pytest.mark.skipif(os.environ.get("E1_RUN_CONFIRMATION") != "1",
