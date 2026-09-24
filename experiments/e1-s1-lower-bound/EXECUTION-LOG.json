@@ -1,0 +1,49 @@
+{
+ "record": "execution log of the one approved E1 attempt (contract revision 8.5)",
+ "written_by": "the operator after the run, from the captured stdout and stderr files; the record directory is untouched and its files are exactly as the driver wrote them",
+ "authorisation": "user approval of one E1 execution at 4baeb67 (2026-09-24), with tolerance_scope_decision COPIED_NUMBERS_WITHIN_SCOPE, q2_within_D5 true and a 24-hour window; the approval candidate passed CI run 264 and one focused final review (CLEAN_WITH_NOTES, nothing blocking)",
+ "source_commit_at_launch": "4baeb67e5c135a97eb23d5e0057a086baa681f4e",
+ "working_tree_at_launch": "clean except the untracked experiments/e1-s1-lower-bound/E1-APPROVAL.json",
+ "approval_sha256": "b8f6883b6fa431aaca5778e135667bd5cfa0afd830822f908e263db263b8ee7d",
+ "invocation": "env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 timeout --signal=KILL 1260 .venv/bin/python experiments/e1-s1-lower-bound/driver.py",
+ "cwd": "repository root",
+ "pre_check": {
+  "utc": "2026-09-24T22:28:38Z",
+  "require_approval": "accepted",
+  "preflight_problems": [],
+  "spent_state": [],
+  "loadavg": "0.09 0.02 0.01 2/103 465"
+ },
+ "permission_note": "an earlier launch request was refused by the session's permission classifier before anything ran (nothing was spent); after the user switched the session to Accept-edits mode the command was approved by the user and ran once",
+ "start_utc": "2026-09-24T22:28:47.313356+00:00",
+ "start_utc_basis": "the driver's provenance.json started_utc",
+ "end_utc": "2026-09-24T22:34:19.404921696Z",
+ "end_utc_basis": "the modification time of the record's manifest.sha256, the driver's last write",
+ "exit_code": 0,
+ "stdout": "/home/user/QMHP-CEM/results/E1-S1-LOWER-BOUND-20260924T222847Z\n",
+ "stderr": "",
+ "stderr_note": "empty: no warning of any kind was emitted",
+ "record_dir": "results/E1-S1-LOWER-BOUND-20260924T222847Z",
+ "record_manifest_sha256": "8d70ee11252c96fbbb0de5a666e963d8886273bafc7ad1aab4f36110f7f067ad",
+ "record_sha256": {
+  "results/E1-S1-LOWER-BOUND-20260924T222847Z/controls.json": "cd1478d17de55567b6346260ce363aba089946f6432fabe893cbce6ba27374fd",
+  "results/E1-S1-LOWER-BOUND-20260924T222847Z/geometry.json": "3ff76ab8355178b61f7f8024e315ffb3737e54ade610b4d1a5714d94cd74ece4",
+  "results/E1-S1-LOWER-BOUND-20260924T222847Z/internal-sets.json": "e827c87f7a17a697fe17707c9010273a69898678685c0515ce4484e909bc4144",
+  "results/E1-S1-LOWER-BOUND-20260924T222847Z/manifest.sha256": "8d70ee11252c96fbbb0de5a666e963d8886273bafc7ad1aab4f36110f7f067ad",
+  "results/E1-S1-LOWER-BOUND-20260924T222847Z/pass-E1.1-half.json": "bf6f6912354a4a008af30a18685d31a323e8da304b1a923a230603ee450bbdc4",
+  "results/E1-S1-LOWER-BOUND-20260924T222847Z/pass-E1.1.json": "e0849bc2c2b4bd76c06e62052fb88209d089e0b97851cd07521172445815f65c",
+  "results/E1-S1-LOWER-BOUND-20260924T222847Z/pass-E1.2+E1.2-excl-R1.json": "c69a032d7f801e05d64fb6c7cd00655e02f5d78c5f4b1757b97f483364b41b04",
+  "results/E1-S1-LOWER-BOUND-20260924T222847Z/provenance.json": "255fb82bd168bbf12679f73c607fb426bab069285e4eedf9bc0598a2364b172f",
+  "results/E1-S1-LOWER-BOUND-20260924T222847Z/sigma-E1.1-half.json": "504bc3047d267a6eaa18aa1b3cd9c96344e681e6c49cc8c3192e060baa459ca4",
+  "results/E1-S1-LOWER-BOUND-20260924T222847Z/sigma-E1.1.json": "aa62bc1095d69a3e8c71d543e66c2151c222ae6e36bfeba97b93ca40d596a2e0",
+  "results/E1-S1-LOWER-BOUND-20260924T222847Z/sigma-E1.2-excl-R1.json": "1aedeca875bfdaa426a233a4aee45a01313b18c6621a91cd7e890dfc655b3409",
+  "results/E1-S1-LOWER-BOUND-20260924T222847Z/sigma-E1.2.json": "935548a194ea1b165f26d5accba2ead3dd46c54cd440e5730fd0824a0feab8a2",
+  "results/E1-S1-LOWER-BOUND-20260924T222847Z/summary.json": "3d1733ebad73fb53414f4b02cf2ff3865509b09305c9546efe2d014a0b6e9c11"
+ },
+ "attempt_markers": {
+  "experiments/e1-s1-lower-bound/ATTEMPT-SPENT.json": "5100a1317f8fc6267b9d4469b089f2dc4fc1fe92f645701e8665a1970658711a",
+  "experiments/e1-s1-lower-bound/E1-APPROVAL.consumed.json": "b8f6883b6fa431aaca5778e135667bd5cfa0afd830822f908e263db263b8ee7d",
+  "git_common_dir_ledger_equals_ATTEMPT-SPENT.json": true
+ },
+ "attempts": "1 of 1; no retry is authorised or will be made"
+}

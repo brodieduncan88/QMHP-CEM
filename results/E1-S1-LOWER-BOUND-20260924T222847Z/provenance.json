@@ -1,0 +1,181 @@
+{
+ "contract_sha256": "2db93be49ee455f1da952acbe300f370d7614a8986c4151a9563adf805f00150",
+ "approval_sha256": "b8f6883b6fa431aaca5778e135667bd5cfa0afd830822f908e263db263b8ee7d",
+ "approval": {
+  "authorises": "one execution of E1, the static-capacitance lower-bound certificate for the S1 island (problem C)",
+  "attempt": 1,
+  "prior_records": [],
+  "contract_sha256": "2db93be49ee455f1da952acbe300f370d7614a8986c4151a9563adf805f00150",
+  "mesh_sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+  "baseline_manifest_sha256": "e3e447068dea6b4c2790c29de7a34be77f971717fa6e40964f6e31fdee193622",
+  "baseline_summary_sha256": "7eca21f3688a662f0324003093de2902cfbd67503fa0de71f5c028df13181298",
+  "code_sha256": {
+   "driver.py": "75121e5f199bce4344e2dc84d4c6fc2d966659ae72233807d6439ef1f133d807",
+   "e1_numerics.py": "d3094dac0c5a0907a6fadd66986f37afd9e5d306d5c3d6f09f879e9551e4ab8d",
+   "e1_geometry.py": "226153c5351d101c9b2565dcbc3252781f4c0a2ebc658b9942ce86ff0fe639d3",
+   "e1_controls.py": "7fa268c1eefa7e3d738c2c3104649be263d5044fb1fdf1524bf5bafe825d3e8f",
+   "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
+   "orchestrator/manifest.py": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f"
+  },
+  "preapproval_code_sha256": {
+   "e1_standin.py": "ad3643836bcd6d9e3eed98ab7c7a4f2e320dd1a2c04093e66e3cde564b9c0d77"
+  },
+  "environment": {
+   "python": "3.11.15",
+   "numpy": "2.4.6",
+   "scipy": "1.17.1",
+   "glibc": "2.39",
+   "longdouble_nmant": 63,
+   "threads_env": {
+    "OPENBLAS_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1"
+   }
+  },
+  "invocation": "env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 timeout --signal=KILL 1260 .venv/bin/python experiments/e1-s1-lower-bound/driver.py",
+  "budget": {
+   "cpu_soft_s": 900,
+   "cpu_hard_s": 960,
+   "address_space_bytes": 4294967296,
+   "address_space_hard_headroom_bytes": 1073741824,
+   "wall_alarm_s": 1200,
+   "outer_kill_s": 1260,
+   "attempts": 1,
+   "retry": "none"
+  },
+  "gamma": "1e-6",
+  "tolerance_set": "T0",
+  "repository_path": "/home/user/QMHP-CEM",
+  "source_commit": "4baeb67e5c135a97eb23d5e0057a086baa681f4e",
+  "not_before_utc": "2026-09-24T22:03:44Z",
+  "not_after_utc": "2026-09-25T22:03:44Z",
+  "tolerance_scope_decision": "COPIED_NUMBERS_WITHIN_SCOPE",
+  "q2_within_D5": true,
+  "does_not_authorise": [
+   "a second attempt, whatever the first one's outcome",
+   "running from another checkout, another commit or outside the validity window",
+   "removing or editing ATTEMPT-SPENT.json, the git-common-directory ledger entry, E1-APPROVAL.consumed.json or the record",
+   "any further capacitance computation on S1 after E1 (contract section 8 stop rule)",
+   "any E_C, g, deviation or suitability statement, or any statement in frequency units, from any E1 number",
+   "any tolerance T1-T4 not adopted by a recorded human decision before this approval",
+   "any Palace solve, Route A inversion, workflow dispatch or physical extraction"
+  ]
+ },
+ "source_commit_measured": "4baeb67e5c135a97eb23d5e0057a086baa681f4e",
+ "repository_path": "/home/user/QMHP-CEM",
+ "inputs": {
+  "contract": "2db93be49ee455f1da952acbe300f370d7614a8986c4151a9563adf805f00150",
+  "mesh": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428",
+  "baseline_manifest": "e3e447068dea6b4c2790c29de7a34be77f971717fa6e40964f6e31fdee193622",
+  "baseline_summary": "7eca21f3688a662f0324003093de2902cfbd67503fa0de71f5c028df13181298",
+  "code": {
+   "driver.py": "75121e5f199bce4344e2dc84d4c6fc2d966659ae72233807d6439ef1f133d807",
+   "e1_numerics.py": "d3094dac0c5a0907a6fadd66986f37afd9e5d306d5c3d6f09f879e9551e4ab8d",
+   "e1_geometry.py": "226153c5351d101c9b2565dcbc3252781f4c0a2ebc658b9942ce86ff0fe639d3",
+   "e1_controls.py": "7fa268c1eefa7e3d738c2c3104649be263d5044fb1fdf1524bf5bafe825d3e8f",
+   "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
+   "orchestrator/manifest.py": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f"
+  }
+ },
+ "baseline": {
+  "C_hi_fF": 67.9755386760262,
+  "C_br_fF": 56.67470653023562,
+  "C_hi_bit_exact": true,
+  "C_br_bit_exact": true
+ },
+ "probes": {
+  "dispatch": {
+   "inputs": 3000,
+   "inputs_not_representable_in_float64": 2998,
+   "mismatches": 0,
+   "ok": true
+  },
+  "arithmetic": {
+   "cases": {
+    "s - 1 == 2^-63": true,
+    "s * s == 1 + 2^-62": true,
+    "add": true,
+    "sub": true,
+    "mul": true,
+    "div": true
+   },
+   "ok": true
+  }
+ },
+ "c0": {
+  "c0": "4845609718814441968540117692180125196986746835762176664467617100795030701646549771889658622377466263616432144146301377989387789010847759929530537019406715429/418993997810706158384998745421710933139212383249202245583439891134978388037180802031834356676138766148341049270174864280196085720676569099264297313239040000",
+  "c0_float": 11.564866666666667,
+  "q_B": 31,
+  "c_F": 7.263866666666667,
+  "corner_sum_term": 2.805,
+  "division_term": 1.496,
+  "limit": "1180591620717411299456/18446744073709551585",
+  "within_limit": true,
+  "constants": {
+   "K_T": "77/400",
+   "K_12": "221/625",
+   "K_F": "187/1000",
+   "K_S": "231/200"
+  }
+ },
+ "environment": {
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "platform": "Linux-6.18.44-fc-v37-x86_64-with-glibc2.39",
+  "longdouble": {
+   "nmant": 63,
+   "itemsize": 16,
+   "libc": [
+    "glibc",
+    "2.39"
+   ]
+  }
+ },
+ "invocation": {
+  "cwd": "/home/user/QMHP-CEM",
+  "argv": [
+   "experiments/e1-s1-lower-bound/driver.py"
+  ],
+  "parent_argv": [
+   "timeout",
+   "--signal=KILL",
+   "1260",
+   ".venv/bin/python",
+   "experiments/e1-s1-lower-bound/driver.py"
+  ],
+  "executable": "/home/user/QMHP-CEM/.venv/bin/python",
+  "prefix": "/home/user/QMHP-CEM/.venv",
+  "optimize": 0,
+  "dont_write_bytecode": true,
+  "pycache_prefix": "/dev/null/qmhp-no-bytecode-cache",
+  "bytecode_cache_paths": {
+   "e1_numerics.py": "/dev/null/qmhp-no-bytecode-cache/home/user/QMHP-CEM/experiments/e1-s1-lower-bound/e1_numerics.cpython-311.pyc",
+   "e1_geometry.py": "/dev/null/qmhp-no-bytecode-cache/home/user/QMHP-CEM/experiments/e1-s1-lower-bound/e1_geometry.cpython-311.pyc",
+   "e1_controls.py": "/dev/null/qmhp-no-bytecode-cache/home/user/QMHP-CEM/experiments/e1-s1-lower-bound/e1_controls.cpython-311.pyc",
+   "anchor_fem.py": "/dev/null/qmhp-no-bytecode-cache/home/user/QMHP-CEM/experiments/static-anchor-hypothesis/anchor_fem.cpython-311.pyc",
+   "orchestrator/manifest.py": "/dev/null/qmhp-no-bytecode-cache/home/user/QMHP-CEM/orchestrator/manifest.cpython-311.pyc"
+  },
+  "threads_env": {
+   "OPENBLAS_NUM_THREADS": "1",
+   "OMP_NUM_THREADS": "1",
+   "MKL_NUM_THREADS": "1"
+  }
+ },
+ "started_utc": "2026-09-24T22:28:47.313356+00:00",
+ "limits": {
+  "cpu_soft_s": 900,
+  "cpu_hard_s": 960,
+  "address_space_bytes": 4294967296,
+  "address_space_hard_bytes": 5368709120,
+  "wall_alarm_s": 1198,
+  "wall_alarm_from_start_s": 1200,
+  "stop_signals": [
+   "SIGXCPU",
+   "SIGALRM",
+   "SIGTERM",
+   "SIGHUP",
+   "SIGINT"
+  ]
+ }
+}
