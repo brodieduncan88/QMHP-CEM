@@ -8,18 +8,57 @@
 
 **Corrected in the cleanup after the review of `2f752cd`.** The third version (committed at `2f752cd`) said that only the names and timestamps of the uncommitted files were read, although §2 cites `run8_small`'s rounding count (review finding REC-1). The statement of what was read is corrected below, and the wrong sentence is kept verbatim in §8.
 
+**Corrected again in the final cleanup after the review of `e87373f`.** The fourth version (committed at `e87373f`) said that m = 532 "gives" N = 1,524. Its statement of what was read was also incomplete, and broader than the evidence. It stated session-record facts as if they were verified. Each is corrected below, and the wrong sentences are kept verbatim in §8.
+
 - **What this record changes.** It rewrites no historical record. These stay as they are:
-  - the commits `90bf9eb`, `22c9585`, `28f6ca3` and `2f752cd` and their messages;
+  - the commits `90bf9eb`, `22c9585`, `28f6ca3`, `2f752cd` and `e87373f` and their messages;
   - their committed evidence files;
   - contract revisions 8.2, 8.3, 8.4 and 8.5;
   - the uncommitted scratch and `/tmp` files listed in §3.
-- **What was read.** No energy, bound or capacitance value of those uncommitted files was read for this record.
-  - Of the `/tmp` Confirmation files, only their names and timestamps were read.
-  - Of the revision-8 prototype's session output files (`run8_*`, and the review's `rr_*`), only the following were read, in the revision-8.4 and 8.5 rounds: their names and timestamps, their key names, the set sizes N, n_island and N_x printed in their logs, and the rounding counts m in their JSON files.
-  - `run8_small` has no log. Its rounding count m = 532 was read, and gives its set size N = 1,524 (§2).
-- **No S1 numerics.** No S1 numerics were run for this record. The revision-8.4 and 8.5 rounds and the cleanup after the review of `2f752cd` ran only:
+- **Sources of this record.** Each statement rests on one of:
+  - the repository: commits, committed files and code;
+  - the attributes of the uncommitted files: names, file times, byte sizes, hashes, key names, set sizes and rounding counts;
+  - geometry-only recomputation;
+  - the author's account of the session record, which is not part of the repository. Statements that rest on it are marked "the author's account". They cannot be checked from the repository, and file access times do not settle them.
+- **What was read (the author's account).** No S1 energy, bound or capacitance value was read for this record. In particular, none of the E1.1, E1.1-half or E1.2 quantities in the prototype's output files was read, and no value of a `/tmp` Confirmation file was read. One read of an uncommitted file did show bound- and capacitance-type values of synthetic proxies, not S1's; it is listed below.
+  - **Scope.** The reads listed below are those found by a search of the session record's commands (not their outputs) for the uncommitted files' names and directories, since the first version of this record. The search covers:
+    - the revision-8.3, 8.4 and 8.5 rounds;
+    - both cleanups;
+    - the reviews of `22c9585`, `28f6ca3`, `2f752cd` and `e87373f`.
+
+    A read that names none of those files or directories would not be found.
+  - **The `/tmp` Confirmation directories.** Their names, file names, file counts, byte sizes and times only.
+  - **Source code.** This covers the revision-8 prototype's source (`next/e1/rev8/cost/*.py` and the review's copy) and the configuration studies' scripts. The source was read. The prototype's stand-in generator was run for geometry only (§2).
+  - **The prototype's run outputs.** These are `run8_*.json` and `run8_*.log`, the review's `rr_*`, and its copy of `run8_small.json`. The following were read:
+    - their names, times (modification and access), byte sizes, key names, value types and list lengths;
+    - the set sizes N, n_island and N_x, from the logs' one line `N … ni … nx …`;
+    - the rounding counts m. For `run8_small`, which has no log, m = [532, 521, 512] (§2).
+    - In the revision-8.3 round, also:
+      - each JSON's `force_fail` setting and its `paths` (the solver path each set took);
+      - the key names of its timing record `T`;
+      - the number of its lines that match "K4", "E1.1" or "half".
+    - In the review of `28f6ca3`, `force_fail` again.
+    - In the review of `e87373f`, the logs' field names, and the K2b pair count 10,096, which the contract publishes.
+  - **The prototype's configuration-certification file** `cert8_results.jsonl`, in the review of `28f6ca3`:
+    - the selected configuration's row: its parameters, N, solver path and proxy-A g_E. That g_E is the value committed in the contract and in `proxyA-gE.json`;
+    - the file's first 400 bytes. They show the whole row of the configuration n = 32, q = 1.5, κ = 1.5, h = 1.25, w = 0.4, and most of the row of the configuration that differs from it only in q = 2.0:
+      - their proxy A's N, solver path, pivot ratio and g_E;
+      - the enclosure width per unit of c;
+      - for the first, also the proxy's charge Q and its CPU time.
+
+      These are values of synthetic proxies whose islands are not S1's. They were not used.
+  - **Other session files:**
+    - the smoke Confirmation's `next/e1/smoke/conf-nominal.json`: its `code_sha256` hashes only;
+    - `next/e1/evidence/code-at-evidence-start.json`: its key names;
+    - the evidence-run script `next/e1/evidence/run.sh`;
+    - the start and exit lines of `next/e1/evidence/run2.log`;
+    - the manifests `REV8-MANIFEST.sha256` and the selection study's `SELECTION-MANIFEST.sha256`: their hashes and entries (file names with hashes);
+    - the selection study's result files: their names and times;
+    - cached S1 geometry: geometry only.
+- **No S1 numerics (the author's account, from the same commands).** No S1 matrix was assembled or factorised for this record, and no S1 energy, bound or capacitance was formed. The rounds and reviews above ran only:
   - geometry-only comparisons: the S1 geometry phase, which assembles no matrix, and the prototype's stand-in generator;
-  - synthetic tests, including mutation tests of the separation check.
+  - tests and reviewer harnesses on small synthetic sets, including mutation tests of the separation check. Some harnesses ran the driver's attempt and Confirmation functions on such sets, redirected into scratch;
+  - `--proxy-a-ge`, which refuses by design. It was run with the numerics routines replaced by stubs (review of `28f6ca3`).
 
   The panel counts in §2 come from those comparisons.
 - **Status of the computation (D14).** The computation described below is acknowledged as an **unintended pre-execution computation, not approved behaviour**.
@@ -35,7 +74,7 @@
   - "No approval, no ledger entry and no S1 capacitance were involved.";
   - "The Confirmations ran on the SYNTHETIC stand-in of contract §6".
 - **S-4.** `docs/coupled-candidate/README.md` at `90bf9eb`, the E1 row: "No S1 capacitance has been computed."
-- **S-5.** Session reports made while E1 was being implemented and reviewed. They described the Confirmation and its evidence as involving no S1 capacitance, energy or matrix.
+- **S-5.** Session reports made while E1 was being implemented and reviewed. They described the Confirmation and its evidence as involving no S1 capacitance, energy or matrix. The session reports are not part of the repository; this item is the author's account of them.
 - **S-6.** Contract revision 8.2, §6 (sha256 `24ffff7d…504c`). It describes the prototype's stand-in as "the selected island (n = 32, q = 3.5) at (−0.6, 0) mm", but does not state the consequence given in §2.
 - **S-7.** The committed evidence of `90bf9eb`:
   - `confirmation-nominal.json` and `confirmation-forced.json` each record `"s1_capacitance_computed": false`;
@@ -88,7 +127,9 @@
   - So the E1.2 of every Confirmation in §3, and of the prototype's full-size runs (N = 9,995), held S1's island plus these 534 panels. Its matrix therefore contained a 1,558-row principal block whose entries are S1's E1.2 entries for the same panels, up to the argument order of the entry routine. This is reasoning only; no entry was computed for this record.
   - **The prototype's reduced run is different (D16).** `run8_small` used a 500-panel draw of the same sheet: N = 1,524, with N_x = 1,324.
     - Its E1.2 held S1's island plus 32 panels bit-identical to S1 E1.2 ground panels, so its matrix contained a 1,056-row block of S1's E1.2 entries (reasoning only).
-    - Its N follows from its rounding count (m = 532) and the prototype's `--small` path, `standin(500, 200)`. The 32 comes from a geometry-only comparison.
+    - **How N = 1,524 is established.** It is not derived from the rounding count. It is the size of the prototype's `--small` stand-in, `standin(500, 200)` in `run8.py`: S1's 1,024 island panels plus 500 ground panels drawn from the sheet, with N_x = 1,524 − 200 = 1,324. `standin.py` was last modified before the run (file times 23:28:43 and 23:32:06). The 32 comes from a geometry-only comparison of that stand-in with S1's E1.2.
+    - **What the file shows.** `run8_small.json` records no N. Its rounding counts, read from the file, are m = [532, 521, 512], for its E1.2, E1.1 and E1.1-half passes. By the prototype's formula (`m_count` in `ldk8.py`), m = 532 holds for every N from 1,281 to 1,536. So m is consistent with N = 1,524 but does not determine it. The full-size stand-in (N = 9,995) gives m = 1,331.
+    - **What rests on the session record.** `run8.py` was modified after `run8_small.json` was written (file time 23:38:47). Its current source therefore does not show by itself how that run was invoked. That the run used `--small`, with `standin(500, 200)`, is the author's account from the session record, which is not part of the repository.
 - **What was not computed.** No set equal to S1's E1.2 or E1.2-excl-R1, and no set containing an image of either, was assembled, factorised or used in any energy.
 - **Proxy A contains S1's E1.1, translated.** Proxy A's first 1,024 panels are S1's E1.1 translated by +0.6 mm in x, up to the rounding of the translation. A further 162 of its panels are bit-identical to S1 E1.2 panels. The same island is in proxies B and C of every configuration with n = 32 and q = 3.5.
   - Every Cholesky factorisation of such a proxy computes the factor of that translated E1.1's matrix as its leading block. No σ, energy or bound was formed on that block alone.
@@ -105,7 +146,7 @@
 | revision-8 prototype `run8.py`, full-size runs `run8_full`, `run8_force5`, `run8_release` (N = 9,995) | 2026-09-23, 23:37–23:47 (file times) | session prototype (not the E1 implementation) | E1.1 and E1.1-half quantities; an E1.2 with S1's island and 534 S1 ground panels | session scratch `next/e1/rev8/cost/run8_{full,force5,release}.json`, covered by the manifest `c781b6ef…` pinned in contract §9 |
 | revision-8 prototype `run8.py`, reduced run `run8_small` (N = 1,524) | 2026-09-23, 23:32 (file time) | session prototype | E1.1 and E1.1-half quantities; an E1.2 with S1's island and 32 S1 ground panels | session scratch `next/e1/rev8/cost/run8_small.json`, covered by the manifest `c781b6ef…` |
 | the revision-8 configuration review's re-measurements of the prototype: `rr_release`, `rr_full`, `rr_force5` (N = 9,995) | 2026-09-24, 00:49–01:12 (file times) | session prototype (review copy) | the same as the full-size runs | session scratch `next/e1/rev8-review/configuration/cost_copy/rr_*.json` |
-| smoke nominal Confirmation | 2026-09-24 02:57–03:02 | pre-freeze implementation (not `90bf9eb`) | the same | `/tmp/qmhp-e1-confirmation-b7cbxuw0`: sigma and pass files only. The run's output JSON in session scratch holds dimensionless per-set diagnostics. |
+| smoke nominal Confirmation | 2026-09-24 02:57–03:02 | pre-freeze implementation (not `90bf9eb`) | the same | `/tmp/qmhp-e1-confirmation-b7cbxuw0`: sigma and pass files only. Its output JSON and log are in session scratch (`next/e1/smoke/`, file time 03:02). By the author's account the JSON holds dimensionless per-set diagnostics, as the committed `confirmation-*.json` do; only its `code_sha256` hashes were read for this record. |
 | committed nominal Confirmation | 03:22–03:27 | `90bf9eb` | the same | `/tmp/qmhp-e1-confirmation-akx65x9c`; `experiments/e1-s1-lower-bound/confirmation-nominal.json` |
 | committed forced-fallback Confirmation | 03:27–03:32 | `90bf9eb` | the same | `/tmp/qmhp-e1-confirmation-xfdweylp`; `experiments/e1-s1-lower-bound/confirmation-forced.json` |
 | in-suite re-run, nominal (opt-in test) | 03:44–03:49 | `90bf9eb` worktree | the same | `/tmp/qmhp-e1-confirmation-v_3j__tc` |
@@ -120,18 +161,18 @@
   - The two opt-in Confirmation tests (`test_the_confirmation_re_runs_within_the_limits`, nominal and forced, run only with `E1_RUN_CONFIRMATION=1`) are part of the test suite, but are skipped by default and in CI.
   - When they were run, at `90bf9eb`, they did form S1's E1.1 and E1.1-half quantities: they are the two in-suite rows of the table above (D16).
 
-**What each `/tmp` directory holds:**
+**What each `/tmp` directory holds** (as `driver.py` at `90bf9eb` writes these files; the file names are from listings):
 - `sigma-E1.1*.json`: σ, Q and σᵀS₆₄σ.
 - `pass-E1.1*.json`: Ê, Ŵ and Ĝ as exact fractions.
 - `internal-sets.json`: C_lo, C̃ and w. It is in `akx65x9c`, `xfdweylp`, `v_3j__tc` and `59ubr8uc`. It is not in `b7cbxuw0` or `g_ee43ay`.
-- These files were not read, are preserved unchanged, and are not committed.
+- They are preserved unchanged and are not committed. By the author's account they were not opened: the commands show only listings of their names, file counts, sizes and times.
 
 **What the committed `confirmation-*.json` hold for E1.1 and E1.1-half:**
 - dimensionless diagnostics only: path, m, width_rel, check_g_rel and g_E;
 - the K4 statuses;
 - no capacitance value.
 
-The same dimensionless diagnostics were shown in session reports.
+By the author's account of the session record, session reports of that time showed the same dimensionless diagnostics. That record is not part of the repository.
 
 ## 4. Status of the computed quantities
 
@@ -224,3 +265,17 @@ The third version (committed at `2f752cd`) said the following (review of `2f752c
 | third version (verbatim) | why it is wrong | corrected in |
 |---|---|---|
 | "**Values not read.** The values of those uncommitted files were not read for this record. Only their names and timestamps were." | the revision-8.4 and 8.5 rounds also read the prototype files' key names, set sizes and rounding counts, and §2 cites `run8_small`'s m = 532. No energy, bound or capacitance value was read | the header ("What was read") |
+
+The fourth version (committed at `e87373f`) said the following (review of `e87373f`; final cleanup).
+
+| fourth version (verbatim) | why it is wrong | corrected in |
+|---|---|---|
+| "`run8_small` has no log. Its rounding count m = 532 was read, and gives its set size N = 1,524 (§2)." | m = 532 holds for every N from 1,281 to 1,536, so it does not give N. N = 1,524 comes from the prototype's source (`standin(500, 200)`), and that the run used it is the author's account | the header ("What was read"), §2 |
+| "Its N follows from its rounding count (m = 532) and the prototype's `--small` path, `standin(500, 200)`." | the same | §2 |
+| "**What was read.** No energy, bound or capacitance value of those uncommitted files was read for this record." | too broad. The review of `28f6ca3` printed the first 400 bytes of `cert8_results.jsonl`, which show bound- and capacitance-type values of two synthetic proxies (not S1's). The statement also rests on the session record, and it was not marked as such | the header ("What was read") |
+| "No energy, bound or capacitance value was read" (in this section's row for the third version) | the same | the header ("What was read") |
+| "Of the revision-8 prototype's session output files (`run8_*`, and the review's `rr_*`), only the following were read, in the revision-8.4 and 8.5 rounds: their names and timestamps, their key names, the set sizes N, n_island and N_x printed in their logs, and the rounding counts m in their JSON files." | incomplete. It left out the reads of the revision-8.3 round (`force_fail`, `paths`, the keys of `T`, line counts) and of the reviews. It also left out the other session files read: `cert8_results.jsonl`, the smoke Confirmation's hashes, and the evidence-run script and log | the header ("What was read") |
+| "**No S1 numerics.** No S1 numerics were run for this record. The revision-8.4 and 8.5 rounds and the cleanup after the review of `2f752cd` ran only:" | it did not cover the reviews' harness runs, and it rests on the session record without saying so | the header ("No S1 numerics") |
+| "The run's output JSON in session scratch holds dimensionless per-set diagnostics." (§3 table) | stated as verified; only its hashes were read for this record, and its content is the author's account | §3 |
+| "These files were not read, are preserved unchanged, and are not committed." (§3) | stated as verified. That the files were not opened is the author's account, and their content is described from the code that writes them | §3 |
+| "The same dimensionless diagnostics were shown in session reports." (§3) | stated as verified; it is the author's account of the session record | §3 |

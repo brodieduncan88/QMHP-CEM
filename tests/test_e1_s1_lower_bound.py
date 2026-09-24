@@ -1810,6 +1810,99 @@ def test_the_matching_is_one_to_one_not_a_global_count():
     assert es.separation_problems({"X": X}, {"E1.2": A}) == []
 
 
+def _second_anchor(A: np.ndarray) -> tuple[int, float]:
+    """The second anchor of the fit, by the rule _embed_under documents: of the panels whose
+    smallest side is at least 1/8 of the anchor's, the one whose lower-left corner is farthest
+    from the anchor's (max norm), the lexicographically smallest on a tie; and that distance."""
+    a = _anchor_index(A)
+    m = np.minimum(A[:, 1] - A[:, 0], A[:, 3] - A[:, 2])
+    d = np.maximum(np.abs(A[:, 0] - A[a, 0]), np.abs(A[:, 2] - A[a, 2]))
+    d = np.where(m >= m[a] / 8, d, -1.0)
+    idx = np.flatnonzero(d == d.max())
+    return int(idx[np.lexsort(A[idx].T[::-1])[0]]), float(d.max())
+
+
+def test_the_second_anchor_loop_tries_all_five_candidates_not_only_the_first_or_last_two():
+    """Second anchor (final cleanup): five plausible candidates in the second anchor's window, each
+    a panel of the second anchor's exact size, for every ground square: decoys at -25 and -15 eps
+    listed before the image, and at +15 and +25 eps listed after it. The code's own corner index
+    lists the window in that order (checked below), so the true second anchor is the third of five.
+    A loop that tried only the first two, or only the last two (or only the first or the last),
+    would fit only decoys, whose fits fail, and miss the image."""
+    img = E12 + np.array([0.31, 0.31, -0.17, -0.17])
+    e = _eps(img)
+    offsets = (-25, -15, 0, 15, 25)
+    X = np.concatenate([img if k == 0 else img[64:] + k * e for k in offsets])
+    a, (ib, delta) = _anchor_index(E12), _second_anchor(E12)
+    assert a < 64 <= ib                                               # an island anchor, a ground second anchor
+    eps, (wa, ha) = _eps(X), (E12[a, 1] - E12[a, 0], E12[a, 3] - E12[a, 2])
+    L = max(E12[:, 1].max() - E12[:, 0].min(), E12[:, 3].max() - E12[:, 2].min())
+    e0, V = eps * (2 + 4 * delta / (wa + ha)), eps * (2 + 2 * L / delta)
+    assert 25 * e < e0 and 10 * e > V                                 # inside the window; each decoy apart from the image
+    ng = len(E12) - 64
+    start = {-25: 0, -15: ng, 0: 2 * ng, 15: 2 * ng + len(E12), 25: 3 * ng + len(E12)}
+    at = {k: start[k] + (ib if k == 0 else ib - 64) for k in offsets}  # the second anchor's copy in each block
+    b = start[0] + a                                                  # the anchor's image
+    s0 = ((X[b, 1] - X[b, 0]) + (X[b, 3] - X[b, 2])) / (wa + ha)
+    window = es._Corners(es.normalised(X), max(e0, V)).near(
+        X[b, 0] + s0 * (E12[ib, 0] - E12[a, 0]), X[b, 2] + s0 * (E12[ib, 2] - E12[a, 2]), e0)
+    assert window == [at[k] for k in offsets]                        # the true second anchor is third of five
+    hit = es.find_embedding(X, E12)
+    assert hit is not None and hit["scale"] == pytest.approx(1.0)
+    _verify_map(X, E12, hit)
+    assert es.separation_problems({"X": X}, {"E1.2": E12})
+
+
+def _greedy_assigns(cands: list, rows, pick) -> bool:
+    """A greedy assignment (no augmenting paths): each row in turn takes one free candidate."""
+    used = set()
+    for r in rows:
+        free = [p for p in cands[r] if p not in used]
+        if not free:
+            return False
+        used.add(pick(free))
+    return True
+
+
+def test_the_matching_finds_an_assignment_that_needs_augmenting_paths():
+    """Matching (final cleanup): an exact image of the case with two ground squares each given three
+    near-duplicate twins, 0.75 V apart in their x1 bound. Each row of such a chain then has its own
+    image and its neighbours' images as candidates, and none further. A perfect matching exists
+    (every row to its own image). But one chain's images are listed in order and the other's in
+    reverse, so a greedy assignment leaves a row without a panel, whichever end of the rows it
+    starts from, whichever free candidate it takes, and also if it serves the rows with the fewest
+    candidates first (checked below on independently computed candidate lists). Only a true
+    one-to-one matching (augmenting paths) finds the image."""
+    t = np.array([0.05, 0.05, 0.02, 0.02])
+    ib, _ = _second_anchor(E12)
+    g1, g2 = 64 + 100, 64 + 300                                       # two ground squares far apart
+    assert ib not in (g1, g2) and _anchor_index(E12) < 64
+    d = 0.75 * es.find_embedding(E12 + t, E12)["tolerance"]
+    twins = {g: E12[g] + np.array([[0, k * d, 0, 0] for k in (1, 2, 3)]) for g in (g1, g2)}
+    A = np.concatenate([E12, twins[g1], twins[g2]])
+    X = np.concatenate([(twins[g2] + t)[::-1], E12 + t, twins[g1] + t])   # chain g2 reversed, chain g1 in order
+    hit = es.find_embedding(X, A)
+    assert hit is not None and 0.6 < d / hit["tolerance"] < 0.9
+    V = hit["tolerance"]
+    image = np.concatenate([np.arange(3, 3 + len(E12)), np.arange(3 + len(E12), len(X)), [2, 1, 0]])
+    dist = np.abs(X[None, :, :] - (A + t)[:, None, :]).max(axis=2)
+    cands = [np.flatnonzero(row <= V).tolist() for row in dist]      # independent of the code under test
+    assert all(image[r] in c for r, c in enumerate(cands))            # a perfect matching exists
+    chain = [g1, len(E12), len(E12) + 1, len(E12) + 2]
+    assert [len(cands[r]) for r in chain] == [2, 3, 3, 2]             # own image and neighbours' only
+    assert sum(len(c) for c in cands) == len(A) + 2 * 6               # every other row: its own image only
+    n = len(A)
+    orders = [range(n), range(n - 1, -1, -1), sorted(range(n), key=lambda r: (len(cands[r]), r)),
+              sorted(range(n), key=lambda r: (len(cands[r]), -r))]
+    for rows in orders:
+        for pick in (min, max):
+            assert not _greedy_assigns(cands, rows, pick)
+    s, (tx, ty) = hit["scale"], hit["translation"]
+    assert s == pytest.approx(1.0) and abs(tx - 0.05) <= V and abs(ty - 0.02) <= V
+    assert hit["symmetry"] == {"exchange_x_y": False, "x_sign": 1, "y_sign": 1}
+    assert es.separation_problems({"X": X}, {"E1.2": A})
+
+
 def test_the_scale_is_fitted_on_the_long_baseline():
     """The fit (T3): every bound of the image perturbed by up to 0.9 tol. The scale from the
     anchor's size alone is then off by up to about 4 tol/(w_a + h_a), too much for the panels far
@@ -2705,14 +2798,26 @@ def test_the_doc_and_README_state_what_was_computed_and_that_the_evidence_is_pen
     assert "reduced run `run8_small` (N = 1,524)" in record and "32 S1 ground panels" in record          # T1
     assert "The two opt-in Confirmation tests" in record and "E1_RUN_CONFIRMATION=1" in record            # T2
     body = record[:record.index("## 8. Revision history")]                                              # REC-1
-    assert "Its rounding count m = 532 was read" in body and "No energy, bound or capacitance value" in body
     assert "Only their names and timestamps were." not in body and "Only their names and timestamps were." in record
     assert "revision-8.4 separation has passed review" not in body
+    # final cleanup: m was read but does not give N; what was read is complete and marked as the author's account
+    assert "m = [532, 521, 512]" in body and "does not determine it" in body and "It is not derived from the rounding count" in body
+    for wrong in ("gives its set size N = 1,524", "Its N follows from its rounding count"):
+        assert wrong not in body and wrong in record
+    assert "No S1 energy, bound or capacitance value was read for this record." in body
+    assert "No energy, bound or capacitance value of those uncommitted files was read for this record." in record
+    assert "No energy, bound or capacitance value of those uncommitted files was read for this record." not in body
+    for read in ("`force_fail`", "`cert8_results.jsonl`", "`code_sha256`", "evidence/run2.log`", "the K2b pair count 10,096"):
+        assert read in body, read
+    assert body.count("the author's account") >= 5 and "The run's output JSON in session scratch holds" not in body
+    skip = next(m for m in test_the_confirmation_re_runs_within_the_limits.pytestmark if m.name == "skipif")
+    assert "after the revision-8.5 correction has passed review" in skip.kwargs["reason"]           # N-4
+    assert "8.4" not in skip.kwargs["reason"]
 
 
 @pytest.mark.skipif(os.environ.get("E1_RUN_CONFIRMATION") != "1",
                     reason="the ~5-minute Confirmation runs re-run only with E1_RUN_CONFIRMATION=1, and only on a "
-                           "human instruction after the revision-8.4 separation has passed review")
+                           "human instruction after the revision-8.5 correction has passed review")
 @pytest.mark.parametrize("mode", ["nominal", "forced"])
 def test_the_confirmation_re_runs_within_the_limits(mode, tmp_path):
     out = subprocess.run(["timeout", "--signal=KILL", "1260", sys.executable, "experiments/e1-s1-lower-bound/driver.py",
