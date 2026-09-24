@@ -1,0 +1,214 @@
+{
+ "status": "APPROVAL CANDIDATE, NOT AN APPROVAL. This file binds, by sha256, everything the approver is asked to approve. It authorises nothing; the driver never reads it. E1 is PREPARED, NOT APPROVED, NOT EXECUTED.",
+ "source_commit": "the full SHA of the commit that adds this file (it cannot contain its own SHA); it is reported to the approver with this package, and must equal HEAD at execution",
+ "reviewed_implementation": {
+  "commit": "88988d43a49b290e7c7537c41033aec3d61af672",
+  "statement": "every file bound by code_sha256 and preapproval_code_sha256, the contract and the approval draft is byte-identical from this commit to the commit that adds this package; the binding test checks every one against the hashes here, which are the draft's"
+ },
+ "companion": {
+  "path": "experiments/e1-s1-lower-bound/APPROVAL-PACKAGE.rev8.5.md",
+  "sha256": "95eecf673e61bddb809f43fcda490c748d6ac75f840b53a80176dfab7c54d3de"
+ },
+ "contract": {
+  "path": "experiments/e1-s1-lower-bound/E1-CONTRACT.rev8.5.md",
+  "sha256": "2db93be49ee455f1da952acbe300f370d7614a8986c4151a9563adf805f00150"
+ },
+ "code_sha256": {
+  "driver.py": "75121e5f199bce4344e2dc84d4c6fc2d966659ae72233807d6439ef1f133d807",
+  "e1_numerics.py": "d3094dac0c5a0907a6fadd66986f37afd9e5d306d5c3d6f09f879e9551e4ab8d",
+  "e1_geometry.py": "226153c5351d101c9b2565dcbc3252781f4c0a2ebc658b9942ce86ff0fe639d3",
+  "e1_controls.py": "7fa268c1eefa7e3d738c2c3104649be263d5044fb1fdf1524bf5bafe825d3e8f",
+  "anchor_fem.py": "1123e38f16b6c443fd397330db568e8c5d4e18fa9a7c4dc844c599204e6437c1",
+  "orchestrator/manifest.py": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f"
+ },
+ "preapproval_code_sha256": {
+  "e1_standin.py": "ad3643836bcd6d9e3eed98ab7c7a4f2e320dd1a2c04093e66e3cde564b9c0d77"
+ },
+ "approval_draft": {
+  "path": "experiments/e1-s1-lower-bound/E1-APPROVAL.draft.json",
+  "sha256": "75bfb5814cdc691d5b5890c42231f5b79f55b3fc9c0137814a7b5a9d8752ce2e"
+ },
+ "s1_inputs": {
+  "mesh": {
+   "path": "results/COUPLED-LADDER-O1-L2-N2R-20260918T061455Z/L2/solver/coupled_chip_cell_L2.msh",
+   "sha256": "d8dc1a92159d7659c8a86bf3340241bf78ad751c71684a62fd14394b92c14428"
+  },
+  "baseline_manifest": {
+   "path": "results/STATIC-REFINEMENT-STUDY-20260923T062048Z/manifest.sha256",
+   "sha256": "e3e447068dea6b4c2790c29de7a34be77f971717fa6e40964f6e31fdee193622"
+  },
+  "baseline_summary": {
+   "path": "results/STATIC-REFINEMENT-STUDY-20260923T062048Z/summary.json",
+   "sha256": "7eca21f3688a662f0324003093de2902cfbd67503fa0de71f5c028df13181298"
+  }
+ },
+ "environment": {
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "scipy": "1.17.1",
+  "glibc": "2.39",
+  "longdouble_nmant": 63,
+  "threads_env": {
+   "OPENBLAS_NUM_THREADS": "1",
+   "OMP_NUM_THREADS": "1",
+   "MKL_NUM_THREADS": "1"
+  }
+ },
+ "invocation": "env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 timeout --signal=KILL 1260 .venv/bin/python experiments/e1-s1-lower-bound/driver.py",
+ "budget": {
+  "cpu_soft_s": 900,
+  "cpu_hard_s": 960,
+  "address_space_bytes": 4294967296,
+  "address_space_hard_headroom_bytes": 1073741824,
+  "wall_alarm_s": 1200,
+  "outer_kill_s": 1260,
+  "attempts": 1,
+  "retry": "none"
+ },
+ "tolerance_set": "T0",
+ "gamma": "1e-6",
+ "attempt": 1,
+ "prior_records": [],
+ "authorises": "one execution of E1, the static-capacitance lower-bound certificate for the S1 island (problem C)",
+ "does_not_authorise": [
+  "a second attempt, whatever the first one's outcome",
+  "running from another checkout, another commit or outside the validity window",
+  "removing or editing ATTEMPT-SPENT.json, the git-common-directory ledger entry, E1-APPROVAL.consumed.json or the record",
+  "any further capacitance computation on S1 after E1 (contract section 8 stop rule)",
+  "any E_C, g, deviation or suitability statement, or any statement in frequency units, from any E1 number",
+  "any tolerance T1-T4 not adopted by a recorded human decision before this approval",
+  "any Palace solve, Route A inversion, workflow dispatch or physical extraction"
+ ],
+ "human_fields": {
+  "source_commit": "the SHA reported with this package (HEAD at execution)",
+  "not_before_utc": "ISO-8601 UTC",
+  "not_after_utc": "ISO-8601 UTC, at most 7 days after not_before_utc",
+  "tolerance_scope_decision": "COPIED_NUMBERS_WITHIN_SCOPE or COPIED_NUMBERS_EXCLUDED",
+  "q2_within_D5": "true (Q2 stays) or false (Q2 is dropped before execution)"
+ },
+ "pre_approval_evidence": {
+  "confirmation": {
+   "directory": "experiments/e1-s1-lower-bound/preapproval-confirmation-rev8.5",
+   "produced_from_commit": "ca19ece8bb524b06dc3b8130974505e0052aff03",
+   "note": "nominal and forced-fallback Confirmations of contract section 3.2 item 2, on the synthetic stand-in; both passed",
+   "manifest": {
+    "path": "experiments/e1-s1-lower-bound/preapproval-confirmation-rev8.5/MANIFEST.sha256",
+    "sha256": "8761f952eca2ea305659737a27aae16c87a1584135a4e8989383dfcfb50c16b8"
+   },
+   "files_sha256": {
+    "MANIFEST.sha256": "8761f952eca2ea305659737a27aae16c87a1584135a4e8989383dfcfb50c16b8",
+    "PREDECLARATION.md": "17602835148980c5f1102b5df8270ca69a283d6b77fe5f2c250b93a693840a82",
+    "README.md": "bee5fc8282f512d9bbfaefcdabb555ae258115b66ab0d3d5c6299885eec442ae",
+    "forced/confirmation-forced.json": "4e165722671e8a2b717efdbae95b9d4692b35f53e6f0485e7406c669efebd178",
+    "forced/evidence-dir/controls.json": "cd1478d17de55567b6346260ce363aba089946f6432fabe893cbce6ba27374fd",
+    "forced/evidence-dir/geometry.json": "3ff76ab8355178b61f7f8024e315ffb3737e54ade610b4d1a5714d94cd74ece4",
+    "forced/evidence-dir/internal-sets.json": "4212b72f6fa485e03008b4e99697de8e46c1d581b4323fef090b78651b60fb74",
+    "forced/evidence-dir/manifest.sha256": "23c2e30fd3bc7b53d812fef7e22b3623ec7ff087c0ef7805c91fec8a81cecd1f",
+    "forced/evidence-dir/pass-E1.1-half.json": "919d65f6a6448428b41779f782c66fb8b94d1e57fee983b76affe2dc0018f515",
+    "forced/evidence-dir/pass-E1.1.json": "e5df5d91ff1daaf9fc7cc7a11082524c1a935a5c818869146e6024086c19cf2d",
+    "forced/evidence-dir/pass-E1.2+E1.2-excl-R1.json": "1f7090c5ca0fbecdc51c9099097b3061d790a7c92cf1643fd66c071396b8ccf2",
+    "forced/evidence-dir/sigma-E1.1-half.json": "16ba5adb84b94ea19963ab5e2cec502526c0ba8ce3e7710b95653dc79a433dd8",
+    "forced/evidence-dir/sigma-E1.1.json": "65f3bdac3214d461cab36a5a7be42d63fa74b396fffccd826afbc366d04cfd05",
+    "forced/evidence-dir/sigma-E1.2-excl-R1.json": "c1d001c2d5bd0ef059d45cbd72bf2a0fd86ac4bb38dd71e35564809b9b039e7f",
+    "forced/evidence-dir/sigma-E1.2.json": "a6f10bbb467735163bee2a77352ee4b52216f51be46db6d075496233d245456d",
+    "forced/evidence-dir/summary.json": "1982e3381e75ee50ca5d18992a5f4ee351ecf2965a518d1fedc3ed777f9944f4",
+    "forced/run-forced.record": "e2b990fb02e31ced9f196423a5050ec336f27a3e294265c227e506f332352cf0",
+    "forced/stderr-forced.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "forced/stdout-forced.log": "4e165722671e8a2b717efdbae95b9d4692b35f53e6f0485e7406c669efebd178",
+    "nominal/confirmation-nominal.json": "e243975f1570929b307109c622183b204a76ec99240d678f39aae5f51d1f5943",
+    "nominal/evidence-dir/controls.json": "cd1478d17de55567b6346260ce363aba089946f6432fabe893cbce6ba27374fd",
+    "nominal/evidence-dir/geometry.json": "3ff76ab8355178b61f7f8024e315ffb3737e54ade610b4d1a5714d94cd74ece4",
+    "nominal/evidence-dir/internal-sets.json": "e19658ed8f3bdbabfd7e9cf514a321197f9f3c091a54d00f92f04f118d41a2f9",
+    "nominal/evidence-dir/manifest.sha256": "30f3d7f8f5525c839af0ecefab6db89424d81fe047b9c9c8f9d5440b82e0416c",
+    "nominal/evidence-dir/pass-E1.1-half.json": "919d65f6a6448428b41779f782c66fb8b94d1e57fee983b76affe2dc0018f515",
+    "nominal/evidence-dir/pass-E1.1.json": "e5df5d91ff1daaf9fc7cc7a11082524c1a935a5c818869146e6024086c19cf2d",
+    "nominal/evidence-dir/pass-E1.2+E1.2-excl-R1.json": "41494eab2d4a93ac9050896342c25ea654969d841f6ff1ebb0f3c9be106cd035",
+    "nominal/evidence-dir/sigma-E1.1-half.json": "16ba5adb84b94ea19963ab5e2cec502526c0ba8ce3e7710b95653dc79a433dd8",
+    "nominal/evidence-dir/sigma-E1.1.json": "65f3bdac3214d461cab36a5a7be42d63fa74b396fffccd826afbc366d04cfd05",
+    "nominal/evidence-dir/sigma-E1.2-excl-R1.json": "122264aa796af005e072de728a729d2f60fb3d8064b8ba1503290fcbb6eeae89",
+    "nominal/evidence-dir/sigma-E1.2.json": "c381ecea23144fd3cddbb2791bf92fe974dd5feec0fb891d599b8bbc68e94ce3",
+    "nominal/evidence-dir/summary.json": "813ff6f178d27916db1d1a023a57f1aef68d60ce27d702a707c8cb88056a22aa",
+    "nominal/run-nominal.record": "781a827849496d3efb8b83091f73ab1fe6ffe177e31011106b54a93f2c391faf",
+    "nominal/stderr-nominal.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "nominal/stdout-nominal.log": "e243975f1570929b307109c622183b204a76ec99240d678f39aae5f51d1f5943",
+    "run.sh": "755a4b438bb336450dd56f5c6715a0f9a832a6c322a7564c3992f37ff0c903e4"
+   }
+  },
+  "confirmation_index_correction": {
+   "path": "docs/coupled-candidate/corrections/e1-preapproval-confirmation-rev8.5-readme-correction.md",
+   "sha256": "ea0c8c410506908f72689da39325fe4308ee93f25b081b49a165c103635c9a30",
+   "note": "corrects the Confirmation index's claim that summary.json holds no S1 value (it holds S1's copied C_hi)"
+  },
+  "rehearsal": {
+   "directory": "experiments/e1-s1-lower-bound/preapproval-rehearsal-rev8.5",
+   "produced_from_commit": "017f90e8ab492f3d1ef31685dc6f6fc86b4bfb60",
+   "note": "the contract section 5 rehearsal: synthetic controls and the S1 geometry phase; no S1 matrix",
+   "manifest": {
+    "path": "experiments/e1-s1-lower-bound/preapproval-rehearsal-rev8.5/MANIFEST.sha256",
+    "sha256": "f3f7db902cd8315b54a082ff234607e238bb99668b6c78328cb9203675631161"
+   },
+   "files_sha256": {
+    "DONE": "bfce7ac8a25d6ce0432c46ab87785e1e02384fe880b8dbed46ac387788b1a412",
+    "MANIFEST.sha256": "f3f7db902cd8315b54a082ff234607e238bb99668b6c78328cb9203675631161",
+    "PREDECLARATION.md": "d87e43acd0eb2026e5a44b344f6e9c48e4e22f5277b724d3256f1e18e561a06e",
+    "README.md": "e98cb92299eafc01ecd5070be17b5b307a1f55b8ed9aee50dc166a33c2627637",
+    "check_rehearsal.py": "122fb2b54e7bef2a804c20b6795c0f9b7b8a0dcad73fd1f76d09ed9faeae3992",
+    "part1-driver/check-rehearsal.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "part1-driver/check-rehearsal.exit": "cfeb85ede1d625fc08f3515d17fe7be2446e52b6d824e4a7dc81a5f98fd399f4",
+    "part1-driver/check-rehearsal.out.json": "1feccb800e25ecc96dd882323c2675f8e174124d9c48733d191e87106262042a",
+    "part1-driver/rehearsal.json": "4f6b56ed8b58693837811e54effdcb78ba7936f01c0b13ec90e0358064628170",
+    "part1-driver/run-driver.record": "32a099579358ff7dc064145cff7e35a638d8ba4957414bed0c0e5b62816d5c77",
+    "part1-driver/stderr-driver.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "part1-driver/stdout-driver.log": "4f6b56ed8b58693837811e54effdcb78ba7936f01c0b13ec90e0358064628170",
+    "part1-driver/time-driver.txt": "1f7c31eca96803c1cd40f0be7e3c54d5df4d539c47c5f7f7dcf51e56e29b8738",
+    "part2-test/run-test.record": "2d0b1e8ac7208d89a37465c1e64664835f552820d85af5dd668c147c0b7410e5",
+    "part2-test/stderr-test.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "part2-test/stdout-test.log": "6a98e2bc4bf41e8035e54a98ec81c586393ead7fcb2461ecdb7e5d392adb6358",
+    "part2-test/time-test.txt": "c86de48261d0847f9297a00f95897385989bfe01377634a8441ddc282ee61b02",
+    "run.sh": "7b6369069e3e5ef3499b6652d5a8c441d10e0f43de4bbf9b2aead50b52c9598c"
+   }
+  },
+  "c2_stop_signal_test_diagnosis": {
+   "directory": "experiments/e1-s1-lower-bound/c2-stop-signal-test-diagnosis",
+   "produced_from_commit": "b0fec36515016946c6225e2a18d5cd6379439fa2",
+   "note": "the C-2 test was timing-raced; replaced by a deterministic test; no implementation defect (diagnosed on this pre-fix commit)",
+   "manifest": {
+    "path": "experiments/e1-s1-lower-bound/c2-stop-signal-test-diagnosis/MANIFEST.sha256",
+    "sha256": "70da8bcdc103df90f257f8fb3326ba9dbddc395e6cc21c4fcfe088ba37ce8f0c"
+   },
+   "files_sha256": {
+    "MANIFEST.sha256": "70da8bcdc103df90f257f8fb3326ba9dbddc395e6cc21c4fcfe088ba37ce8f0c",
+    "README.md": "32eddfc7dcfa47cd72a9aa7e3ccfc1917302abd9889adea1c58f3e7d1b4fb2f5",
+    "delivery_probe.py": "dd2d8eb842be73e9ff8f8e0e21e42b115b39db00ad18e887766e5a7fb902edd3",
+    "determinism-and-mutations.harness-bug.log": "03705cf69182a0e203fd8437a1eb021a6846fc5d963f663e3a13e94b6934aab8",
+    "determinism-and-mutations.log": "894cf3dd12179311ead87d0b1f3348e1b969d02bc968b037207645161f80fb71",
+    "determinism_and_mutations.py": "760f50a55f8b5a3befc94e69d88a280e258f0ae560d3486ad55d64165971c60b",
+    "diag_timing.py": "56e88d325cc0e4959d589c0bdacdedb9b64b5438ff41075fe8e51ee6f518536d",
+    "prototype_run_against_b0fec36.py": "ef974625cce956f30f1c12e7ae0ddc14af02cf6c67d755d658e67e9339c7181c",
+    "timing-rows-b0fec36.jsonl": "2b141ba16e6306d0465373468de9e79a4f5896ffa86003d4e067dcf9721a3f69"
+   }
+  },
+  "superseded_90bf9eb": {
+   "rehearsal.json": "3b6e31b198ae81b0d8a6a6ab24116457fb04c9d195f3fd373451f9856d45c2b8",
+   "proxyA-gE.json": "83f442794e5020732a68942e790f42b9715d078ba9c1feb12cb0f94a0139d222",
+   "confirmation-nominal.json": "522be6f04455aed92b1532558fd6110a340440dd4e33d2845c3ace2b9c32b2aa",
+   "confirmation-forced.json": "7a18cc98540e9fada6a5ee72d7e9c2ab9e1ad32c5a118532e212a5433a26564a"
+  }
+ },
+ "attempt_status": {
+  "status": "UNSPENT",
+  "checked_at_commit": "6f965e98a5ac719f6840ad0c6639763a8ded2f1e",
+  "spent_state": [],
+  "git_common_ledger": {
+   "path": ".git/qmhp-attempts/E1-S1-LOWER-BOUND.json",
+   "exists": false
+  },
+  "absent": [
+   "experiments/e1-s1-lower-bound/E1-APPROVAL.json",
+   "experiments/e1-s1-lower-bound/E1-APPROVAL.consumed.json",
+   "experiments/e1-s1-lower-bound/ATTEMPT-SPENT.json",
+   "results/E1-S1-LOWER-BOUND-*"
+  ],
+  "rule": "one attempt, spent before any control runs; no retry whatever the outcome (contract section 8)"
+ }
+}

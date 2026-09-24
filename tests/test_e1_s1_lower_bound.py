@@ -2892,3 +2892,76 @@ def test_the_confirmation_re_runs_within_the_limits(mode, tmp_path):
     assert r["confirmation_pass"] is True and all(r["checks"].values()) and r["separation_problems"] == []
     assert r["control_separation_problems"] == []
     assert r["resources"]["cpu_s"] <= 450 and r["resources"]["peak_address_space_bytes"] <= 2 * 1024 ** 3
+
+
+# === the approval candidate: the package binds what the approver is asked to approve ===============
+
+PACKAGE = HERE / "APPROVAL-PACKAGE.rev8.5.json"
+
+
+def _sha_rel(rel: str) -> str:
+    return hashlib.sha256((REPO / rel).read_bytes()).hexdigest()
+
+
+def _manifest_problems(directory: Path, name: str) -> list[str]:
+    """A sha256sum-style manifest ("<hash>  [./]<path>") must list every other file of the
+    directory, and each hash must be the file's."""
+    listed = {}
+    for line in (directory / name).read_text().splitlines():
+        digest, _, rel = line.partition("  ")
+        listed[rel[2:] if rel.startswith("./") else rel] = digest
+    on_disk = {str(p.relative_to(directory)) for p in directory.rglob("*") if p.is_file() and p.name != name}
+    bad = [f"{r}: not in the manifest" for r in sorted(on_disk - set(listed))]
+    bad += [f"{r}: missing" for r in sorted(set(listed) - on_disk)]
+    bad += [f"{r}: changed" for r in sorted(set(listed) & on_disk)
+            if hashlib.sha256((directory / r).read_bytes()).hexdigest() != listed[r]]
+    return bad
+
+
+def test_the_approval_package_binds_every_file_it_names_and_the_driver_pins():
+    """The approval candidate (human instruction of 2026-09-24): every sha256 in the package is the
+    file's; its pins are the driver's and the draft's; every evidence directory is complete and
+    verifies against its manifest. A change to any bound file fails this test, so the package
+    must be re-issued, and re-approved, with it."""
+    pkg = _strict_json(PACKAGE)
+    draft = _strict_json(HERE / "E1-APPROVAL.draft.json")
+    assert pkg["status"].startswith("APPROVAL CANDIDATE, NOT AN APPROVAL")
+    assert pkg["contract"] == {"path": "experiments/e1-s1-lower-bound/E1-CONTRACT.rev8.5.md", "sha256": dr.CONTRACT_SHA256}
+    assert _sha_rel(pkg["contract"]["path"]) == dr.CONTRACT_SHA256 == draft["contract_sha256"] == CONTRACT_8_5_SHA256
+    measured = {n: hashlib.sha256(p.read_bytes()).hexdigest() for n, p in dr.CODE_FILES.items()}
+    assert pkg["code_sha256"] == draft["code_sha256"] == measured
+    assert pkg["preapproval_code_sha256"] == draft["preapproval_code_sha256"] == \
+        {n: hashlib.sha256((HERE / n).read_bytes()).hexdigest() for n in dr.PREAPPROVAL_CODE_FILES}
+    assert pkg["approval_draft"] == {"path": "experiments/e1-s1-lower-bound/E1-APPROVAL.draft.json",
+                                     "sha256": _sha_rel("experiments/e1-s1-lower-bound/E1-APPROVAL.draft.json")}
+    assert pkg["companion"]["sha256"] == _sha_rel(pkg["companion"]["path"])
+    for key, v in pkg["s1_inputs"].items():
+        assert v == {"path": dr.CONFIG[key], "sha256": dr.CONFIG[f"{key}_sha256"]}, key
+        assert v["sha256"] == draft[f"{key}_sha256"] == _sha_rel(v["path"]), key
+    assert (pkg["environment"], pkg["invocation"], pkg["budget"]) == (dr.ENVIRONMENT, dr.INVOCATION, dr.BUDGET)
+    assert (pkg["environment"], pkg["invocation"], pkg["budget"]) == (draft["environment"], draft["invocation"], draft["budget"])
+    for k in ("tolerance_set", "gamma", "attempt", "prior_records", "authorises", "does_not_authorise"):
+        assert pkg[k] == draft[k], k
+    ev = pkg["pre_approval_evidence"]
+    for key in ("confirmation", "rehearsal", "c2_stop_signal_test_diagnosis"):
+        e = ev[key]
+        d = REPO / e["directory"]
+        on_disk = sorted(str(p.relative_to(d)) for p in d.rglob("*") if p.is_file())
+        assert sorted(e["files_sha256"]) == on_disk, key
+        assert all(_sha_rel(f"{e['directory']}/{f}") == h for f, h in e["files_sha256"].items()), key
+        assert e["manifest"] == {"path": f"{e['directory']}/MANIFEST.sha256",
+                                 "sha256": e["files_sha256"]["MANIFEST.sha256"]}, key
+        assert _manifest_problems(d, "MANIFEST.sha256") == [], key
+    for mode in ("nominal", "forced"):                       # the driver-sealed evidence directories
+        assert manifest.verify(REPO / ev["confirmation"]["directory"] / mode / "evidence-dir") == [], mode
+    corr = ev["confirmation_index_correction"]
+    assert corr["sha256"] == _sha_rel(corr["path"])
+    assert ev["superseded_90bf9eb"] == EVIDENCE_90BF9EB == {f: _sha_rel(f"experiments/e1-s1-lower-bound/{f}")
+                                                             for f in EVIDENCE_90BF9EB}
+    reh = _strict_json(REPO / ev["rehearsal"]["directory"] / "part1-driver" / "rehearsal.json")
+    assert reh["rehearsal_pass"] is True and reh["code_sha256"] == {**draft["code_sha256"], **draft["preapproval_code_sha256"]}
+    assert reh["contract_sha256"] == dr.CONTRACT_SHA256
+    for mode in ("nominal", "forced"):
+        c = _strict_json(REPO / ev["confirmation"]["directory"] / mode / f"confirmation-{mode}.json")
+        assert c["confirmation_pass"] is True and c["code_sha256"] == reh["code_sha256"], mode
+    assert pkg["attempt_status"]["status"] == "UNSPENT" and pkg["attempt_status"]["spent_state"] == []

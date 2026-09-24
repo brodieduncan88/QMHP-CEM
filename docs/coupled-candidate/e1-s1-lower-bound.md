@@ -43,6 +43,7 @@ Confirmations).**
 | `preapproval-confirmation-rev8.5/` | the revision-8.5 Confirmations, nominal and forced fallback: predeclaration, run script, outputs, logs, run records, the driver's sealed evidence directories, index and `MANIFEST.sha256` |
 | `preapproval-rehearsal-rev8.5/` | the revision-8.5 rehearsal: predeclaration, run script, acceptance check script, output, logs, run records, index and `MANIFEST.sha256` |
 | `c2-stop-signal-test-diagnosis/` | why the C-2 stop-signal test was intermittent (its timing, not the implementation), and the evidence for its deterministic replacement |
+| `APPROVAL-PACKAGE.rev8.5.json`, `APPROVAL-PACKAGE.rev8.5.md` | the approval candidate: every sha256 the approver is asked to approve, checked by a test; it authorises nothing |
 
 The attempt would be run once, from the repository root, exactly as contract §6 states:
 
@@ -61,6 +62,7 @@ The pre-approval evidence of contract §5 was regenerated from the corrected cod
 - The Confirmations' stand-in is synthetic (N = 9,995). Its `summary.json` carries S1's frozen C_hi, copied and not computed, and its QUALIFIED outcome includes the check C_lo^static ≤ C_hi against that copied value. The Confirmation index said otherwise; the correction is [`corrections/e1-preapproval-confirmation-rev8.5-readme-correction.md`](corrections/e1-preapproval-confirmation-rev8.5-readme-correction.md).
 - The forced run's CPU margin to the 450 s limit is 13.6 %. The Confirmation measures the attempt path on the stand-in, not on S1.
 - The rehearsal's output carries S1 geometry facts and, copied from the frozen static study, C_hi and C_br with their bit-exactness checks. It computes nothing on S1 beyond geometry.
+- The approval candidate binds all of this by sha256 in `APPROVAL-PACKAGE.rev8.5.json`, with a human-readable companion; a test recomputes every hash.
 
 ### The superseded evidence of `90bf9eb`
 
