@@ -1,10 +1,12 @@
 # Copyright (c) 2026 Brodie Duncan. All rights reserved.
 # Proprietary QMHP-CEM source. No licence is granted except by explicit written agreement.
 """E1 numerics: the Galerkin entries, the rigorous energy enclosure, the trial vector and
-the float64 consistency check, exactly as the frozen contract E1-CONTRACT.rev8.3.md (its
+the float64 consistency check, exactly as the frozen contract E1-CONTRACT.rev8.4.md (its
 sha256 is pinned in driver.py) specifies them in sections 4.3-4.5. Section numbers below refer
 to that contract. A non-finite or non-positive quantity never raises here: it makes the
-requirement it belongs to fail, so the attempt is UNQUALIFIED, never FAILED (section 8).
+requirement it belongs to fail, so the attempt is UNQUALIFIED, never FAILED (section 8). The
+same holds for a finite value outside the float64 range: every decision is exact, and a
+recorded float64 copy of such a value is +-inf (null in JSON), never an OverflowError.
 
 Nothing here reads the S1 mesh or any result. The functions work on any list of
 axis-aligned rectangles on z = 0 (R, an (N, 4) float64 array of x0, x1, y0, y1 in mm).
@@ -17,6 +19,7 @@ from __future__ import annotations
 import ctypes
 import math
 import platform
+import sys
 from decimal import Decimal
 from fractions import Fraction
 
@@ -34,6 +37,8 @@ BLOCK = 256
 LD_MIN_NORMAL = Fraction(1, 2 ** 16382)
 #: the no-underflow requirement's floor (section 4.3)
 UNDERFLOW_FLOOR = Fraction(1, 2 ** 16300)
+#: the largest finite float64, exactly
+DBL_MAX = Fraction(sys.float_info.max)
 
 #: pi_lo, the 35-digit truncation of pi (section 4.3)
 PI_LO = Fraction(Decimal("3.1415926535897932384626433832795028"))
@@ -61,19 +66,38 @@ def to_fr(x) -> Fraction:
 
 
 def rd(x: Fraction) -> float:
-    """RD: the float64 nearest to x from below (round toward -infinity), exactly once."""
-    f = float(x)                        # int/int true division is correctly rounded
+    """RD: the largest float64 not above x (round toward -infinity), exactly once. Above the
+    float64 range that is the largest finite float64; below -DBL_MAX it is -inf."""
+    if x >= DBL_MAX:
+        return sys.float_info.max
+    if x < -DBL_MAX:
+        return -math.inf
+    f = float(x)                        # int/int true division is correctly rounded; |x| <= DBL_MAX
     if Fraction(f) > x:
         f = float(np.nextafter(f, -np.inf))
     return f
 
 
 def ru(x: Fraction) -> float:
-    """Round toward +infinity (displays of C_hi only)."""
+    """Round toward +infinity (displays of C_hi only): +inf above the float64 range."""
+    if x > DBL_MAX:
+        return math.inf
+    if x <= -DBL_MAX:
+        return -sys.float_info.max
     f = float(x)
     if Fraction(f) < x:
         f = float(np.nextafter(f, np.inf))
     return f
+
+
+def to_float(x) -> float:
+    """A recorded float64 copy of an exact rational, a float64 or a long double: +-inf beyond
+    the float64 range instead of an OverflowError (no decision is taken on it)."""
+    try:
+        with np.errstate(over="ignore", under="ignore"):
+            return float(x)
+    except OverflowError:
+        return math.inf if x > 0 else -math.inf
 
 
 def gamma(m: int) -> Fraction:
@@ -81,8 +105,22 @@ def gamma(m: int) -> Fraction:
     return m * U_LD / (1 - m * U_LD)
 
 
+def _digits(n: int) -> str:
+    """The decimal digits of an int of any size (str() refuses more than 4,300 digits, and an
+    exact long double below about 1e-4300 has a longer denominator)."""
+    if n < 0:
+        return "-" + _digits(-n)
+    if n < 10 ** 4000:
+        return str(n)
+    chunks, base = [], 10 ** 1000
+    while n:
+        n, r = divmod(n, base)
+        chunks.append(r)
+    return str(chunks[-1]) + "".join(f"{c:01000d}" for c in reversed(chunks[:-1]))
+
+
 def pq(x: Fraction) -> str:
-    return f"{x.numerator}/{x.denominator}"
+    return f"{_digits(x.numerator)}/{_digits(x.denominator)}"
 
 
 def finite(x) -> bool:
@@ -95,7 +133,7 @@ def finite(x) -> bool:
 
 def pq_or_label(x) -> str:
     """The exact p/q string of a finite value; 'non-finite: <repr>' otherwise (raw files)."""
-    return pq(to_fr(x)) if finite(x) else f"non-finite: {float(x)!r}"
+    return pq(to_fr(x)) if finite(x) else f"non-finite: {to_float(x)!r}"
 
 
 def eps_avg_lo() -> Fraction:
@@ -313,7 +351,7 @@ def underflow_check(sigmas: list, min_abs_S, min_B) -> dict:
     nz = [np.abs(v[v != 0]) for v in sigmas if np.any(v != 0)]
     vals = (min_abs_S, min_B)
     if not nz or not all(np.isfinite(a).all() for a in nz) or not all(finite(v) for v in vals):
-        return {"min_abs_sigma": None, "min_abs_S": float(min_abs_S), "min_B": float(min_B),
+        return {"min_abs_sigma": None, "min_abs_S": to_float(min_abs_S), "min_B": to_float(min_B),
                 "first_product_bound": None, "second_product_bound_log2": None, "ok": False,
                 "reason": "no nonzero sigma, or a non-finite smallest |sigma|, |S~| or B~"}
     s = min(float(a.min()) for a in nz)
@@ -321,8 +359,8 @@ def underflow_check(sigmas: list, min_abs_S, min_B) -> dict:
     s_f = Fraction(s)
     first = s_f * e
     second = s_f * s_f * e * Fraction(1, 2 ** 64)
-    return {"min_abs_sigma": s, "min_abs_S": float(min_abs_S), "min_B": float(min_B),
-            "first_product_bound": float(first) if first > 0 else 0.0,
+    return {"min_abs_sigma": s, "min_abs_S": to_float(min_abs_S), "min_B": to_float(min_B),
+            "first_product_bound": to_float(first) if first > 0 else 0.0,
             "second_product_bound_log2": (math.log2(second.numerator) - math.log2(second.denominator)) if second > 0 else None,
             "ok": bool(first >= UNDERFLOW_FLOOR and second >= UNDERFLOW_FLOOR)}
 
@@ -340,15 +378,15 @@ def enclosure(Q: Fraction, E, W, G, m: int, kappa_: Fraction) -> dict:
     Eup = e_up(E, W, G, m) if fin else None             # exact arithmetic only on finite values
     ok = bool(fin and to_fr(E) > 0 and to_fr(W) >= 0 and to_fr(G) >= 0 and Eup > 0 and Q > 0)
     if not ok:
-        return {"ok": False, "E_hat": float(E), "W_hat": float(W), "G_hat": float(G), "m": m,
-                "Q": float(Q), "E_up_positive": bool(fin and Eup > 0), "E_hat_positive": bool(fin and to_fr(E) > 0)}
+        return {"ok": False, "E_hat": to_float(E), "W_hat": to_float(W), "G_hat": to_float(G), "m": m,
+                "Q": to_float(Q), "E_up_positive": bool(fin and Eup > 0), "E_hat_positive": bool(fin and to_fr(E) > 0)}
     C_lo = rd(Q * Q * kappa_ / Eup)
     C_t = Q * Q * kappa_ / to_fr(E)
     return {"ok": True, "m": m, "gamma_m": pq(gamma(m)), "E_hat_pq": pq(to_fr(E)), "W_hat_pq": pq(to_fr(W)),
-            "G_hat_pq": pq(to_fr(G)), "E_up_pq": pq(Eup), "Q_pq": pq(Q), "E_hat": float(E), "W_hat": float(W),
-            "G_hat": float(G), "E_up": float(Eup), "Q": float(Q), "C_lo_fF": C_lo, "C_tilde_fF": float(C_t),
-            "w_fF": float(C_t - Fraction(C_lo)),
-            "width_rel": float((C_t - Fraction(C_lo)) / Fraction(C_lo)) if C_lo > 0 else None}
+            "G_hat_pq": pq(to_fr(G)), "E_up_pq": pq(Eup), "Q_pq": pq(Q), "E_hat": to_float(E), "W_hat": to_float(W),
+            "G_hat": to_float(G), "E_up": to_float(Eup), "Q": to_float(Q), "C_lo_fF": C_lo, "C_tilde_fF": to_float(C_t),
+            "w_fF": to_float(C_t - Fraction(C_lo)),
+            "width_rel": to_float((C_t - Fraction(C_lo)) / Fraction(C_lo)) if C_lo > 0 else None}
 
 
 # --- float64 assembly, the trial vector and its fallbacks (section 4.5) ------------------------
@@ -498,9 +536,9 @@ def check_g(Q: Fraction, E64: float, E_hat, C_lo: float, kappa_: Fraction) -> di
     C64 = Q * Q * kappa_ / Fraction(E64)
     Ct = Q * Q * kappa_ / to_fr(E_hat)
     lhs = abs(C64 - Ct)
-    return {"ok": bool(lhs <= Fraction(1, 10 ** 7) * Fraction(C_lo)), "E64": E64, "C64_fF": float(C64),
-            "C_tilde_fF": float(Ct), "rel": float(lhs / Fraction(C_lo)) if C_lo > 0 else None,
-            "g_E": float(abs(Fraction(E64) - to_fr(E_hat)) / to_fr(E_hat))}
+    return {"ok": bool(lhs <= Fraction(1, 10 ** 7) * Fraction(C_lo)), "E64": E64, "C64_fF": to_float(C64),
+            "C_tilde_fF": to_float(Ct), "rel": to_float(lhs / Fraction(C_lo)) if C_lo > 0 else None,
+            "g_E": to_float(abs(Fraction(E64) - to_fr(E_hat)) / to_fr(E_hat))}
 
 
 # --- probes (section 4.4) -------------------------------------------------------------------

@@ -1,13 +1,14 @@
 # Copyright (c) 2026 Brodie Duncan. All rights reserved.
 # Proprietary QMHP-CEM source. No licence is granted except by explicit written agreement.
 """E1 synthetic known-answer and negative controls K1, K2, K2b, K3, N3 and N4, exactly as the
-frozen contract E1-CONTRACT.rev8.3.md specifies them in section 5. SYNTHETIC GEOMETRY ONLY:
+frozen contract E1-CONTRACT.rev8.4.md specifies them in section 5. SYNTHETIC GEOMETRY ONLY:
 nothing here reads the S1 mesh. (N1, N2, N3b and N3c need S1 geometry and live in
 e1_geometry.geometry_phase; K4 needs the S1 enclosures and lives in the driver.)
 
 Every control is evaluated as isfinite(value) and <inequality>; a non-finite quantity fails the
-control (UNQUALIFIED) and never raises: finiteness is checked before any exact conversion, and a
-last-resort sigma that is not finite or has Q <= 0 inside K3 or N3 fails that control.
+control (UNQUALIFIED) and never raises: finiteness is checked before any exact conversion, a
+recorded value outside the float64 range becomes +-inf (and fails), and a last-resort sigma that
+is not finite or has Q <= 0 inside K3 or N3 fails that control.
 """
 from __future__ import annotations
 
@@ -38,7 +39,7 @@ K2B_PAIRS_SHA256 = "9f47657181725147b14f3c2d05034d9bbde2d9f5e2f7419fcf9704cf38a6
 
 
 def _fin(v) -> bool:
-    return v is not None and math.isfinite(float(v))
+    return v is not None and math.isfinite(nm.to_float(v))
 
 
 def smin() -> float:
@@ -108,7 +109,7 @@ def quadrature(a, b) -> dict:
 
 def _rel_to_reference(v, ref: Fraction):
     """|v - ref|/ref exactly for a finite v; None (a failure) for a non-finite one."""
-    return float(abs(nm.to_fr(v) - ref) / ref) if nm.finite(v) else None
+    return nm.to_float(abs(nm.to_fr(v) - ref) / ref) if nm.finite(v) else None
 
 
 def k1() -> dict:
@@ -332,7 +333,7 @@ def n3(kappa_free: Fraction, epsilon0: float, a: float = 0.1, n: int = 16) -> di
     if not (nm.finite(E64) and E64 > 0):
         return {"C_galerkin_free_space_fF": None, "C_exact_fF": c_exact, "ratio": None,
                 "reason": "sigma^T S sigma is not finite and positive", "pass": False}
-    c_gal = float(sol["Q"] * sol["Q"] * kappa_free / Fraction(E64))
+    c_gal = nm.to_float(sol["Q"] * sol["Q"] * kappa_free / Fraction(E64))
     ratio = c_gal / c_exact
     return {"C_galerkin_free_space_fF": c_gal, "C_exact_fF": c_exact, "ratio": ratio,
             "pass": bool(_fin(ratio) and ratio > 10)}
@@ -341,7 +342,8 @@ def n3(kappa_free: Fraction, epsilon0: float, a: float = 0.1, n: int = 16) -> di
 def control_numeric_sets() -> dict:
     """Every panel set on which a synthetic control forms an entry, a matrix or an energy: K1's
     unit square (its self entry), the K2/N4 pairs, the K2b pairs, K3's two disks and N3's plate.
-    The rehearsal checks them against the S1 attempt sets (section 3.2 item 2 separation)."""
+    The rehearsal and the Confirmation check them against the S1 attempt sets before any
+    control numerics (section 3.2 item 2 separation)."""
     out = {"K1 unit square": np.array([(0.0, 1.0, 0.0, 1.0)])}
     for k, (name, a, b) in enumerate(k2_pairs()):
         out[f"K2/N4 pair {k} ({name})"] = np.array([a, b], dtype=np.float64)

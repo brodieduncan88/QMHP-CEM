@@ -4,16 +4,16 @@
 """E1 - THE STATIC-CAPACITANCE LOWER-BOUND CERTIFICATE FOR THE S1 ISLAND (PROBLEM C).
 PREPARED, NOT APPROVED, NOT EXECUTED.
 
-The scientific contract is E1-CONTRACT.rev8.3.md in this directory (its sha256 is
-CONTRACT_SHA256 below), frozen with this code. Revision 8.3 is revision 8.2 plus the
-stand-in separation of D14. This file implements it and does not restate it; section numbers
-refer to it.
+The scientific contract is E1-CONTRACT.rev8.4.md in this directory (its sha256 is
+CONTRACT_SHA256 below), frozen with this code. Revision 8.4 is revision 8.3 with the
+structural separation rule of D15 and the corrected statements of what was computed. This file
+implements it and does not restate it; section numbers refer to it.
 
 E1 certifies only the static problem-C capacitance bound C_static in [C_lo^static, C_hi].
 It makes no E_C and no suitability claim: E_C,F1F1 is the constant EC_NOT_EVALUATED_BY_E1,
 the correspondence to the registered operator is NOT_ESTABLISHED, the deviation is
 NOT_EVALUATED and suitability is SUITABILITY_NOT_ASSESSED in every state. No output contains
-a GHz or MHz quantity. E1.1 and E1.2-excl-R1 are internal (K4 only).
+a GHz or MHz quantity. E1.1, E1.1-half and E1.2-excl-R1 are internal (K4 only).
 
 Modes
 -----
@@ -28,17 +28,25 @@ Modes
                      by orchestrator/manifest.py's write_verified.
 ``--rehearsal``      The synthetic control phase and the S1 GEOMETRY phase (section 5,
                      rehearsal). No matrix is assembled on S1 and no S1 capacitance is computed.
+                     Every control set is checked against S1's E1.1 and E1.1-half (section 3.2
+                     item 2 separation) before any control numerics, and against all four S1
+                     attempt sets after the geometry phase. Exits 4 unless rehearsal_pass (the
+                     preflight clean, the controls, the geometry and the separation) is true.
 ``--confirmation``   The resource Confirmation of section 3.2 item 2: the whole attempt path
                      under the declared budget, with the S1 geometry phase and all controls, on
                      the SYNTHETIC stand-in of the selected sizes (e1_standin.py), nominal or
-                     with every factorisation fallback forced for E1.2 and E1.2-excl-R1. Before
-                     any stand-in matrix is assembled, the stand-in's four numeric sets are
-                     checked against the S1 geometry phase's sets (section 3.2 item 2
-                     separation); if any coincides, nothing is computed. The S1 panel sets are
-                     then discarded; the S1 mesh is read for geometry only. Every limit flag
-                     fails closed: a missing measurement is a failure, and the mode exits 4
-                     unless confirmation_pass is true.
-``--proxy-a-ge``     g_E on synthetic proxy A for the selected configuration (section 3.2 item 4).
+                     with every factorisation fallback forced for E1.2 and E1.2-excl-R1. The
+                     control sets are checked against S1's E1.1 and E1.1-half before any
+                     control numerics, and the stand-in's four numeric sets against the S1
+                     geometry phase's four sets before any stand-in matrix is assembled
+                     (section 3.2 item 2 separation); if any contains an image of an S1 attempt
+                     set, nothing further is computed. The S1 panel sets are then discarded; the
+                     S1 mesh is read for geometry only. Every limit flag fails closed: a missing
+                     measurement is a failure, and the mode exits 4 unless confirmation_pass is
+                     true.
+``--proxy-a-ge``     Refuses (exit 4), computing nothing: proxy A embeds a translated E1.1, so the
+                     section 3.2 item 2 separation rule refuses any further run on it (D15). Proxy
+                     A is historical configuration-selection evidence only.
 ``--show-invocation`` The measured invocation and its differences from INVOCATION.
 """
 from __future__ import annotations
@@ -93,8 +101,8 @@ import e1_controls as ec  # noqa: E402
 import e1_geometry as eg  # noqa: E402
 import e1_numerics as nm  # noqa: E402
 
-CONTRACT = HERE / "E1-CONTRACT.rev8.3.md"
-CONTRACT_SHA256 = "2b9b9357bb438987723914727a851161201a7a9f477aa66ae674fb0ed9d6b296"
+CONTRACT = HERE / "E1-CONTRACT.rev8.4.md"
+CONTRACT_SHA256 = "cdf6cced13e1965bbf017a4a7d3d4af0f661df0ca921e6dd69335b4a68971740"
 APPROVAL = HERE / "E1-APPROVAL.json"
 APPROVAL_CONSUMED = HERE / "E1-APPROVAL.consumed.json"
 APPROVAL_DRAFT = HERE / "E1-APPROVAL.draft.json"
@@ -103,11 +111,14 @@ COMMON_LEDGER = Path("qmhp-attempts") / "E1-S1-LOWER-BOUND.json"
 RESULTS_ROOT = REPO / "results"
 RECORD_PREFIX = "E1-S1-LOWER-BOUND-"
 #: every repository file the attempt executes; the attempt refuses if any other repository
-#: module is loaded (e1_standin.py is loaded only by --confirmation and --proxy-a-ge)
+#: module is loaded (e1_standin.py is loaded only by the pre-approval modes)
 CODE_FILES = {"driver.py": HERE / "driver.py", "e1_numerics.py": HERE / "e1_numerics.py",
               "e1_geometry.py": HERE / "e1_geometry.py", "e1_controls.py": HERE / "e1_controls.py",
               "anchor_fem.py": REPO / "experiments" / "static-anchor-hypothesis" / "anchor_fem.py",
               "orchestrator/manifest.py": REPO / "orchestrator" / "manifest.py"}
+#: the pre-approval code the attempt never loads but the approval binds: the stand-in and the
+#: section 3.2 item 2 separation check, whose evidence the approver compares (L5-8)
+PREAPPROVAL_CODE_FILES = {"e1_standin.py": HERE / "e1_standin.py"}
 #: the inputs of section 9 read by E1 code
 CONFIG = {
     "mesh": "results/COUPLED-LADDER-O1-L2-N2R-20260918T061455Z/L2/solver/coupled_chip_cell_L2.msh",
@@ -200,7 +211,7 @@ def _clean(o):
     if isinstance(o, np.integer):
         return int(o)
     if isinstance(o, Fraction):
-        return f"{o.numerator}/{o.denominator}"
+        return nm.pq(o)
     if isinstance(o, np.ndarray):
         return [_clean(v) for v in o.tolist()]
     if isinstance(o, dict):
@@ -451,6 +462,7 @@ def approval_want() -> dict:
             "mesh_sha256": CONFIG["mesh_sha256"], "baseline_manifest_sha256": CONFIG["baseline_manifest_sha256"],
             "baseline_summary_sha256": CONFIG["baseline_summary_sha256"],
             "code_sha256": {name: _sha(p) for name, p in CODE_FILES.items()},
+            "preapproval_code_sha256": {name: _sha(p) for name, p in PREAPPROVAL_CODE_FILES.items()},
             "environment": ENVIRONMENT, "invocation": INVOCATION, "budget": BUDGET,
             "gamma": CONFIG["gamma"], "tolerance_set": CONFIG["tolerance_set"], "repository_path": str(REPO)}
 
@@ -465,9 +477,11 @@ def draft_approval() -> dict:
         "how_to_grant_it": (
             "A human who approves writes experiments/e1-s1-lower-bound/E1-APPROVAL.json containing every field "
             "below except DRAFT and how_to_grant_it; does_not_authorise may be kept unchanged or left out, and "
-            "any other field refuses. Approve only a commit whose pre-approval evidence in this directory "
-            "(rehearsal.json, proxyA-gE.json, confirmation-nominal.json, confirmation-forced.json) carries the "
-            "code_sha256 below. source_commit is replaced by the full "
+            "any other field refuses, as does a repeated member or a non-standard JSON constant. Approve only a "
+            "commit whose pre-approval evidence (the rehearsal and both Confirmation runs, produced from this "
+            "commit after its review) carries the code_sha256 and preapproval_code_sha256 below; the evidence "
+            "files committed at 90bf9eb are superseded, and proxyA-gE.json is historical configuration-selection "
+            "evidence that is not re-run (contract section 3.2 item 2, D15). source_commit is replaced by the full "
             "SHA of the reviewed commit, which must be HEAD at execution. not_before_utc and not_after_utc are "
             "replaced by ISO-8601 UTC times at most 7 days apart. tolerance_scope_decision is replaced by one of "
             f"{list(TOLERANCE_SCOPE_CHOICES)} (contract section 7: whether numbers E1 only copies from the frozen "
@@ -499,12 +513,34 @@ def draft_approval() -> dict:
     }
 
 
+def _members_once(pairs: list) -> dict:
+    """object_pairs_hook: a JSON object whose members are all distinct. json.loads would keep
+    only the last of a repeated member, so what a reader sees could differ from what is bound."""
+    keys = [k for k, _ in pairs]
+    repeated = sorted({k for k in keys if keys.count(k) > 1})
+    if repeated:
+        raise Refusal(f"E1-APPROVAL.json repeats the member(s) {repeated}")
+    return dict(pairs)
+
+
+def _no_constant(token: str):
+    raise Refusal(f"E1-APPROVAL.json holds the non-standard JSON constant {token}")
+
+
+def _same_json(a, b) -> bool:
+    """Equality of two JSON values including their types: true is not 1, and 1.0 is not 1."""
+    return json.dumps(a, sort_keys=True, allow_nan=False) == json.dumps(b, sort_keys=True, allow_nan=False)
+
+
 def require_approval(now: datetime | None = None, *, raw: bytes | None = None) -> dict:
     """The approval (section 8): bound to this contract, the code, the mesh and the inputs;
     carrying gamma = 1e-6, tolerance set T0, the human's section 7 scope decision and the
-    Q2 decision of section 1; for HEAD; inside a window of at most 7 days."""
+    Q2 decision of section 1; for HEAD; inside a window of at most 7 days. Strict JSON: a
+    repeated member or a non-standard constant refuses, and bound values compare with their
+    JSON types."""
     try:
-        ap = json.loads(_read_approval() if raw is None else raw)
+        ap = json.loads(_read_approval() if raw is None else raw, object_pairs_hook=_members_once,
+                        parse_constant=_no_constant)
     except json.JSONDecodeError as exc:
         raise Refusal(f"E1-APPROVAL.json is not JSON: {exc}") from exc
     if not isinstance(ap, dict):
@@ -513,12 +549,12 @@ def require_approval(now: datetime | None = None, *, raw: bytes | None = None) -
     unknown = sorted(set(ap) - set(want) - set(HUMAN_FIELDS) - {"does_not_authorise"})
     if unknown:
         raise Refusal(f"the approval carries fields the driver does not bind: {unknown}")
-    if "does_not_authorise" in ap and ap["does_not_authorise"] != draft_approval()["does_not_authorise"]:
+    if "does_not_authorise" in ap and not _same_json(ap["does_not_authorise"], draft_approval()["does_not_authorise"]):
         raise Refusal("approval does_not_authorise differs from the draft's list")
     for key, value in want.items():
-        if ap.get(key) != value:
+        if key not in ap or not _same_json(ap[key], value):
             raise Refusal(f"approval {key} does not match: the reviewed state has changed")
-    if ap.get("tolerance_scope_decision") not in TOLERANCE_SCOPE_CHOICES:
+    if not isinstance(ap.get("tolerance_scope_decision"), str) or ap["tolerance_scope_decision"] not in TOLERANCE_SCOPE_CHOICES:
         raise Refusal("the approval does not record the human's section 7 scope decision "
                       f"(tolerance_scope_decision must be one of {TOLERANCE_SCOPE_CHOICES})")
     if not isinstance(ap.get("q2_within_D5"), bool):
@@ -781,9 +817,9 @@ def analyse(cap: dict, kappa_lo: Fraction, c_hi: float) -> dict:
         g = nm.check_g(sol["Q"], cap["e64"][s], p["E"][k], enc["C_lo_fF"], kappa_lo)
         if not g["ok"]:
             problems.append(f"{s}: check (g) failed")
-        Eup = Fraction(enc["E_up_pq"])
         res[s] = {**enc, "check_g": g, "path": sol["path"], "_C_lo_exact": Fraction(enc["C_lo_fF"]),
-                  "_C_tilde_exact": sol["Q"] * sol["Q"] * kappa_lo / nm.to_fr(p["E"][k]), "_E_up": Eup}
+                  "_C_tilde_exact": sol["Q"] * sol["Q"] * kappa_lo / nm.to_fr(p["E"][k]),
+                  "_E_up": nm.e_up(p["E"][k], p["W"][k], p["G"][k], p["m"])}
     kk4 = None
     if not problems:
         kk4 = k4(res, {s: cap["sols"][s]["path"] for s in SETS})
@@ -873,11 +909,21 @@ def finish(write, result: dict, problems: list, approval: dict | None, subject: 
 
 
 def run_phases(write, *, mesh: dict, c0: Fraction, standin: dict | None = None, force_fail: int = 0,
-               check_standin=None) -> dict:
+               check_standin=None, check_controls=None) -> dict:
     """The phases in contract order: synthetic controls, the S1 geometry phase (a failure in
     either stops before any matrix is assembled), then the capacitance phase on the S1 panel
     sets (attempt) or on the synthetic stand-in (Confirmation, where the S1 sets are
-    discarded first). Returns the outcome and the analysis."""
+    discarded first). In the Confirmation (standin given) the section 3.2 item 2 separation is
+    checked twice, failing closed and computing nothing further on a coincidence or a missing
+    check: the control sets before any control numerics (check_controls), and the stand-in's
+    sets against the geometry phase's before any stand-in matrix (check_standin). Returns the
+    outcome and the analysis."""
+    control_separation = None
+    if standin is not None:
+        control_separation = check_controls() if check_controls is not None else ["no control separation check was supplied"]
+        if control_separation:
+            return {"outcome": "UNQUALIFIED", "problems": [f"control separation: {b}" for b in control_separation],
+                    "control_separation": control_separation}
     controls = controls_phase(c0)
     write("controls.json", controls)
     if controls["failures"]:
@@ -895,7 +941,7 @@ def run_phases(write, *, mesh: dict, c0: Fraction, standin: dict | None = None, 
         separation = check_standin(geo) if check_standin is not None else ["no separation check was supplied"]
         if separation:
             return {"outcome": "UNQUALIFIED", "problems": [f"separation: {b}" for b in separation],
-                    "separation": separation}
+                    "separation": separation, "control_separation": control_separation}
         sets = standin
     del geo
     gc.collect()
@@ -905,7 +951,8 @@ def run_phases(write, *, mesh: dict, c0: Fraction, standin: dict | None = None, 
         return {"outcome": "UNQUALIFIED", "problems": [f"trial vector: {exc}"]}
     an = analyse(cap, Fraction(nm.KAPPA_LO_PQ), CONFIG["C_hi_fF"])
     return {"outcome": "QUALIFIED" if not an["problems"] else "UNQUALIFIED", "problems": an["problems"],
-            "analysis": an, "paths": {s: cap["sols"][s]["path"] for s in SETS}, "separation": separation}
+            "analysis": an, "paths": {s: cap["sols"][s]["path"] for s in SETS}, "separation": separation,
+            "control_separation": control_separation}
 
 
 # --- the attempt -----------------------------------------------------------------------------
@@ -914,7 +961,7 @@ def execute(results_root: Path | None = None) -> Path:
     t0 = time.monotonic()
     results_root = RESULTS_ROOT if results_root is None else results_root
     if _sha(CONTRACT) != CONTRACT_SHA256:
-        raise Refusal("the contract file is not the frozen revision 8.2")
+        raise Refusal(f"the contract file is not the frozen {CONTRACT.name} (sha256 {CONTRACT_SHA256})")
     spent = spent_state(results_root)
     if spent:
         raise Refusal(f"{spent[0]} exists: the one attempt is spent")
@@ -1003,8 +1050,11 @@ def execute(results_root: Path | None = None) -> Path:
 def _record_failure(exc, rec: Path, ledger: dict, created: list, written: list, limits, provenance,
                     prov_text, t0) -> None:
     """The failure path of a spent attempt (FAILED). Signals can no longer raise. Every extra
-    is guarded, so failure.json and the manifest are written whatever else fails; provenance
-    that was not yet written is written here (C-3), or kept in the ledger note."""
+    is guarded, so failure.json and the manifest are written whatever else fails. Provenance
+    that was not yet written is written here (C-3); if provenance.json still cannot be written,
+    failure.json carries the provenance itself; and if failure.json cannot be written either,
+    the ledger entries are overwritten with a note that carries it (as when no record directory
+    exists). Only when every one of these writes fails is the provenance lost (L1-1)."""
     tb = _guarded(traceback.format_exc)
     _guarded(lambda: traceback.clear_frames(exc.__traceback__))
     _guarded(gc.collect)
@@ -1028,6 +1078,7 @@ def _record_failure(exc, rec: Path, ledger: dict, created: list, written: list, 
         err_p = _guarded(_save_provenance)
         prov_note = ("provenance.json (written by the failure path)" if (rec / "provenance.json").is_file()
                      else f"NOT WRITTEN: {err_p}")
+    prov_missing = not (rec / "provenance.json").is_file()
     failure = {"outcome": "FAILED - the one attempt is spent; no retry", "error": repr(exc), "traceback": tb,
                "fixed_statements": FIXED_STATEMENTS, "reported_result": "NONE",
                "files_written": list(written),
@@ -1035,11 +1086,21 @@ def _record_failure(exc, rec: Path, ledger: dict, created: list, written: list, 
                "summary_json_superseded": (rec / "summary.json").is_file(),
                "signals_received": list(_SIGNALS["received"]), "limits": limits,
                "resources": _guarded(lambda: _usage(t0)), "provenance": prov_note}
+    if prov_missing:
+        # the text rendered and guarded before spending, else the in-memory provenance (L1-1)
+        failure["provenance_content"] = _guarded(lambda: json.loads(prov_text)) if prov_text is not None else provenance
     err = None
     try:
         _dump(rec / "failure.json", failure)
     except BaseException as exc1:       # noqa: BLE001
         err = exc1
+    if prov_missing and err is not None:
+        note = {**ledger, "record_created": True, "error": repr(exc), "traceback": tb,
+                "outcome": ("FAILED - the one attempt is spent; no retry; neither provenance.json nor "
+                            "failure.json could be written"),
+                "failure_json_error": repr(err), "provenance": failure["provenance_content"]}
+        for p in (created or [common_ledger_path()]):
+            _guarded(lambda p=p: _dump(p, note))
     try:
         manifest.write_verified(rec)
     except BaseException as exc2:       # noqa: BLE001
@@ -1062,29 +1123,50 @@ def _measured_within(value, limit) -> bool:
     return value is not None and nm.finite(value) and value <= limit
 
 
+def _island_sets_match(geo: dict, island: dict) -> list[str]:
+    """The geometry phase's E1.1 and E1.1-half are the formula sets the early separation check
+    used (section 3.1): byte for byte, else that check proved nothing."""
+    got = {"E1.1": geo["R_E1_2"][:geo["n_island"]], "E1.1-half": geo["R_E1_1_half"]}
+    return [f"the geometry phase's {k} is not the section 3.1 formula set the early separation check used"
+            for k in island if got[k].shape != island[k].shape or got[k].tobytes() != island[k].tobytes()]
+
+
 def rehearsal() -> dict:
     """The synthetic control phase and the S1 geometry phase (section 5, rehearsal). No matrix
-    is assembled on S1 and no S1 capacitance is computed. The control phase's numeric sets are
-    checked against the S1 geometry phase's sets (section 3.2 item 2 separation)."""
+    is assembled on S1 and no S1 capacitance is computed. Section 3.2 item 2 separation: every
+    control set is checked against S1's E1.1 and E1.1-half (from the section 3.1 formula;
+    enough for all four attempt sets) BEFORE any control numerics, and nothing is computed on
+    a coincidence; after the geometry phase, against all four S1 attempt sets.
+    rehearsal_pass needs the preflight clean as well (L5-6)."""
     import e1_standin  # noqa: PLC0415 - synthetic; never on the attempt path
     t0 = time.monotonic()
     pre = preflight_problems()
-    controls = controls_phase(pre["c0"]["c0"])
+    control_sets = ec.control_numeric_sets()
+    island = e1_standin.s1_island_sets()
+    separation = e1_standin.separation_problems(control_sets, island)
+    controls = None if separation else controls_phase(pre["c0"]["c0"])
     geo = geometry_phase(qmhp_mesh())
     s1 = e1_standin.numeric_sets(geo) if not geo["failures"] else {}
-    separation = e1_standin.separation_problems(ec.control_numeric_sets(), s1) if s1 else ["no S1 sets to check"]
+    if s1:
+        separation = separation + _island_sets_match(geo, island) + e1_standin.separation_problems(control_sets, s1)
+    else:
+        separation = separation + ["no S1 sets to check"]
+    controls_pass = controls is not None and not controls["failures"]
+    passed = {"preflight_clean": not pre["problems"], "controls_pass": controls_pass,
+              "geometry_pass": not geo["failures"], "separation_pass": not separation}
     return {"mode": "rehearsal", "contract_sha256": CONTRACT_SHA256,
+            "rehearsal_pass": all(passed.values()), "passes": passed,
             "s1_matrices_assembled": "none: the geometry phase assembles no matrix (tested with a spy)",
             "preflight_problems_on_this_host": pre["problems"], "probes": pre["probes"], "c0": pre["c0"],
             "baseline": pre["baseline"], "inputs": pre["digests"],
-            "controls": controls, "controls_pass": not controls["failures"],
+            "controls": controls, "controls_pass": controls_pass,
             "geometry": {k: v for k, v in geo.items() if not k.startswith("R_")},
             "geometry_pass": not geo["failures"],
             "separation_problems": separation, "separation_pass": not separation,
             "resources": _usage(t0),
             "environment": {"python": platform.python_version(), "numpy": np.__version__, "scipy": scipy.__version__,
                             "longdouble": nm.longdouble_facts(), "threads_env": measure_invocation()["threads_env"]},
-            "code_sha256": _code_digests({"e1_standin.py": HERE / "e1_standin.py"})}
+            "code_sha256": _code_digests(PREAPPROVAL_CODE_FILES)}
 
 
 def confirmation(forced: bool, evidence_dir: Path | None = None) -> dict:
@@ -1093,9 +1175,10 @@ def confirmation(forced: bool, evidence_dir: Path | None = None) -> dict:
     with every factorisation fallback forced for E1.2 and E1.2-excl-R1. No ledger, no approval.
     The per-phase files are written into ``evidence_dir`` (a fresh temporary directory) and
     sealed by write_verified, as in the attempt. Fails closed: confirmation_pass is true only if
-    every measurement exists and is within its limit, the budget was enforced, the stand-in
-    was separated from the S1 sets, the capacitance phase ran on the expected paths, no stop
-    signal arrived, nothing raised and the evidence directory verifies."""
+    every measurement exists and is within its limit, the budget was enforced, the control sets
+    and the stand-in were separated from the S1 sets (section 3.2 item 2, each checked before
+    any numerics on them), the capacitance phase ran on the expected paths, no stop signal
+    arrived, nothing raised and the evidence directory verifies."""
     import e1_standin  # noqa: PLC0415 - synthetic; never on the attempt path
     t0 = time.monotonic()
     pre = preflight_problems()
@@ -1108,15 +1191,22 @@ def confirmation(forced: bool, evidence_dir: Path | None = None) -> dict:
         _guarded_dump(evidence_dir / name, obj)
         written.append(name)
 
+    island = e1_standin.s1_island_sets()
+
     def separation(geo):
-        return e1_standin.separation_problems(e1_standin.numeric_sets(stand), e1_standin.numeric_sets(geo))
+        return _island_sets_match(geo, island) + e1_standin.separation_problems(
+            e1_standin.numeric_sets(stand), e1_standin.numeric_sets(geo))
+
+    def control_separation():
+        return e1_standin.separation_problems(ec.control_numeric_sets(), island)
 
     try:
         limits = _enforce_budget()
         enforcement = _budget_enforcement_problems()
         stand = e1_standin.standin()
         result = run_phases(write, mesh=qmhp_mesh(), c0=pre["c0"]["c0"], standin=stand,
-                            force_fail=len(nm.FALLBACK_STEPS) if forced else 0, check_standin=separation)
+                            force_fail=len(nm.FALLBACK_STEPS) if forced else 0, check_standin=separation,
+                            check_controls=control_separation)
         summary = finish(write, result, list(result["problems"]), None, SUBJECT_STANDIN, {})
         manifest.write_verified(evidence_dir)
     except BaseException as exc:            # noqa: BLE001 - recorded; the Confirmation fails closed
@@ -1136,7 +1226,8 @@ def confirmation(forced: bool, evidence_dir: Path | None = None) -> dict:
         "peak_within_limit": _measured_within(usage.get("peak_address_space_bytes"),
                                               CONFIRMATION_LIMITS["peak_address_space_bytes"]),
         "budget_enforced": enforcement == [],
-        "separated_from_s1": result is not None and result.get("separation") == [],
+        "separated_from_s1": (result is not None and result.get("separation") == []
+                              and result.get("control_separation") == []),
         "capacitance_phase_ran_on_expected_paths": paths_ok,
         "no_stop_signal": not _SIGNALS["received"],
         "no_error": error is None,
@@ -1150,6 +1241,7 @@ def confirmation(forced: bool, evidence_dir: Path | None = None) -> dict:
             "stand_in": ({"N": len(stand["R_E1_2"]), "N_x": stand["n_excl"], "n_island": stand["n_island"],
                           "sheet_panels": stand.get("sheet_panels")} if stand else None),
             "separation_problems": (result or {}).get("separation"),
+            "control_separation_problems": (result or {}).get("control_separation"),
             "outcome_on_stand_in": (result or {}).get("outcome"), "problems_on_stand_in": (result or {}).get("problems"),
             "paths": paths, "K4": an.get("K4"),
             "per_set": {k: {"path": v.get("path"), "m": v.get("m"), "width_rel": v.get("width_rel"),
@@ -1157,38 +1249,23 @@ def confirmation(forced: bool, evidence_dir: Path | None = None) -> dict:
                         for k, v in an.get("sets", {}).items()},
             "evidence_writes": {"directory": str(evidence_dir), "files": written, "manifest_verify": verify},
             "summary_outcome_on_stand_in": (summary or {}).get("outcome"), "signals_received": list(_SIGNALS["received"]),
-            "preflight_problems_on_this_host": pre["problems"], "s1_capacitance_computed": False,
-            "code_sha256": _code_digests({"e1_standin.py": HERE / "e1_standin.py"})}
+            "preflight_problems_on_this_host": pre["problems"],
+            "code_sha256": _code_digests(PREAPPROVAL_CODE_FILES)}
 
 
 def proxy_a_ge() -> dict:
-    """g_E on synthetic proxy A for the selected configuration with the frozen routines. The
-    proxy set (4,080 panels) is checked against the S1 island sets (it cannot coincide with the
-    larger S1 sets, whose sizes differ). g_E fails closed when an energy is not finite."""
+    """Proxy A (section 3.2 item 5) is historical configuration-selection evidence only (D15).
+    Its first 1,024 panels are S1's E1.1 translated by +0.6 mm in x, so the section 3.2 item 2
+    separation rule refuses any further run on it. This mode checks that and refuses (exit 4),
+    computing nothing on proxy A."""
     import e1_standin  # noqa: PLC0415
-    t0 = time.monotonic()
     px = e1_standin.proxy_a()
-    R, ni = px["R"], px["n_island"]
-    separation = e1_standin.separation_problems(
-        {"proxy A": R}, {"E1.1": eg.island_panels(eg.CONFIG["n"], eg.CONFIG["q"]),
-                         "E1.1-half": eg.island_panels(eg.CONFIG["n"], eg.CONFIG["q"], step=2)})
-    if separation:
-        return {"mode": "proxy-A g_E", "separation_problems": separation, "g_E": None, "g_E_within_1e-9": False}
-    S = nm.assemble64(R)
-    sol = nm.solve_sigma(S, ni)
-    E64 = nm.energy64(S, sol["d"], sol["sigma"])
-    del S
-    p = nm.ld_pass(R, [sol["sigma"]])
-    g_E = None
-    if nm.finite(E64) and nm.finite(p["E"][0]) and nm.to_fr(p["E"][0]) > 0:
-        g_E = float(abs(Fraction(E64) - nm.to_fr(p["E"][0])) / nm.to_fr(p["E"][0]))
-    enc = nm.enclosure(sol["Q"], p["E"][0], p["W"][0], p["G"][0], p["m"], Fraction(nm.KAPPA_LO_PQ))
-    return {"mode": "proxy-A g_E", "contract_sha256": CONTRACT_SHA256,
-            "configuration": {"h_um": 1.25, "w_mm": 0.48, "n": 32, "q": 3.5, "kappa": 1.25},
-            "separation_problems": separation,
-            "N": len(R), "path": sol["path"], "pivot_ratio_squared": sol["pivot_ratio_squared"], "g_E": g_E,
-            "g_E_within_1e-9": _measured_within(g_E, 1e-9), "width_rel_c64": enc.get("width_rel"),
-            "resources": _usage(t0), "code_sha256": _code_digests({"e1_standin.py": HERE / "e1_standin.py"})}
+    separation = e1_standin.separation_problems({"proxy A": px["R"]}, e1_standin.s1_island_sets())
+    return {"mode": "proxy-A g_E", "contract_sha256": CONTRACT_SHA256, "N": len(px["R"]),
+            "separation_problems": separation, "g_E": None, "g_E_within_1e-9": False,
+            "status": ("REFUSED, nothing computed: proxy A is historical configuration-selection evidence only "
+                       "(contract section 3.2 items 2 and 5, D15)"),
+            "code_sha256": _code_digests(PREAPPROVAL_CODE_FILES)}
 
 
 def main(argv=None) -> int:
@@ -1207,13 +1284,13 @@ def main(argv=None) -> int:
             res = {"measured": m, "differences_from_declared": invocation_problems(m)}
         elif args.rehearsal:
             res = rehearsal()
-            code = 0 if (res["controls_pass"] and res["geometry_pass"] and res["separation_pass"]) else 4
+            code = 0 if res["rehearsal_pass"] else 4
         elif args.confirmation:
             res = confirmation(args.confirmation == "forced")
             code = 0 if res["confirmation_pass"] else 4
         elif args.proxy_a_ge:
             res = proxy_a_ge()
-            code = 0 if res["g_E_within_1e-9"] else 4
+            code = 4
         else:
             print(execute())
             return 0

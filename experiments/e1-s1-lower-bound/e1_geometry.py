@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Brodie Duncan. All rights reserved.
 # Proprietary QMHP-CEM source. No licence is granted except by explicit written agreement.
 """E1 geometry: the S1 model checks, the island, the R1 cut, the lattice candidates, the
-panel merge and exact containment, exactly as the frozen contract E1-CONTRACT.rev8.3.md
+panel merge and exact containment, exactly as the frozen contract E1-CONTRACT.rev8.4.md
 specifies them in sections 3.1, 3.3, 4.1 and 4.2. GEOMETRY AND TAGS ONLY: nothing here
 assembles a matrix or computes a capacitance.
 
