@@ -1,0 +1,54 @@
+<!doctype html>
+<!-- Copyright (c) 2026 Brodie Duncan. All rights reserved.
+     Proprietary QMHP-CEM source. No licence is granted except by explicit written agreement. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>QMHP-CEM Evidence Viewer</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/overview">
+      <span class="brand-mark" aria-hidden="true">Q</span>
+      <span>QMHP-CEM Evidence Viewer<small>computational evidence, read only</small></span>
+    </a>
+    <span class="chip readonly" title="This viewer answers GET and HEAD only. It has no execution, approval or write path."><span class="dot"></span>READ-ONLY</span>
+    <span class="chip" id="checkout-chip">checkout: loading</span>
+    <span class="spacer"></span>
+    <div class="search" role="search">
+      <label class="sr" for="global-search">Search the repository</label>
+      <input id="global-search" type="search" placeholder="Search records, verdicts, hashes..." autocomplete="off">
+    </div>
+  </header>
+  <div class="hw-strip" role="note">
+    <strong>HARDWARE BOUNDARY</strong>
+    <span>A computational PASS is not hardware validation. SOLVED and SYNTHETIC evidence never closes a HARDWARE-GATED gate.</span>
+    <span id="measured-strip" class="muted"></span>
+  </div>
+  <div class="layout">
+    <nav class="side" id="nav" aria-label="Sections">
+      <a href="#/overview" data-r="overview"><span class="n">01</span>Overview</a>
+      <a href="#/experiments" data-r="experiments"><span class="n">02</span>Experiments &amp; contracts</a>
+      <a href="#/records" data-r="records"><span class="n">03</span>Evidence records</a>
+      <a href="#/candidates" data-r="candidates"><span class="n">04</span>Candidates &amp; runs</a>
+      <a href="#/gates" data-r="gates"><span class="n">05</span>Gate status</a>
+      <a href="#/provenance" data-r="provenance"><span class="n">06</span>Provenance &amp; hashes</a>
+      <a href="#/audit" data-r="audit"><span class="n">07</span>Execution &amp; audit trail</a>
+      <a href="#/corrections" data-r="corrections"><span class="n">08</span>Corrections</a>
+      <a href="#/classification" data-r="classification"><span class="n">09</span>Evidence classification</a>
+      <div class="sep">Reference</div>
+      <a href="#/documents" data-r="documents"><span class="n">10</span>Documents</a>
+      <a href="#/unavailable" data-r="unavailable"><span class="n">11</span>Unavailable actions</a>
+    </nav>
+    <main id="view" tabindex="-1" aria-live="polite"><p class="loading">Loading...</p></main>
+  </div>
+  <footer class="foot">
+    Read-only viewer over the checked-out repository. It displays what the repository's own files state and
+    re-measures hashes on request; it does not execute, approve, edit, commit or push anything.
+  </footer>
+  <script src="/static/app.js" type="module"></script>
+</body>
+</html>
