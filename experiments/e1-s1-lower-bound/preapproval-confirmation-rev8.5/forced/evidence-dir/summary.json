@@ -1,0 +1,92 @@
+{
+ "subject": "SYNTHETIC STAND-IN of the Confirmation (contract section 3.2 item 2): NOT S1",
+ "outcome": "QUALIFIED",
+ "fixed_statements": {
+  "correspondence_to_registered_operator": "NOT_ESTABLISHED",
+  "E_C_F1F1": "EC_NOT_EVALUATED_BY_E1",
+  "deviation_from_registered_value": "NOT_EVALUATED",
+  "suitability": "SUITABILITY_NOT_ASSESSED",
+  "blindness": "not blind: exploratory prior knowledge exists (contract section 8)"
+ },
+ "tolerance_set": "T0",
+ "gamma": "1e-6",
+ "tolerance_scope_decision": null,
+ "not_reported": "E_C,F1F1 and g; no quantity in frequency units; no suitability or deviation label",
+ "diagnostics": {
+  "per_set": {
+   "E1.2": {
+    "path": "last_resort",
+    "m": 1331,
+    "enclosure_ok": true,
+    "check_g_ok": true,
+    "check_g_rel": 1.7402193501598934e-09,
+    "g_E": 1.740219272281637e-09,
+    "width_rel": 4.3011759635838994e-08
+   },
+   "E1.2-excl-R1": {
+    "path": "last_resort",
+    "m": 1331,
+    "enclosure_ok": true,
+    "check_g_ok": true,
+    "check_g_rel": 1.7402193501598934e-09,
+    "g_E": 1.740219272281637e-09,
+    "width_rel": 4.3011759635838994e-08
+   },
+   "E1.1": {
+    "path": "cholesky",
+    "m": 521,
+    "enclosure_ok": true,
+    "check_g_ok": true,
+    "check_g_rel": 9.98875604388362e-10,
+    "g_E": 9.988755836480573e-10,
+    "width_rel": 1.9764775903600163e-08
+   },
+   "E1.1-half": {
+    "path": "cholesky",
+    "m": 512,
+    "enclosure_ok": true,
+    "check_g_ok": true,
+    "check_g_rel": 4.99311958417436e-12,
+    "g_E": 4.993119582672921e-12,
+    "width_rel": 2.957085207027202e-10
+   }
+  },
+  "K4": {
+   "inequalities": [
+    {
+     "inequality": "1",
+     "larger_set": "E1.1",
+     "smaller_set": "E1.1-half",
+     "status": "PASS"
+    },
+    {
+     "inequality": "2",
+     "larger_set": "E1.2-excl-R1",
+     "smaller_set": "E1.1",
+     "status": "NOT_EVALUATED_LAST_RESORT",
+     "set_named": "E1.2-excl-R1"
+    },
+    {
+     "inequality": "3",
+     "larger_set": "E1.2",
+     "smaller_set": "E1.2-excl-R1",
+     "status": "NOT_EVALUATED_LAST_RESORT",
+     "set_named": "E1.2"
+    }
+   ],
+   "failed": []
+  }
+ },
+ "reported_result": {
+  "quantity": "SYNTHETIC STAND-IN of the Confirmation (contract section 3.2 item 2): NOT S1",
+  "C_lo_static_fF": 34.73248518800597,
+  "C_hi_fF": 67.9755386760262,
+  "display_fF": "[34.732485, 67.975539]",
+  "C_lo_static_basis": "certified Thomson/Galerkin lower bound for E1.2 under the libm ASSUMPTION of section 4.4, in the model's eps0 convention (1/(mu0 c_light^2), mu0 = 4 pi 1e-7 H/m)",
+  "C_hi_basis": "the frozen static study's Dirichlet upper bound, rigorous relative to the assembled operator up to the uncertified rho (contract section 1)"
+ },
+ "Q2": {
+  "label": "Q2_DROPPED_AT_APPROVAL",
+  "note": "the approval did not confirm that Q2 stays within D5"
+ }
+}

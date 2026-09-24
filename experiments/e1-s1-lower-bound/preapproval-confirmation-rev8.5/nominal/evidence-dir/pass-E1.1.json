@@ -1,0 +1,29 @@
+{
+ "pass": "E1.1",
+ "N": 1024,
+ "m": 521,
+ "gamma_m_pq": "521/18446744073709551095",
+ "E_hat_pq": [
+  "14849063833185072839/295147905179352825856"
+ ],
+ "W_hat_pq": [
+  "307744909806231975/309485009821345068724781056"
+ ],
+ "G_hat_pq": [
+  "14849063833185072839/295147905179352825856"
+ ],
+ "sigmas": [
+  "E1.1"
+ ],
+ "B_finite_nonnegative": true,
+ "S_finite": true,
+ "underflow": {
+  "min_abs_sigma": 4.44715971569341e-08,
+  "min_abs_S": 4.948914997431976,
+  "min_B": 4.9871916073539114e-15,
+  "first_product_bound": 2.217883761066858e-22,
+  "second_product_bound_log2": -160.35577487185714,
+  "ok": true
+ },
+ "status": "RAW: long-double sums; no capacitance"
+}

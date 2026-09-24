@@ -1,0 +1,117 @@
+{
+ "facts": {
+  "attr4_components": 2,
+  "island_triangles": 283,
+  "island_nodes": 189,
+  "island_bbox": [
+   -0.6749999999999999,
+   -0.5249999999999999,
+   -0.07500000000000001,
+   0.075
+  ],
+  "island_area_mm2": 0.022500000000000003,
+  "r1_cut_edges": 8,
+  "r1_cut_nodes": 9,
+  "r1_components": [
+   5531,
+   5610
+  ],
+  "r1_seed_triangles": 1,
+  "r1_triangles": 5531,
+  "r1_area_mm2": 0.3591500000000001,
+  "r1_area_ok": true,
+  "cells_5um": 36864,
+  "candidates": 33394,
+  "cells_in_r1": 1152,
+  "cells_island_full": 900,
+  "cells_no_metal": 2570,
+  "cells_partial": 0,
+  "ground_panels": 8971,
+  "ground_by_side_um": {
+   "1.25": 5264,
+   "2.5": 1316,
+   "5.0": 1376,
+   "10.0": 352,
+   "20.0": 260,
+   "40.0": 403
+  },
+  "ground_on_r1": 3285,
+  "ground_straddling": 0,
+  "ground_excl_r1": 5686,
+  "contained_island": 1024,
+  "contained_half": 256,
+  "contained_ground": 8971,
+  "contained_excl": 5686,
+  "excl_membership_equals_not_on_r1": true,
+  "N_E1_2": 9995,
+  "N_E1_2_excl_R1": 6710,
+  "N_E1_1": 1024,
+  "N_E1_1_half": 256
+ },
+ "model_checks": {
+  "checks": {
+   "tet_attribute_set_is_{1,3}": true,
+   "attribute_1_tets_have_z_ge_0": true,
+   "attribute_3_tets_have_z_le_0": true,
+   "no_tet_straddles_z_0": true,
+   "every_node_in_the_box": true,
+   "no_zero_volume_tet": true,
+   "every_face_in_at_most_two_tets": true,
+   "shared_faces_on_opposite_sides": true,
+   "attribute_2_triangles_distinct": true,
+   "one_tet_faces_are_exactly_the_3040_attribute_2_faces": true,
+   "every_one_tet_face_on_a_wall_plane": true,
+   "volume_sum_is_the_box": true,
+   "attribute_3_volume": true,
+   "attribute_1_volume": true,
+   "z0_faces_area_is_16": true,
+   "every_z0_face_between_attribute_1_and_3": true,
+   "every_z0_edge_on_the_square_or_in_two_opposite_faces": true,
+   "tagged_z0_triangles_distinct_tet_faces": true,
+   "every_attribute_4_triangle_at_z_0": true
+  },
+  "details": {
+   "tets": 64434,
+   "faces": 130388,
+   "max_face_multiplicity": 2,
+   "same_side_faces": 0,
+   "one_tet_faces": 3040,
+   "attribute_2_faces": 3040,
+   "z0_faces": 20944,
+   "z0_edge_violations": 0,
+   "tagged_z0_triangles": 11495,
+   "tet_attributes": [
+    1,
+    3
+   ],
+   "volume_attr1": "24/1",
+   "volume_attr3": "7746191359077253/1125899906842624"
+  },
+  "failures": []
+ },
+ "controls": {
+  "N1": {
+   "unshifted_accepted": true,
+   "shifted_refused": true,
+   "pass": true
+  },
+  "N2": {
+   "refused_for_excl": true,
+   "accepted_for_E1_2": true,
+   "pass": true
+  },
+  "N3b": {
+   "unmodified_passes": true,
+   "modified_refused": true,
+   "pass": true
+  },
+  "N3c": {
+   "unmodified_passes": true,
+   "modified_refused": true,
+   "pass": true
+  }
+ },
+ "failures": [],
+ "n_island": 1024,
+ "n_excl": 6710
+}

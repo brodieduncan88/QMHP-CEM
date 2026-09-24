@@ -1,0 +1,10 @@
+mode=forced
+start_utc=2026-09-24T19:42:01Z
+head=ca19ece8bb524b06dc3b8130974505e0052aff03
+git_status_porcelain_lines=0
+loadavg_before=1.00 0.74 0.37 1/103 886
+invocation=env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 timeout --signal=KILL 1260 .venv/bin/python experiments/e1-s1-lower-bound/driver.py --confirmation forced --out /tmp/claude-0/-home-user-QMHP-CEM/7e301b81-9cc3-5878-8c8a-f1390dcdb988/scratchpad/next/e1/r86/confirmation-forced.json
+exit_code=0
+end_utc=2026-09-24T19:48:34Z
+loadavg_after=1.03 0.96 0.61 1/101 961
+git_status_porcelain_lines_after=0
