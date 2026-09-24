@@ -1676,17 +1676,25 @@ def test_a_ledger_only_failure_keeps_the_provenance_in_the_ledger_note(tmp_path,
 
 # === stop signals: the failure path survives them and the budget is really enforced (C-2, C-4) =====
 
-@pytest.mark.parametrize("delay_s", [0.02, 0.05, 0.1])
-def test_a_stop_signal_pending_when_a_C_level_exception_propagates_still_leaves_a_sealed_record(tmp_path, delay_s):
+@pytest.mark.parametrize("fraction", [0.2, 0.5, 0.8])
+def test_a_stop_signal_pending_when_a_C_level_exception_propagates_still_leaves_a_sealed_record(tmp_path, fraction):
     """C-2: a stop signal delivered during a C call that then raises a C-level exception is
     pending when the failure path starts. It must be recorded, not raised: exit 3, failure.json,
-    provenance.json and a verified manifest. zlib raises zlib.error from C after ~0.5 s."""
+    provenance.json and a verified manifest. zlib raises zlib.error from C after decompressing;
+    the child times that call on the host running the test and fires SIGALRM at the given
+    fraction of it, so the signal lands inside the call on any host."""
     code = _child(tmp_path, f"""
-        import signal, zlib
+        import signal, time, zlib
         blob = zlib.compress(bytes(200_000_000), 1)
         bad = blob[:-4] + bytes([(blob[-4] + 1) % 256]) + blob[-3:]
+        t = time.perf_counter()
+        try:
+            zlib.decompress(bad)
+        except zlib.error:
+            pass
+        duration = time.perf_counter() - t
         def boom(mesh):
-            signal.setitimer(signal.ITIMER_REAL, {delay_s})
+            signal.setitimer(signal.ITIMER_REAL, {fraction} * duration)
             zlib.decompress(bad)
         dr.geometry_phase = boom
     """)
