@@ -489,6 +489,70 @@ function artMatrix(rows, cols, opts) {
   return artFigure(sv("svg", { viewBox: `0 0 ${W} ${H}`, role: "group", "aria-label": o.label || "Gate matrix" }, g), o.caption, o.cls);
 }
 
+// ------------------------------------------------------------ 3-D stage
+// The real-time stage stack (scene3d.js + vendored three.js) loads only when WebGL is
+// available and motion is allowed; otherwise the SVG figure is shown instead.
+let stageModule = null;
+const activeStages = [];
+function webglOK() {
+  // Respect Data Saver and very weak devices: they get the SVG figure instead.
+  const conn = navigator.connection;
+  if ((conn && conn.saveData) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2)) return false;
+  try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); }
+  catch (_) { return false; }
+}
+function stageData(defs, records) {
+  const times = records.map((r) => Date.parse(r.timestamp || "")).filter(Number.isFinite);
+  const t0 = Math.min(...times), t1 = Math.max(...times);
+  const fams = new Map();
+  for (const r of records) {
+    if (!fams.has(r.family)) fams.set(r.family, []);
+    const t = Date.parse(r.timestamp || "");
+    fams.get(r.family).push({ id: r.id, tone: worstTone(r.headline),
+      label: `${r.basis.basis}${(r.headline || []).length ? " · " + r.headline.flatMap((h) => h.tokens).slice(0, 3).join(" · ") : ""}`,
+      t: Number.isFinite(t) && t1 > t0 ? (t - t0) / (t1 - t0) : 0.5 });
+  }
+  return { gates: defs.map((g) => ({ id: g.gate_id, hardware: !!g.hardware_required })),
+    families: [...fams.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([name, recs]) => ({ name, records: recs })) };
+}
+// Returns a figure: the live stack when possible, else the fallback figure.
+function stage(fallback, dataPromise, opts) {
+  const o = opts || {};
+  if (reducedMotion || !webglOK()) return fallback();
+  const box = el("div", { class: `stage stage-${o.mode || "hero"} loading` });
+  const fig = el("figure", { class: "art stage-fig reveal" }, box, el("figcaption", null, o.caption));
+  Promise.all([stageModule || (stageModule = import("/static/scene3d.js")), dataPromise]).then(([mod, data]) => {
+    if (!box.isConnected) return;
+    const ctl = mod.mountStack(box, data, {
+      mode: o.mode,
+      progress: o.progress,
+      onHover: (rec, x, y) => (rec ? showTipPoint(x, y, rec.id, rec.label) : hideTip()),
+      onSelect: (rec) => { location.hash = recordHref(rec.id); },
+    });
+    activeStages.push(ctl);
+    box.classList.remove("loading");
+    box.classList.add("live");
+  }).catch(() => {
+    if (fig.isConnected) { const fb = fallback(); fig.replaceWith(fb); fb.classList.add("in"); }
+  });
+  return fig;
+}
+function sectionProgress(node) {
+  return () => {
+    const r = node.getBoundingClientRect(), h = window.innerHeight;
+    return Math.min(1, Math.max(0, (h - r.top) / (h + r.height)));
+  };
+}
+function sectionStage(hw, records) {
+  const fallback = () => artPlates(hw.map((g) => ({ label: g.gate_id, value: "hardware only", locked: true, tone: "gated", href: "#/gates", tip: g.title })),
+    { label: "Hardware-gated gates", caption: "Drawn from master/validation_gates.yaml · one plate per gate that omits PASS · hatched = closable only by measured hardware evidence" });
+  const holder = el("div", { class: "stage-holder" });
+  holder.append(stage(fallback, getCached("/api/gates").then((g) => stageData(g.definitions.gates || [], records)),
+    { mode: "section", caption: "The same stack, separated as you scroll · violet-rimmed plates are the gates only measured hardware evidence can close · not a model of QMHP or any real hardware", progress: sectionProgress(holder) }));
+  return holder;
+}
+const STAGE_CAPTION = "Original 3-D illustration, drawn live from this checkout · one plate per frozen gate (dark with a violet rim = hardware-gated) · one line per record family · one bead per record, coloured by its headline status · not a model of QMHP or any real hardware";
+
 // Motion: reveal on scroll, count up, header state and magnetic buttons. All of it is
 // presentation; it reads nothing and requests nothing.
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -567,6 +631,19 @@ function showTip(target, pinned) {
   tipPinned = !!pinned;
   if (target.tagName === "BUTTON") target.setAttribute("aria-expanded", pinned ? "true" : "false");
 }
+function showTipPoint(x, y, k, v) {
+  clear(tip);
+  tip.append(el("span", { class: "tip-k" }, k), el("span", { class: "tip-v" }, v));
+  tip.classList.add("show");
+  tip.classList.remove("pinned");
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  const left = Math.min(Math.max(12, x + 16), window.innerWidth - tw - 12);
+  const top = Math.min(Math.max(12, y + 18), window.innerHeight - th - 12);
+  tip.style.setProperty("left", `${left}px`);
+  tip.style.setProperty("top", `${top}px`);
+  tipFor = null;
+  tipPinned = false;
+}
 function hideTip() {
   tip.classList.remove("show", "pinned");
   if (tipFor && tipFor.tagName === "BUTTON") tipFor.setAttribute("aria-expanded", "false");
@@ -623,7 +700,10 @@ async function viewOverview() {
         el("div", { class: "hero-ctas" },
           el("a", { class: "btn solid", href: "#/records" }, "Explore evidence records", arrow()),
           el("a", { class: "btn", href: "#/classification" }, "How labels are assigned", arrow()))),
-      recs.records.length ? artLattice(recs.records, { rowH: Math.max(40, Math.min(150, 380 / Math.max(1, new Set(recs.records.map((r) => r.family)).size))), grid: true }) : null),
+      recs.records.length ? stage(
+        () => artLattice(recs.records, { rowH: Math.max(40, Math.min(150, 380 / Math.max(1, new Set(recs.records.map((r) => r.family)).size))), grid: true }),
+        getCached("/api/gates").then((g) => stageData(g.definitions.gates || [], recs.records)),
+        { mode: "hero", caption: STAGE_CAPTION, progress: () => Math.min(1, window.scrollY / (window.innerHeight * 0.9)) }) : null),
     el("div", { class: "hero-stats" },
       [[d.counts.records, "Result records", "#/records"], [d.counts.candidates, "Candidates evaluated", "#/candidates"],
         [d.hardware_gated_gates.length, "Hardware-gated gates", "#/gates"], [measuredCount, "Measured records", "#/classification"]]
@@ -656,8 +736,7 @@ async function viewOverview() {
     el("span", { class: "k" }, g.gate_id), el("span", { class: "v" }, g.title),
     el("span", null, badge("HARDWARE-GATED", "gated", { k: g.gate_id, v: g.pass_permitted ? "PASS permitted" : "PASS is not in this gate's frozen allowed statuses." }))));
   out.push(el("section", { class: "section band-dark bleed" }, el("div", { class: "wrap split media-left" },
-    hw.length ? artPlates(hw.map((g) => ({ label: g.gate_id, value: "hardware only", locked: true, tone: "gated", href: "#/gates", tip: g.title })),
-      { label: "Hardware-gated gates", caption: `Drawn from master/validation_gates.yaml · one plate per gate that omits PASS · hatched = closable only by measured hardware evidence` }) : el("div"),
+    hw.length ? sectionStage(hw, recs.records) : el("div"),
     el("div", { class: "reveal d1" }, eyebrow("(04)", "Gates only hardware can close"),
       el("h2", { class: "statement" }, "Some questions only a ", el("em", null, "cold"), " measurement answers."),
       el("p", { class: "copy mt" }, "These gates omit PASS from their frozen allowed statuses, so no simulated or model-derived result in this repository can close them."),
@@ -1268,6 +1347,7 @@ async function route() {
 let rendered = false;
 function render(nodes, onHero) {
   const apply = () => {
+    while (activeStages.length) { try { activeStages.pop().dispose(); } catch (_) { /* already gone */ } }
     clear(view);
     window.scrollTo(0, 0);
     document.body.classList.toggle("on-hero", onHero);

@@ -423,6 +423,44 @@ def test_static_route_serves_only_the_viewers_own_assets(live_repo_server):
         assert b"import" not in body and b"QMHP-CEM" not in body, bad
 
 
+#: SHA-256 of the one vendored script, as recorded in frontend/vendor-src/BUILD.md.
+THREE_BUNDLE_SHA256 = "38a81bdd710c27cf03a760f3192c9bbfecc861a71144c44271786738d69d118c"
+
+
+def test_vendored_3d_library_is_pinned_licensed_and_cannot_make_requests(live_repo_server):
+    """three.js is the only third-party script. It is served from the viewer's own
+    origin, matches the digest recorded when it was built, ships its MIT licence, and -
+    tree-shaken to the classes the scene uses - contains no network primitive at all."""
+    bundle = FRONTEND / "static" / "vendor" / "three.min.js"
+    data = bundle.read_bytes()
+    assert hashlib.sha256(data).hexdigest() == THREE_BUNDLE_SHA256, "rebuild or re-pin: see frontend/vendor-src/BUILD.md"
+    assert THREE_BUNDLE_SHA256 in (FRONTEND / "vendor-src" / "BUILD.md").read_text(encoding="utf-8")
+    assert "MIT" in (FRONTEND / "static" / "vendor" / "LICENSE-three.txt").read_text(encoding="utf-8")
+    text = data.decode("utf-8")
+    for primitive in ("fetch(", "XMLHttpRequest", "WebSocket", "sendBeacon", "EventSource", "importScripts",
+                      "localStorage", "sessionStorage", "indexedDB", "postMessage", "window.open", "eval("):
+        assert primitive not in text, primitive
+    status, headers, body = live_repo_server.request("GET", "/static/vendor/three.min.js")
+    assert status == 200 and headers["Content-Type"].startswith("text/javascript") and body == data
+    for bad in ("/static/vendor/LICENSE-three.txt", "/static/vendor/../app.js", "/static/vendor/other.js",
+                "/static/vendor/three.module.js", "/static/vendor/%2e%2e/scene3d.js"):
+        status, _h, _b = live_repo_server.request("GET", bad)
+        assert status == 404, bad
+
+
+def test_scripts_load_only_same_origin_modules():
+    """The page's modules import only the viewer's own files: scene3d.js imports the
+    vendored bundle and nothing else, and app.js dynamically imports only /static/."""
+    scene = (FRONTEND / "static" / "scene3d.js").read_text(encoding="utf-8")
+    assert re.findall(r'from\s+"([^"]+)"', scene) == ["/static/vendor/three.min.js"]
+    for js in JS_SOURCES:
+        text = js.read_text(encoding="utf-8")
+        for target in re.findall(r'import\(\s*"([^"]+)"', text):
+            assert target.startswith("/static/") and "//" not in target[1:], (js.name, target)
+        assert "http://" not in re.sub(r'"http://www\.w3\.org/2000/svg"', "", text), js.name
+        assert "https://" not in text, js.name
+
+
 def test_file_endpoint_is_confined_to_the_repository(fixture_repo):
     server = Server(fixture_repo)
     try:

@@ -36,10 +36,31 @@ caption says which data drew it:
 
 | Figure | Where | Drawn from |
 |---|---|---|
-| Evidence lattice | Overview hero, Records | one row per record family, x = recorded time, shape = evidence basis, colour = most severe headline status, gold curves = records naming records; each mark opens its record |
-| Stage stack | Overview, Gates, Experiments | one plate per gate (or contract group / experiment); hatched = hardware-gated, PASS not permitted |
+| Evidence lattice | Records (and the overview hero where 3-D is unavailable) | one row per record family, x = recorded time, shape = evidence basis, colour = most severe headline status, gold curves = records naming records; each mark opens its record |
+| Stage stack (SVG) | Gates, Experiments (and the overview where 3-D is unavailable) | one plate per gate (or contract group / experiment); hatched = hardware-gated, PASS not permitted |
 | Digest sigil | Provenance | a master file's SHA-256, re-measured on load: one tick per hex digit |
 | Result matrix | Candidates | candidate x gate, coloured by the recorded status; each mark shows its reason |
+
+**The live 3-D stage stack** (`static/scene3d.js`) is an original real-time
+three.js model on the overview: one plate per frozen gate (gold = computational,
+dark with a pulsing violet rim = hardware-gated, PASS not permitted), one coax line
+per record family and one bead per record, placed by recorded time and coloured by
+its headline status. Hover a bead for its record, click to open it. Scrolling
+separates and turns the stack (hero), and a second instance in "Gates only hardware
+can close" opens up as that section passes. It is labelled on the page as not a
+model of QMHP or of any real hardware.
+
+It renders only while on screen and the tab is visible, runs at 30 fps on touch
+devices, is disposed on every page change, and is skipped - the SVG figure is shown
+instead - without WebGL, under `prefers-reduced-motion`, with Data Saver on, or on
+devices reporting two or fewer CPU cores. It requests nothing: it receives data the
+page already fetched through its single GET helper.
+
+**three.js 0.186.1 (MIT)** is the one third-party script, vendored as a tree-shaken
+bundle at `static/vendor/three.min.js` with its licence. The bundle contains no
+network code at all. How it was built, and its SHA-256, are recorded in
+`vendor-src/BUILD.md`; the tests pin the digest and assert the absence of any
+network primitive.
 
 **Badge details** (the JSON path and recorded text behind a status, the rule
 behind a basis, a gate's reason) open in a popover on hover, keyboard focus or

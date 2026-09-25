@@ -28,9 +28,10 @@ from .repo_fs import AccessDenied, NotFound, TooLarge
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 STATIC_TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
                 ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".woff2": "font/woff2"}
-#: The viewer's own assets: flat names, plus its vendored OFL fonts under fonts/. No
+#: The viewer's own assets: flat names, its vendored OFL fonts under fonts/ and the one
+#: vendored script (three.js, pinned by digest in the tests). No
 #: other subdirectory, no dot-segments, no repository file is ever reachable here.
-STATIC_NAME = re.compile(r"[a-z0-9_\-]+\.(html|js|css|svg)|fonts/[a-z0-9_\-]+\.woff2")
+STATIC_NAME = re.compile(r"[a-z0-9_\-]+\.(html|js|css|svg)|fonts/[a-z0-9_\-]+\.woff2|vendor/three\.min\.js")
 _ID = r"(?P<id>[A-Za-z0-9][A-Za-z0-9._\-]{0,199})"
 
 #: (pattern, adapter method, takes) - the complete route table. All are GET/HEAD.
