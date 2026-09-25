@@ -37,6 +37,15 @@ READOUT = 4.301974466
 G = 0.15
 CEM_PACKAGES = {"contracts", "models", "orchestrator", "evaluator", "geometry", "solvers"}
 
+#: Synthetic stand-ins for approved runtime versions. They are NOT real approvals and
+#: deliberately look nothing like real version numbers.
+SYNTHETIC_RUNTIME = {
+    "python_version": "synthetic-python", "numpy_version": "synthetic-numpy",
+    "scipy_version": "synthetic-scipy", "qutip_version": "synthetic-qutip",
+}
+#: A synthetic Hermiticity limit for the unit tests, not an approved value.
+HERMITICITY_LIMIT = 1e-12
+
 
 def _load(path: Path, name: str):
     spec = importlib.util.spec_from_file_location(name, path)
@@ -149,7 +158,8 @@ def _write(tmp_path: Path, payload=None, *, raw: bytes | None = None, expected: 
         expected = _expected_record(payload, snapshot_bytes)
     expected_path = tmp_path / "expected.json"
     expected_path.write_text(json.dumps(expected))
-    return str(snapshot), str(schema), str(expected_path)
+    # the expected-hashes record is bound by its sha256, supplied separately
+    return str(snapshot), str(schema), str(expected_path), hashlib.sha256(expected_path.read_bytes()).hexdigest()
 
 
 def _status(tmp_path: Path, payload=None, **kwargs) -> tuple[str, str]:
@@ -203,9 +213,9 @@ def test_missing_snapshot_is_blocked_not_generated(tmp_path):
 
 
 def test_missing_expected_record_is_blocked(tmp_path, base_payload):
-    snapshot, schema, _ = _write(tmp_path, base_payload)
+    snapshot, schema, _, digest = _write(tmp_path, base_payload)
     with pytest.raises(checker.CheckFailure) as info:
-        checker.validate(snapshot, schema, None)
+        checker.validate(snapshot, schema, None, digest)
     assert info.value.status == "BLOCKED"
 
 
@@ -354,23 +364,26 @@ def test_altered_coupling_entry_with_rehash_is_caught_by_the_comparator(base_pay
     data = _synthetic()
     baseline_h = data["hamiltonian"].copy()
     baseline_h[0, 13] += 1e-9
+    baseline_h[13, 0] += 1e-9               # kept Hermitian, so only the entry comparison can catch it
     independent = {"H": data["hamiltonian"], "eigenvalues": data["eigenvalues"], "observables": data["observables"]}
     baseline = {"H": baseline_h, "eigenvalues": data["eigenvalues"], "observables": data["observables"]}
-    checks = checker.compare(independent, baseline, checker.PROPOSED_ENGINEERING_RULES)
+    checks = checker.compare(independent, baseline, checker.PROPOSED_ENGINEERING_RULES, HERMITICITY_LIMIT)
+    assert checks["hermiticity"]["verdict"] == "PASS"
     assert checks["hamiltonian_max_entry"]["verdict"] == "FAIL"
     assert checks["ordered_eigenvalues_max"]["verdict"] == "PASS"
-    unaltered = checker.compare(independent, independent, checker.PROPOSED_ENGINEERING_RULES, labels_ok=True)
+    unaltered = checker.compare(independent, independent, checker.PROPOSED_ENGINEERING_RULES, HERMITICITY_LIMIT,
+                                label_problems=[], labels_match_baseline=True)
     assert all(item["verdict"] == "PASS" for item in unaltered.values())
 
 
 def test_comparator_reports_named_checks_not_a_blanket_verdict(base_payload):
     data = _synthetic()
     same = {"H": data["hamiltonian"], "eigenvalues": data["eigenvalues"], "observables": data["observables"]}
-    checks = checker.compare(same, same, checker.PROPOSED_ENGINEERING_RULES)
+    checks = checker.compare(same, same, checker.PROPOSED_ENGINEERING_RULES, HERMITICITY_LIMIT)
     assert set(checks) == {
-        "hamiltonian_max_entry", "ordered_eigenvalues_max", "pull_MHz_level0", "pull_MHz_level1",
-        "pull_MHz_level2", "sink_logical_contrast_MHz", "sink_line_GHz", "dressed_emission_GHz",
-        "f8_weight",
+        "hermiticity", "hamiltonian_max_entry", "ordered_eigenvalues_max", "labels", "pull_MHz_level0",
+        "pull_MHz_level1", "pull_MHz_level2", "sink_logical_contrast_MHz", "sink_line_GHz",
+        "dressed_emission_GHz", "f8_weight",
     }
 
 
@@ -422,12 +435,14 @@ def test_payload_with_duplicate_labels_validates_but_reports_them(tmp_path, base
 # --------------------------------------------------------------- execution gates
 
 
-def test_synthetic_payload_is_never_executed(tmp_path, base_payload):
+def test_synthetic_payload_is_never_executed(tmp_path, base_payload, monkeypatch):
     validated = checker.validate(*_write(tmp_path, base_payload))
     output = tmp_path / "run"
+    # even with a runtime that matches the approved one, a synthetic payload is refused
+    monkeypatch.setattr(checker, "runtime_identity", lambda: dict(SYNTHETIC_RUNTIME))
     with pytest.raises(checker.CheckFailure) as info:
-        checker.execute(validated, {"thresholds": checker.PROPOSED_ENGINEERING_RULES}, str(output))
-    assert info.value.status == "REJECTED" and not output.exists()
+        checker.execute(validated, _rules(), str(output))
+    assert info.value.status == "REJECTED" and "synthetic" in str(info.value) and not output.exists()
 
 
 def _rules(**overrides) -> dict:
@@ -443,6 +458,7 @@ def _rules(**overrides) -> dict:
         "memory_limit_MB": 512,
         "permitted_attempts": 1,
         "eigensolver": "numpy.linalg.eigh (UPLO='L') on Qobj.full()",
+        "approved_runtime": dict(SYNTHETIC_RUNTIME),
     }
     rules.update(overrides)
     return rules
@@ -476,6 +492,14 @@ def test_frozen_rules_gate(tmp_path):
         (_rules(rules_status="MASTER-FROZEN"), "BLOCKED"),
         (_rules(label_min_margin=0), "REJECTED"),
         (_rules(wall_time_limit_s=True), "REJECTED"),
+        # the approved runtime (fix 2): missing is BLOCKED, malformed is REJECTED
+        ({k: v for k, v in _rules().items() if k != "approved_runtime"}, "BLOCKED"),
+        (_rules(approved_runtime={k: v for k, v in SYNTHETIC_RUNTIME.items() if k != "qutip_version"}), "BLOCKED"),
+        (_rules(approved_runtime=dict(SYNTHETIC_RUNTIME, numpy_version=None)), "BLOCKED"),
+        (_rules(approved_runtime=dict(SYNTHETIC_RUNTIME, scipy_version="")), "REJECTED"),
+        (_rules(approved_runtime=dict(SYNTHETIC_RUNTIME, python_version=3.9)), "REJECTED"),
+        (_rules(approved_runtime=dict(SYNTHETIC_RUNTIME, platform="synthetic")), "REJECTED"),
+        (_rules(approved_runtime="synthetic-python"), "REJECTED"),
     ):
         path_bad, digest_bad = _rules_file(tmp_path, bad)
         with pytest.raises(checker.CheckFailure) as info:
@@ -484,18 +508,21 @@ def test_frozen_rules_gate(tmp_path):
 
 
 def test_cli_without_execute_performs_no_calculation(tmp_path, base_payload, capsys):
-    snapshot, schema, expected = _write(tmp_path, base_payload)
-    code = checker.main(["--snapshot", snapshot, "--schema", schema, "--expected", expected])
+    snapshot, schema, expected, digest = _write(tmp_path, base_payload)
+    code = checker.main(["--snapshot", snapshot, "--schema", schema, "--expected", expected,
+                         "--expected-sha256", digest])
     assert code == checker.EXIT_OK
-    assert "no calculation performed" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "no calculation performed" in out and ("expected-hashes record sha256 %s" % digest) in out
     assert sorted(p.name for p in tmp_path.iterdir()) == ["expected.json", "snapshot.json"]
 
 
 def test_cli_exit_codes_for_blocked_and_rejected(tmp_path, base_payload):
     assert checker.main([]) == checker.EXIT_BLOCKED
     bad = _mutated(base_payload, lambda p: p.__setitem__("tensor_order", ["resonator", "fluxonium"]))
-    snapshot, schema, expected = _write(tmp_path, bad)
-    assert checker.main(["--snapshot", snapshot, "--schema", schema, "--expected", expected]) == checker.EXIT_REJECTED
+    snapshot, schema, expected, digest = _write(tmp_path, bad)
+    assert checker.main(["--snapshot", snapshot, "--schema", schema, "--expected", expected,
+                         "--expected-sha256", digest]) == checker.EXIT_REJECTED
 
 
 # ----------------------------------------------- isolation of the standalone checker
@@ -847,11 +874,15 @@ def test_master_hash_mismatches_are_rejected(tmp_path, base_payload):
 def test_observables_are_not_evaluated_when_labels_are_not_safe():
     data = _synthetic()
     same = {"H": data["hamiltonian"], "eigenvalues": data["eigenvalues"], "observables": data["observables"]}
-    unsafe = checker.compare(same, same, checker.PROPOSED_ENGINEERING_RULES, labels_ok=False)
-    for key in checker.OBSERVABLE_CHECKS:
-        assert unsafe[key]["verdict"].startswith("NOT-EVALUATED"), key
-    assert unsafe["hamiltonian_max_entry"]["verdict"] == "PASS"
-    default = checker.compare(same, same, checker.PROPOSED_ENGINEERING_RULES)
+    for problems, match in ((["AMBIGUOUS: synthetic"], True), ([], False), (["DUPLICATE: synthetic"], False)):
+        unsafe = checker.compare(same, same, checker.PROPOSED_ENGINEERING_RULES, HERMITICITY_LIMIT,
+                                 label_problems=problems, labels_match_baseline=match)
+        assert unsafe["labels"]["verdict"] == "FAIL"
+        for key in checker.OBSERVABLE_CHECKS:
+            assert unsafe[key]["verdict"].startswith("NOT-EVALUATED"), key
+        assert unsafe["hamiltonian_max_entry"]["verdict"] == "PASS"
+    default = checker.compare(same, same, checker.PROPOSED_ENGINEERING_RULES, HERMITICITY_LIMIT)
+    assert default["labels"]["verdict"].startswith("NOT-EVALUATED")
     assert all(default[key]["verdict"].startswith("NOT-EVALUATED") for key in checker.OBSERVABLE_CHECKS)
 
 
@@ -883,3 +914,241 @@ def test_protocol_doc_does_not_call_the_eigensolver_independent():
     assert "floating-point slack" in doc and "**not** a scientific acceptance tolerance" in doc
     scope = json.loads(SCHEMA_PATH.read_text())["properties"]["evidence_scope"]["const"]
     assert "shared with CEM, not independent" in scope
+
+
+# ============================================ revision 2: regression tests, post-fix
+#
+# Pre-fix reproduction of these three defects was done separately, against a frozen
+# copy of 5eefb3b; these tests are the post-fix regression proof only.
+
+
+def _execute_tree() -> ast.FunctionDef:
+    return next(node for node in _tree(CHECKER_PATH).body
+                if isinstance(node, ast.FunctionDef) and node.name == "execute")
+
+
+# ---------------------------------------- fix 1: the expected-hashes record is bound
+
+
+def test_expected_record_sha256_is_required_and_exact(tmp_path, base_payload):
+    snapshot, schema, expected, digest = _write(tmp_path, base_payload)
+    for missing in (None, ""):
+        with pytest.raises(checker.CheckFailure) as info:
+            checker.validate(snapshot, schema, expected, missing)
+        assert info.value.status == "BLOCKED" and "--expected-sha256" in str(info.value)
+    for wrong in ("0" * 64, digest.upper(), digest[:-1]):
+        with pytest.raises(checker.CheckFailure) as info:
+            checker.validate(snapshot, schema, expected, wrong)
+        assert info.value.status == "REJECTED" and "expected-hashes record sha256" in str(info.value)
+    result = checker.validate(snapshot, schema, expected, digest)
+    assert result["expected_sha256"] == digest == hashlib.sha256(Path(expected).read_bytes()).hexdigest()
+
+
+def test_substituted_expected_record_is_rejected(tmp_path, base_payload):
+    """The pre-fix attack: a tampered snapshot shipped with its own self-consistent
+    expected record. Only the externally supplied record hash can catch it."""
+    (tmp_path / "original").mkdir()
+    (tmp_path / "substituted").mkdir()
+    original = _write(tmp_path / "original", base_payload)
+    tampered = _mutated(base_payload, lambda p: (p["baseline_H_real"][0].__setitem__(13, 1e-9 + p["baseline_H_real"][0][13]),
+                                                 p.__setitem__("source_commit", "f" * 40)))
+    snapshot, schema, substituted, substituted_digest = _write(tmp_path / "substituted", tampered)
+    with pytest.raises(checker.CheckFailure) as info:
+        checker.validate(snapshot, schema, substituted, original[3])     # the approved record hash
+    assert info.value.status == "REJECTED" and "expected-hashes record sha256" in str(info.value)
+    # control: the substituted record is internally consistent, so the external hash is the only defence
+    assert checker.validate(snapshot, schema, substituted, substituted_digest)["expected_sha256"] == substituted_digest
+
+
+def test_cli_blocks_without_expected_sha256_and_rejects_a_wrong_one(tmp_path, base_payload, capsys):
+    snapshot, schema, expected, digest = _write(tmp_path, base_payload)
+    common = ["--snapshot", snapshot, "--schema", schema, "--expected", expected]
+    assert checker.main(common) == checker.EXIT_BLOCKED
+    assert checker.main(common + ["--expected-sha256", "1" * 64]) == checker.EXIT_REJECTED
+    assert checker.main(common + ["--expected-sha256", digest]) == checker.EXIT_OK
+    out = capsys.readouterr().out
+    assert out.count("BLOCKED") == 1 and out.count("REJECTED") == 1 and digest in out
+
+
+def test_execution_records_carry_the_measured_expected_record_hash():
+    records = {}
+    for node in ast.walk(_execute_tree()):
+        if isinstance(node, (ast.Assign, ast.AnnAssign)) and isinstance(node.value, ast.Dict):
+            target = node.targets[0] if isinstance(node, ast.Assign) else node.target
+            if isinstance(target, ast.Name) and target.id in ("attempt", "result"):
+                records[target.id] = {key.value: ast.unparse(value) for key, value in
+                                      zip(node.value.keys, node.value.values) if isinstance(key, ast.Constant)}
+    for name in ("attempt", "result"):
+        assert records[name]["expected_sha256"] == "validated['expected_sha256']", name
+    assert records["attempt"]["runtime_gate"] == "runtime_gate"
+
+
+# ---------------------------------------- fix 2: the runtime is gated before calculation
+
+
+def test_runtime_gate_requires_an_exact_match():
+    comparison = checker.check_runtime(SYNTHETIC_RUNTIME, dict(SYNTHETIC_RUNTIME, platform="synthetic"))
+    assert set(comparison) == set(checker.RUNTIME_KEYS)
+    assert all(item["approved"] == item["actual"] for item in comparison.values())
+    for key in checker.RUNTIME_KEYS:
+        for actual_value, reason in ((SYNTHETIC_RUNTIME[key] + " ", "is not the approved"),
+                                     (SYNTHETIC_RUNTIME[key] + "-rc1", "is not the approved"),
+                                     (None, "unavailable")):
+            with pytest.raises(checker.CheckFailure) as info:
+                checker.check_runtime(SYNTHETIC_RUNTIME, dict(SYNTHETIC_RUNTIME, **{key: actual_value}))
+            assert info.value.status == "BLOCKED" and key in str(info.value) and reason in str(info.value)
+        with pytest.raises(checker.CheckFailure) as info:
+            checker.check_runtime({k: v for k, v in SYNTHETIC_RUNTIME.items() if k != key}, SYNTHETIC_RUNTIME)
+        assert info.value.status == "BLOCKED" and "no approved version" in str(info.value)
+
+
+def test_runtime_mismatch_blocks_execute_before_any_record(tmp_path, base_payload, monkeypatch):
+    validated = checker.validate(*_write(tmp_path, base_payload))
+
+    def must_not_run(*_args, **_kwargs):
+        raise AssertionError("a calculation was reached")
+
+    monkeypatch.setattr(checker, "assemble_with_qutip", must_not_run)
+    monkeypatch.setattr(checker, "label_states", must_not_run)
+    output = tmp_path / "run"
+    # the real runtime of this environment is not the synthetic approved one
+    for rules in (_rules(), {k: v for k, v in _rules().items() if k != "approved_runtime"},
+                  _rules(approved_runtime="synthetic-python")):
+        with pytest.raises(checker.CheckFailure) as info:
+            checker.execute(validated, rules, str(output))
+        assert info.value.status == "BLOCKED" and "runtime" in str(info.value) and not output.exists()
+    for key in checker.RUNTIME_KEYS:
+        monkeypatch.setattr(checker, "runtime_identity", lambda key=key: dict(SYNTHETIC_RUNTIME, **{key: None}))
+        with pytest.raises(checker.CheckFailure) as info:
+            checker.execute(validated, _rules(), str(output))
+        assert info.value.status == "BLOCKED" and key in str(info.value) and not output.exists()
+
+
+def test_runtime_gate_precedes_every_record_and_calculation_in_execute():
+    body = _execute_tree().body
+    lines = {}
+    for index, statement in enumerate(body):
+        text = ast.unparse(statement)
+        for marker in ("check_runtime(", "os.makedirs(", "import qutip", "import numpy", "payload_kind"):
+            if marker in text:
+                lines.setdefault(marker, index)
+    assert lines["check_runtime("] < lines["payload_kind"] < lines["os.makedirs("] < lines["import qutip"]
+    assert lines["check_runtime("] < lines["import numpy"]
+
+
+def test_no_runtime_version_is_hard_coded_in_the_checker():
+    import re
+
+    version = re.compile(r"\b\d+\.\d+\.\d+\b")
+    strings = [node.value for node in ast.walk(_tree(CHECKER_PATH))
+               if isinstance(node, ast.Constant) and isinstance(node.value, str)]
+    assert not [text for text in strings if version.search(text)]
+    assert checker.RUNTIME_KEYS == ("python_version", "numpy_version", "scipy_version", "qutip_version")
+
+
+# ---------------------------------------- fix 3: Hermiticity is a real gate
+
+
+def _hermiticity_inputs():
+    data = _synthetic()
+    good = data["hamiltonian"]
+    bad = good.copy()
+    bad[0, 13] += 1e-3                      # upper triangle only: invisible to eigh(UPLO='L')
+    full = {"eigenvalues": data["eigenvalues"], "observables": data["observables"]}
+    return good, bad, full
+
+
+@pytest.mark.parametrize("which", ["independent", "baseline", "both"])
+def test_non_hermitian_matrix_fails_the_gate_and_nothing_downstream_is_evaluated(which):
+    good, bad, full = _hermiticity_inputs()
+    independent = dict(full, H=bad if which in ("independent", "both") else good)
+    baseline = dict(full, H=bad if which in ("baseline", "both") else good)
+    checks = checker.compare(independent, baseline, checker.PROPOSED_ENGINEERING_RULES, HERMITICITY_LIMIT,
+                             label_problems=[], labels_match_baseline=True)
+    gate = checks["hermiticity"]
+    assert gate["verdict"] == "FAIL" and gate["limit"] == HERMITICITY_LIMIT
+    assert gate["independent_defect_GHz"] == (pytest.approx(1e-3, rel=1e-12) if which != "baseline" else 0.0)
+    assert gate["baseline_defect_GHz"] == (pytest.approx(1e-3, rel=1e-12) if which != "independent" else 0.0)
+    for key in checker.HERMITICITY_GATED_CHECKS:
+        assert checks[key]["verdict"] == checker.NOT_EVALUATED_HERMITICITY, key
+        if key != "labels":
+            assert checks[key]["abs_difference"] is None, key
+    # the entry comparison is independent of the gate: identical corruption still matches entry by entry
+    assert checks["hamiltonian_max_entry"]["verdict"] == ("PASS" if which == "both" else "FAIL")
+
+
+def test_hermiticity_failure_does_not_touch_eigensolve_results():
+    good, bad, _ = _hermiticity_inputs()
+    checks = checker.compare({"H": bad}, {"H": good}, checker.PROPOSED_ENGINEERING_RULES, HERMITICITY_LIMIT)
+    assert checks["hermiticity"]["verdict"] == "FAIL"
+    # positive control: once the gate PASSES, the eigensolve results are required
+    with pytest.raises(KeyError):
+        checker.compare({"H": good}, {"H": good}, checker.PROPOSED_ENGINEERING_RULES, HERMITICITY_LIMIT)
+
+
+def test_hermiticity_gate_boundary_non_finite_and_limit_validation():
+    def matrix(defect):
+        return np.array([[0.0, defect], [0.0, 0.0]])
+
+    assert checker.hermiticity_check(matrix(0.5), matrix(0.0), 0.5)["verdict"] == "PASS"
+    assert checker.hermiticity_check(matrix(0.0), matrix(np.nextafter(0.5, 1.0)), 0.5)["verdict"] == "FAIL"
+    assert checker.hermiticity_check(matrix(np.nan), matrix(0.0), 0.5)["verdict"] == "FAIL"
+    for bad_limit in (0, -1.0, True, None, "1e-12"):
+        with pytest.raises(checker.CheckFailure) as info:
+            checker.hermiticity_check(matrix(0.0), matrix(0.0), bad_limit)
+        assert info.value.status == "REJECTED"
+
+
+def test_hermiticity_gate_never_repairs_a_matrix():
+    good, bad, full = _hermiticity_inputs()
+    before_bad, before_good = bad.copy(), good.copy()
+    checks = checker.compare(dict(full, H=bad), dict(full, H=good), checker.PROPOSED_ENGINEERING_RULES,
+                             HERMITICITY_LIMIT)
+    assert np.array_equal(bad, before_bad) and np.array_equal(good, before_good)
+    assert checks["hermiticity"]["independent_defect_GHz"] == float(np.max(np.abs(bad - bad.conj().T)))
+    # code only: docstrings legitimately say that nothing is symmetrised
+    tree = _tree(CHECKER_PATH)
+    for node in ast.walk(tree):
+        body = getattr(node, "body", None)
+        if isinstance(body, list) and body and isinstance(body[0], ast.Expr) \
+                and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str):
+            node.body = body[1:] or [ast.Pass()]
+    code = ast.unparse(tree)
+    for forbidden in (") / 2", "0.5 * (", "/ 2.0", "hermitian_part", "symmetri"):
+        assert forbidden not in code, forbidden
+
+
+def test_execute_runs_the_hermiticity_gate_before_the_eigensolve():
+    tree = _execute_tree()
+    gate_line = next(node.lineno for node in ast.walk(tree) if isinstance(node, ast.Call)
+                     and getattr(node.func, "id", None) == "hermiticity_check")
+    eigh_calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                  and ast.unparse(node.func) == "np.linalg.eigh"]
+    assert len(eigh_calls) == 1 and gate_line < eigh_calls[0].lineno
+    guards = [node for node in ast.walk(tree) if isinstance(node, ast.If)
+              and "gate['verdict'] == 'PASS'" in ast.unparse(node.test)]
+    assert len(guards) == 1
+    assert any(node is eigh_calls[0] for statement in guards[0].body for node in ast.walk(statement))
+    for name in ("label_states", "observables_from", "label_quality"):
+        calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call) and getattr(node.func, "id", None) == name]
+        assert calls and all(any(call is node for statement in guards[0].body for node in ast.walk(statement))
+                             for call in calls), name
+
+
+def test_labels_are_a_named_check():
+    good, _, full = _hermiticity_inputs()
+    same = dict(full, H=good)
+    passed = checker.compare(same, same, checker.PROPOSED_ENGINEERING_RULES, HERMITICITY_LIMIT,
+                             label_problems=[], labels_match_baseline=True)
+    assert passed["labels"]["verdict"] == "PASS"
+    assert all(passed[key]["verdict"] == "PASS" for key in checker.OBSERVABLE_CHECKS)
+    failed = checker.compare(same, same, checker.PROPOSED_ENGINEERING_RULES, HERMITICITY_LIMIT,
+                             label_problems=["LOW-OVERLAP: synthetic"], labels_match_baseline=True)
+    assert failed["labels"]["verdict"] == "FAIL" and failed["labels"]["problems"] == ["LOW-OVERLAP: synthetic"]
+
+
+def test_protocol_doc_describes_the_revision_2_gates():
+    doc = DOC_PATH.read_text()
+    for phrase in ("--expected-sha256", "approved_runtime", "python_version", "qutip_version",
+                   "numpy_version", "scipy_version", "Hermiticity is a gate", "NOT-EVALUATED"):
+        assert phrase in doc, phrase

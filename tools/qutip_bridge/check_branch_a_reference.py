@@ -29,14 +29,21 @@ Deliberate constraints (docs/qutip/branch-a-fixed-point-crosscheck-v1.md):
 
 * Standalone. It must not import QMHP-CEM (contracts, models, orchestrator,
   evaluator, geometry, solvers); it runs on a separate machine.
-* Python 3.9 syntax. Target runtime: the owner's Mac, Python 3.9.6 and QuTiP 5.0.4.
-  That runtime is recorded at execution time, not assumed.
+* Python 3.9 syntax. Target runtime: the owner's Mac. The approved Python, NumPy,
+  SciPy and QuTiP versions come only from the hash-bound frozen-rules file; none is
+  hard-coded here. Before any calculation the actual versions must equal them
+  exactly, or execution is BLOCKED.
 * Validation uses the standard library only. NumPy and QuTiP are imported lazily,
   inside the execution path, and only after every validation step has passed.
 * Fail closed. JSON is parsed strictly: NaN, Infinity, overflowing literals and
   duplicate keys are rejected. No pickle, no eval/exec, no executable configuration,
   no downloads, no dependency installation.
-* Hashes that authenticate the snapshot are supplied OUTSIDE the snapshot.
+* Hashes that authenticate the snapshot are supplied OUTSIDE the snapshot, in the
+  expected-hashes record. That record is itself bound by its sha256, supplied on
+  the command line (--expected-sha256): missing is BLOCKED, a mismatch is REJECTED.
+* Hermiticity is a gate, not a note. If either Hamiltonian exceeds the approved
+  Hermiticity limit, nothing derived from the eigensolve is compared. No matrix is
+  ever symmetrised or repaired.
 
 Exit codes: 0 VALIDATED (or EXECUTED), 2 BLOCKED (a required input is missing),
 3 REJECTED (an input failed a check), 4 EXECUTION-FAILED (preserved, never retried).
@@ -111,7 +118,12 @@ FROZEN_RULES_REQUIRED = (
     "memory_limit_MB",
     "permitted_attempts",
     "eigensolver",
+    "approved_runtime",
 )
+
+#: The runtime versions a frozen-rules file must approve. The approved VALUES live
+#: only in that file; this tuple names the fields, never the versions.
+RUNTIME_KEYS = ("python_version", "numpy_version", "scipy_version", "qutip_version")
 
 #: The only rules status under which execution may proceed. Anything else - in
 #: particular the PROPOSED values copied into a file without that approval - keeps
@@ -441,19 +453,39 @@ def check_expected_hashes(
 # ------------------------------------------------------------------- validation
 
 
+def check_expected_record_binding(expected_bytes: bytes, expected_sha256: Optional[str]) -> str:
+    """Bind the expected-hashes record to a sha256 supplied outside it.
+
+    Without this, anyone able to replace the record could make any snapshot
+    validate. A missing sha256 BLOCKS; a mismatch (exact lowercase-hex comparison)
+    is REJECTED. Returns the measured sha256 for the records.
+    """
+    if not expected_sha256:
+        raise _blocked("the sha256 of the expected-hashes record was not supplied "
+                       "(--expected-sha256); the record is not trusted on its own")
+    measured = sha256_bytes(expected_bytes)
+    if measured != expected_sha256:
+        raise _reject("expected-hashes record sha256 %s does not match the supplied %s"
+                      % (measured, expected_sha256))
+    return measured
+
+
 def validate(
     snapshot_path: Optional[str],
     schema_path: Optional[str],
     expected_path: Optional[str],
+    expected_sha256: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Every check that must pass before a calculation is allowed.
 
-    Raises CheckFailure (BLOCKED or REJECTED). Returns the parsed payload and
-    findings. Performs no numerical model calculation.
+    Raises CheckFailure (BLOCKED or REJECTED). Returns the parsed payload,
+    findings and the measured snapshot, schema and expected-record hashes.
+    Performs no numerical model calculation.
     """
     schema_bytes = read_required_file(schema_path, "schema file")
     expected_bytes = read_required_file(expected_path, "expected-hashes record")
     snapshot_bytes = read_required_file(snapshot_path, "reference snapshot")
+    expected_measured = check_expected_record_binding(expected_bytes, expected_sha256)
 
     schema = strict_json_loads(schema_bytes, "schema")
     if not isinstance(schema, dict) or schema.get("$id") != SCHEMA_ID:
@@ -474,6 +506,7 @@ def validate(
         "findings": findings,
         "snapshot_sha256": sha256_bytes(snapshot_bytes),
         "schema_sha256": sha256_bytes(schema_bytes),
+        "expected_sha256": expected_measured,
     }
 
 
@@ -564,53 +597,121 @@ OBSERVABLE_CHECKS = (
     "sink_line_GHz", "dressed_emission_GHz", "f8_weight",
 )
 
+#: Everything derived from the eigensolve. eigh(UPLO='L') reads only the lower
+#: triangle, so for a matrix outside the Hermiticity limit none of these means
+#: anything: they are NOT-EVALUATED, never PASS or FAIL.
+HERMITICITY_GATED_CHECKS = ("ordered_eigenvalues_max", "labels") + OBSERVABLE_CHECKS
 
-def compare(independent: Dict[str, Any], baseline: Dict[str, Any], thresholds: Dict[str, float],
-            labels_ok: bool = False) -> Dict[str, Any]:
-    """Named absolute differences against the frozen thresholds. No blanket PASS.
-
-    Observables depend on the state labels. Unless ``labels_ok`` is True (labels
-    unambiguous under the frozen rule AND identical to the baseline assignment) the
-    observable checks are NOT-EVALUATED; they never fall back to another assignment.
-    """
-    import numpy as np
-
-    checks = {}
-
-    def record(name: str, difference: float, limit_key: str) -> None:
-        limit = thresholds[limit_key]
-        verdict = "PASS" if difference <= limit else "FAIL"
-        if name in OBSERVABLE_CHECKS and not labels_ok:
-            verdict = "NOT-EVALUATED: labels ambiguous, duplicated or not identical to the baseline"
-        checks[name] = {
-            "abs_difference": difference,
-            "limit": limit,
-            "limit_rule": limit_key,
-            "verdict": verdict,
-        }
-
-    record("hamiltonian_max_entry",
-           float(np.max(np.abs(independent["H"] - baseline["H"]))),
-           "max_hamiltonian_entry_abs_diff_GHz")
-    record("ordered_eigenvalues_max",
-           float(np.max(np.abs(independent["eigenvalues"] - baseline["eigenvalues"]))),
-           "max_ordered_eigenvalue_abs_diff_GHz")
-    for key in ("pull_MHz_level0", "pull_MHz_level1", "pull_MHz_level2", "sink_logical_contrast_MHz"):
-        record(key, abs(independent["observables"][key] - baseline["observables"][key]),
-               "max_pull_or_contrast_abs_diff_MHz")
-    for key in ("sink_line_GHz", "dressed_emission_GHz"):
-        record(key, abs(independent["observables"][key] - baseline["observables"][key]),
-               "max_sink_line_or_emission_abs_diff_GHz")
-    record("f8_weight", abs(independent["observables"]["f8_weight"] - baseline["observables"]["f8_weight"]),
-           "max_f8_weight_abs_diff")
-    return checks
+NOT_EVALUATED_HERMITICITY = (
+    "NOT-EVALUATED: the Hermiticity check failed; eigh(UPLO='L') reads only the lower "
+    "triangle, so nothing derived from the eigensolve is compared"
+)
+NOT_EVALUATED_LABELS = (
+    "NOT-EVALUATED: the labels check did not PASS (labels ambiguous, duplicated, not "
+    "identical to the baseline, or not assessed)"
+)
 
 
 def hermiticity_defect(matrix: Any) -> float:
+    """max |H - H^dagger|, measured on a copy. The matrix is never modified."""
     import numpy as np
 
     array = np.asarray(matrix)
     return float(np.max(np.abs(array - array.conj().T)))
+
+
+def hermiticity_check(independent_h: Any, baseline_h: Any, limit: float) -> Dict[str, Any]:
+    """The named Hermiticity gate. It measures both matrices and repairs neither.
+
+    PASS only if BOTH defects are within the approved limit. A non-finite defect
+    fails the comparison and therefore FAILS.
+    """
+    if isinstance(limit, bool) or not isinstance(limit, (int, float)) or not limit > 0:
+        raise _reject("the Hermiticity limit must be a positive number")
+    independent_defect = hermiticity_defect(independent_h)
+    baseline_defect = hermiticity_defect(baseline_h)
+    within = independent_defect <= limit and baseline_defect <= limit
+    return {
+        "independent_defect_GHz": independent_defect,
+        "baseline_defect_GHz": baseline_defect,
+        "limit": limit,
+        "limit_rule": "max_hamiltonian_hermiticity_defect_GHz",
+        "verdict": "PASS" if within else "FAIL",
+    }
+
+
+def compare(independent: Dict[str, Any], baseline: Dict[str, Any], thresholds: Dict[str, float],
+            hermiticity_limit: float, label_problems: Optional[List[str]] = None,
+            labels_match_baseline: bool = False) -> Dict[str, Any]:
+    """Named absolute differences against the frozen thresholds. No blanket PASS.
+
+    Gates, in order:
+      * ``hermiticity``: both matrices within the approved limit. If it FAILS, the
+        eigenvalue, labels and observable checks are NOT-EVALUATED and are not
+        computed; ``independent`` then needs no eigenvalues or observables.
+      * ``labels``: PASS only if the frozen label rule found no problem AND the
+        assignment equals the baseline. ``label_problems=None`` means no label
+        assessment was made, which is NOT-EVALUATED.
+      * observables: NOT-EVALUATED unless ``labels`` PASSES. They never fall back
+        to another assignment.
+    The Hamiltonian entry comparison does not depend on either gate.
+    """
+    import numpy as np
+
+    checks: Dict[str, Any] = {}
+    gate = hermiticity_check(independent["H"], baseline["H"], hermiticity_limit)
+    checks["hermiticity"] = gate
+    hermitian = gate["verdict"] == "PASS"
+
+    def record(name: str, difference: float, limit_key: str, gated_by: Optional[str] = None) -> None:
+        limit = thresholds[limit_key]
+        checks[name] = {
+            "abs_difference": difference,
+            "limit": limit,
+            "limit_rule": limit_key,
+            "verdict": gated_by if gated_by else ("PASS" if difference <= limit else "FAIL"),
+        }
+
+    def not_evaluated(name: str, limit_key: str) -> None:
+        checks[name] = {"abs_difference": None, "limit": thresholds[limit_key],
+                        "limit_rule": limit_key, "verdict": NOT_EVALUATED_HERMITICITY}
+
+    record("hamiltonian_max_entry",
+           float(np.max(np.abs(independent["H"] - baseline["H"]))),
+           "max_hamiltonian_entry_abs_diff_GHz")
+
+    observable_rules = [(key, "max_pull_or_contrast_abs_diff_MHz") for key in
+                        ("pull_MHz_level0", "pull_MHz_level1", "pull_MHz_level2", "sink_logical_contrast_MHz")]
+    observable_rules += [(key, "max_sink_line_or_emission_abs_diff_GHz") for key in
+                         ("sink_line_GHz", "dressed_emission_GHz")]
+    observable_rules += [("f8_weight", "max_f8_weight_abs_diff")]
+
+    if not hermitian:
+        not_evaluated("ordered_eigenvalues_max", "max_ordered_eigenvalue_abs_diff_GHz")
+        checks["labels"] = {"problems": None, "assignment_matches_baseline": None,
+                            "limit_rule": "label_min_overlap, label_min_margin",
+                            "verdict": NOT_EVALUATED_HERMITICITY}
+        for key, limit_key in observable_rules:
+            not_evaluated(key, limit_key)
+        return checks
+
+    record("ordered_eigenvalues_max",
+           float(np.max(np.abs(independent["eigenvalues"] - baseline["eigenvalues"]))),
+           "max_ordered_eigenvalue_abs_diff_GHz")
+    if label_problems is None:
+        labels_verdict = "NOT-EVALUATED: no label assessment was supplied"
+    else:
+        labels_verdict = "PASS" if not label_problems and labels_match_baseline else "FAIL"
+    checks["labels"] = {
+        "problems": None if label_problems is None else list(label_problems),
+        "assignment_matches_baseline": None if label_problems is None else bool(labels_match_baseline),
+        "limit_rule": "label_min_overlap, label_min_margin",
+        "verdict": labels_verdict,
+    }
+    gated = None if labels_verdict == "PASS" else NOT_EVALUATED_LABELS
+    for key, limit_key in observable_rules:
+        record(key, abs(independent["observables"][key] - baseline["observables"][key]), limit_key, gated)
+    return checks
 
 
 def assemble_with_qutip(payload: Dict[str, Any], qutip: Any) -> Any:
@@ -688,6 +789,18 @@ def load_frozen_rules(path: Optional[str], expected_sha256: Optional[str]) -> Di
     for key, value in thresholds.items():
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not value > 0:
             raise _reject("frozen-rules threshold %s must be a positive number" % key)
+    approved = rules["approved_runtime"]
+    if not isinstance(approved, dict):
+        raise _reject("frozen-rules approved_runtime must be an object naming %r" % list(RUNTIME_KEYS))
+    missing = [key for key in RUNTIME_KEYS if approved.get(key) is None]
+    if missing:
+        raise _blocked("frozen-rules approved_runtime lacks %r; execution stays BLOCKED" % missing)
+    extra = sorted(set(approved) - set(RUNTIME_KEYS))
+    if extra:
+        raise _reject("frozen-rules approved_runtime has fields this checker does not enforce: %r" % extra)
+    for key in RUNTIME_KEYS:
+        if not isinstance(approved[key], str) or not approved[key].strip():
+            raise _reject("frozen-rules approved_runtime.%s must be a non-empty version string" % key)
     return rules
 
 
@@ -722,6 +835,11 @@ def _write_manifest(root: str) -> str:
 
 
 def runtime_identity() -> Dict[str, Any]:
+    """The actual runtime. Importing a module to read its version is not a calculation.
+
+    A module that cannot be imported, or that has no ``__version__``, is recorded as
+    None, which the runtime gate treats as unavailable (BLOCKED).
+    """
     identity: Dict[str, Any] = {
         "python_version": sys.version.split()[0],
         "platform": platform.platform(),
@@ -730,22 +848,55 @@ def runtime_identity() -> Dict[str, Any]:
     for name in ("numpy", "scipy", "qutip"):
         try:
             module = __import__(name)
-            identity["%s_version" % name] = getattr(module, "__version__", "unknown")
-        except ImportError:
+            identity["%s_version" % name] = getattr(module, "__version__", None)
+        except Exception:  # any import failure means the version is unavailable
             identity["%s_version" % name] = None
     return identity
+
+
+def check_runtime(approved: Dict[str, Any], actual: Dict[str, Any]) -> Dict[str, Any]:
+    """Exact comparison of the actual runtime with the frozen-rules approved runtime.
+
+    Runs before any NumPy or QuTiP calculation. A version that is not approved, that
+    cannot be read, or that differs in any character BLOCKS execution. The approved
+    versions come only from the frozen-rules file; none is hard-coded here.
+    """
+    comparison: Dict[str, Any] = {}
+    problems = []
+    for key in RUNTIME_KEYS:
+        want, have = approved.get(key), actual.get(key)
+        comparison[key] = {"approved": want, "actual": have}
+        if want is None:
+            problems.append("%s: no approved version" % key)
+        elif have is None:
+            problems.append("%s: actual version unavailable" % key)
+        elif have != want:
+            problems.append("%s: actual %r is not the approved %r" % (key, have, want))
+    if problems:
+        raise _blocked("the runtime does not match the frozen-rules approved runtime: %s"
+                       % "; ".join(problems))
+    return comparison
 
 
 def execute(validated: Dict[str, Any], rules: Dict[str, Any], output_dir: str,
             rules_sha256: Optional[str] = None) -> Dict[str, Any]:
     """The QuTiP calculation. Reached only after validation and frozen rules.
 
-    Writes an append-only record into a NEW directory: the attempt marker first,
-    then raw outputs, then the named checks, then the manifest. A failure is
-    preserved, never retried. The in-process timer is not a hard stop; the wall and
-    memory limits must be enforced by the approved external launcher.
+    Gates before anything is written or calculated: the actual runtime must equal
+    the frozen-rules approved runtime (else BLOCKED), the payload must be a
+    CEM-EXPORT, and the output directory must be new.
+
+    Then it writes an append-only record into the NEW directory: the attempt marker
+    first, then raw outputs, then the named checks, then the manifest. The
+    Hermiticity gate runs before the eigensolve; if it FAILS, the eigensolve,
+    labelling and observables are not run. A failure is preserved, never retried.
+    The in-process timer is not a hard stop; the wall and memory limits must be
+    enforced by the approved external launcher.
     """
     payload = validated["payload"]
+    runtime = runtime_identity()
+    approved_runtime = rules.get("approved_runtime")
+    runtime_gate = check_runtime(approved_runtime if isinstance(approved_runtime, dict) else {}, runtime)
     if payload["payload_kind"] != "CEM-EXPORT":
         raise _reject("payload_kind %r cannot be executed; synthetic fixtures are never evidence"
                       % payload["payload_kind"])
@@ -759,63 +910,77 @@ def execute(validated: Dict[str, Any], rules: Dict[str, Any], output_dir: str,
         "started_utc": _utc_now(),
         "snapshot_sha256": validated["snapshot_sha256"],
         "schema_sha256": validated["schema_sha256"],
+        "expected_sha256": validated["expected_sha256"],
         "frozen_rules": rules,
         "frozen_rules_sha256": rules_sha256,
-        "runtime": runtime_identity(),
+        "runtime": runtime,
+        "runtime_gate": runtime_gate,
     }
     _write_json(os.path.join(output_dir, "attempt.json"), attempt)
     started = time.monotonic()
-    result: Dict[str, Any] = {"protocol_id": PROTOCOL_ID, "snapshot_sha256": validated["snapshot_sha256"]}
+    result: Dict[str, Any] = {
+        "protocol_id": PROTOCOL_ID,
+        "snapshot_sha256": validated["snapshot_sha256"],
+        "expected_sha256": validated["expected_sha256"],
+    }
     try:
         import numpy as np
         import qutip
 
         hamiltonian = assemble_with_qutip(payload, qutip)
         independent_h = hamiltonian.full()
-        eigenvalues, eigenvectors = np.linalg.eigh(independent_h, UPLO="L")
-        labelled = label_states(eigenvectors, NPH, LABEL_PAIRS)
-        annihilation = qutip.tensor(qutip.qeye(NQ), qutip.destroy(NPH)).full()
-        independent = {
-            "H": independent_h,
-            "eigenvalues": eigenvalues,
-            "observables": observables_from(eigenvalues, eigenvectors, labelled["labels"],
-                                            payload["readout_GHz"], annihilation),
-        }
         baseline = {
             "H": np.asarray(payload["baseline_H_real"]) + 1j * np.asarray(payload["baseline_H_imag"]),
             "eigenvalues": np.asarray(payload["baseline_eigenvalues"]),
             "observables": payload["baseline_observables"],
         }
+        hermiticity_limit = rules["max_hamiltonian_hermiticity_defect_GHz"]
+        gate = hermiticity_check(independent_h, baseline["H"], hermiticity_limit)
+        independent: Dict[str, Any] = {"H": independent_h}
         result["raw"] = {
-            "eigenvalues_GHz": [float(value) for value in eigenvalues],
-            "labels": labelled["labels"],
-            "duplicate_dressed_indices": labelled["duplicate_dressed_indices"],
-            "observables": independent["observables"],
-            "independent_hamiltonian_hermiticity_defect_GHz": hermiticity_defect(independent_h),
-            "baseline_hamiltonian_hermiticity_defect_GHz": hermiticity_defect(baseline["H"]),
+            "independent_hamiltonian_hermiticity_defect_GHz": gate["independent_defect_GHz"],
+            "baseline_hamiltonian_hermiticity_defect_GHz": gate["baseline_defect_GHz"],
         }
+        label_problems = None
+        labels_match = False
+        if gate["verdict"] == "PASS":
+            eigenvalues, eigenvectors = np.linalg.eigh(independent_h, UPLO="L")
+            labelled = label_states(eigenvectors, NPH, LABEL_PAIRS)
+            annihilation = qutip.tensor(qutip.qeye(NQ), qutip.destroy(NPH)).full()
+            independent["eigenvalues"] = eigenvalues
+            independent["observables"] = observables_from(eigenvalues, eigenvectors, labelled["labels"],
+                                                          payload["readout_GHz"], annihilation)
+            result["raw"].update({
+                "eigenvalues_GHz": [float(value) for value in eigenvalues],
+                "labels": labelled["labels"],
+                "duplicate_dressed_indices": labelled["duplicate_dressed_indices"],
+                "observables": independent["observables"],
+            })
+            label_problems = label_quality(labelled["labels"], rules["label_min_overlap"],
+                                           rules["label_min_margin"])
+            labels_match = [
+                (item["level"], item["photon"], item["dressed_index"]) for item in labelled["labels"]
+            ] == [
+                (item["level"], item["photon"], item["dressed_index"]) for item in payload["baseline_labels"]
+            ]
+        else:
+            result["raw"]["eigensolve"] = ("NOT RUN: the Hermiticity check failed, so no eigensolve, "
+                                           "labelling or observable was calculated")
         _write_json(os.path.join(output_dir, "raw.json"), result["raw"])
-        result["label_problems"] = label_quality(labelled["labels"], rules["label_min_overlap"],
-                                                 rules["label_min_margin"])
-        result["label_assignment_matches_baseline"] = [
-            (item["level"], item["photon"], item["dressed_index"]) for item in labelled["labels"]
-        ] == [
-            (item["level"], item["photon"], item["dressed_index"]) for item in payload["baseline_labels"]
-        ]
-        labels_ok = not result["label_problems"] and result["label_assignment_matches_baseline"]
-        result["checks"] = compare(independent, baseline, rules["thresholds"], labels_ok=labels_ok)
+        result["label_problems"] = label_problems
+        result["label_assignment_matches_baseline"] = labels_match if label_problems is not None else None
+        result["checks"] = compare(independent, baseline, rules["thresholds"], hermiticity_limit,
+                                   label_problems, labels_match)
         result["checks_rule_basis"] = "frozen-rules sha256 %s (%s)" % (rules_sha256, rules["rules_status"])
-        result["hermiticity_within_rule"] = (
-            result["raw"]["independent_hamiltonian_hermiticity_defect_GHz"]
-            <= rules["max_hamiltonian_hermiticity_defect_GHz"]
-        )
         result["execution_status"] = "COMPLETED"
     except Exception as exc:  # preserved, never retried
         result["execution_status"] = "EXECUTION-FAILED"
         result["error"] = "%s: %s" % (type(exc).__name__, exc)
     result["wall_seconds_in_process"] = time.monotonic() - started
     result["provenance_qualification"] = (
-        "INPUTS-HASH-VERIFIED (runtime identity recorded, not qualified against a frozen expectation)"
+        "INPUTS-HASH-VERIFIED; RUNTIME-VERSIONS-MATCHED (python, numpy, scipy and qutip versions "
+        "equal the frozen-rules approved runtime; platform and linked libraries are recorded, "
+        "not qualified)"
         if result["execution_status"] == "COMPLETED" else "NOT-QUALIFIED"
     )
     result["scientific_verdict"] = (
@@ -837,6 +1002,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--snapshot", help="reference snapshot JSON exported by the CEM environment")
     parser.add_argument("--schema", help="schemas/qutip/branch-a-reference-v1.schema.json")
     parser.add_argument("--expected", help="external expected-hashes record (JSON)")
+    parser.add_argument("--expected-sha256",
+                        help="sha256 of the expected-hashes record bytes, supplied separately (lowercase hex)")
     parser.add_argument("--execute", action="store_true",
                         help="run the QuTiP calculation after validation (requires frozen rules)")
     parser.add_argument("--frozen-rules", help="separately approved frozen-rules JSON")
@@ -845,12 +1012,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        validated = validate(args.snapshot, args.schema, args.expected)
+        validated = validate(args.snapshot, args.schema, args.expected, args.expected_sha256)
     except CheckFailure as failure:
         print("%s: %s" % (failure.status, failure))
         return EXIT_BLOCKED if failure.status == "BLOCKED" else EXIT_REJECTED
-    print("VALIDATED: %s (snapshot sha256 %s); no calculation performed"
-          % (validated["payload"]["protocol_id"], validated["snapshot_sha256"]))
+    print("VALIDATED: %s (snapshot sha256 %s, expected-hashes record sha256 %s); no calculation performed"
+          % (validated["payload"]["protocol_id"], validated["snapshot_sha256"], validated["expected_sha256"]))
     if not args.execute:
         return EXIT_OK
 

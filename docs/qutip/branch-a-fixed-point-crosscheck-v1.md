@@ -82,12 +82,18 @@ H/h [GHz] = F (x) I_12  +  f_R * I_10 (x) num(12)  +  g * n_skip (x) (a + a^dag)
 
 **Equivalence, not byte identity.** The QuTiP product g·(n_ij·x_pq) may differ from CEM's (g·n_ij)·x_pq in the last bit. The comparison is numerical equivalence within the frozen threshold, not byte identity (CLAUDE.md §13).
 
-**Hermiticity.** The Hermiticity defect of both matrices is recorded, not repaired. The charge matrix is built from a finite-difference derivative, so it need not be exactly anti-Hermitian at round-off.
+**Hermiticity is a gate, not a note.** The charge matrix is built from a finite-difference derivative, so it need not be exactly Hermitian at round-off. The Hermiticity defect max |H − H†| of both matrices is measured and recorded, never repaired.
+- It is a named check, `hermiticity`. It PASSES only if both the QuTiP-assembled and the baseline matrix are within the approved `max_hamiltonian_hermiticity_defect_GHz`. A non-finite defect FAILS.
+- `eigh(UPLO='L')` reads only the lower triangle, so the eigensolve cannot see an upper-triangle defect. If `hermiticity` FAILS:
+  - the eigensolve, labelling and observables are **not run**;
+  - the eigenvalue, labels and observable checks are all reported NOT-EVALUATED, with no difference value.
+- The Hamiltonian entry comparison does not depend on the gate and is always reported.
+- No matrix is ever symmetrised, averaged with its adjoint or otherwise repaired.
 
 **Labels.** The existing maximum-bare-overlap rule is used. For each bare (level, photon) with level ∈ {0,1,2} and photon ∈ {0,1}, the label is the dressed index maximising |⟨bare|dressed⟩|², taking the first maximum on exact ties.
 - The overlap and the runner-up overlap are recorded.
 - Duplicate or ambiguous assignments are **reported, not repaired**. There is no frequency-proximity fallback, and frequencies are never chosen because they "look right".
-- **Labels gate the observables.** If any label is duplicated, below the frozen minimum overlap or margin, or differs from the baseline assignment, every observable check is reported NOT-EVALUATED. The Hamiltonian and eigenvalue checks are still reported.
+- **Labels gate the observables.** Labels are a named check, `labels`. It PASSES only if no label is duplicated or below the frozen minimum overlap or margin, and the assignment equals the baseline's. Otherwise it FAILS, and every observable check is reported NOT-EVALUATED. The Hamiltonian and eigenvalue checks are still reported. If the Hermiticity gate fails, `labels` itself is NOT-EVALUATED.
 - **The ambiguity rule is not yet approved.** Until a frozen-rules file supplies it, execution is BLOCKED; the checker invents no criterion.
 - **Schema slack.** The schema allows overlaps up to 1.000000001. That is floating-point slack for a squared eigenvector component, **not** a scientific acceptance tolerance.
 
@@ -129,7 +135,8 @@ These are **not** frozen master requirements. They are **not approved**, and **n
 - `rules_status: "FROZEN-BY-HUMAN-APPROVAL (ENGINEERING-RULE, not MASTER-FROZEN)"`. Any other status, including the proposed values copied into a file without that approval, keeps execution BLOCKED. The file is agent-writable, so this is a declaration, not proof of authorisation;
 - the thresholds above, as approved;
 - the label rule: a minimum assigned overlap and a minimum margin over the runner-up;
-- the maximum Hamiltonian Hermiticity defect;
+- the maximum Hamiltonian Hermiticity defect, which is a gate (§2);
+- `approved_runtime`: the exact `python_version`, `numpy_version`, `scipy_version` and `qutip_version` strings. The values live only in this file; no version is hard-coded in the checker. A missing field is BLOCKED, an empty or non-string one is REJECTED, and a field the checker does not enforce is REJECTED;
 - the wall-time and memory limits;
 - `permitted_attempts: 1`;
 - the eigensolver string;
@@ -152,6 +159,7 @@ The primary comparator is the paired CEM calculation at the **same** fixed frequ
   - the baseline: the real and imaginary 120×120 CEM Hamiltonian, the eigensolver, the 120 ordered eigenvalues, the label convention and labels with scores, the observables, the diagnostics, the runtime, and the implementation hashes.
 - **Payload kind.** `CEM-EXPORT` or `SYNTHETIC-TEST-FIXTURE`. Synthetic fixtures exist only inside unit tests and are never evidence. The checker refuses to execute them.
 - **Authentication is outside the payload.** The snapshot, schema and frozen-rules hashes, plus the expected source hashes, are supplied separately. A self-reported digest, or an approval flag an agent wrote, is not proof of human authorisation. The exact bytes are hashed.
+- **The expected-hashes record is itself bound.** Its sha256 is supplied on the command line as `--expected-sha256` (lowercase hex). Without it the checker is BLOCKED; a record with any other hash is REJECTED. Otherwise a tampered snapshot shipped with its own self-consistent record would validate. The measured record hash is carried into the VALIDATED line and into `attempt.json` and `result.json`.
 
 ## 5. The exporter (`scripts/export_qutip_branch_a_reference.py`)
 
@@ -177,23 +185,33 @@ The primary comparator is the paired CEM calculation at the **same** fixed frequ
 
 ## 6. The standalone checker (`tools/qutip_bridge/check_branch_a_reference.py`)
 
-**Runtime.** It targets the owner's Mac: Python 3.9.6 and QuTiP 5.0.4 (NumPy 2.0.2, SciPy 1.13.1 observed in conversation). That is not a runtime qualification, and the actual versions are recorded at execution. It uses Python 3.9 syntax and imports no QMHP-CEM module. Validation needs only the standard library.
+**Runtime.** It targets the owner's Mac. The brief names Python 3.9.6 and QuTiP 5.0.4, with NumPy 2.0.2 and SciPy 1.13.1 observed in conversation; that is context, not a qualification, and the checker does not use those numbers. It uses Python 3.9 syntax and imports no QMHP-CEM module. Validation needs only the standard library.
+
+**Runtime gate.** Before anything is written or calculated, the actual `python_version`, `numpy_version`, `scipy_version` and `qutip_version` are compared exactly, character for character, with the frozen-rules `approved_runtime`.
+- A missing approval, an unreadable version (a module that fails to import or has no `__version__`) or any mismatch is BLOCKED. Nothing is written and nothing is calculated.
+- Reading a version imports the module; importing is not a calculation.
+- The platform and the linked numerical libraries are recorded, not qualified.
 
 **It validates before any calculation, in this order:**
 1. file presence (BLOCKED if missing);
-2. strict JSON, rejecting NaN, Infinity, overflowing literals and duplicate keys;
-3. the schema, covering required fields, constants (protocol, units, tensor order, N_q/N_ph, readout, g, threshold), exact list shapes and types;
-4. the external hashes: snapshot bytes, schema bytes, source commit, source-file, master and implementation hashes;
-5. structural checks:
+2. the expected-hashes record bytes against `--expected-sha256` (BLOCKED if not supplied, REJECTED on mismatch), before the record is parsed;
+3. strict JSON, rejecting NaN, Infinity, overflowing literals and duplicate keys;
+4. the schema, covering required fields, constants (protocol, units, tensor order, N_q/N_ph, readout, g, threshold), exact list shapes and types;
+5. the external hashes: snapshot bytes, schema bytes, source commit, source-file, master and implementation hashes;
+6. structural checks:
    - frequencies start at 0 and do not decrease;
    - eigenvalues are ascending;
    - the baseline diagonal equals frequencies[level] + f_R·photon bit for bit, in the declared tensor order;
    - there are no entries outside the g·n(a+a†) pattern;
    - the skip count, label completeness and consistency, and the observable aliases agree.
 
-**Calculation.** It needs `--execute` plus a hash-bound frozen-rules file and a new output directory. Without them it stops at VALIDATED or BLOCKED.
+**Calculation.** It needs `--execute` plus a hash-bound frozen-rules file and a new output directory. Without them it stops at VALIDATED or BLOCKED. The runtime gate then runs before anything else.
 
-**The record.** Execution writes an append-only record in this order: `attempt.json` first, then `raw.json`, then `result.json`, then `manifest.sha256`. Execution status, provenance qualification and scientific verdict are separate fields. Each named check has its own PASS, FAIL or NOT-EVALUATED, tied to the frozen-rules sha256, and the tool issues no overall verdict. Provenance is reported as INPUTS-HASH-VERIFIED; the runtime identity is recorded but not qualified against a frozen expectation.
+**The record.** Execution writes an append-only record in this order: `attempt.json` first, then `raw.json`, then `result.json`, then `manifest.sha256`.
+- `attempt.json` and `result.json` carry the measured `expected_sha256`. `attempt.json` also carries the approved-versus-actual runtime comparison.
+- Execution status, provenance qualification and scientific verdict are separate fields.
+- The named checks are `hermiticity`, `hamiltonian_max_entry`, `ordered_eigenvalues_max`, `labels` and the seven observables. Each has its own PASS, FAIL or NOT-EVALUATED, tied to the frozen-rules sha256. The tool issues no overall verdict.
+- Provenance is reported as INPUTS-HASH-VERIFIED and RUNTIME-VERSIONS-MATCHED. The platform and linked libraries are recorded, not qualified.
 
 **Failures.** A failure is preserved and never retried. The in-process timer is not a hard stop; the external launcher must enforce the limits.
 
@@ -221,7 +239,10 @@ They use **synthetic** fixtures only: made-up frequencies and a seeded charge ma
   - an altered fixed frequency;
   - executing a synthetic payload;
   - a CEM import, or Python-3.10-only syntax, in the checker;
-  - pickle, eval or exec use.
+  - pickle, eval or exec use;
+  - a missing, wrong, truncated or upper-case `--expected-sha256`, and a substituted self-consistent expected-hashes record;
+  - a missing, null, empty, non-string or unenforced `approved_runtime` field, and every runtime version mismatched, suffixed or unavailable;
+  - a non-Hermitian independent matrix, baseline matrix or both (upper-triangle only, invisible to `eigh(UPLO='L')`), the exact-limit boundary, a non-finite defect and an invalid limit.
 - **Not run in this environment:** QuTiP is not installed here and was not installed, so the QuTiP assembly path is exercised by no test.
 
 ## 8. What would be needed to execute, and in what order
@@ -235,12 +256,14 @@ Each step is a separate human approval (AGENTS.md §3, CLAUDE.md §2–3). None 
    - the approval record and its sha256;
    - one attempt;
    - the environment (the CEM `uv.lock` runtime).
-3. Freeze the frozen-rules file: thresholds, label rule, Hermiticity limit, wall-time and memory limits, eigensolver and one attempt. Record its sha256.
+3. Freeze the frozen-rules file: thresholds, label rule, Hermiticity limit, the approved runtime versions, wall-time and memory limits, eigensolver and one attempt. Record its sha256.
 4. Build the expected-hashes record from the verified export:
    - the snapshot and schema bytes;
    - the source commit;
    - the source-file, master and implementation hashes.
-5. Approve one QuTiP execution on the Mac through a launcher that enforces the limits and records the actual runtime identity.
+
+   Record its sha256; it is passed as `--expected-sha256`.
+5. Approve one QuTiP execution on the Mac through a launcher that enforces the limits and passes `--expected-sha256` and `--frozen-rules-sha256`. The checker refuses to calculate unless the runtime matches the approved versions exactly.
 
 Open items:
 - the launcher mechanism for the Mac;
