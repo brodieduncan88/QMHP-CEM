@@ -358,6 +358,7 @@ def test_security_headers_forbid_form_submission_and_framing(live_repo_server):
     assert headers["Allow"] == "GET, HEAD"
     csp = headers["Content-Security-Policy"]
     assert "form-action 'none'" in csp and "frame-ancestors 'none'" in csp and "script-src 'self'" in csp
+    assert "font-src 'self'" in csp and "default-src 'none'" in csp
     assert "unsafe-inline" not in csp and "unsafe-eval" not in csp
     assert SECURITY_HEADERS["Allow"] == "GET, HEAD"
 
@@ -400,17 +401,23 @@ def test_exercising_every_route_changes_nothing_in_the_repository(live_repo_serv
 
 
 def test_static_route_serves_only_the_viewers_own_assets(live_repo_server):
-    """Decorative images are served from frontend/static/img/ as image/webp; nothing else
-    under that prefix, and no dot-segment or repository path, is reachable."""
-    images = sorted((FRONTEND / "static" / "img").glob("*.webp"))
-    assert images, "the viewer ships its decorative images"
-    for img in images:
-        status, headers, body = live_repo_server.request("GET", f"/static/img/{img.name}")
-        assert status == 200 and headers["Content-Type"] == "image/webp", img.name
-        assert body[:4] == b"RIFF" and body[8:12] == b"WEBP", img.name
-    for bad in ("/static/img/../app.js", "/static/img/%2e%2e/app.js", "/static/img/x.jpg",
-                "/static/img/sub/x.webp", "/static/img/", "/static/../frontend/server.py",
-                "/static/img/..%2f..%2fREADME.md", "/static/README.md", "/results/README.md"):
+    """The vendored OFL fonts are served from frontend/static/fonts/ as font/woff2, with
+    their licence texts present in the repository; nothing else under that prefix, no
+    dot-segment and no repository path is reachable through /static/."""
+    fonts_dir = FRONTEND / "static" / "fonts"
+    fonts = sorted(fonts_dir.glob("*.woff2"))
+    assert fonts, "the viewer ships its fonts"
+    assert (fonts_dir / "OFL-geist.txt").is_file() and (fonts_dir / "OFL-instrument-serif.txt").is_file()
+    for licence in fonts_dir.glob("OFL-*.txt"):
+        assert "SIL Open Font License" in licence.read_text(encoding="utf-8"), licence.name
+    for font in fonts:
+        status, headers, body = live_repo_server.request("GET", f"/static/fonts/{font.name}")
+        assert status == 200 and headers["Content-Type"] == "font/woff2", font.name
+        assert body[:4] == b"wOF2", font.name
+    for bad in ("/static/fonts/../app.js", "/static/fonts/%2e%2e/app.js", "/static/fonts/OFL-geist.txt",
+                "/static/fonts/x.ttf", "/static/fonts/sub/x.woff2", "/static/fonts/", "/static/img/x.webp",
+                "/static/../frontend/server.py", "/static/fonts/..%2f..%2fREADME.md", "/static/README.md",
+                "/results/README.md"):
         status, _h, body = live_repo_server.request("GET", bad)
         assert status == 404, (bad, status)
         assert b"import" not in body and b"QMHP-CEM" not in body, bad

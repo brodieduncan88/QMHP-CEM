@@ -21,17 +21,34 @@ network access. It binds to the loopback interface unless `--host` says otherwis
 
 ## Design
 
-An editorial, product-page layout: a full-bleed hero on the overview, numbered
-section eyebrows, oversized display type, spec-table rows, alternating light and
-dark bands, a hardware-boundary ticker, scroll reveals, a light parallax and
-count-up figures. It follows the system colour scheme (light or dark) and turns
-all motion off under `prefers-reduced-motion`. Everything is local: system fonts,
-no external requests, and the same strict CSP (no inline script or style).
+An editorial layout: a compact hero on the overview with a "Now" strip of the
+latest verdicts directly beneath it, numbered section eyebrows, display type,
+spec-table rows, alternating light and dark bands, a hardware-boundary ticker with
+a pause control, scroll reveals, count-up figures, magnetic buttons and
+cross-fading page transitions (View Transitions API where available). It follows
+the system colour scheme; every text colour meets WCAG AA contrast on the surface
+it sits on, including the dark bands in light mode. All motion stops under
+`prefers-reduced-motion`, and the ticker starts paused.
 
-**Imagery** in `static/img/` is decorative, third-party photography of cryogenic
-hardware supplied by the repository owner; see `static/img/SOURCES.md`. Every
-image is captioned as illustrative, not QMHP hardware and not evidence. Its
-licence for public use has not been established here.
+**Artwork is original and drawn from the data.** There are no photographs. The
+figures are SVG built in the browser from this checkout's own records, and each
+caption says which data drew it:
+
+| Figure | Where | Drawn from |
+|---|---|---|
+| Evidence lattice | Overview hero, Records | one row per record family, x = recorded time, shape = evidence basis, colour = most severe headline status, gold curves = records naming records; each mark opens its record |
+| Stage stack | Overview, Gates, Experiments | one plate per gate (or contract group / experiment); hatched = hardware-gated, PASS not permitted |
+| Digest sigil | Provenance | a master file's SHA-256, re-measured on load: one tick per hex digit |
+| Result matrix | Candidates | candidate x gate, coloured by the recorded status; each mark shows its reason |
+
+**Badge details** (the JSON path and recorded text behind a status, the rule
+behind a basis, a gate's reason) open in a popover on hover, keyboard focus or
+tap; Escape closes it. On phones every table except the gate matrix becomes a
+stack of labelled cards, and touch targets are at least 24 px.
+
+**Type** is Geist, Geist Mono and Instrument Serif, SIL Open Font License 1.1,
+vendored as WOFF2 under `static/fonts/` with their licence texts (OFL requires
+the licence to travel with the fonts). No font is fetched from a third party.
 
 ## What it will not do
 
@@ -62,7 +79,7 @@ browser ──GET──▶ server.py ──▶ adapter.py ──▶ repo_fs.py �
 | `classify.py` | The labelling rules, stated as data and shown verbatim in the UI. |
 | `adapter.py` | Parses `results/`, `experiments/`, approval files, manifests, `master/` and documents into views. Re-hashing a manifest is a read. |
 | `server.py` | `http.server` handler with `do_GET` and `do_HEAD` only; the standard library answers every other verb with `501`. All routes are in `ROUTES`. Repository content is returned as JSON strings and rendered as text, so a committed HTML/SVG file cannot run in the viewer's origin. Strict CSP, including `form-action 'none'`. |
-| `static/` | A vanilla-JS single page. One `fetch` helper, `method: "GET"`. No forms, no storage, no inline script. Decorative images are served only as `img/<name>.webp`. |
+| `static/` | A vanilla-JS single page. One `fetch` helper, `method: "GET"`. No forms, no storage, no inline script or style. Fonts are served only as `fonts/<name>.woff2`. |
 
 ## Information architecture
 

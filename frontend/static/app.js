@@ -31,6 +31,12 @@ async function get(path) {
   return body;
 }
 const q = encodeURIComponent;
+// Idempotent reads used by several views are requested once per page load.
+const readCache = new Map();
+function getCached(path) {
+  if (!readCache.has(path)) readCache.set(path, get(path).catch((e) => { readCache.delete(path); throw e; }));
+  return readCache.get(path);
+}
 
 // ---------------------------------------------------------------------- DOM
 function el(tag, props, ...kids) {
@@ -66,19 +72,25 @@ function shortSha(s) { return s ? String(s).slice(0, 12) : ""; }
 function trunc(s, n) { s = s == null ? "" : String(s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
 
 // ------------------------------------------------------------------- badges
-function badge(label, tone, title) {
-  return el("span", { class: `badge tone-${tone || "neutral"}`, title }, label);
+// A badge that carries detail is a button: hover, focus or tap shows the detail in
+// the #tip popover. A badge inside a link stays plain (no nested controls).
+function badge(label, tone, tip) {
+  const cls = `badge tone-${tone || "neutral"}`;
+  if (!tip) return el("span", { class: cls }, label);
+  const t = typeof tip === "string" ? { k: label, v: tip } : tip;
+  return el("button", { type: "button", class: cls, "data-tip": t.v, "data-tip-k": t.k, "aria-describedby": "tip", "aria-expanded": "false" }, label);
 }
-function basisBadge(basis, lg) {
+function basisBadge(basis, lg, plain) {
   const b = typeof basis === "string" ? basis : basis && basis.basis;
-  const title = basis && basis.reason ? `${basis.rule}: ${basis.reason}` : undefined;
-  return el("span", { class: `basis basis-${b}${lg ? " lg" : ""}`, title }, b || "?");
+  const cls = `basis basis-${b}${lg ? " lg" : ""}`;
+  if (plain || !basis || !basis.reason) return el("span", { class: cls }, b || "?");
+  return el("button", { type: "button", class: cls, "data-tip": basis.reason, "data-tip-k": `Rule ${basis.rule} → ${b}`, "aria-describedby": "tip", "aria-expanded": "false" }, b);
 }
-function statusBadges(items, max) {
+function statusBadges(items, max, plain) {
   const out = [];
   for (const item of items || []) {
     item.tokens.forEach((tok, i) => {
-      out.push(badge(tok, item.tones[i], `${item.path} = "${trunc(item.raw, 300)}"`));
+      out.push(plain ? badge(tok, item.tones[i]) : badge(tok, item.tones[i], { k: item.path, v: `“${trunc(item.raw, 300)}”` }));
     });
   }
   return max && out.length > max ? [...out.slice(0, max), el("span", { class: "muted small" }, ` +${out.length - max}`)] : out;
@@ -108,7 +120,12 @@ function lockedAction(label, reason) {
 
 // ----------------------------------------------------------------- tables
 function table(headers, rows, cls) {
-  return el("div", { class: "table-wrap" },
+  const labels = headers.map((h) => (typeof h === "string" ? h : ""));
+  for (const tr of rows) {
+    if (!tr || !tr.children) continue;
+    [...tr.children].forEach((td, i) => { if (labels[i]) td.setAttribute("data-label", labels[i]); });
+  }
+  return el("div", { class: `table-wrap${cls === "matrix" ? " keep" : ""}` },
     el("table", { class: cls },
       el("thead", null, el("tr", null, headers.map((h) => el("th", null, h)))),
       el("tbody", null, rows.length ? rows : el("tr", null, el("td", { colspan: headers.length, class: "empty" }, "Nothing to show.")))));
@@ -206,7 +223,7 @@ function markdown(text, path) {
       continue;
     }
     const h = /^(#{1,6})\s+(.*)$/.exec(line);
-    if (h) { const n = h[1].length; out.push(`<h${n}>${inline(h[2], baseDir)}</h${n}>`); i += 1; continue; }
+    if (h) { const n = Math.min(h[1].length + 1, 6); out.push(`<h${n}>${inline(h[2], baseDir)}</h${n}>`); i += 1; continue; }
     if (/^\s*(---+|\*\*\*+|___+)\s*$/.test(line)) { out.push("<hr class=\"soft\">"); i += 1; continue; }
     if (/^\s*\|/.test(line) && i + 1 < lines.length && isTableSep(lines[i + 1])) {
       const head = cells(line);
@@ -271,53 +288,208 @@ function tabs(defs) {
 }
 
 function head(title, lead, crumbs, extra) {
-  return el("div", { class: "page-head" },
-    el("div", null,
-      crumbs ? el("div", { class: "crumbs" }, crumbs) : null,
-      el("h1", null, title),
-      lead ? el("p", null, lead) : null),
-    extra || null);
+  const mono = /^[A-Za-z0-9._\-]+$/.test(String(title)) && String(title).length > 14;
+  return el("header", { class: "detail-hero" },
+    el("div", { class: "dh-copy" },
+      crumbs ? el("p", { class: "eyebrow bare" }, crumbs) : null,
+      el("h1", { class: `dh-title${mono ? " mono" : ""}` }, title),
+      lead ? el("p", { class: "lead" }, lead) : null),
+    extra ? el("div", { class: "dh-extra" }, extra) : null);
 }
 
 // ---------------------------------------------------------- editorial
-// Decorative photography. Every image is labelled where it appears: it shows
-// third-party cryogenic hardware, not QMHP hardware, and it is never evidence.
-const CAPTION = "Illustrative photograph · third-party cryogenic hardware · not QMHP hardware · not evidence";
-const IMG = {
-  cryostat: { src: "/static/img/cryostat-interior.webp", alt: "Gold-plated interior of a dilution-refrigerator cryostat (illustrative)", ratio: "1 / 1" },
-  assembly: { src: "/static/img/qcage-assembly.webp", alt: "Sample-holder assembly with coaxial wiring on a mixing-chamber mount (illustrative)", ratio: "1 / 1" },
-  holder: { src: "/static/img/sample-holder.webp", alt: "Sample holder with four connector banks (illustrative)", ratio: "3 / 2" },
-  wiring: { src: "/static/img/wiring-stage.webp", alt: "Coaxial wiring and attenuators between cryostat plates (illustrative)", ratio: "16 / 9" },
-  panel: { src: "/static/img/connector-panel.webp", alt: "Gold-plated coaxial connector panel (illustrative)", ratio: "16 / 9" },
-};
-function plate(key, opts) {
-  const im = IMG[key];
-  const o = opts || {};
-  const fig = el("figure", { class: `plate reveal${o.dark ? " dark" : ""}${o.cls ? " " + o.cls : ""}` },
-    el("div", { class: "frame" }, el("img", { src: im.src, alt: im.alt, loading: o.eager ? "eager" : "lazy", decoding: "async" })),
-    el("figcaption", null, el("span", null, o.label ? el("b", null, o.label) : null), el("span", null, CAPTION)));
-  fig.style.setProperty("--ratio", o.ratio || im.ratio);
-  return fig;
-}
 function lines(text, cls) {
   return el("h1", { class: cls }, String(text).split("\n").map((ln) => el("span", { class: "line" }, el("span", null, ln))));
 }
 function eyebrow(n, label) {
   return el("p", { class: "eyebrow" }, n ? el("span", { class: "num" }, n) : null, label);
 }
-function pageHero(n, title, lead, img, extra) {
-  const copy = el("div", null, eyebrow(n, SECTION_NAMES[n] || ""), lines(title, "title"),
-    lead ? el("p", { class: "lead" }, lead) : null, extra || null);
-  return el("header", { class: `page-hero${img ? " has-media" : ""}` }, copy, img ? plate(img, { eager: true }) : null);
-}
 const SECTION_NAMES = {
   "02": "Experiments & contracts", "03": "Evidence records", "04": "Candidates & runs", "05": "Gate status",
   "06": "Provenance & hashes", "07": "Execution & audit trail", "08": "Corrections", "09": "Evidence classification",
   "10": "Documents", "11": "Unavailable actions",
 };
+function pageHero(n, title, lead, art) {
+  const copy = el("div", null, eyebrow(n, SECTION_NAMES[n] || ""), lines(title, "title"), lead ? el("p", { class: "lead" }, lead) : null);
+  return el("header", { class: `page-hero${art ? " has-art" : ""}` }, copy, art || null);
+}
 function arrow() { return el("span", { class: "arr", "aria-hidden": "true" }, "→"); }
+function skeleton() {
+  return el("div", { class: "wrap skeleton", "aria-hidden": "true" },
+    el("div", { class: "sk sk-eyebrow" }), el("div", { class: "sk sk-title" }),
+    el("div", { class: "sk sk-line" }), el("div", { class: "sk sk-line" }), el("div", { class: "sk sk-block" }));
+}
 
-// Motion: reveal on scroll, count up, header state and a light parallax. All of it is
+// ------------------------------------------------------------ artwork
+// Original figures drawn from this checkout's own records. Nothing here is a picture
+// of hardware; each caption says exactly which data drew it.
+const SVGNS = "http://www.w3.org/2000/svg";
+function sv(tag, attrs, ...kids) {
+  const node = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === undefined || v === null || v === false) continue;
+    if (k === "text") node.textContent = v; else node.setAttribute(k, String(v));
+  }
+  for (const kid of kids.flat(Infinity)) if (kid) node.append(kid);
+  return node;
+}
+function stagger(node, i) { node.style.setProperty("--i", String(i)); return node; }
+let artSeq = 0;
+const TONE_RANK = { negative: 5, caution: 4, gated: 3, positive: 2, neutral: 1, muted: 0 };
+function worstTone(headline) {
+  let best = "neutral", rank = -1;
+  for (const h of headline || []) for (const t of h.tones) if ((TONE_RANK[t] ?? 1) > rank) { rank = TONE_RANK[t] ?? 1; best = t; }
+  return best;
+}
+function artFigure(svgNode, caption, cls) {
+  return el("figure", { class: `art reveal${cls ? " " + cls : ""}` }, svgNode, caption ? el("figcaption", null, caption) : null);
+}
+function nodeShape(basis, cx, cy, tone) {
+  const fill = `node tone-fill-${tone}`, ring = `node ring tone-stroke-${tone}`;
+  const diamond = (r) => `${cx},${cy - r} ${cx + r},${cy} ${cx},${cy + r} ${cx - r},${cy}`;
+  switch (basis) {
+    case "SOLVED": return sv("circle", { cx, cy, r: 6.5, class: fill });
+    case "SYNTHETIC": return sv("circle", { cx, cy, r: 6, class: `${ring} dashed` });
+    case "ANALYSIS": return sv("rect", { x: cx - 5.5, y: cy - 5.5, width: 11, height: 11, rx: 1.5, class: fill });
+    case "DECLARATION": return sv("polygon", { points: diamond(7), class: `${ring} dotted` });
+    case "MEASURED": return sv("polygon", { points: diamond(7.5), class: fill });
+    default: return sv("circle", { cx, cy, r: 6, class: `${ring} dotted` });
+  }
+}
+// The evidence lattice: one row per record family, x = recorded time, shape = basis,
+// colour = the record's most severe headline tone, gold curves = records naming records.
+function artLattice(records, opts) {
+  const o = opts || {};
+  const W = 640, rowH = o.rowH || 54, padL = 132, padR = 22, padT = 18;
+  const fams = [...new Set(records.map((r) => r.family))].sort();
+  const H = padT + Math.max(1, fams.length) * rowH + 34;
+  const times = records.map((r) => Date.parse(r.timestamp || "")).filter(Number.isFinite);
+  const t0 = Math.min(...times), t1 = Math.max(...times);
+  const span = W - padL - padR;
+  const xOf = (r) => { const t = Date.parse(r.timestamp || ""); return (!Number.isFinite(t) || t1 === t0) ? padL + span / 2 : padL + ((t - t0) / (t1 - t0)) * span; };
+  const pos = new Map();
+  for (const f of fams) {
+    const row = records.filter((r) => r.family === f).sort((a, b) => xOf(a) - xOf(b));
+    let lastX = -1e9, flip = 0;
+    for (const r of row) {
+      const x = xOf(r); let dy = 0;
+      if (x - lastX < 13) { flip += 1; dy = (flip % 2 ? -1 : 1) * 11; } else { flip = 0; lastX = x; }
+      pos.set(r.id, [x, padT + fams.indexOf(f) * rowH + rowH / 2 + dy]);
+    }
+  }
+  const grid = sv("g");
+  fams.forEach((f, i) => {
+    const y = padT + i * rowH + rowH / 2;
+    grid.append(sv("line", { x1: padL - 10, x2: W - padR + 8, y1: y, y2: y, class: "rule-soft" }),
+      sv("text", { x: 0, y: y + 3.5, class: "lbl", text: trunc(f, 18) }));
+  });
+  const axisY = padT + fams.length * rowH + 16;
+  if (o.grid) {
+    for (let k = 0; k <= 12; k += 1) {
+      const gx = padL + (span * k) / 12;
+      grid.append(sv("line", { x1: gx, x2: gx, y1: padT, y2: axisY - 8, class: "rule-soft" }));
+    }
+  }
+  grid.append(sv("line", { x1: padL, x2: W - padR, y1: axisY - 8, y2: axisY - 8, class: "rule" }));
+  if (times.length) {
+    grid.append(sv("text", { x: padL, y: axisY + 8, class: "lbl", text: fmtTs(new Date(t0).toISOString().replace(/\.\d+Z$/, "Z")).slice(0, 16) }),
+      sv("text", { x: W - padR, y: axisY + 8, class: "lbl", "text-anchor": "end", text: fmtTs(new Date(t1).toISOString().replace(/\.\d+Z$/, "Z")).slice(0, 16) }));
+  }
+  const linksG = sv("g"); let li = 0;
+  for (const r of records) {
+    for (const target of r.links || []) {
+      if (!pos.has(target) || !pos.has(r.id)) continue;
+      const [x1, y1] = pos.get(r.id), [x2, y2] = pos.get(target);
+      const lift = Math.min(60, 18 + Math.abs(x2 - x1) / 6);
+      linksG.append(stagger(sv("path", { d: `M${x1},${y1} C${x1},${Math.min(y1, y2) - lift} ${x2},${Math.min(y1, y2) - lift} ${x2},${y2}`, class: "link-path", pathLength: 1 }), li++));
+    }
+  }
+  const nodesG = sv("g");
+  records.forEach((r, i) => {
+    const [cx, cy] = pos.get(r.id);
+    const shape = stagger(nodeShape(r.basis.basis, cx, cy, worstTone(r.headline)), i);
+    const toks = (r.headline || []).flatMap((h) => h.tokens).slice(0, 4).join(" · ");
+    nodesG.append(sv("a", { href: recordHref(r.id), "data-tip-k": r.id, "data-tip": `${r.basis.basis}${toks ? " · " + toks : ""} · ${fmtTs(r.timestamp)}`, "aria-label": `${r.id}: ${r.basis.basis}${toks ? ", " + toks : ""}` },
+      sv("circle", { cx, cy, r: 22, class: "node-hit" }), shape));
+  });
+  const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, role: "group", "aria-label": `Evidence lattice of ${records.length} records` }, grid, linksG, nodesG);
+  return artFigure(svg, o.caption === undefined
+    ? `Drawn from ${records.length} records in this checkout · row = family · x = recorded time · shape = evidence basis · colour = most severe headline status · gold = one record naming another · select a mark to open it`
+    : o.caption, o.cls);
+}
+// A stage stack: one plate per row, hatched and locked when only hardware can close it.
+function artPlates(rows, opts) {
+  const o = opts || {};
+  const uid = `hatch-${++artSeq}`;
+  // compact: a label-free stack for section headers; the table below carries the detail
+  const W = 560, plateH = o.compact ? 20 : 38, gap = o.compact ? 9 : (o.gap || 18), top = 10;
+  const n = Math.max(1, rows.length);
+  const H = top + n * (plateH + gap) + 6;
+  const wMax = 540, wMin = 330;
+  const defs = sv("defs", null, sv("pattern", { id: uid, width: 8, height: 8, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" },
+    sv("line", { x1: 0, y1: 0, x2: 0, y2: 8, class: "hatch-line" })));
+  const rodX = [W / 2 - wMin / 2 + 34, W / 2 + wMin / 2 - 34];
+  // standoffs between consecutive plates, never across a plate's label
+  const rods = sv("g");
+  for (let i = 0; i < n - 1; i += 1) {
+    const y1 = top + i * (plateH + gap) + plateH, y2 = y1 + gap;
+    rodX.forEach((x) => rods.append(sv("line", { x1: x, x2: x, y1: y1 + 2, y2: y2 - 2, class: "rod" })));
+  }
+  const plates = sv("g");
+  rows.forEach((row, i) => {
+    const w = n === 1 ? wMax : wMax - ((wMax - wMin) * i) / (n - 1);
+    const x = (W - w) / 2, y = top + i * (plateH + gap);
+    const g = stagger(sv("g", { class: "plate-g" },
+      sv("rect", { x, y, width: w, height: plateH, rx: 7, class: `plate-body${row.locked ? " locked" : ""} tone-stroke-${row.tone || "neutral"}`, fill: row.locked ? `url(#${uid})` : null }),
+      o.compact ? null : sv("text", { x: x + 14, y: y + plateH / 2 + 3.5, class: "lbl lbl-strong", text: trunc(row.label, 22) }),
+      o.compact ? null : sv("text", { x: x + w - 14, y: y + plateH / 2 + 3.5, class: "lbl", "text-anchor": "end", text: trunc(row.value || "", 30) })), i);
+    plates.append(row.href && !o.compact ? sv("a", { href: row.href, "data-tip-k": row.label, "data-tip": row.tip || row.value || "", "aria-label": `${row.label}: ${row.value || ""}` }, g) : g);
+  });
+  const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, role: "group", "aria-label": o.label || "Stage stack" }, defs, rods, plates);
+  return artFigure(svg, o.caption, o.cls);
+}
+// A digest drawn as a ring: 64 ticks, one per hex digit, length = the digit's value.
+function artSigil(hex, label, sub, opts) {
+  const o = opts || {};
+  const W = 320, c = 160, R = 138;
+  const digits = String(hex || "").toLowerCase().replace(/[^0-9a-f]/g, "").slice(0, 64).padEnd(64, "0");
+  const ring = sv("g", { class: "sigil-rot" });
+  [...digits].forEach((d, i) => {
+    const v = parseInt(d, 16), a = (i / 64) * Math.PI * 2 - Math.PI / 2, len = 10 + v * 3;
+    ring.append(sv("line", { x1: c + Math.cos(a) * R, y1: c + Math.sin(a) * R, x2: c + Math.cos(a) * (R - len), y2: c + Math.sin(a) * (R - len), class: `tick${i % 8 === 0 ? " alt" : ""}` }));
+  });
+  for (let i = 0; i < 32; i += 1) {
+    const v = parseInt(digits.slice(i * 2, i * 2 + 2), 16), a = (i / 32) * Math.PI * 2 - Math.PI / 2, r = 70 + (v / 255) * 10;
+    ring.append(sv("circle", { cx: c + Math.cos(a) * r, cy: c + Math.sin(a) * r, r: 1.6 + (v % 4) * 0.5, class: "tone-fill-neutral" }));
+  }
+  const svg = sv("svg", { viewBox: `0 0 ${W} ${W}`, role: "img", "aria-label": `${label}: SHA-256 ${hex}` },
+    sv("circle", { cx: c, cy: c, r: R + 8, class: "rule-soft", fill: "none" }), ring,
+    sv("circle", { cx: c, cy: c, r: 64, class: "core" }),
+    sv("text", { x: c, y: c - 8, "text-anchor": "middle", class: "lbl", text: trunc(String(label).replace(/\.[a-z]+$/, ""), 15) }),
+    sv("text", { x: c, y: c + 10, "text-anchor": "middle", class: "hexl", text: `${digits.slice(0, 8)}…${digits.slice(-4)}` }),
+    sub ? sv("text", { x: c, y: c + 26, "text-anchor": "middle", class: "lbl", text: sub }) : null);
+  return artFigure(svg, o.caption, o.cls);
+}
+// Candidates x gates: one mark per gate result, coloured by the recorded status.
+function artMatrix(rows, cols, opts) {
+  const o = opts || {};
+  const cell = 24, padL = 30, padT = 70, W = padL + cols.length * cell + 10, H = padT + rows.length * cell + 6;
+  const g = sv("g");
+  cols.forEach((c, j) => g.append(sv("text", { x: padL + j * cell + cell / 2, y: padT - 10, class: "lbl", transform: `rotate(-55 ${padL + j * cell + cell / 2} ${padT - 10})`, text: trunc(c, 14) })));
+  let k = 0;
+  rows.forEach((row, i) => {
+    g.append(sv("text", { x: 0, y: padT + i * cell + cell / 2 + 3.5, class: "lbl", text: String(i + 1).padStart(2, "0") }));
+    cols.forEach((c, j) => {
+      const res = row.cells[c];
+      const cx = padL + j * cell + cell / 2, cy = padT + i * cell + cell / 2;
+      const mark = res ? stagger(sv("circle", { cx, cy, r: 6.5, class: `node tone-fill-${res.tone}` }), k++) : sv("circle", { cx, cy, r: 1.5, class: "tone-fill-muted" });
+      g.append(res ? sv("a", { href: recordHref(row.record), "data-tip-k": `${c} · ${row.label}`, "data-tip": `${res.status}${res.reason ? " — " + trunc(res.reason, 180) : ""}`, "aria-label": `${row.label}, ${c}: ${res.status}` }, sv("circle", { cx, cy, r: 12, class: "node-hit" }), mark) : mark);
+    });
+  });
+  return artFigure(sv("svg", { viewBox: `0 0 ${W} ${H}`, role: "group", "aria-label": o.label || "Gate matrix" }, g), o.caption, o.cls);
+}
+
+// Motion: reveal on scroll, count up, header state and magnetic buttons. All of it is
 // presentation; it reads nothing and requests nothing.
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 function countUp(node) {
@@ -336,18 +508,28 @@ function enhance(root) {
   const targets = root.querySelectorAll(".reveal, [data-count]");
   if (!("IntersectionObserver" in window) || reducedMotion) {
     targets.forEach((t) => { t.classList.add("in"); if (t.dataset.count) countUp(t); });
-    return;
+  } else {
+    if (revealObserver) revealObserver.disconnect();
+    revealObserver = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        e.target.classList.add("in");
+        if (e.target.dataset.count) countUp(e.target);
+        revealObserver.unobserve(e.target);
+      }
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.12 });
+    targets.forEach((t) => revealObserver.observe(t));
   }
-  if (revealObserver) revealObserver.disconnect();
-  revealObserver = new IntersectionObserver((entries) => {
-    for (const e of entries) {
-      if (!e.isIntersecting) continue;
-      e.target.classList.add("in");
-      if (e.target.dataset.count) countUp(e.target);
-      revealObserver.unobserve(e.target);
-    }
-  }, { rootMargin: "0px 0px -8% 0px", threshold: 0.12 });
-  targets.forEach((t) => revealObserver.observe(t));
+  if (!reducedMotion && window.matchMedia("(pointer: fine)").matches) {
+    root.querySelectorAll(".btn").forEach((b) => {
+      b.addEventListener("pointermove", (e) => {
+        const r = b.getBoundingClientRect();
+        b.style.setProperty("--mx", `${((e.clientX - r.left) / r.width - 0.5) * 10}px`);
+        b.style.setProperty("--my", `${((e.clientY - r.top) / r.height - 0.5) * 8}px`);
+      });
+      b.addEventListener("pointerleave", () => { b.style.setProperty("--mx", "0px"); b.style.setProperty("--my", "0px"); });
+    });
+  }
 }
 function onScroll() {
   let last = window.scrollY, ticking = false;
@@ -357,85 +539,139 @@ function onScroll() {
     document.body.classList.toggle("head-hidden", y > 480 && y > last + 2);
     if (y < last - 2 || y < 480) document.body.classList.remove("head-hidden");
     last = y;
-    const hero = document.querySelector(".hero");
-    if (hero && !reducedMotion) {
-      hero.style.setProperty("--hero-shift", `${Math.min(y, 1200) * 0.18}px`);
-      hero.style.setProperty("--hero-scale", String(1.08 + Math.min(y, 1200) / 12000));
-    }
     ticking = false;
   };
   window.addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
   update();
 }
 
+// Badge detail popover: hover (mouse), focus (keyboard) or tap (touch) shows it;
+// Escape, a second tap or a tap elsewhere closes it.
+const tip = el("div", { id: "tip", class: "tip", role: "tooltip" });
+let tipFor = null, tipPinned = false;
+function showTip(target, pinned) {
+  const k = target.getAttribute("data-tip-k") || "", v = target.getAttribute("data-tip") || "";
+  clear(tip);
+  tip.append(k ? el("span", { class: "tip-k" }, k) : null, el("span", { class: "tip-v" }, v),
+    pinned ? el("span", { class: "tip-hint" }, "Esc or tap elsewhere to close") : null);
+  tip.classList.add("show");
+  tip.classList.toggle("pinned", !!pinned);
+  const r = target.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+  const left = Math.min(Math.max(12, r.left + r.width / 2 - tw / 2), window.innerWidth - tw - 12);
+  let top = r.bottom + 10;
+  if (top + th > window.innerHeight - 12) top = Math.max(12, r.top - th - 10);
+  tip.style.setProperty("left", `${left}px`);
+  tip.style.setProperty("top", `${top}px`);
+  if (tipFor && tipFor !== target && tipFor.tagName === "BUTTON") tipFor.setAttribute("aria-expanded", "false");
+  tipFor = target;
+  tipPinned = !!pinned;
+  if (target.tagName === "BUTTON") target.setAttribute("aria-expanded", pinned ? "true" : "false");
+}
+function hideTip() {
+  tip.classList.remove("show", "pinned");
+  if (tipFor && tipFor.tagName === "BUTTON") tipFor.setAttribute("aria-expanded", "false");
+  tipFor = null;
+  tipPinned = false;
+}
+function setupTips() {
+  document.documentElement.append(tip);
+  const at = (e) => (e.target && e.target.closest ? e.target.closest("[data-tip]") : null);
+  document.addEventListener("pointerover", (e) => { const t = at(e); if (t && !tipPinned && e.pointerType === "mouse") showTip(t, false); });
+  document.addEventListener("pointerout", (e) => { const t = at(e); if (t && !tipPinned && t === tipFor && !t.contains(e.relatedTarget)) hideTip(); });
+  document.addEventListener("focusin", (e) => { const t = at(e); if (t) showTip(t, false); else if (!tipPinned) hideTip(); });
+  document.addEventListener("click", (e) => {
+    const t = e.target && e.target.closest ? e.target.closest("button[data-tip]") : null;
+    if (t) { if (tipFor === t && tipPinned) hideTip(); else showTip(t, true); return; }
+    if (tipPinned && !tip.contains(e.target)) hideTip();
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideTip(); });
+  window.addEventListener("scroll", () => { if (tipFor) hideTip(); }, { passive: true });
+}
+
+function candidateArt(cands) {
+  if (!cands.length) return null;
+  const cols = [...new Set(cands.flatMap((c) => c.gates.map((g) => g.gate_id)))];
+  const rows = cands.map((c) => ({ label: `${c.candidate_id} @ ${c.record_id}`, record: c.record_id,
+    cells: Object.fromEntries(c.gates.map((g) => [g.gate_id, { tone: g.tone, status: g.status, reason: g.reason }])) }));
+  return artMatrix(rows, cols, { label: "Candidate gate results", caption: `Drawn from ${rows.length} candidate gate reports · row = candidate · column = gate · colour = recorded status · select a mark for its reason` });
+}
+function provenanceArt(m) {
+  const c = m && m.present ? (m.checks || []).find((x) => x.measured) || (m.checks || [])[0] : null;
+  if (!c) return null;
+  const name = c.path.split("/").pop();
+  return artSigil(c.measured || c.declared, name, `re-measured: ${c.status}`,
+    { caption: `Drawn from the SHA-256 of ${c.path}, re-measured when this page loaded · one tick per hex digit · tick length = digit value` });
+}
+
 // ================================================================== views
 async function viewOverview() {
-  const [d, cls] = await Promise.all([get("/api/overview"), get("/api/classification")]);
+  const [d, cls, recs] = await Promise.all([get("/api/overview"), getCached("/api/classification"), get("/api/records")]);
   const legend = Object.fromEntries(cls.families.map((f) => [f.family, f]));
   const measuredCount = d.by_basis.MEASURED || 0;
   const out = [];
 
-  // 01 - hero
-  out.push(el("section", { class: "hero bleed" },
-    el("div", { class: "hero-media", "aria-hidden": "true" },
-      el("img", { src: IMG.cryostat.src, alt: "", decoding: "async", fetchpriority: "high" })),
-    el("div", { class: "wrap hero-inner" },
-      eyebrow("(01)", "QMHP-CEM — Computational Engineering Model"),
-      el("h1", { class: "display" },
-        el("span", { class: "line" }, el("span", null, "Evidence,")),
-        el("span", { class: "line" }, el("span", null, "not")),
-        el("span", { class: "line" }, el("span", null, el("em", null, "assertion.")))),
-      el("p", { class: "hero-lead" }, "A read-only window onto every record, gate and hash in this checkout: what was computed, what was only declared, and what still waits on hardware. Each label names the rule that put it there."),
-      el("div", { class: "hero-ctas" },
-        el("a", { class: "btn solid", href: "#/records" }, "Explore evidence records", arrow()),
-        el("a", { class: "btn", href: "#/classification" }, "How labels are assigned", arrow())),
-      el("div", { class: "hero-stats" },
-        [[d.counts.records, "Result records", "#/records"], [d.counts.candidates, "Candidates evaluated", "#/candidates"],
-          [d.hardware_gated_gates.length, "Hardware-gated gates", "#/gates"], [measuredCount, "Measured records", "#/classification"]]
-          .map(([v, k, href]) => el("a", { href }, el("span", { class: "v", "data-count": String(v) }, String(v)), el("span", { class: "k" }, k)))),
-      el("p", { class: "hero-caption" }, CAPTION))));
+  // 01 - hero: the statement, and the evidence itself drawn as a lattice
+  out.push(el("section", { class: "hero bleed" }, el("div", { class: "wrap" },
+    el("div", { class: "hero-grid" },
+      el("div", null,
+        eyebrow("(01)", "QMHP-CEM — Computational Engineering Model"),
+        el("h1", { class: "display" },
+          el("span", { class: "line" }, el("span", null, "Evidence,")),
+          el("span", { class: "line" }, el("span", null, "not")),
+          el("span", { class: "line" }, el("span", null, el("em", null, "assertion.")))),
+        el("p", { class: "hero-lead" }, "A read-only window onto every record, gate and hash in this checkout: what was computed, what was only declared, and what still waits on hardware. Each label names the rule that put it there."),
+        el("div", { class: "hero-ctas" },
+          el("a", { class: "btn solid", href: "#/records" }, "Explore evidence records", arrow()),
+          el("a", { class: "btn", href: "#/classification" }, "How labels are assigned", arrow()))),
+      recs.records.length ? artLattice(recs.records, { rowH: Math.max(40, Math.min(150, 380 / Math.max(1, new Set(recs.records.map((r) => r.family)).size))), grid: true }) : null),
+    el("div", { class: "hero-stats" },
+      [[d.counts.records, "Result records", "#/records"], [d.counts.candidates, "Candidates evaluated", "#/candidates"],
+        [d.hardware_gated_gates.length, "Hardware-gated gates", "#/gates"], [measuredCount, "Measured records", "#/classification"]]
+        .map(([v, k, href]) => el("a", { href }, el("span", { class: "v", "data-count": String(v) }, String(v)), el("span", { class: "k" }, k)))))));
 
-  // 02 - the boundary, stated
+  // 02 - now: the latest verdicts, before anything else
+  out.push(el("section", { class: "now bleed", "aria-label": "Latest status" }, el("div", { class: "wrap now-inner" },
+    el("div", null, eyebrow("(02)", "Now"), el("p", { class: "small muted" }, "The newest record in each family, with its own headline status.")),
+    el("div", { class: "now-rows" }, d.latest_by_family.map((r) => el("a", { class: "now-row", href: recordHref(r.id) },
+      el("span", { class: "fam" }, r.family),
+      el("span", { class: "rid" }, r.id, el("small", null, fmtTs(r.timestamp))),
+      el("span", { class: "row" }, basisBadge(r.basis, false, true), statusBadges(r.headline, 4, true)),
+      el("span", { class: "arr", "aria-hidden": "true" }, "→")))))));
+
+  // 03 - the boundary, stated
   const basisRows = Object.entries(d.by_basis).map(([b, n]) => el("a", { class: "spec-row", href: `#/records?basis=${b}` },
-    el("span", { class: "k" }, basisBadge(b)), el("span", { class: "v" }, (cls.bases.find((x) => x.basis === b) || {}).explanation || ""),
+    el("span", { class: "k" }, basisBadge(b, false, true)), el("span", { class: "v" }, (cls.bases.find((x) => x.basis === b) || {}).explanation || ""),
     el("span", { class: "n", "data-count": String(n) }, String(n))));
   out.push(el("section", { class: "section bleed" }, el("div", { class: "wrap split" },
-    el("div", { class: "reveal" }, eyebrow("(02)", "The hardware boundary"),
+    el("div", { class: "reveal" }, eyebrow("(03)", "The hardware boundary"),
       el("h2", { class: "statement" }, "A computational PASS is ", el("em", null, "not"), " hardware validation.")),
     el("div", { class: "reveal d1" },
       el("p", { class: "copy" }, d.measured_statement, " Every record carries an evidence basis assigned by an explicit, ordered rule, and every status badge quotes the record's own words."),
       ...d.notes.map((n) => el("div", { class: "notice warn" }, el("span", { class: "ico" }, "NOTE"), el("div", { class: "body" }, n))),
       el("div", { class: "spec mt" }, basisRows)))));
 
-  // 03 - gates only hardware can close
-  const hwRows = d.hardware_gated_gates.map((g) => el("div", { class: "spec-row" },
+  // 04 - gates only hardware can close, drawn as a locked stage stack
+  const hw = d.hardware_gated_gates;
+  const hwRows = hw.map((g) => el("div", { class: "spec-row" },
     el("span", { class: "k" }, g.gate_id), el("span", { class: "v" }, g.title),
-    el("span", null, badge("HARDWARE-GATED", "gated", g.pass_permitted ? "PASS permitted" : "PASS is not in this gate's frozen allowed statuses"))));
+    el("span", null, badge("HARDWARE-GATED", "gated", { k: g.gate_id, v: g.pass_permitted ? "PASS permitted" : "PASS is not in this gate's frozen allowed statuses." }))));
   out.push(el("section", { class: "section band-dark bleed" }, el("div", { class: "wrap split media-left" },
-    plate("assembly", { dark: true, label: "Fig. 01" }),
-    el("div", { class: "reveal d1" }, eyebrow("(03)", "Gates only hardware can close"),
+    hw.length ? artPlates(hw.map((g) => ({ label: g.gate_id, value: "hardware only", locked: true, tone: "gated", href: "#/gates", tip: g.title })),
+      { label: "Hardware-gated gates", caption: `Drawn from master/validation_gates.yaml · one plate per gate that omits PASS · hatched = closable only by measured hardware evidence` }) : el("div"),
+    el("div", { class: "reveal d1" }, eyebrow("(04)", "Gates only hardware can close"),
       el("h2", { class: "statement" }, "Some questions only a ", el("em", null, "cold"), " measurement answers."),
-      el("p", { class: "copy mt" }, "From master/validation_gates.yaml. These gates omit PASS from their frozen allowed statuses, so no simulated or model-derived result in this repository can close them."),
+      el("p", { class: "copy mt" }, "These gates omit PASS from their frozen allowed statuses, so no simulated or model-derived result in this repository can close them."),
       el("div", { class: "spec mt" }, hwRows.length ? hwRows : el("p", { class: "empty" }, "No frozen gate definitions in this checkout."))))));
 
-  // 04 - latest evidence per family
-  out.push(el("section", { class: "section bleed" }, el("div", { class: "wrap" },
-    el("div", { class: "sec-head reveal" }, el("div", null, eyebrow("(04)", "Latest evidence"), el("h2", null, "The newest record in each family")),
-      el("p", null, "Status badges are quoted verbatim from each record's headline fields. Hover one for its JSON path.")),
-    el("div", { class: "cards reveal d1" }, d.latest_by_family.map((r) => el("a", { class: "card", href: recordHref(r.id) },
-      el("span", { class: "fam" }, r.family), el("span", { class: "rid" }, r.id), el("span", { class: "when" }, fmtTs(r.timestamp)),
-      el("div", { class: "row" }, basisBadge(r.basis), statusBadges(r.headline, 5)),
-      el("div", { class: "foot" }, el("span", { class: "small muted" }, trunc(r.statement || "", 110)), el("span", { class: "go", "aria-hidden": "true" }, "→"))))))));
-
   // 05 - status families as figures
-  const figs = Object.entries(d.by_status_family).map(([f, n]) => el("a", { class: "figure", href: `#/records?status=${q(f)}` },
-    el("div", { class: "v", "data-count": String(n) }, String(n)), el("div", { class: "k" }, badge(f, (legend[f] || {}).tone, (legend[f] || {}).meaning))));
+  const figs = Object.entries(d.by_status_family).map(([f, n]) => el("a", { class: "figure", href: `#/records?status=${q(f)}`, "aria-label": `${n} records: ${f}. ${(legend[f] || {}).meaning || ""}` },
+    el("div", { class: "v", "data-count": String(n) }, String(n)), el("div", { class: "k" }, badge(f, (legend[f] || {}).tone))));
   out.push(el("section", { class: "section tight band-plate bleed" }, el("div", { class: "wrap" },
     el("div", { class: "sec-head reveal" }, el("div", null, eyebrow("(05)", "Status at a glance"), el("h2", null, "Headline status families")),
       el("p", null, "Records whose own headline fields carry a token in that family. A family only picks the colour; the token is always the record's.")),
     el("div", { class: "figures reveal d1" }, figs))));
 
-  // 06 - frozen master and checkout
+  // 06/07 - frozen master and checkout
   const m = d.master || {};
   const co = d.checkout;
   out.push(el("section", { class: "section bleed" }, el("div", { class: "wrap split" },
@@ -504,7 +740,7 @@ async function viewRecords(params) {
         el("td", { class: "small" }, r.manifests.length ? `${r.manifests.length} manifest` : el("span", { class: "muted" }, "none"))))));
   }
   render();
-  return [pageHero("03", "Evidence\nrecords.", "Every directory under results/, newest first. Status badges are tokens quoted from each record's own headline fields; hover for the JSON path and the full text."),
+  return [pageHero("03", "Evidence\nrecords.", "Every directory under results/, newest first. Status badges are tokens quoted from each record's own headline fields; hover, focus or tap one for its JSON path and full text.", d.records.length ? artLattice(d.records, { rowH: 40 }) : null),
     el("div", { class: "filters" }, input, sel("basis", ["SYNTHETIC", "SOLVED", "MEASURED", "ANALYSIS", "DECLARATION", "UNCLASSIFIED"], "bases"),
       sel("status", statusFams, "status families"), sel("family", families, "families"), count),
     holder];
@@ -648,7 +884,7 @@ function runTable(runs) {
 }
 async function viewCandidates() {
   const d = await get("/api/candidates");
-  return [pageHero("04", "Candidates\n& runs.", "Candidates evaluated against the frozen gates, and the named runs each record lists. Candidate geometry is ENGINEERING-SEED throughout.", "holder"),
+  return [pageHero("04", "Candidates\n& runs.", "Candidates evaluated against the frozen gates, and the named runs each record lists. Candidate geometry is ENGINEERING-SEED throughout.", candidateArt(d.candidates)),
     ...computationalNotice("SOLVED"),
     el("h2", null, `Candidates (${d.candidates.length})`), candidateTable(d.candidates),
     el("h2", null, `Runs (${d.runs.length})`), runTable(d.runs)];
@@ -658,7 +894,7 @@ async function viewCandidates() {
 async function viewGates() {
   const d = await get("/api/gates");
   const defs = d.definitions.gates || [];
-  const out = [pageHero("05", "Gates and\ntheir reasons.", "The frozen gate definitions, every gate result the records carry with its recorded reason, and each record's own headline verdicts.", "assembly"), ...computationalNotice("SOLVED")];
+  const out = [pageHero("05", "Gates and\ntheir reasons.", "The frozen gate definitions, every gate result the records carry with its recorded reason, and each record's own headline verdicts.", defs.length ? artPlates(defs.map((g) => ({ label: g.gate_id, value: g.hardware_required ? "hardware only" : (g.required_evidence || []).join(", "), locked: g.hardware_required, tone: g.hardware_required ? "gated" : "neutral", tip: g.title })), { compact: true, label: "Frozen gate definitions", caption: "Drawn from master/validation_gates.yaml \u00b7 one plate per gate, in file order \u00b7 hatched = hardware-gated, PASS not permitted" }) : null), ...computationalNotice("SOLVED")];
   out.push(el("h2", null, "Frozen gate definitions"),
     el("p", { class: "muted" }, d.definitions.path ? ["From ", link(fileHref(d.definitions.path), d.definitions.path), ". Allowed statuses are frozen data; hardware gates omit PASS."] : "master/validation_gates.yaml is not present in this checkout."),
     table(["Gate", "Title", "Kind", "Severity", "Required evidence", "Allowed statuses", "Hardware"], defs.map((g) => el("tr", null,
@@ -711,7 +947,7 @@ async function viewGates() {
 async function viewProvenance() {
   const d = await get("/api/provenance");
   const m = d.master;
-  const out = [pageHero("06", "Provenance\n& hashes.", d.note, "panel")];
+  const out = [pageHero("06", "Provenance\n& hashes.", d.note, provenanceArt(d.master))];
   if (m.present) {
     out.push(el("h2", null, "Frozen master layer"),
       el("div", { class: "panel" }, kv([["Revision", m.revision], ["Status", m.status], ["Date", m.date], ["Provenance file", link(fileHref(m.path), m.path)]]),
@@ -754,7 +990,7 @@ async function viewProvenance() {
 // ------------------------------------------------------------ experiments
 async function viewExperiments() {
   const d = await get("/api/experiments");
-  const out = [pageHero("02", "Experiments &\nfrozen contracts.", "The frozen requirements layer and data contracts, then each experiment directory with its execution state as its own files state it.", "wiring")];
+  const out = [pageHero("02", "Experiments &\nfrozen contracts.", "The frozen requirements layer and data contracts, then each experiment directory with its execution state as its own files state it.", d.frozen_contracts.length ? artPlates([...d.frozen_contracts.map((g) => ({ label: g.group, value: `${g.files.length} file${g.files.length === 1 ? "" : "s"}`, tone: "neutral", tip: g.label })), ...d.experiments.map((e) => ({ label: e.id, value: e.state.label, tone: e.state.tone, href: `#/experiments/${q(e.id)}`, tip: e.state.reason }))].slice(0, 12), { compact: true, label: "Frozen contracts and experiments", caption: `Drawn from this checkout \u00b7 one plate per frozen-contract group${d.experiments.length ? " and experiment" : ""} \u00b7 value = file count or stated execution state` }) : null)];
   out.push(el("h2", null, "Frozen contracts"), el("div", { class: "grid cols-2" }, d.frozen_contracts.map((g) => el("div", { class: "panel" },
     el("h3", null, g.label), el("ul", null, g.files.map((f) => el("li", null, link(fileHref(f.path), f.path, "mono"), el("span", { class: "muted small" }, `  ${fmtSize(f.size)}`))))))));
   out.push(el("h2", null, `Experiments (${d.experiments.length})`));
@@ -1009,7 +1245,7 @@ async function route() {
     const m = re.exec(path);
     if (!m) continue;
     clear(view);
-    view.append(el("p", { class: "loading wrap" }, "Loading…"));
+    view.append(skeleton());
     try {
       const nodes = await fn(m, params);
       if (seq !== routeSeq) return;
@@ -1021,8 +1257,6 @@ async function route() {
         el("p", { class: "error" }, e.message), e.detail ? el("p", { class: "muted" }, e.detail) : null,
         el("p", null, link("#/overview", "Back to the overview", "link"))))], false);
     }
-    view.focus({ preventScroll: true });
-    window.scrollTo(0, 0);
     return;
   }
   render([el("div", { class: "page-head" }, el("div", null, el("h1", null, "No such page"),
@@ -1030,34 +1264,54 @@ async function route() {
 }
 
 // Full-bleed sections go straight into <main>; everything else is grouped into the
-// centred page column.
+// centred page column. With View Transitions available, pages cross-fade.
+let rendered = false;
 function render(nodes, onHero) {
-  clear(view);
-  document.body.classList.toggle("on-hero", onHero);
-  document.body.classList.remove("head-hidden");
-  let column = null;
-  for (const node of nodes) {
-    if (node.classList && node.classList.contains("bleed")) {
-      column = null;
-      view.append(node);
-    } else {
-      if (!column) { column = el("div", { class: "wrap page-body" }); view.append(column); }
-      column.append(node);
+  const apply = () => {
+    clear(view);
+    window.scrollTo(0, 0);
+    document.body.classList.toggle("on-hero", onHero);
+    document.body.classList.remove("head-hidden");
+    hideTip();
+    let column = null;
+    for (const node of nodes) {
+      if (node.classList && node.classList.contains("bleed")) {
+        column = null;
+        view.append(node);
+      } else {
+        if (!column) { column = el("div", { class: "wrap page-body" }); view.append(column); }
+        column.append(node);
+      }
     }
-  }
-  enhance(view);
+    enhance(view);
+    const h1 = view.querySelector("h1");
+    if (h1) { h1.setAttribute("tabindex", "-1"); h1.focus({ preventScroll: true }); } else view.focus({ preventScroll: true });
+  };
+  if (rendered && document.startViewTransition && !reducedMotion) document.startViewTransition(apply);
+  else apply();
+  rendered = true;
 }
 
 async function boot() {
+  setupTips();
   const search = document.getElementById("global-search");
   search.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); location.hash = `#/search?q=${q(search.value.trim())}`; }
   });
+  const ticker = document.querySelector(".ticker");
+  const toggle = document.getElementById("ticker-toggle");
+  const setPaused = (p) => {
+    ticker.classList.toggle("paused", p);
+    toggle.setAttribute("aria-pressed", String(p));
+    toggle.querySelector(".lbl").textContent = p ? "Play" : "Pause";
+  };
+  toggle.addEventListener("click", () => setPaused(!ticker.classList.contains("paused")));
+  if (reducedMotion) setPaused(true);
   try {
-    const co = await get("/api/checkout");
+    const co = await getCached("/api/checkout");
     const where = co.available ? `Checkout ${co.branch || "detached"} @ ${shortSha(co.head_sha)}` : "Checkout: no git metadata";
     document.querySelectorAll(".checkout-text").forEach((n) => { n.textContent = where; });
-    const cls = await get("/api/classification");
+    const cls = await getCached("/api/classification");
     document.querySelectorAll(".measured-text").forEach((n) => { n.textContent = cls.measured_statement; });
   } catch (_) { /* the page still works without the ticker text */ }
   window.addEventListener("hashchange", route);
