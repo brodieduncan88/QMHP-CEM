@@ -2,6 +2,8 @@
 
 **Status: DESK SCOPING NOTE; NON-DECISION RECORD. It registers, adopts and authorises nothing.**
 
+*Supplement (25 September 2026): PA's pole characterisation (dark-mode and degeneracy caveat), the island harmonic-field condition, and PA's H(curl) well-posedness under the PEC-end condition are recorded in [`corrections/r1-correspondence-scoping-supplement-1.md`](corrections/r1-correspondence-scoping-supplement-1.md). The text below is otherwise unchanged.*
+
 - **What it is.** A scoping note, written 2026-09-25 and committed the same day, at the human's direction, as a desk-only, non-decision record. It covers what is needed to get from the E1 static result to the registered E_C,F1F1:
   - the definitional options, and what each combination means;
   - what the existing records can and cannot establish;
