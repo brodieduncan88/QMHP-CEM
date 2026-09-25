@@ -520,6 +520,9 @@ function stage(fallback, dataPromise, opts) {
   const o = opts || {};
   if (reducedMotion || !webglOK()) return fallback();
   const box = el("div", { class: `stage stage-${o.mode || "hero"} loading` });
+  // The close-up callout: a plain-language label that appears when the camera reaches the chip.
+  const callout = o.callout ? el("p", { class: "stage-callout", "aria-hidden": "true" }, o.callout) : null;
+  if (callout) box.append(callout);
   const fig = el("figure", { class: "art stage-fig reveal" }, box, el("figcaption", null, o.caption));
   Promise.all([stageModule || (stageModule = import("/static/scene3d.js")), dataPromise]).then(([mod, data]) => {
     if (!box.isConnected) return;
@@ -528,10 +531,12 @@ function stage(fallback, dataPromise, opts) {
       progress: o.progress,
       onHover: (rec, x, y) => (rec ? showTipPoint(x, y, rec.id, rec.label) : hideTip()),
       onSelect: (rec) => { location.hash = recordHref(rec.id); },
+      onCloseUp: o.callout ? (a) => callout.classList.toggle("show", a > 0.8) : null,
     });
     activeStages.push(ctl);
     box.classList.remove("loading");
     box.classList.add("live");
+    if (o.onLive) o.onLive();
   }).catch(() => {
     if (fig.isConnected) { const fb = fallback(); fig.replaceWith(fb); fb.classList.add("in"); }
   });
@@ -539,8 +544,16 @@ function stage(fallback, dataPromise, opts) {
 }
 function sectionProgress(node) {
   return () => {
-    const r = node.getBoundingClientRect(), h = window.innerHeight;
-    return Math.min(1, Math.max(0, (h - r.top) / (h + r.height)));
+    const h = window.innerHeight;
+    // Pinned (wide screens): progress runs across the whole tall section while the stage stays put.
+    const sec = node.closest(".pinned-scene");
+    if (sec && window.matchMedia("(min-width: 901px)").matches) {
+      const r = sec.getBoundingClientRect();
+      return Math.min(1, Math.max(0, (h - r.top) / r.height));
+    }
+    // Unpinned (phones): finish by the time the stage reaches the top of the screen.
+    const r = node.getBoundingClientRect();
+    return Math.min(1, Math.max(0, (h - r.top) / (h + r.height) / 0.7));
   };
 }
 function sectionStage(hw, records) {
@@ -548,10 +561,13 @@ function sectionStage(hw, records) {
     { label: "Hardware-gated gates", caption: "Drawn from master/validation_gates.yaml · one plate per gate that omits PASS · hatched = closable only by measured hardware evidence" });
   const holder = el("div", { class: "stage-holder" });
   holder.append(stage(fallback, getCached("/api/gates").then((g) => stageData(g.definitions.gates || [], records)),
-    { mode: "section", caption: "The same stack, separated as you scroll · violet-rimmed plates are the gates only measured hardware evidence can close · not a model of QMHP or any real hardware", progress: sectionProgress(holder) }));
+    { mode: "section", caption: SECTION_CAPTION, progress: sectionProgress(holder),
+      callout: "Illustrative chip · procedural artwork, not a QMHP device design and not a measurement",
+      onLive: () => { const sec = holder.closest("section"); if (sec) sec.classList.add("pinned-scene"); } }));
   return holder;
 }
-const STAGE_CAPTION = "Original 3-D illustration, drawn live from this checkout · one plate per frozen gate (dark with a violet rim = hardware-gated) · one line per record family · one bead per record, coloured by its headline status · not a model of QMHP or any real hardware";
+const SECTION_CAPTION = "The same stack: keep scrolling and it separates, then the camera descends to the sample stage · the chip, its bond wires, coax and flex lines are illustrative artwork; each junction marker is tinted by one record's headline status · violet-rimmed plates are the gates only measured hardware evidence can close · not a model of QMHP or any real hardware";
+const STAGE_CAPTION = "Original 3-D illustration, drawn live from this checkout · one plate per frozen gate (dark with a violet rim = hardware-gated) · one coax line per record family (the remaining lines are unlabelled wiring), with connectors, attenuators and thermalisation coils · one bead per record, coloured by its headline status · the chip at the bottom is illustrative artwork · not a model of QMHP or any real hardware";
 
 // Motion: reveal on scroll, count up, header state and magnetic buttons. All of it is
 // presentation; it reads nothing and requests nothing.

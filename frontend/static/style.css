@@ -632,3 +632,16 @@ pre.code.wrap-pre { white-space: pre-wrap; max-height: 260px; }
   .btn { transform: none; }
   ::view-transition-old(page), ::view-transition-new(page) { animation: none; }
 }
+
+/* Section 04 pins its stage while the stack separates and the camera descends to the chip. */
+.stage-callout { position: absolute; left: 50%; top: 5%; transform: translate(-50%, 10px); margin: 0; max-width: min(88%, 440px);
+  padding: 8px 14px; border: 1px solid rgba(200, 155, 74, .45); border-radius: 999px; background: rgba(10, 12, 18, .72);
+  color: #f3eadb; font: 500 11.5px/1.35 var(--mono); letter-spacing: .06em; text-align: center; text-transform: uppercase;
+  opacity: 0; pointer-events: none; transition: opacity .5s var(--ease), transform .5s var(--ease); z-index: 1; }
+.stage-callout.show { opacity: 1; transform: translate(-50%, 0); }
+@media (min-width: 901px) {
+  .pinned-scene .split.media-left { min-height: 220svh; align-items: start; }
+  .pinned-scene .split.media-left > * { position: sticky; top: calc(var(--head-h) + 3svh); }
+  .pinned-scene .stage-section { max-height: calc(94svh - var(--head-h) - 110px); margin-inline: auto; }
+}
+@media (prefers-reduced-motion: reduce) { .stage-callout { transition: none; } }

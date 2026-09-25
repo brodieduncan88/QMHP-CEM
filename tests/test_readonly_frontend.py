@@ -424,7 +424,7 @@ def test_static_route_serves_only_the_viewers_own_assets(live_repo_server):
 
 
 #: SHA-256 of the one vendored script, as recorded in frontend/vendor-src/BUILD.md.
-THREE_BUNDLE_SHA256 = "38a81bdd710c27cf03a760f3192c9bbfecc861a71144c44271786738d69d118c"
+THREE_BUNDLE_SHA256 = "1b6ac2963c0483b6eac25baac51db9172b1644bf6fc9d15e7467441b81ed3efd"
 
 
 def test_vendored_3d_library_is_pinned_licensed_and_cannot_make_requests(live_repo_server):

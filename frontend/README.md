@@ -43,11 +43,21 @@ caption says which data drew it:
 
 **The live 3-D stage stack** (`static/scene3d.js`) is an original real-time
 three.js model on the overview: one plate per frozen gate (gold = computational,
-dark with a pulsing violet rim = hardware-gated, PASS not permitted), one coax line
-per record family and one bead per record, placed by recorded time and coloured by
-its headline status. Hover a bead for its record, click to open it. Scrolling
-separates and turns the stack (hero), and a second instance in "Gates only hardware
-can close" opens up as that section passes. It is labelled on the page as not a
+dark with a pulsing violet rim = hardware-gated, PASS not permitted), one bead per
+record, placed by recorded time and coloured by its headline status. Hover a bead
+for its record, click to open it. Scrolling separates and turns the stack (hero).
+
+The wiring and the sample stage are drawn in detail but are illustrative: semi-rigid
+coax lines (one per record family carries its beads; the rest are unlabelled) with
+bulkhead connectors and nuts at every plate, attenuators, copper thermalisation
+coils, and braided flex lines into a gold sample package with SMA launches, launch
+traces and bond wires. The chip on it is a procedural texture (feedline, qubit
+cells with meandered inductors, couplers, readout resonators, flux lines, bond-pad
+ring), printed "ILLUSTRATIVE LAYOUT · NOT A DEVICE DESIGN"; its only data is that
+each junction marker is tinted by one record's headline status. In "Gates only
+hardware can close" the stage pins on wide screens while the stack separates and
+the camera descends to the chip, where a callout repeats that it is artwork, not a
+QMHP design and not a measurement. Everything is labelled on the page as not a
 model of QMHP or of any real hardware.
 
 It renders only while on screen and the tab is visible, runs at 30 fps on touch

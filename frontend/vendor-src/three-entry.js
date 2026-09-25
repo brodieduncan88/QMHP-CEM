@@ -33,4 +33,9 @@ export {
   ACESFilmicToneMapping,
   SRGBColorSpace,
   BackSide,
+  CanvasTexture,
+  LineSegments,
+  LineBasicMaterial,
+  BufferGeometry,
+  Float32BufferAttribute,
 } from "three";
