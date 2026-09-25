@@ -105,6 +105,12 @@ H/h [GHz] = F (x) I_12  +  f_R * I_10 (x) num(12)  +  g * n_skip (x) (a + a^dag)
 - the dressed emission E(2,0) − E(1,0), in GHz;
 - the F8 weight |⟨dressed(1,0)| I ⊗ a |dressed(2,0)⟩|².
 
+**F8 contraction: an implementation note (the Mac Accelerate issue).** The checker evaluates the F8 scalar Σᵢⱼ conj(v1ᵢ) Aᵢⱼ v2ⱼ with `np.einsum("i,ij,j->", v1.conj(), A, v2, optimize=False)`, not with a chained `v1.conj() @ A @ v2`. Here v1 and v2 are the dressed (1,0) and (2,0) eigenvectors and A = I ⊗ a.
+- **Why.** The owner reported a problem with the chained matmul route on the Mac, whose NumPy is linked to Apple Accelerate. The observed symptom is recorded by the owner, not here, and was not reproduced in this repository's environment.
+- **What changes.** With `optimize=False`, `np.einsum` calls NumPy's own C einsum (`c_einsum`) directly, rather than the matmul route that goes through the linked BLAS. That dispatch was read in NumPy 2.4.6's `einsumfunc.py`; the Mac's NumPy 2.0.2 source and the C internals were not inspected.
+- **What does not change.** The observable's definition, the Hamiltonian, the labels and the thresholds. Nothing is symmetrised or repaired.
+- **Equivalence.** The summation order differs, so the two routes agree to round-off, not bit for bit (CLAUDE.md §13). The contract tests check the einsum route against exact rational arithmetic on the same inputs and against the previous chained form.
+
 ## 3. Acceptance rules: existing rules and proposed rules are kept apart
 
 ### 3.1 Existing rules (unchanged by this protocol)
@@ -242,7 +248,8 @@ They use **synthetic** fixtures only: made-up frequencies and a seeded charge ma
   - pickle, eval or exec use;
   - a missing, wrong, truncated or upper-case `--expected-sha256`, and a substituted self-consistent expected-hashes record;
   - a missing, null, empty, non-string or unenforced `approved_runtime` field, and every runtime version mismatched, suffixed or unavailable;
-  - a non-Hermitian independent matrix, baseline matrix or both (upper-triangle only, invisible to `eigh(UPLO='L')`), the exact-limit boundary, a non-finite defect and an invalid limit.
+  - a non-Hermitian independent matrix, baseline matrix or both (upper-triangle only, invisible to `eigh(UPLO='L')`), the exact-limit boundary, a non-finite defect and an invalid limit;
+  - the F8 einsum contraction against exact rational arithmetic and the previous chained `@` form, with static checks that no `@` and no symmetrisation or repair remain.
 - **Not run in this environment:** QuTiP is not installed here and was not installed, so the QuTiP assembly path is exercised by no test.
 
 ## 8. What would be needed to execute, and in what order

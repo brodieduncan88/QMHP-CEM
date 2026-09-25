@@ -578,7 +578,12 @@ def observables_from(eigenvalues: Any, eigenvectors: Any, labels: List[Dict[str,
     energy = {key: float(eigenvalues[value]) for key, value in index.items()}
     pulls = [(energy[(level, 1)] - energy[(level, 0)] - readout) * 1e3 for level in range(3)]
     vectors = np.asarray(eigenvectors)
-    element = vectors[:, index[(1, 0)]].conj() @ np.asarray(annihilation) @ vectors[:, index[(2, 0)]]
+    v1 = vectors[:, index[(1, 0)]]
+    v2 = vectors[:, index[(2, 0)]]
+    # F8 scalar <v1| A |v2> = sum_ij conj(v1_i) A_ij v2_j. Implementation only: einsum with
+    # optimize=False instead of a chained `@`, so the scalar does not go through the BLAS
+    # matmul path (see the Accelerate note in the protocol doc). Same definition.
+    element = np.einsum("i,ij,j->", v1.conj(), np.asarray(annihilation), v2, optimize=False)
     return {
         "pull_MHz_level0": pulls[0],
         "pull_MHz_level1": pulls[1],

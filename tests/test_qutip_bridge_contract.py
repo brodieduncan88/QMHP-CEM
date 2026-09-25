@@ -1152,3 +1152,147 @@ def test_protocol_doc_describes_the_revision_2_gates():
     for phrase in ("--expected-sha256", "approved_runtime", "python_version", "qutip_version",
                    "numpy_version", "scipy_version", "Hermiticity is a gate", "NOT-EVALUATED"):
         assert phrase in doc, phrase
+
+
+# ================================ F8 contraction: einsum instead of a chained `@`
+#
+# A numerical implementation change only. These tests compare the new einsum route
+# with (a) exact rational arithmetic on the same float inputs and (b) the chained `@`
+# form as committed at b71692e. They check the definition, not bit identity:
+# summation order differs, so agreement is to round-off (CLAUDE.md section 13).
+
+
+def _observables_as_at_b71692e(eigenvalues, eigenvectors, labels, readout, annihilation):
+    """Verbatim copy of observables_from as committed at b71692e (chained `@`). Comparison only."""
+    index = {(item["level"], item["photon"]): item["dressed_index"] for item in labels}
+    energy = {key: float(eigenvalues[value]) for key, value in index.items()}
+    pulls = [(energy[(level, 1)] - energy[(level, 0)] - readout) * 1e3 for level in range(3)]
+    vectors = np.asarray(eigenvectors)
+    element = vectors[:, index[(1, 0)]].conj() @ np.asarray(annihilation) @ vectors[:, index[(2, 0)]]
+    return {
+        "pull_MHz_level0": pulls[0],
+        "pull_MHz_level1": pulls[1],
+        "pull_MHz_level2": pulls[2],
+        "logical_pull_MHz": pulls[checker.LOGICAL_STATES[0]],
+        "sink_pull_MHz": pulls[checker.SINK_STATE],
+        "sink_logical_contrast_MHz": pulls[checker.SINK_STATE] - pulls[checker.LOGICAL_STATES[0]],
+        "sink_line_GHz": readout + pulls[checker.SINK_STATE] / 1e3,
+        "dressed_emission_GHz": energy[(2, 0)] - energy[(1, 0)],
+        "f8_weight": float(abs(element) ** 2),
+    }
+
+
+def _exact_contraction(v1, a_matrix, v2):
+    """sum_ij conj(v1_i) A_ij v2_j in exact rational arithmetic on the float inputs.
+
+    Returns the exact value rounded once to complex, and sum_ij |conj(v1_i) A_ij v2_j|
+    for a rounding-error bound. Only the nonzero A_ij contribute.
+    """
+    from fractions import Fraction
+
+    total_re = total_im = Fraction(0)
+    magnitude = 0.0
+    rows, cols = np.nonzero(a_matrix)
+    for i, j in zip(rows.tolist(), cols.tolist()):
+        x1, y1 = Fraction(float(v1[i].real)), -Fraction(float(v1[i].imag))       # conj(v1_i)
+        xa, ya = Fraction(float(a_matrix[i, j].real)), Fraction(float(a_matrix[i, j].imag))
+        x2, y2 = Fraction(float(v2[j].real)), Fraction(float(v2[j].imag))
+        p_re, p_im = x1 * xa - y1 * ya, x1 * ya + y1 * xa
+        total_re += p_re * x2 - p_im * y2
+        total_im += p_re * y2 + p_im * x2
+        magnitude += abs(v1[i]) * abs(a_matrix[i, j]) * abs(v2[j])
+    return complex(float(total_re), float(total_im)), magnitude
+
+
+def _rounding_bound(n, magnitude):
+    """A deliberately loose bound on the floating-point error of either route:
+    8 (n + 2) u times the sum of term magnitudes, u = eps / 2."""
+    return 4 * (n + 2) * np.finfo(float).eps * magnitude
+
+
+def _f8_vectors_and_operator(seed):
+    data = _synthetic(seed)
+    index = {(item["level"], item["photon"]): item["dressed_index"] for item in data["labels"]}
+    annihilation = np.kron(np.eye(NQ), np.diag(np.sqrt(np.arange(1, NPH)), 1))
+    return data, data["eigenvectors"][:, index[(1, 0)]], data["eigenvectors"][:, index[(2, 0)]], annihilation
+
+
+def test_einsum_reproduces_the_scalar_contraction_exactly_on_controlled_data():
+    """Small dyadic complex data: every product and sum is exact in binary floating
+    point, so both routes must equal the exact contraction bit for bit."""
+    v1 = np.array([1 + 2j, -3j, 2.0, 0.5 - 0.25j])
+    a_matrix = np.array([[1, 2j, 0, -1], [0, 3, 1 - 1j, 0], [2j, 0, -2, 0.5], [0, 1, 0, 1 + 1j]], dtype=complex)
+    v2 = np.array([0.5j, 1 - 1j, -2.0, 4.0])
+    exact = sum(np.conj(v1[i]) * a_matrix[i, j] * v2[j] for i in range(4) for j in range(4))
+    by_hand, _ = _exact_contraction(v1, a_matrix, v2)
+    einsum = np.einsum("i,ij,j->", v1.conj(), a_matrix, v2, optimize=False)
+    chained = v1.conj() @ a_matrix @ v2
+    assert by_hand == exact == einsum == chained
+
+
+@pytest.mark.parametrize("seed", [7, 11, 23])
+def test_einsum_matches_the_exact_contraction_and_the_old_route_on_the_real_operator(seed):
+    _, v1, v2, annihilation = _f8_vectors_and_operator(seed)
+    exact, magnitude = _exact_contraction(v1, annihilation, v2)
+    bound = _rounding_bound(annihilation.shape[0], magnitude)
+    einsum = np.einsum("i,ij,j->", v1.conj(), annihilation, v2, optimize=False)
+    chained = v1.conj() @ annihilation @ v2
+    assert abs(einsum - exact) <= bound
+    assert abs(chained - exact) <= bound
+    assert abs(einsum - chained) <= 2 * bound
+
+
+@pytest.mark.parametrize("seed", [7, 11, 23])
+def test_f8_observable_is_numerically_unchanged(seed):
+    data, v1, v2, annihilation = _f8_vectors_and_operator(seed)
+    args = (data["eigenvalues"], data["eigenvectors"], data["labels"], READOUT, annihilation)
+    new = checker.observables_from(*args)
+    old = _observables_as_at_b71692e(*args)
+    assert set(new) == set(old)
+    for key in old:
+        if key != "f8_weight":
+            assert new[key] == old[key], key            # untouched code: identical
+    exact, magnitude = _exact_contraction(v1, annihilation, v2)
+    element_bound = _rounding_bound(annihilation.shape[0], magnitude)
+    weight_bound = 2 * abs(exact) * element_bound + element_bound ** 2 + 4 * np.finfo(float).eps * abs(exact) ** 2
+    assert abs(new["f8_weight"] - abs(exact) ** 2) <= weight_bound
+    assert abs(new["f8_weight"] - old["f8_weight"]) <= 2 * weight_bound
+    # the change of route moves F8 by under 1/1000 of the (proposed, unapproved) F8 comparison threshold
+    assert abs(new["f8_weight"] - old["f8_weight"]) <= 1e-3 * checker.PROPOSED_ENGINEERING_RULES["max_f8_weight_abs_diff"]
+
+
+def _observables_tree() -> ast.FunctionDef:
+    return next(node for node in _tree(CHECKER_PATH).body
+                if isinstance(node, ast.FunctionDef) and node.name == "observables_from")
+
+
+def test_checker_no_longer_uses_matmul_for_the_f8_contraction():
+    function = _observables_tree()
+    assert not [node for node in ast.walk(function) if isinstance(node, ast.BinOp) and isinstance(node.op, ast.MatMult)]
+    # that contraction was the checker's only `@`; none remains anywhere in the module
+    assert not [node for node in ast.walk(_tree(CHECKER_PATH))
+                if isinstance(node, ast.BinOp) and isinstance(node.op, ast.MatMult)]
+    calls = [node for node in ast.walk(function) if isinstance(node, ast.Call) and ast.unparse(node.func) == "np.einsum"]
+    assert len(calls) == 1
+    call = calls[0]
+    assert isinstance(call.args[0], ast.Constant) and call.args[0].value == "i,ij,j->"
+    assert [ast.unparse(arg) for arg in call.args[1:]] == ["v1.conj()", "np.asarray(annihilation)", "v2"]
+    assert [(k.arg, ast.unparse(k.value)) for k in call.keywords] == [("optimize", "False")]
+
+
+def test_f8_definition_is_unchanged_and_nothing_is_repaired():
+    function = _observables_tree()
+    returned = next(node for node in ast.walk(function) if isinstance(node, ast.Return))
+    values = {key.value: ast.unparse(value) for key, value in zip(returned.value.keys, returned.value.values)}
+    assert values["f8_weight"] == "float(abs(element) ** 2)"
+    body = function.body[1:] if isinstance(function.body[0], ast.Expr) else function.body   # drop the docstring
+    code = "\n".join(ast.unparse(statement) for statement in body)
+    for forbidden in (".T", "np.abs(", ".real", ".imag", "np.real", "np.clip", "round(", "/ 2", "0.5 *",
+                      "hermit", "symmetri", "normalize", "np.linalg.norm"):
+        assert forbidden not in code, forbidden
+    assert code.count(".conj()") == 1 and code.count("abs(") == 1
+    # runtime: the inputs are not modified
+    data, _, _, annihilation = _f8_vectors_and_operator(7)
+    vectors_before, operator_before = data["eigenvectors"].copy(), annihilation.copy()
+    checker.observables_from(data["eigenvalues"], data["eigenvectors"], data["labels"], READOUT, annihilation)
+    assert np.array_equal(data["eigenvectors"], vectors_before) and np.array_equal(annihilation, operator_before)
