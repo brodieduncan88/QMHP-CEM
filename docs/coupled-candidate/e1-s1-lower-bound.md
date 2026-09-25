@@ -83,7 +83,7 @@ The attempt was run once, from the repository root, exactly as contract §6 stat
   - there is no quantity in frequency units;
   - `E_C` and `g` stay UNAVAILABLE.
 - **Tolerances.** The §7 scope decision is `COPIED_NUMBERS_WITHIN_SCOPE`, and no T1–T4 criterion was adopted before approval. So no tolerance may ever be applied to any number in, or derived from, any E1 file. That includes C_hi and anything formed from C_lo^static or C_hi.
-- **Q2.** Contract §1 requires a separate correction record for the frozen study's model bracket. It has not been written yet, and the frozen study is not edited.
+- **Q2.** Contract §1 requires a separate correction record for the frozen study's model bracket. It is [`corrections/static-refinement-study-model-bracket-correction.md`](corrections/static-refinement-study-model-bracket-correction.md), and the frozen study is not edited.
 - **Not blind.** E1 was not blind (contract §8): exploratory S1 values existed before it. Its Q2 label is not an independent reproduction of those exploratory statements; see reason F of [`corrections/e1-exploratory-claims-correction.md`](corrections/e1-exploratory-claims-correction.md).
 - **Internal values.** The internal sets' values (E1.1, E1.1-half, E1.2-excl-R1) are in `internal-sets.json` for audit only. They are not results (D2, D10).
 - **The attempt is spent.** There is no retry, and E1 is the last capacitance computation on S1 (the contract §8 stop rule).
@@ -100,7 +100,7 @@ The pre-approval evidence of contract §5 was regenerated from the corrected cod
 
 - The Confirmations' stand-in is synthetic (N = 9,995). Its `summary.json` carries S1's frozen C_hi, copied and not computed, and its QUALIFIED outcome includes the check C_lo^static ≤ C_hi against that copied value. The Confirmation index said otherwise; the correction is [`corrections/e1-preapproval-confirmation-rev8.5-readme-correction.md`](corrections/e1-preapproval-confirmation-rev8.5-readme-correction.md).
 - The forced run's CPU margin to the 450 s limit is 13.6 %. The Confirmation measures the attempt path on the stand-in, not on S1.
-- The rehearsal's output carries S1 geometry facts and, copied from the frozen static study, C_hi and C_br with their bit-exactness checks. It computes nothing on S1 beyond geometry.
+- The rehearsal's output carries S1 geometry facts, C_hi (copied bit-exactly from the frozen static study) and C_br (recomputed bit-exactly by the contract §1 formula from the same frozen record), each with its bit-exactness check. Beyond geometry it computes nothing on S1: recomputing C_br is float64 arithmetic on three recorded values.
 - The approval candidate binds all of this by sha256 in `APPROVAL-PACKAGE.rev8.5.json`, with a human-readable companion; a test recomputes every hash.
 
 ### The superseded evidence of `90bf9eb`
