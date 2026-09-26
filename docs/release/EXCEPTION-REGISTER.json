@@ -1,0 +1,1134 @@
+{
+  "register": "QMHP-CEM-RELEASE-EXCEPTION-REGISTER",
+  "register_revision": 1,
+  "frozen_from_commit": "ba076d9d972077a7a3e256a6404ab455fd748461",
+  "frozen_from_branch": "qutip/branch-a-fixed-point-crosscheck-v1-prep",
+  "frozen_on": "2026-09-26",
+  "release_scope_document": "docs/release/RELEASE-SCOPE.md",
+  "status_addendum": "docs/release/STATUS-ADDENDUM-2026-09-26.md",
+  "scope_approval": "Owner instruction in the working session on 2026-09-26: 'Approve narrow release scope — Palace benchmark + QuTiP fixed-point bundle only, openEMS/geometry explicitly unsupported'. A session statement; repository files cannot prove it.",
+  "release_actions_approved": "none: no tag, publication, merge or pull request is approved by the scope approval",
+  "file_class": "proprietary QMHP-CEM documentation/data; contains no third-party content",
+  "freeze_rule": "This file is frozen. tests/test_release_registers.py pins its sha256. It is never edited: a correction is a new, dated, superseding register that names this one.",
+  "measurement_rule": "Every digest and structured fact here was measured from the git objects of the frozen commit, not copied from another document. Line numbers are at the frozen commit.",
+  "tree_binding": {
+    "must_still_match": [
+      "results/",
+      "docs/qutip/",
+      "tools/qutip_bridge/",
+      "schemas/qutip/",
+      "scripts/export_qutip_branch_a_reference.py",
+      "experiments/qutip-a-readout-crosscheck/",
+      "solvers/openems/",
+      "docker/openems.Dockerfile",
+      "geometry/chip_planar/",
+      "geometry/package_picogk/"
+    ],
+    "exact_file_sets": {
+      "experiments/qutip-a-readout-crosscheck/": [
+        "ATTEMPT-LEDGER.QUTIP-A-READOUT-CROSSCHECK-v1-110a2e0-attempt1.json",
+        "EXECUTION-LOG.json",
+        "README.md",
+        "RESOURCE-RULE-APPROVAL.json",
+        "qutip_branch_a_launcher_asgrowth.py"
+      ],
+      "solvers/openems/": [
+        "__init__.py",
+        "adapter.py"
+      ],
+      "geometry/chip_planar/": [
+        "__init__.py",
+        "cells.py"
+      ],
+      "geometry/package_picogk/": [
+        "Object001Package.cs",
+        "Program.cs",
+        "QmhpCem.Geometry.csproj",
+        "README.md",
+        "__init__.py",
+        "driver.py"
+      ]
+    },
+    "rule": "A sha256_at_frozen_commit or register_sha256 on a path under one of these prefixes must still match the working tree; tests/test_release_registers.py fails closed otherwise. Digests of other cited files (for example pyproject.toml, uv.lock, orchestrator/manifest.py) are recorded at the frozen commit only: those files may change later, and this register then describes the frozen commit, not the later tree. Each exact_file_sets directory must hold exactly the listed files, so that, for example, a second attempt ledger cannot appear beside the one spent attempt, and no file can be added to the openEMS or geometry directories. Every file in those three directories, and docker/openems.Dockerfile, is digest-bound (REL-BD-01 to REL-BD-03), and the test exercises the registry-resolved openEMS adapter and the package-level planar cells, so a change there fails the test until a superseding scope is approved. An implementation placed in some other directory is not detected by this mechanism."
+  },
+  "disposition_vocabulary": {
+    "QUARANTINED": "A record kept exactly as executed with no execution-time register; its files are content-pinned by tests/test_frozen_evidence.py.",
+    "APPROVED-BY-OWNER": "An exception or deviation the owner approved in the working session (a session statement the records reference by identifier and digest). It is carried, not removed.",
+    "DISCLOSED-UNRESOLVED": "A known defect, gap or ambiguity, disclosed and not fixed in this release.",
+    "IMMUTABLE-TEXT": "Stale or incorrect text inside hash-pinned bytes or an executed record. It must not be edited; the dated addendum states how to read it.",
+    "NOT-RECOMPUTABLE": "Cannot be established from the repository.",
+    "HUMAN-DECISION-REQUIRED": "Needs an owner, reviewer or legal decision; no conclusion is drawn here.",
+    "UNSUPPORTED": "Belongs to a capability the release does not support.",
+    "DISCLOSURE": "An event disclosed for completeness; no defect in the evidence."
+  },
+  "exceptions": [
+    {
+      "id": "EXC-P01",
+      "scope": "release-palace",
+      "disposition": "QUARANTINED",
+      "title": "PALACE-VERIFY-20260915T063014Z: failed execution with no register",
+      "statement": "The record has no manifest.sha256. Its only run, ladder-L1, is RUN_FAILED: Palace exited 1 with 'InterpolationOperator class requires MFEM_USE_GSLIB!' on image 732526ec (no palace-gslib label). Report rendering then failed, so neither report.md nor a manifest was written. summary.json has complete false and verdict fields mesh INCOMPLETE, aux BLOCKED, Object 001 BLOCKED.",
+      "quarantine_record": "PALACE-VERIFY-20260915T063014Z",
+      "evidence": [
+        {
+          "path": "results/PALACE-VERIFY-20260915T063014Z/summary.json",
+          "sha256_at_frozen_commit": "c84549b80ccd8b5336c0f1289780b7ca44771a50730b8f4d220a8320a340b720"
+        },
+        {
+          "path": "tests/test_frozen_evidence.py",
+          "lines_at_frozen_commit": "95-118"
+        }
+      ],
+      "consequence": "Its verdict fields are artefacts of an aborted run and are never counted. Integrity rests on content pins taken at commit time, not on an execution-time register.",
+      "resolution_route": "None. Writing a manifest now is prohibited (it would be an operator register written after the run)."
+    },
+    {
+      "id": "EXC-P02",
+      "scope": "release-palace",
+      "disposition": "DISCLOSED-UNRESOLVED",
+      "title": "Residual byte-pattern variability in golden solver output",
+      "statement": "Two eig.csv and error-indicators.csv byte patterns occur across the 13 golden records. The eig.csv patterns differ in Im(f), Q and the error columns at about the 6th significant digit of those columns, and the real parts are identical. error-indicators.csv differs more: its Maximum column differs at the 4th significant digit (1.025941020e-03 against 1.023900419e-03, a relative difference of about 2e-3). The same 10/3 split, on the same three records (025408Z, 063105Z, 233133Z), also occurs in output that takes no Palace input: quantum_results.json (94c4450c... against aefeb606...), gate_report.json (8e272ab7... against e686b849...) and the COLLISION measured value (98.41316039467607 against 98.41316039466896 MHz). Those come from the host-side dressed_system.dressed_spectrum() of the nominal device model, whose pulls differ by up to 7.2e-11 MHz (sink pull 8.72116588454297 against 8.721165884614912). All 13 records carry the same recorded os, python version and dependency lock. The pattern recurred after the thread pin and does not follow the image ID. The three da6f7d0d records are also the three shortest Palace runs (a correlation, not a cause).",
+      "evidence": [
+        {
+          "path": "results/PALACE-GOLDEN-20260915T014639Z/QMHP-CEM-A-RF-000001/solver/postpro/eig.csv",
+          "sha256_at_frozen_commit": "19877b1e7acad8f2787b7d193a23a906bb1b8f9385c3a6cb53dd4bafb505fdfa"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T025408Z/QMHP-CEM-A-RF-000001/solver/postpro/eig.csv",
+          "sha256_at_frozen_commit": "da6f7d0d1f8f385db87a41d32d398b3c239fa98f4d1b330c5557dbe3351adc32"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T014639Z/QMHP-CEM-A-RF-000001/quantum_results.json",
+          "sha256_at_frozen_commit": "aefeb60664edcd237c4f18aa1a2d1901a499bea2b171adc4036ab9a36f271a2b"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T025408Z/QMHP-CEM-A-RF-000001/quantum_results.json",
+          "sha256_at_frozen_commit": "94c4450c2a9d8f06c8164d5df3a72cf9b4c30113e97ed3cb4c92dcd42cc14d7c"
+        }
+      ],
+      "host_side_split": {
+        "quantum_results_sha256_groups": [
+          {
+            "sha256": "aefeb60664edcd237c4f18aa1a2d1901a499bea2b171adc4036ab9a36f271a2b",
+            "records": [
+              "PALACE-GOLDEN-20260915T014639Z",
+              "PALACE-GOLDEN-20260915T015804Z",
+              "PALACE-GOLDEN-20260915T030418Z",
+              "PALACE-GOLDEN-20260915T050927Z",
+              "PALACE-GOLDEN-20260915T065025Z",
+              "PALACE-GOLDEN-20260915T091128Z",
+              "PALACE-GOLDEN-20260915T115911Z",
+              "PALACE-GOLDEN-20260915T225434Z",
+              "PALACE-GOLDEN-20260916T023201Z",
+              "PALACE-GOLDEN-20260920T120817Z"
+            ]
+          },
+          {
+            "sha256": "94c4450c2a9d8f06c8164d5df3a72cf9b4c30113e97ed3cb4c92dcd42cc14d7c",
+            "records": [
+              "PALACE-GOLDEN-20260915T025408Z",
+              "PALACE-GOLDEN-20260915T063105Z",
+              "PALACE-GOLDEN-20260915T233133Z"
+            ]
+          }
+        ],
+        "collision_measured_groups": [
+          {
+            "value": 98.41316039466896,
+            "records": [
+              "PALACE-GOLDEN-20260915T014639Z",
+              "PALACE-GOLDEN-20260915T015804Z",
+              "PALACE-GOLDEN-20260915T030418Z",
+              "PALACE-GOLDEN-20260915T050927Z",
+              "PALACE-GOLDEN-20260915T065025Z",
+              "PALACE-GOLDEN-20260915T091128Z",
+              "PALACE-GOLDEN-20260915T115911Z",
+              "PALACE-GOLDEN-20260915T225434Z",
+              "PALACE-GOLDEN-20260916T023201Z",
+              "PALACE-GOLDEN-20260920T120817Z"
+            ]
+          },
+          {
+            "value": 98.41316039467607,
+            "records": [
+              "PALACE-GOLDEN-20260915T025408Z",
+              "PALACE-GOLDEN-20260915T063105Z",
+              "PALACE-GOLDEN-20260915T233133Z"
+            ]
+          }
+        ]
+      },
+      "consequence": "Reproducibility is claimed at the level of frequencies and verdicts only (REL-PAL-04). The records show that the splits coincide, not that they share a cause.",
+      "resolution_route": "Root cause not established; would need a separately approved investigation."
+    },
+    {
+      "id": "EXC-P03",
+      "scope": "release-palace",
+      "disposition": "NOT-RECOMPUTABLE",
+      "title": "Thread pin not verifiable from the records",
+      "statement": "No Palace record contains OMP_NUM_THREADS or OPENBLAS_NUM_THREADS. The pin is declared in docker/palace.Dockerfile only, and each record was built from its own commit's Dockerfile. After the pin, Palace Total still spans 23.207766373 s to 40.952382498 s.",
+      "evidence": [
+        {
+          "path": "docker/palace.Dockerfile",
+          "lines_at_frozen_commit": "191-192"
+        }
+      ],
+      "consequence": "The thread configuration of each run is an expected configuration, not a measured one.",
+      "resolution_route": "None for the existing records."
+    },
+    {
+      "id": "EXC-P04",
+      "scope": "release-palace",
+      "disposition": "DISCLOSED-UNRESOLVED",
+      "title": "Palace image is not registry-pinned",
+      "statement": "7 distinct local image IDs occur across the 17 Palace records; repo_digest is null in every record; the palace-gslib label is absent on cc87ec6b, 484073ba and 732526ec and 'ON' on the others. The images are not retained in the repository, and a rebuild is not guaranteed bit-identical.",
+      "image_ids": {
+        "sha256:2440f8d0b04f6413bfd385b9c72e502d633c37eb0672a8fffbcc23d4a4064759": [
+          "PALACE-VERIFY-20260915T115901Z"
+        ],
+        "sha256:30c91c71d34ba29e49aa6ebcb67220800622251a0dd4cc8ea5dc7e8b229b945c": [
+          "PALACE-GOLDEN-20260915T115911Z",
+          "PALACE-GOLDEN-20260915T225434Z",
+          "PALACE-GOLDEN-20260915T233133Z",
+          "PALACE-GOLDEN-20260916T023201Z",
+          "PALACE-GOLDEN-20260920T120817Z"
+        ],
+        "sha256:484073bafdb0fac46ec037d8b711ba9c08138689dd208863f904f1c6cb009bd5": [
+          "PALACE-GOLDEN-20260915T030418Z"
+        ],
+        "sha256:732526ecea92853418d2ed009475825063e400dc9fa06471d90d9c89e04cce9e": [
+          "PALACE-GOLDEN-20260915T050927Z",
+          "PALACE-GOLDEN-20260915T063105Z",
+          "PALACE-VERIFY-20260915T063014Z"
+        ],
+        "sha256:b19e305b926216e10619ba51435bd78ee5b1b34e996e953a70030191e3ed0063": [
+          "PALACE-GOLDEN-20260915T065025Z"
+        ],
+        "sha256:cc87ec6b397ec4e55b19984b112e1638d15dd3f18bd3cf9a3b594019ec474265": [
+          "PALACE-GOLDEN-20260915T014639Z",
+          "PALACE-GOLDEN-20260915T015804Z",
+          "PALACE-GOLDEN-20260915T025408Z"
+        ],
+        "sha256:f41ad915d54c2b31d7131bbd570479ccf9cc577eac7ea208ab06f840d8b0aa46": [
+          "PALACE-GOLDEN-20260915T091128Z",
+          "PALACE-VERIFY-20260915T065055Z",
+          "PALACE-VERIFY-20260915T091242Z"
+        ]
+      },
+      "evidence": [
+        {
+          "path": "results/PALACE-GOLDEN-20260915T014639Z/execution_record.json",
+          "what": "solver_provenance"
+        }
+      ],
+      "consequence": "Re-execution on the identical binary cannot be done from the repository alone.",
+      "resolution_route": "A future registry-pinned image; not part of this release."
+    },
+    {
+      "id": "EXC-P05",
+      "scope": "release-palace",
+      "disposition": "DISCLOSED-UNRESOLVED",
+      "title": "Benchmark thresholds are ENGINEERING-RULEs",
+      "statement": "Every Palace threshold (golden tolerance 0.02, expected deviation 1e-4, eigen and backward-error tolerances 1e-6, mesh-refinement 1e-4 rules, height rules, the 400000-DOF budget, timeouts) is an ENGINEERING-RULE of the adapter or campaign, declared before the runs.",
+      "evidence": [
+        {
+          "path": "solvers/palace/config.py",
+          "lines_at_frozen_commit": "33-73"
+        },
+        {
+          "path": "solvers/palace/verification.py",
+          "lines_at_frozen_commit": "44-76"
+        }
+      ],
+      "consequence": "No PASS against these rules is a physical-validation statement.",
+      "resolution_route": "None needed; carried as a qualification."
+    },
+    {
+      "id": "EXC-P06",
+      "scope": "release-palace",
+      "disposition": "DISCLOSED-UNRESOLVED",
+      "title": "065055Z verdicts differ because the analysis code differed",
+      "statement": "All four VERIFY records share the same campaign definition (campaign.json ef3689ac...). 065055Z (analysis at git_commit 801d5b94) gives aux INCOMPLETE and Object 001 INCOMPLETE; 091242Z and 115901Z (da0a48c9, ac8bc4a0) give aux PASS and Object 001 BLOCKED. The campaign digest does not bind the analysis code. No separate correction record exists; commit 90924c1 reports a campaign workflow step failure although summary.json has complete true.",
+      "evidence": [
+        {
+          "path": "results/PALACE-VERIFY-20260915T065055Z/summary.json"
+        },
+        {
+          "path": "docs/palace-verification.md",
+          "lines_at_frozen_commit": "110"
+        }
+      ],
+      "consequence": "065055Z is kept as executed; its verdicts are superseded in reading only by the later records.",
+      "resolution_route": "A correction record, if the owner wants one; not part of this release."
+    },
+    {
+      "id": "EXC-P07",
+      "scope": "release-palace",
+      "disposition": "DISCLOSED-UNRESOLVED",
+      "title": "campaign.sha256 is a definition digest, not a file manifest, and is unpinned",
+      "statement": "campaign.sha256 holds the canonical-JSON digest 249e1a12... labelled campaign.json; sha256sum -c against the file bytes (ef3689ac...) would fail. The .sha256 suffix is outside the membership rule and no pin covers it (file sha256 d0d2d5a6... in all four VERIFY records).",
+      "evidence": [
+        {
+          "path": "orchestrator/manifest.py",
+          "sha256_at_frozen_commit": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f"
+        },
+        {
+          "path": "docs/agent-contract-implementation.md",
+          "lines_at_frozen_commit": "172-175"
+        }
+      ],
+      "consequence": "None for the verdicts; a documentation and pinning gap.",
+      "resolution_route": "None in this release."
+    },
+    {
+      "id": "EXC-P08",
+      "scope": "release-palace",
+      "disposition": "NOT-RECOMPUTABLE",
+      "title": "Palace statements that exist only in docs or commit subjects",
+      "statement": "Workflow run IDs, the failed image-build runs and the 818 s build, the '1 passed' palace-marked test, and the 3x3 Palace sweep output (a workflow artifact only) appear in docs or commit subjects, not in any committed record.",
+      "evidence": [
+        {
+          "path": "docs/palace-execution.md",
+          "lines_at_frozen_commit": "185-193, 222-227, 311-320, 337-339"
+        }
+      ],
+      "consequence": "None of these is a release claim.",
+      "resolution_route": "None; GitHub Actions artifacts expire."
+    },
+    {
+      "id": "EXC-P09",
+      "scope": "release-palace",
+      "disposition": "IMMUTABLE-TEXT",
+      "title": "Stale text inside the 13 golden execution records",
+      "statement": "Every golden execution record says 'not yet a mesh-converged result (spec §15)', written before the verification campaign ran; and every TOLERANCE gate reason says the static and dressed models 'are not implemented in v0.1', although they are implemented and the record's own quantum_unavailable gives the real cause: '--tolerance-samples 0'. Eleven of the 13 records (all but the first two, which predate the field) also carry \"validated\": true. It is written by scripts/palace_golden_run.py:271 as 'results is not None', and means only that the result passed validate_convergence().",
+      "quotes": [
+        {
+          "path": "results/PALACE-GOLDEN-20260915T014639Z/execution_record.json",
+          "text": "not yet a mesh-converged result"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T015804Z/execution_record.json",
+          "text": "not yet a mesh-converged result"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T025408Z/execution_record.json",
+          "text": "not yet a mesh-converged result"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T030418Z/execution_record.json",
+          "text": "not yet a mesh-converged result"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T050927Z/execution_record.json",
+          "text": "not yet a mesh-converged result"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T063105Z/execution_record.json",
+          "text": "not yet a mesh-converged result"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T065025Z/execution_record.json",
+          "text": "not yet a mesh-converged result"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T091128Z/execution_record.json",
+          "text": "not yet a mesh-converged result"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T115911Z/execution_record.json",
+          "text": "not yet a mesh-converged result"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T225434Z/execution_record.json",
+          "text": "not yet a mesh-converged result"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T233133Z/execution_record.json",
+          "text": "not yet a mesh-converged result"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260916T023201Z/execution_record.json",
+          "text": "not yet a mesh-converged result"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260920T120817Z/execution_record.json",
+          "text": "not yet a mesh-converged result"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T014639Z/execution_record.json",
+          "text": "which are not implemented in v0.1."
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T015804Z/execution_record.json",
+          "text": "which are not implemented in v0.1."
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T025408Z/execution_record.json",
+          "text": "which are not implemented in v0.1."
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T030418Z/execution_record.json",
+          "text": "which are not implemented in v0.1."
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T050927Z/execution_record.json",
+          "text": "which are not implemented in v0.1."
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T063105Z/execution_record.json",
+          "text": "which are not implemented in v0.1."
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T065025Z/execution_record.json",
+          "text": "which are not implemented in v0.1."
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T091128Z/execution_record.json",
+          "text": "which are not implemented in v0.1."
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T115911Z/execution_record.json",
+          "text": "which are not implemented in v0.1."
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T225434Z/execution_record.json",
+          "text": "which are not implemented in v0.1."
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T233133Z/execution_record.json",
+          "text": "which are not implemented in v0.1."
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260916T023201Z/execution_record.json",
+          "text": "which are not implemented in v0.1."
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260920T120817Z/execution_record.json",
+          "text": "which are not implemented in v0.1."
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T025408Z/execution_record.json",
+          "text": "\"validated\": true"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T030418Z/execution_record.json",
+          "text": "\"validated\": true"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T050927Z/execution_record.json",
+          "text": "\"validated\": true"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T063105Z/execution_record.json",
+          "text": "\"validated\": true"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T065025Z/execution_record.json",
+          "text": "\"validated\": true"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T091128Z/execution_record.json",
+          "text": "\"validated\": true"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T115911Z/execution_record.json",
+          "text": "\"validated\": true"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T225434Z/execution_record.json",
+          "text": "\"validated\": true"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T233133Z/execution_record.json",
+          "text": "\"validated\": true"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260916T023201Z/execution_record.json",
+          "text": "\"validated\": true"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260920T120817Z/execution_record.json",
+          "text": "\"validated\": true"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "evaluator/computational.py",
+          "lines_at_frozen_commit": "193-197"
+        },
+        {
+          "path": "scripts/palace_golden_run.py",
+          "lines_at_frozen_commit": "271"
+        }
+      ],
+      "consequence": "Read with the addendum: the empty-box mesh campaign has since been executed (REL-PAL-06); the TOLERANCE gate was not evaluated because no ensemble was requested; 'validated' is eigensolver-convergence acceptance of the empty box, not validation of Object 001 (REL-PAL-N2).",
+      "resolution_route": "Records are immutable; the dated addendum is the reconciliation."
+    },
+    {
+      "id": "EXC-P10",
+      "scope": "release-palace",
+      "disposition": "DISCLOSED-UNRESOLVED",
+      "title": "Out-of-scope material reads the empty-box mode as a package mode",
+      "statement": "config/coupled/v2a_five_node_candidate.json:586 calls 9.635690 GHz 'the first package mode' citing PALACE-VERIFY-20260915T115901Z, and config/coupled/source_register.json:155-163 binds the 'first Object 001 package mode 9.635690 GHz'. That value is the ladder-L3 (1,1,0) frequency of the EMPTY PEC box; the chip dielectric, recess, launches and lid are absent.",
+      "evidence": [
+        {
+          "path": "config/coupled/v2a_five_node_candidate.json",
+          "lines_at_frozen_commit": "586"
+        },
+        {
+          "path": "config/coupled/source_register.json",
+          "lines_at_frozen_commit": "155-163"
+        }
+      ],
+      "consequence": "The release establishes no package mode (REL-PAL-N2). Those files are out of scope and are not edited here.",
+      "resolution_route": "Owner review of the coupled-candidate binding, outside this release."
+    },
+    {
+      "id": "EXC-P11",
+      "scope": "release-palace",
+      "disposition": "DISCLOSED-UNRESOLVED",
+      "title": "Environment fields in all 17 Palace records are wrong or declared",
+      "statement": "environment.uv_version is '(x86_64-unknown-linux-gnu)', a platform triple, because orchestrator/environment.py:30 takes the last token of 'uv --version'. environment.picogk_version '2.3.0' is the constant PICOGK_VERSION although dotnet_version is null.",
+      "evidence": [
+        {
+          "path": "orchestrator/environment.py",
+          "lines_at_frozen_commit": "28-30"
+        },
+        {
+          "path": "geometry/package_picogk/driver.py",
+          "lines_at_frozen_commit": "25-28"
+        }
+      ],
+      "consequence": "The uv version of each run cannot be recovered from the records; picogk_version is a declared value in a measured-environment field. Neither affects the solver result.",
+      "resolution_route": "A code fix would be a separate approved change; the records stay as executed."
+    },
+    {
+      "id": "EXC-P12",
+      "scope": "release-palace",
+      "disposition": "DISCLOSED-UNRESOLVED",
+      "title": "The Palace adapter does not refuse in-module",
+      "statement": "solvers/palace/adapter.py is the sole NO_IN_MODULE_REFUSAL member: it launches whatever its caller hands it. Recorded as an open architecture question.",
+      "evidence": [
+        {
+          "path": "tests/test_launch_authority.py",
+          "lines_at_frozen_commit": "281-294"
+        },
+        {
+          "path": "docs/agent-contract-implementation.md",
+          "lines_at_frozen_commit": "103-112"
+        }
+      ],
+      "consequence": "Launch authority for Palace rests on callers and human approval, not on the adapter.",
+      "resolution_route": "Open architecture question; not part of this release."
+    },
+    {
+      "id": "EXC-P13",
+      "scope": "release-palace",
+      "disposition": "DISCLOSED-UNRESOLVED",
+      "title": "Workflow-trigger exposure of Palace paths",
+      "statement": "palace-golden.yml runs a Palace solve and commits a record on a push to main or palace/** that touches solvers/palace/**, docker/palace.Dockerfile, scripts/palace_golden_run.py or the workflow; palace-verify.yml has its own three paths. docs/, README.md and tests/ are not trigger paths; a push to the qutip/ branch triggers ci.yml only.",
+      "evidence": [
+        {
+          "path": ".github/workflows/palace-golden.yml",
+          "lines_at_frozen_commit": "27-49"
+        },
+        {
+          "path": "tests/test_launch_authority.py",
+          "lines_at_frozen_commit": "55-109"
+        }
+      ],
+      "consequence": "Release documentation must not touch those paths on those branches.",
+      "resolution_route": "None needed."
+    },
+    {
+      "id": "EXC-P14",
+      "scope": "release-palace",
+      "disposition": "HUMAN-DECISION-REQUIRED",
+      "title": "Licence status of the tools that produced the Palace evidence is not recorded",
+      "statement": "Palace 0.13.0 (commit a61c8cbe) produced the Palace records, with the libraries its image builds through Palace's superbuild (docker/palace.Dockerfile names MFEM, hypre, METIS, PETSc/SLEPc, SuperLU_DIST and libCEED 'and the rest', and enables GSLIB) and the Ubuntu runtime packages it installs (OpenMPI, OpenBLAS and the GCC runtime libraries, among others). gmsh (4.15.2 in uv.lock, via the optional 'palace' extra) generated the committed meshes. That component list is not exhaustive and no component version other than Palace's and gmsh's was measured. The release registers record no licence or distribution status for them. The repository LICENSE says third-party software such as Palace and MFEM is governed by its own licences.",
+      "evidence": [
+        {
+          "path": "LICENSE"
+        },
+        {
+          "path": "pyproject.toml",
+          "lines_at_frozen_commit": "23-26"
+        },
+        {
+          "path": "docker/palace.Dockerfile",
+          "lines_at_frozen_commit": "29-32, 81-82, 135, 169-170"
+        }
+      ],
+      "consequence": "No legal conclusion is drawn here (CLAUDE.md section 12).",
+      "resolution_route": "Human or legal review before any publication."
+    },
+    {
+      "id": "EXC-Q01",
+      "scope": "release-qutip",
+      "disposition": "APPROVED-BY-OWNER",
+      "title": "Resource-limit deviation: memory_limit_MB = 1024 not enforced",
+      "statement": "macOS rejected RLIMIT_AS and RLIMIT_DATA of 1 GiB (errno 22 EINVAL, reproduced by the dummy diagnostic). For RLIMIT_AS the diagnostic ties this to virtual size: the smallest accepted soft limit on its ladder was 512 GiB against a 415.10 GiB process; the cause of the RLIMIT_DATA rejection was not measured. The execution used the separately approved rule QUTIP-A-MACOS-AS-GROWTH-LIMIT-v1: RLIMIT_AS soft = hard = the checker's baseline VSZ + 1073741824 bytes, an ADDRESS-SPACE GROWTH LIMIT. The frozen-rules file was not edited.",
+      "evidence": [
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/inputs/archive/qmhp-qutip-branch-a-approval-110a2e0/frozen-rules.json",
+          "sha256_at_frozen_commit": "42e1c2a9963b92b7a3d54ff86bdebae479b8aee9a81fbd519821d32b1f3c57d6"
+        },
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/RESOURCE-RULE-APPROVAL.json",
+          "sha256_at_frozen_commit": "7d38e9de97595391003bdd4943d2dd8352bc5a2c0ef9254c5c5dc71af9a122bf"
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/launcher-final.json",
+          "sha256_at_frozen_commit": "0c4f9c716295b57df7cb7caa8a2efe53b130544cbe926b38e23d4ef41164631f"
+        },
+        {
+          "path": "results/QUTIP-A-MAC-MEMORY-DIAGNOSTIC-20260926T045655Z/console.txt",
+          "sha256_at_frozen_commit": "e5c160887f9b1db9922e84eb49b7a8862d515bb79f702b2c066a35bd2e34b75a"
+        }
+      ],
+      "consequence": "Protocol conformance is QUALIFIED: RESOURCE-LIMIT DEVIATION (REL-QT-01, REL-QT-06). The growth control is not a total-memory or resident-memory limit; memory committed later inside regions reserved before the limit is not established as bounded; child processes inherit the absolute RLIMIT_AS.",
+      "resolution_route": "Carried permanently for this execution. It is never to be described as a 1 GiB total-memory limit (that description is not correct)."
+    },
+    {
+      "id": "EXC-Q02",
+      "scope": "release-qutip",
+      "disposition": "APPROVED-BY-OWNER",
+      "title": "Launcher-registered records and the narrow file-type exception",
+      "statement": "The four QUTIP-A records use their writers' own sha256sum-format registers (launcher-manifest.sha256, SHA256SUMS, qualification-manifest.sha256), not manifest.sha256. They contain 48 files whose suffixes are outside orchestrator.manifest.COMMITTABLE_SUFFIXES (.py, .stdout, .stderr, .log, run-attempt1.* timing files, PRESERVATION-SHA256SUMS, SHA256SUMS). None contains a NUL byte; the four records total 1195866 bytes. The owner approved this as a NARROW RECORD-SPECIFIC EXCEPTION on 2026-09-26; the general policy is unchanged.",
+      "launcher_registered": {
+        "QUTIP-A-LAUNCH-BLOCKED-20260926T025352Z": {
+          "register": "launcher-manifest.sha256",
+          "register_sha256": "546de29f88e8ce46ec890e9ec28fae79a5646ecb9bb030b669ea8edc9d4e1826"
+        },
+        "QUTIP-A-MAC-MEMORY-DIAGNOSTIC-20260926T045655Z": {
+          "register": "SHA256SUMS",
+          "register_sha256": "d0e341588cc932064beb6207c48d5e3698c98aff25be717194870856cf91fa81"
+        },
+        "QUTIP-A-LAUNCHER-CONTROL-TEST-20260926T060642Z": {
+          "register": "qualification-manifest.sha256",
+          "register_sha256": "b5443d4195848248f817a37c14c341d2fcc3b8e930d88e96b0968750e813b3fc"
+        },
+        "QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z": {
+          "register": "launcher-manifest.sha256",
+          "register_sha256": "a6bfdcd36e643457571ccc30fc84bd7bfcb91d113ff8f7f037b035fa96881ce3"
+        }
+      },
+      "outside_committable_suffixes": {
+        "QUTIP-A-LAUNCH-BLOCKED-20260926T025352Z": 10,
+        "QUTIP-A-MAC-MEMORY-DIAGNOSTIC-20260926T045655Z": 2,
+        "QUTIP-A-LAUNCHER-CONTROL-TEST-20260926T060642Z": 17,
+        "QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z": 19
+      },
+      "evidence": [
+        {
+          "path": "tests/test_frozen_evidence.py",
+          "lines_at_frozen_commit": "139-181"
+        },
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/EXECUTION-LOG.json",
+          "sha256_at_frozen_commit": "efde298390b5335543441db9e5fd8212ddae05497e8eed294016559e534fd370"
+        },
+        {
+          "path": "orchestrator/manifest.py",
+          "sha256_at_frozen_commit": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f"
+        }
+      ],
+      "consequence": "scripts/check_record_files.py would flag these files if run on the records without --allow; no CLI command verifies these registers (EXC-R05).",
+      "resolution_route": "None; the exception is record-specific and does not extend to any other record."
+    },
+    {
+      "id": "EXC-Q03",
+      "scope": "release-qutip",
+      "disposition": "IMMUTABLE-TEXT",
+      "title": "Provenance overclaim: 'linked libraries are recorded'",
+      "statement": "The checker's provenance_qualification says 'platform and linked libraries are recorded, not qualified', but runtime_identity() records only python_version, platform, machine and the numpy/scipy/qutip __version__ strings; no BLAS/LAPACK/Accelerate information is recorded. The same overclaim is in the pinned protocol document, in the evidence record's result.json and launcher-final.json (classification.checker_provenance_qualification), in the checker copies inside the three QUTIP-A records that carry them, and in EXECUTION-LOG.json, which corrects it on the next line.",
+      "quotes": [
+        {
+          "path": "tools/qutip_bridge/check_branch_a_reference.py",
+          "text": "platform and linked libraries are recorded, "
+        },
+        {
+          "path": "docs/qutip/branch-a-fixed-point-crosscheck-v1.md",
+          "text": "The platform and the linked numerical libraries are recorded, not qualified."
+        },
+        {
+          "path": "docs/qutip/branch-a-fixed-point-crosscheck-v1.md",
+          "text": "The platform and linked libraries are recorded, not qualified."
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/checker-output/result.json",
+          "text": "platform and linked libraries are recorded, not qualified"
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/launcher-final.json",
+          "text": "platform and linked libraries are recorded, not qualified"
+        },
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/EXECUTION-LOG.json",
+          "text": "platform and linked libraries are recorded, not qualified"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "tools/qutip_bridge/check_branch_a_reference.py",
+          "lines_at_frozen_commit": "842-859, 985-990",
+          "sha256_at_frozen_commit": "9f0798c5b307aa455a3bd6482ab5b46c513d448413de9e8aa14ae48d2733e2b1"
+        }
+      ],
+      "consequence": "Linked-library provenance is NOT-ESTABLISHED (REL-QT-QN8); RUNTIME-VERSIONS-MATCHED means version strings only.",
+      "resolution_route": "The bytes are pinned by the executed record; the dated addendum is the correction."
+    },
+    {
+      "id": "EXC-Q04",
+      "scope": "release-qutip",
+      "disposition": "NOT-RECOMPUTABLE",
+      "title": "Values and custody facts that cannot be recomputed from the repository",
+      "statement": "hamiltonian_max_entry 1.1102230246251565e-16 and the independent Hermiticity defect 4.983043024956605e-15 (the QuTiP Hamiltonian is not stored); the QuTiP-side overlaps and f8 weight values (eigenvectors not stored); the owner's Mac-side shasum screenshots; the upload archives and the export archive (binary, not committed); the first launcher (sha256 9d70d904..., not in the bundle), and therefore the 'verbatim' apply_memory_cap copy in the diagnostic script; the Mac interpreter and site-packages state beyond the recorded versions.",
+      "evidence": [
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/EXECUTION-LOG.json",
+          "sha256_at_frozen_commit": "efde298390b5335543441db9e5fd8212ddae05497e8eed294016559e534fd370"
+        },
+        {
+          "path": "results/QUTIP-A-MAC-MEMORY-DIAGNOSTIC-20260926T045655Z/mac_memory_limit_diagnostic.py",
+          "sha256_at_frozen_commit": "1cc3c52195b9fe4201dd88de1b57eae531121c8c2e58ad3578dee7b099be916f"
+        }
+      ],
+      "consequence": "The claim register cites the two values as recorded, checker-attested values (REL-QT-02, REL-QT-09) and never as recomputed; the custody facts are ASSERTED (REL-QT-10).",
+      "resolution_route": "None within the repository."
+    },
+    {
+      "id": "EXC-Q05",
+      "scope": "release-qutip",
+      "disposition": "DISCLOSED-UNRESOLVED",
+      "title": "The blocked launch and the inferred EINVAL cause",
+      "statement": "The first launcher stopped at BLOCKED-PREFLIGHT because it could not apply its fixed memory cap; its message ends '(SubprocessError: Exception occurred in preexec_fn.)'. The EINVAL cause stated in EXECUTION-LOG.json is not in that record: it is inferred from the later dummy diagnostic that reproduced the failure. The run then proceeded through a diagnostic, a revised launcher, a new resource-rule approval and a new execution approval (-v2).",
+      "evidence": [
+        {
+          "path": "results/QUTIP-A-LAUNCH-BLOCKED-20260926T025352Z/launcher-final.json",
+          "sha256_at_frozen_commit": "724b3350d17f6803786afe1ad564ad6cb1b155b8599d255a002b840e294fd8d5"
+        },
+        {
+          "path": "results/QUTIP-A-MAC-MEMORY-DIAGNOSTIC-20260926T045655Z/console.txt",
+          "sha256_at_frozen_commit": "e5c160887f9b1db9922e84eb49b7a8862d515bb79f702b2c066a35bd2e34b75a"
+        }
+      ],
+      "consequence": "Not an additional scientific attempt: no checker, no receipt, no ledger.",
+      "resolution_route": "None needed."
+    },
+    {
+      "id": "EXC-Q06",
+      "scope": "release-qutip",
+      "disposition": "HUMAN-DECISION-REQUIRED",
+      "title": "QuTiP licence and dependency status not recorded",
+      "statement": "QuTiP 5.0.4 (with NumPy 2.0.2 and SciPy 1.13.1) was used on the owner's Mac. Its licence and distribution status are recorded nowhere in the bundle, and QuTiP is not a declared dependency (absent from pyproject.toml and uv.lock). Nothing indicates QuTiP is redistributed.",
+      "evidence": [
+        {
+          "path": "pyproject.toml",
+          "sha256_at_frozen_commit": "b26642acb58638be3477c1e6f72b139e3dc2b6f8074a2922414b2abf409f8dc9"
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/inputs/archive/qmhp-qutip-branch-a-approval-110a2e0/frozen-rules.json",
+          "sha256_at_frozen_commit": "42e1c2a9963b92b7a3d54ff86bdebae479b8aee9a81fbd519821d32b1f3c57d6"
+        }
+      ],
+      "consequence": "No legal conclusion is drawn here (CLAUDE.md section 12).",
+      "resolution_route": "Human or legal review before any release that distributes or depends on QuTiP."
+    },
+    {
+      "id": "EXC-Q07",
+      "scope": "release-qutip",
+      "disposition": "IMMUTABLE-TEXT",
+      "title": "Stale status text in hash-pinned bridge files and inside the evidence",
+      "statement": "The protocol document, checker, exporter, schema and launcher still say they are prepared, not approved and not executed, or that the resource rule is PROPOSED. Their bytes are pinned by the executed record, and tests/test_qutip_bridge_contract.py asserts three of the strings. The snapshot inside the evidence carries 'PROPOSED ENGINEERING-RULE, not approved' and the preservation README says 'No QuTiP calculation has been run.', both true when written. The execution record's launcher-final.json and attempt-receipt.json embed the rule text and rule_status 'PROPOSED; requires separate human approval before scientific execution' verbatim, although both also record the approval file the launcher consumed (resource_rule_approval: OWNER-APPROVAL-2026-09-26-QUTIP-A-AS-GROWTH-RULE-v1, sha256 7d38e9de..., equal to RESOURCE-RULE-APPROVAL.json). The qualification record's qualification-final.json carries the same PROPOSED text, which was accurate when written: the approval file names that file's digest (63efd145...), so it was written afterwards. The owner's approval itself is a session statement (REL-QT-10). The byte-identical checker and schema copies inside the three QUTIP-A records carry the same status text as the repository files.",
+      "quotes": [
+        {
+          "path": "docs/qutip/branch-a-fixed-point-crosscheck-v1.md",
+          "text": "**Status: PREPARED, NOT APPROVED, NOT EXECUTED. Scientific execution is BLOCKED.**"
+        },
+        {
+          "path": "docs/qutip/branch-a-fixed-point-crosscheck-v1.md",
+          "text": "No reference snapshot has been generated. No QuTiP calculation has been run."
+        },
+        {
+          "path": "docs/qutip/branch-a-fixed-point-crosscheck-v1.md",
+          "text": "**The ambiguity rule is not yet approved.**"
+        },
+        {
+          "path": "docs/qutip/branch-a-fixed-point-crosscheck-v1.md",
+          "text": "They are **not approved**, and **no result was used to choose them**."
+        },
+        {
+          "path": "docs/qutip/branch-a-fixed-point-crosscheck-v1.md",
+          "text": "**Still to be frozen by a human before any evidence-bearing run.**"
+        },
+        {
+          "path": "docs/qutip/branch-a-fixed-point-crosscheck-v1.md",
+          "text": "so the QuTiP assembly path is exercised by no test."
+        },
+        {
+          "path": "tools/qutip_bridge/check_branch_a_reference.py",
+          "text": "STATUS: PREPARED, NOT APPROVED, NOT EXECUTED."
+        },
+        {
+          "path": "scripts/export_qutip_branch_a_reference.py",
+          "text": "STATUS: PREPARED, NOT APPROVED, NOT EXECUTED. No snapshot has been generated."
+        },
+        {
+          "path": "schemas/qutip/branch-a-reference-v1.schema.json",
+          "text": "\"$comment\": \"PREPARED, NOT APPROVED, NOT EXECUTED."
+        },
+        {
+          "path": "schemas/qutip/branch-a-reference-v1.schema.json",
+          "text": "PROPOSED ENGINEERING-RULE, not approved, not carried in this payload"
+        },
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/qutip_branch_a_launcher_asgrowth.py",
+          "text": "STATUS: PREPARED FOR HUMAN REVIEW. NOT RUN ON THE TARGET MAC."
+        },
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/qutip_branch_a_launcher_asgrowth.py",
+          "text": "a NEW PROPOSED rule"
+        },
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/qutip_branch_a_launcher_asgrowth.py",
+          "text": "\"rule_status\": \"PROPOSED; requires separate human approval before scientific execution\""
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/inputs/archive/qmhp-qutip-branch-a-export-110a2e0-attempt1/branch-a-reference-v1.json",
+          "text": "\"comparison_thresholds\": \"PROPOSED ENGINEERING-RULE, not approved, not carried in this payload\""
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/inputs/archive/qmhp-qutip-branch-a-preservation-110a2e0-attempt1/README.txt",
+          "text": "No QuTiP calculation has been run."
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/launcher-final.json",
+          "text": "\"rule_status\": \"PROPOSED; requires separate human approval before scientific execution\""
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/attempt-receipt.json",
+          "text": "\"rule_status\": \"PROPOSED; requires separate human approval before scientific execution\""
+        },
+        {
+          "path": "results/QUTIP-A-LAUNCHER-CONTROL-TEST-20260926T060642Z/qualification-final.json",
+          "text": "\"rule_status\": \"PROPOSED; requires separate human approval before scientific execution\""
+        },
+        {
+          "path": "tests/test_qutip_bridge_contract.py",
+          "text": "assert \"PREPARED, NOT APPROVED, NOT EXECUTED\" in text"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/inputs/archive/qmhp-qutip-branch-a-preservation-110a2e0-attempt1/expected-hashes.json",
+          "sha256_at_frozen_commit": "b667aad5841de92a0c135f8551bc0ecde29f487cb4d354e647af778f195e0a24"
+        },
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/EXECUTION-LOG.json",
+          "sha256_at_frozen_commit": "efde298390b5335543441db9e5fd8212ddae05497e8eed294016559e534fd370"
+        }
+      ],
+      "consequence": "Superseded as a description of the state at the frozen commit; read with the dated addendum.",
+      "resolution_route": "Editing any of these would break the executed record's pins and existing tests; the dated addendum is the only compliant reconciliation."
+    },
+    {
+      "id": "EXC-Q08",
+      "scope": "release-qutip",
+      "disposition": "NOT-RECOMPUTABLE",
+      "title": "Mac Accelerate F8 issue not reproduced",
+      "statement": "The owner-reported symptom with the chained @ route was not reproduced in the repository. The einsum dispatch was read in NumPy 2.4.6 source only; the Mac's NumPy 2.0.2 was not inspected.",
+      "evidence": [
+        {
+          "path": "docs/qutip/branch-a-fixed-point-crosscheck-v1.md",
+          "lines_at_frozen_commit": "108-112",
+          "sha256_at_frozen_commit": "0caeb9e7189d61d6bf4bc9418a5357f3148fd94e67ceabe5b5ab57176daa6730"
+        },
+        {
+          "path": "tools/qutip_bridge/check_branch_a_reference.py",
+          "lines_at_frozen_commit": "584",
+          "sha256_at_frozen_commit": "9f0798c5b307aa455a3bd6482ab5b46c513d448413de9e8aa14ae48d2733e2b1"
+        }
+      ],
+      "consequence": "With EXC-Q03, the BLAS/Accelerate path used on the Mac is unknown.",
+      "resolution_route": "None within the repository."
+    },
+    {
+      "id": "EXC-Q09",
+      "scope": "release-qutip",
+      "disposition": "DISCLOSED-UNRESOLVED",
+      "title": "Post-run bundle files pinned by no execution-time record",
+      "statement": "EXECUTION-LOG.json, the bundle README and the attempt-ledger file are pinned by no execution-time record or earlier test (the ledger digest appears only in EXECUTION-LOG.json). RESOURCE-RULE-APPROVAL.json is a byte-identical reconstruction whose digest equals the value the launcher recorded at execution time.",
+      "evidence": [
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/ATTEMPT-LEDGER.QUTIP-A-READOUT-CROSSCHECK-v1-110a2e0-attempt1.json",
+          "sha256_at_frozen_commit": "d1b632938aca4a091fcfd865a5b1e46bd547ce725fb6450f9c1967e1408ba7ee"
+        },
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/EXECUTION-LOG.json",
+          "sha256_at_frozen_commit": "efde298390b5335543441db9e5fd8212ddae05497e8eed294016559e534fd370"
+        },
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/README.md",
+          "sha256_at_frozen_commit": "faec47656d804238902f470aacd8935fac620d87f416d6fa8dcbb1ca036b257e"
+        }
+      ],
+      "consequence": "From this register on, their digests are frozen by tests/test_release_registers.py. Ledger byte identity to the Mac original still rests on an upload archive that is not in the repository.",
+      "resolution_route": "Frozen here; nothing further."
+    },
+    {
+      "id": "EXC-Q10",
+      "scope": "release-qutip",
+      "disposition": "DISCLOSURE",
+      "title": "Working-copy mutation test on the execution record",
+      "statement": "Before the evidence commit, a mutation test appended one byte to the working copy of the execution record's checker-output/result.json and then restored it. The committed bytes hash to bf3b642c..., equal to both the launcher register and the checker-output manifest, and the file has a single commit.",
+      "evidence": [
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/checker-output/result.json",
+          "sha256_at_frozen_commit": "bf3b642ce850556ddea4590218a7ffd93d3af45ccdc0577edf1ebc866f9a47ee"
+        },
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/README.md",
+          "sha256_at_frozen_commit": "faec47656d804238902f470aacd8935fac620d87f416d6fa8dcbb1ca036b257e"
+        }
+      ],
+      "consequence": "None for the evidence; disclosed for completeness. Byte identity to the upload archive after restoration is asserted, not recomputable here.",
+      "resolution_route": "None; not to be repeated on evidence records."
+    },
+    {
+      "id": "EXC-Q11",
+      "scope": "release-qutip",
+      "disposition": "DISCLOSURE",
+      "title": "Wall-time limit is launcher-supervised, not kernel-enforced",
+      "statement": "The 60 s limit is a launcher SIGKILL of the child's process group after GO; the checker's in-process timer is not a hard stop. The run completed well inside it.",
+      "evidence": [
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/attempt-receipt.json",
+          "sha256_at_frozen_commit": "7e648fdd9b5f071dd4c5bcb39d1650e72911aaacf4c4721f05bce945ae89eda7"
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/launcher-final.json",
+          "sha256_at_frozen_commit": "0c4f9c716295b57df7cb7caa8a2efe53b130544cbe926b38e23d4ef41164631f"
+        }
+      ],
+      "consequence": "Not a deviation; recorded so that the wall limit is never described as kernel-enforced.",
+      "resolution_route": "None needed."
+    },
+    {
+      "id": "EXC-Q12",
+      "scope": "release-qutip",
+      "disposition": "DISCLOSED-UNRESOLVED",
+      "title": "Execution-log readings that are not evidence",
+      "statement": "EXECUTION-LOG.json cites 'two read-only reviewers' who re-derived values; a reviewer count is not evidence (CLAUDE.md section 7.1). The recomputation in REL-QT-03 replaces it for this register.",
+      "quotes": [
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/EXECUTION-LOG.json",
+          "text": "two read-only reviewers"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/EXECUTION-LOG.json",
+          "sha256_at_frozen_commit": "efde298390b5335543441db9e5fd8212ddae05497e8eed294016559e534fd370"
+        }
+      ],
+      "consequence": "Not carried as support for any claim.",
+      "resolution_route": "None; the log is post-run provenance and is not edited."
+    },
+    {
+      "id": "EXC-Q13",
+      "scope": "release-qutip",
+      "disposition": "IMMUTABLE-TEXT",
+      "title": "Evidence text that misleads out of context",
+      "statement": "checker-output/attempt.json has status 'STARTED'; the checker writes it before calculating and result.json carries the outcome (COMPLETED). The first line of checker.stdout ends 'no calculation performed'; it is the validation stage's line, and the second line reports COMPLETED. The field 'memory_growth_limit_MiB': 1024 in launcher-final.json, attempt-receipt.json and qualification-final.json is the parameter of the approved address-space growth rule: RLIMIT_AS = baseline virtual size + 1073741824 bytes. It is not a memory limit of any kind.",
+      "quotes": [
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/checker-output/attempt.json",
+          "text": "\"status\": \"STARTED\""
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/checker.stdout",
+          "text": "; no calculation performed"
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/launcher-final.json",
+          "text": "\"memory_growth_limit_MiB\": 1024"
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/attempt-receipt.json",
+          "text": "\"memory_growth_limit_MiB\": 1024"
+        },
+        {
+          "path": "results/QUTIP-A-LAUNCHER-CONTROL-TEST-20260926T060642Z/qualification-final.json",
+          "text": "\"memory_growth_limit_MiB\": 1024"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/checker-output/result.json",
+          "sha256_at_frozen_commit": "bf3b642ce850556ddea4590218a7ffd93d3af45ccdc0577edf1ebc866f9a47ee",
+          "what": "execution_status COMPLETED"
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/checker.stdout",
+          "sha256_at_frozen_commit": "c063f918a14232816a3dcb73f90bc49491657935d1bc08776d51176930618e4b"
+        }
+      ],
+      "consequence": "None for the evidence; recorded so that neither line is read as a failed or skipped run.",
+      "resolution_route": "None; record text is immutable."
+    },
+    {
+      "id": "EXC-B01",
+      "scope": "release-boundary",
+      "disposition": "UNSUPPORTED",
+      "title": "openEMS container definition is unpinned",
+      "statement": "docker/openems.Dockerfile uses FROM ubuntu:24.04 (a tag, not a digest), unsnapshotted apt and a git clone of --branch v0.0.36 (a tag, not a commit), and says 'STATUS: skeleton'. No licence or provenance record for openEMS was found (not a legal conclusion).",
+      "evidence": [
+        {
+          "path": "docker/openems.Dockerfile",
+          "lines_at_frozen_commit": "9-27"
+        }
+      ],
+      "consequence": "openEMS is unsupported (REL-BD-01).",
+      "resolution_route": "None in this release."
+    },
+    {
+      "id": "EXC-B02",
+      "scope": "release-boundary",
+      "disposition": "DISCLOSED-UNRESOLVED",
+      "title": "v0.1 definition of done not met",
+      "statement": "Spec section 14 items not met or contradicted at the frozen commit: 3 (ShapeKernel pinned; SHAPEKERNEL_REVISION is None), 15 (gdsfactory cells), 16 (PicoGK geometry), 17 (STL/ports/geometry manifest), 23 (openEMS runnable), and 28 ('No v0.2 work has been started', contradicted by the Palace records). Item 25 (.NET build/tests pass) is only partly met. CI restores and builds the PicoGK project (ci.yml dotnet job), and the only build outcome the repository records is push CI run 35818105530 on commit 3270469, dotnet job success (experiments/static-refinement-study/review/closure_3270469.json); geometry/package_picogk/ and ci.yml are byte-identical at the frozen commit. No C# test project exists, and tests/test_geometry.py only builds the project, skipping without the .NET SDK. Items 9 (dressed-system regression) and 10 (F8 Purcell regression) pass the repository tests only under the FLAGGED-FOR-REVIEW cross_implementation tolerance: tests/test_physics_regression.py asserts that f8_purcell_weight and sink_pull_MHz still miss the declared 1e-6, so whether items 9 and 10 are met waits on the human decision in EXC-R02.",
+      "evidence": [
+        {
+          "path": "QMHP-CEM_v0.1_Spec.md",
+          "lines_at_frozen_commit": "1361-1392"
+        },
+        {
+          "path": "geometry/package_picogk/driver.py",
+          "lines_at_frozen_commit": "27-28"
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "lines_at_frozen_commit": "85-100"
+        },
+        {
+          "path": "experiments/static-refinement-study/review/closure_3270469.json",
+          "lines_at_frozen_commit": "65-74"
+        },
+        {
+          "path": "tests/test_geometry.py",
+          "lines_at_frozen_commit": "89-100"
+        },
+        {
+          "path": "tests/test_physics_regression.py",
+          "lines_at_frozen_commit": "164"
+        }
+      ],
+      "consequence": "v0.1 completion per the spec is not established; the release makes no v0.1-complete claim.",
+      "resolution_route": "None in this release."
+    },
+    {
+      "id": "EXC-R01",
+      "scope": "repository-wide",
+      "disposition": "QUARANTINED",
+      "title": "STATIC-ANCHOR-TEST-20260922T192243Z (outside the release)",
+      "statement": "Its driver wrote no manifest.sha256; level0.json, level1.json and summary.json are content-pinned.",
+      "quarantine_record": "STATIC-ANCHOR-TEST-20260922T192243Z",
+      "evidence": [
+        {
+          "path": "tests/test_frozen_evidence.py",
+          "lines_at_frozen_commit": "120-133"
+        }
+      ],
+      "consequence": "Listed so that the quarantine set here equals the one tests/test_frozen_evidence.py enforces.",
+      "resolution_route": "None."
+    },
+    {
+      "id": "EXC-R02",
+      "scope": "repository-wide",
+      "disposition": "HUMAN-DECISION-REQUIRED",
+      "title": "FLAGGED cross_implementation regression pins",
+      "statement": "f8_purcell_weight (rel 2.23e-6, exceeds 1e-6), sink_pull_MHz (1.25e-6, exceeds) and logical_pull_MHz (9.04e-7, within, marginal) stay FLAGGED-FOR-REVIEW. The QuTiP same-input agreement neither resolves nor hides them.",
+      "evidence": [
+        {
+          "path": "docs/regression-pins.md",
+          "lines_at_frozen_commit": "40-54"
+        },
+        {
+          "path": "master/qmhp_v158f_requirements.yaml",
+          "sha256_at_frozen_commit": "b4f92c4cd05b77258706577909f6d1bb17073468bd6cfbc8126ce37942a7adde"
+        }
+      ],
+      "consequence": "Open adjudication.",
+      "resolution_route": "A human decision (docs/regression-pins.md)."
+    },
+    {
+      "id": "EXC-R03",
+      "scope": "repository-wide",
+      "disposition": "NOT-RECOMPUTABLE",
+      "title": "Pins carried but unverifiable",
+      "statement": "perturbative_root_GHz, eq7_chi_MHz, richardson_curvature_GHz_per_Phi0_sq and gamma_qp_over_xqp_per_s are asserted as frozen values only.",
+      "evidence": [
+        {
+          "path": "docs/regression-pins.md",
+          "lines_at_frozen_commit": "70-82"
+        }
+      ],
+      "consequence": "No release claim rests on them.",
+      "resolution_route": "None."
+    },
+    {
+      "id": "EXC-R04",
+      "scope": "repository-wide",
+      "disposition": "DISCLOSED-UNRESOLVED",
+      "title": "Reference bundle 27/29",
+      "statement": "Two listed PDFs (base_v1_5_8e_117pp_operative.pdf, base_v1_5_8e_109pp_provenance.pdf) are not shipped and are skipped as KNOWN_ABSENT, not failed.",
+      "evidence": [
+        {
+          "path": "reference/README.md",
+          "lines_at_frozen_commit": "12-17"
+        },
+        {
+          "path": "scripts/verify_reference_bundle.py",
+          "lines_at_frozen_commit": "6-8, 22-25"
+        }
+      ],
+      "consequence": "Their integrity cannot be established in this repository.",
+      "resolution_route": "None."
+    },
+    {
+      "id": "EXC-R05",
+      "scope": "repository-wide",
+      "disposition": "DISCLOSED-UNRESOLVED",
+      "title": "No CLI verifier for the launcher-registered or quarantined records",
+      "statement": "`cem verify-results` re-hashes a record against its manifest.sha256, so it covers the 16 manifested Palace records (palace-golden.yml runs it on each new golden record). It cannot verify the four launcher-registered QUTIP-A records or the quarantined 063014Z as records, because none has a root-level manifest.sha256; it can verify only nested subtrees that carry one (the execution record's checker-output/, and the copied export archive directory inside three QUTIP-A records). `cem report` also needs batch_report.json, which no PALACE-* record has. Those five records are verified as whole records only by tests/test_frozen_evidence.py.",
+      "evidence": [
+        {
+          "path": "orchestrator/cem.py",
+          "lines_at_frozen_commit": "116-145, 162-178, 276-280"
+        },
+        {
+          "path": ".github/workflows/palace-golden.yml",
+          "lines_at_frozen_commit": "152-156"
+        }
+      ],
+      "consequence": "The verifier that covers every in-scope record is `pytest tests/test_frozen_evidence.py`.",
+      "resolution_route": "A CLI change would be a separate approved change."
+    },
+    {
+      "id": "EXC-R06",
+      "scope": "repository-wide",
+      "disposition": "DISCLOSED-UNRESOLVED",
+      "title": "Enforcement limits of the evidence controls",
+      "statement": "Frozen-evidence enforcement is file immutability, not evidence governance; the promotion guard declines PALACE-VERIFY and PALACE-GOLDEN, so nothing mechanically judges their verdicts; several contract clauses are behavioural only. Pre-push secret scanning does not protect a clone that never installed it, --no-verify, other routes to the remote, or history already pushed, and zero findings means only that no rule matched.",
+      "evidence": [
+        {
+          "path": "docs/agent-contract-implementation.md",
+          "lines_at_frozen_commit": "72-102, 159-187"
+        }
+      ],
+      "consequence": "The registers are frozen by a digest test (tests/test_release_registers.py); their content is a human-reviewed reading, not a mechanical verdict.",
+      "resolution_route": "None in this release."
+    }
+  ]
+}

@@ -1,0 +1,1441 @@
+{
+  "register": "QMHP-CEM-RELEASE-CLAIM-REGISTER",
+  "register_revision": 1,
+  "frozen_from_commit": "ba076d9d972077a7a3e256a6404ab455fd748461",
+  "frozen_from_branch": "qutip/branch-a-fixed-point-crosscheck-v1-prep",
+  "frozen_on": "2026-09-26",
+  "release_scope_document": "docs/release/RELEASE-SCOPE.md",
+  "status_addendum": "docs/release/STATUS-ADDENDUM-2026-09-26.md",
+  "scope_approval": "Owner instruction in the working session on 2026-09-26: 'Approve narrow release scope — Palace benchmark + QuTiP fixed-point bundle only, openEMS/geometry explicitly unsupported'. A session statement; repository files cannot prove it.",
+  "release_actions_approved": "none: no tag, publication, merge or pull request is approved by the scope approval",
+  "file_class": "proprietary QMHP-CEM documentation/data; contains no third-party content",
+  "freeze_rule": "This file is frozen. tests/test_release_registers.py pins its sha256. It is never edited: a correction is a new, dated, superseding register that names this one.",
+  "measurement_rule": "Every digest and structured fact here was measured from the git objects of the frozen commit, not copied from another document. Line numbers are at the frozen commit.",
+  "tree_binding": {
+    "must_still_match": [
+      "results/",
+      "docs/qutip/",
+      "tools/qutip_bridge/",
+      "schemas/qutip/",
+      "scripts/export_qutip_branch_a_reference.py",
+      "experiments/qutip-a-readout-crosscheck/",
+      "solvers/openems/",
+      "docker/openems.Dockerfile",
+      "geometry/chip_planar/",
+      "geometry/package_picogk/"
+    ],
+    "exact_file_sets": {
+      "experiments/qutip-a-readout-crosscheck/": [
+        "ATTEMPT-LEDGER.QUTIP-A-READOUT-CROSSCHECK-v1-110a2e0-attempt1.json",
+        "EXECUTION-LOG.json",
+        "README.md",
+        "RESOURCE-RULE-APPROVAL.json",
+        "qutip_branch_a_launcher_asgrowth.py"
+      ],
+      "solvers/openems/": [
+        "__init__.py",
+        "adapter.py"
+      ],
+      "geometry/chip_planar/": [
+        "__init__.py",
+        "cells.py"
+      ],
+      "geometry/package_picogk/": [
+        "Object001Package.cs",
+        "Program.cs",
+        "QmhpCem.Geometry.csproj",
+        "README.md",
+        "__init__.py",
+        "driver.py"
+      ]
+    },
+    "rule": "A sha256_at_frozen_commit or register_sha256 on a path under one of these prefixes must still match the working tree; tests/test_release_registers.py fails closed otherwise. Digests of other cited files (for example pyproject.toml, uv.lock, orchestrator/manifest.py) are recorded at the frozen commit only: those files may change later, and this register then describes the frozen commit, not the later tree. Each exact_file_sets directory must hold exactly the listed files, so that, for example, a second attempt ledger cannot appear beside the one spent attempt, and no file can be added to the openEMS or geometry directories. Every file in those three directories, and docker/openems.Dockerfile, is digest-bound (REL-BD-01 to REL-BD-03), and the test exercises the registry-resolved openEMS adapter and the package-level planar cells, so a change there fails the test until a superseding scope is approved. An implementation placed in some other directory is not detected by this mechanism."
+  },
+  "recorded_verdicts_rule": "A claim's recorded_verdicts quote each record's own verdict fields verbatim, including those of the quarantined PALACE-VERIFY-20260915T063014Z. That record's fields are artefacts of an aborted run and are never counted (EXC-P01).",
+  "classification_rule": "No claim here is an overall scientific PASS. The QuTiP execution is classified in three separate parts (REL-QT-01) that are always quoted together.",
+  "status_vocabulary": {
+    "VERIFIED": "Established from the repository bytes at the frozen commit and re-measured for this register. The listed limitations still apply.",
+    "QUALIFIED": "Established only with the listed qualifications; never quote the claim without them.",
+    "BLOCKED": "Attempted under a predeclared rule and blocked; nothing is established by it.",
+    "NOT-ESTABLISHED": "An explicit non-claim: the release does not claim this, and nothing in it may be read as claiming it.",
+    "ASSERTED": "An owner or session statement that the records reference; it cannot be recomputed from the repository.",
+    "UNSUPPORTED": "A capability the release explicitly does not support; the code refuses it.",
+    "OUT-OF-SCOPE": "Repository material outside the release; no release claim is made about it."
+  },
+  "in_scope_records": [
+    {
+      "record": "PALACE-GOLDEN-20260915T014639Z",
+      "scope": "palace-benchmark",
+      "role": "executed golden benchmark record (empty Object 001 PEC box)",
+      "register": "manifest.sha256",
+      "register_sha256": "b9e5b03bc1abd925a50164bc64a6d49758e5735e48fd0b8c4888728b745cc0c9",
+      "register_entries": 14
+    },
+    {
+      "record": "PALACE-GOLDEN-20260915T015804Z",
+      "scope": "palace-benchmark",
+      "role": "executed golden benchmark record (empty Object 001 PEC box)",
+      "register": "manifest.sha256",
+      "register_sha256": "d832d832b2b24d8403f22f86df040b0139fac580784a544c8dc9f38a6f2f221e",
+      "register_entries": 14
+    },
+    {
+      "record": "PALACE-GOLDEN-20260915T025408Z",
+      "scope": "palace-benchmark",
+      "role": "executed golden benchmark record (empty Object 001 PEC box)",
+      "register": "manifest.sha256",
+      "register_sha256": "22642de1ffc8b3b0fb63131638ade646e64797ab920677ac6007016d89ca7231",
+      "register_entries": 14
+    },
+    {
+      "record": "PALACE-GOLDEN-20260915T030418Z",
+      "scope": "palace-benchmark",
+      "role": "executed golden benchmark record (empty Object 001 PEC box)",
+      "register": "manifest.sha256",
+      "register_sha256": "dc7aaabb41a6c27568f33b8b3114e5ddbb998649ed9fe573086a1aa0a78abd39",
+      "register_entries": 14
+    },
+    {
+      "record": "PALACE-GOLDEN-20260915T050927Z",
+      "scope": "palace-benchmark",
+      "role": "executed golden benchmark record (empty Object 001 PEC box)",
+      "register": "manifest.sha256",
+      "register_sha256": "297b8d2cae8969ab59184adcde0e069b55f561766308391eec1052a51f246871",
+      "register_entries": 14
+    },
+    {
+      "record": "PALACE-GOLDEN-20260915T063105Z",
+      "scope": "palace-benchmark",
+      "role": "executed golden benchmark record (empty Object 001 PEC box)",
+      "register": "manifest.sha256",
+      "register_sha256": "e4ca28beccd3a925a65599bb06b1e782adbae18106b27bea64db879602010326",
+      "register_entries": 14
+    },
+    {
+      "record": "PALACE-GOLDEN-20260915T065025Z",
+      "scope": "palace-benchmark",
+      "role": "executed golden benchmark record (empty Object 001 PEC box)",
+      "register": "manifest.sha256",
+      "register_sha256": "ea8fa009b5a73cd698bcfbd965890729b0434fe86582895e46fa5371e84d6481",
+      "register_entries": 14
+    },
+    {
+      "record": "PALACE-GOLDEN-20260915T091128Z",
+      "scope": "palace-benchmark",
+      "role": "executed golden benchmark record (empty Object 001 PEC box)",
+      "register": "manifest.sha256",
+      "register_sha256": "e7dabb7e8ea52425bc822c8e1471dbe6e96c66739a1e2af128ec306012b625de",
+      "register_entries": 14
+    },
+    {
+      "record": "PALACE-GOLDEN-20260915T115911Z",
+      "scope": "palace-benchmark",
+      "role": "executed golden benchmark record (empty Object 001 PEC box)",
+      "register": "manifest.sha256",
+      "register_sha256": "668d7e05084cf111880587894fb0b5bd1c7db568d8601fc10aaa9cf375176b60",
+      "register_entries": 14
+    },
+    {
+      "record": "PALACE-GOLDEN-20260915T225434Z",
+      "scope": "palace-benchmark",
+      "role": "executed golden benchmark record (empty Object 001 PEC box)",
+      "register": "manifest.sha256",
+      "register_sha256": "b1e1b1b5e4bf20ba29835129fa05194da0a52b5d783dcaa8e8cb1c97fd919cb6",
+      "register_entries": 14
+    },
+    {
+      "record": "PALACE-GOLDEN-20260915T233133Z",
+      "scope": "palace-benchmark",
+      "role": "executed golden benchmark record (empty Object 001 PEC box)",
+      "register": "manifest.sha256",
+      "register_sha256": "946c90344c3552b3e75d2e3dcaebd1e96692746aaa3f90467fed0ce6f340a804",
+      "register_entries": 14
+    },
+    {
+      "record": "PALACE-GOLDEN-20260916T023201Z",
+      "scope": "palace-benchmark",
+      "role": "executed golden benchmark record (empty Object 001 PEC box)",
+      "register": "manifest.sha256",
+      "register_sha256": "7fde298ddc80db9d02b1590de92f7866227bd24eb36d2232afaa9ca093784afd",
+      "register_entries": 14
+    },
+    {
+      "record": "PALACE-GOLDEN-20260920T120817Z",
+      "scope": "palace-benchmark",
+      "role": "executed golden benchmark record (empty Object 001 PEC box)",
+      "register": "manifest.sha256",
+      "register_sha256": "8185ae14602425add6e4c910ee05aacca88cc0cf7e6be86106921b18ab051e6e",
+      "register_entries": 14
+    },
+    {
+      "record": "PALACE-VERIFY-20260915T063014Z",
+      "scope": "palace-benchmark",
+      "role": "FAILED campaign execution, QUARANTINED: no execution-time register; its decision-relevant files are content-pinned by tests/test_frozen_evidence.py. Its verdict fields are artefacts of an aborted run and are not counted as scientific verdicts",
+      "register": null,
+      "register_sha256": null,
+      "register_entries": null
+    },
+    {
+      "record": "PALACE-VERIFY-20260915T065055Z",
+      "scope": "palace-benchmark",
+      "role": "executed verification campaign record",
+      "register": "manifest.sha256",
+      "register_sha256": "e5cb99bca0929c7fd1ce11295072b1f001e0e1791589d3045fdbf27a444680fd",
+      "register_entries": 116
+    },
+    {
+      "record": "PALACE-VERIFY-20260915T091242Z",
+      "scope": "palace-benchmark",
+      "role": "executed verification campaign record",
+      "register": "manifest.sha256",
+      "register_sha256": "2c0f3921c03088c34873a84b355c9329399a9b289882951471131afd3739f8ab",
+      "register_entries": 116
+    },
+    {
+      "record": "PALACE-VERIFY-20260915T115901Z",
+      "scope": "palace-benchmark",
+      "role": "executed verification campaign record",
+      "register": "manifest.sha256",
+      "register_sha256": "aa205c61a8b3e2adac3d44d861e813a184904ce9b4aa6e90c053bd10e223a45b",
+      "register_entries": 116
+    },
+    {
+      "record": "QUTIP-A-LAUNCH-BLOCKED-20260926T025352Z",
+      "scope": "qutip-fixed-point-bundle",
+      "role": "SUPPORTING EXECUTION PROVENANCE: first launcher stopped at BLOCKED-PREFLIGHT; checker not launched; attempt not consumed; not scientific evidence",
+      "register": "launcher-manifest.sha256",
+      "register_sha256": "546de29f88e8ce46ec890e9ec28fae79a5646ecb9bb030b669ea8edc9d4e1826",
+      "register_entries": 25
+    },
+    {
+      "record": "QUTIP-A-MAC-MEMORY-DIAGNOSTIC-20260926T045655Z",
+      "scope": "qutip-fixed-point-bundle",
+      "role": "SUPPORTING CONTROL PROVENANCE: dummy-only memory-limit diagnostic; not a QMHP or QuTiP calculation; not scientific evidence",
+      "register": "SHA256SUMS",
+      "register_sha256": "d0e341588cc932064beb6207c48d5e3698c98aff25be717194870856cf91fa81",
+      "register_entries": 3
+    },
+    {
+      "record": "QUTIP-A-LAUNCHER-CONTROL-TEST-20260926T060642Z",
+      "scope": "qutip-fixed-point-bundle",
+      "role": "SUPPORTING CONTROL PROVENANCE: pre-flight qualification with dummy probes; no checker, no receipt, no ledger; not scientific evidence",
+      "register": "qualification-manifest.sha256",
+      "register_sha256": "b5443d4195848248f817a37c14c341d2fcc3b8e930d88e96b0968750e813b3fc",
+      "register_entries": 31
+    },
+    {
+      "record": "QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z",
+      "scope": "qutip-fixed-point-bundle",
+      "role": "SCIENTIFIC EVIDENCE: the one approved QUTIP-A-READOUT-CROSSCHECK-v1 execution",
+      "register": "launcher-manifest.sha256",
+      "register_sha256": "a6bfdcd36e643457571ccc30fc84bd7bfcb91d113ff8f7f037b035fa96881ce3",
+      "register_entries": 38
+    }
+  ],
+  "in_scope_qutip_files": [
+    {
+      "path": "docs/qutip/branch-a-fixed-point-crosscheck-v1.md",
+      "sha256_at_frozen_commit": "0caeb9e7189d61d6bf4bc9418a5357f3148fd94e67ceabe5b5ab57176daa6730",
+      "role": "protocol document (hash-pinned by the executed record; carries stale status text, see EXC-Q07)"
+    },
+    {
+      "path": "tools/qutip_bridge/check_branch_a_reference.py",
+      "sha256_at_frozen_commit": "9f0798c5b307aa455a3bd6482ab5b46c513d448413de9e8aa14ae48d2733e2b1",
+      "role": "standalone checker (hash-pinned; byte-identical copy inside three QUTIP-A records)"
+    },
+    {
+      "path": "schemas/qutip/branch-a-reference-v1.schema.json",
+      "sha256_at_frozen_commit": "a65958dbb6c0c1407c5368b66abaf524a85d5a8ddb928e50d68b80504c234cfe",
+      "role": "reference schema (hash-pinned; byte-identical copy inside the execution record)"
+    },
+    {
+      "path": "scripts/export_qutip_branch_a_reference.py",
+      "sha256_at_frozen_commit": "7ad7cafa5a30d154976cfca945afd9925d4eb09e3a4e015d5232239ce79a0182",
+      "role": "CEM exporter (hash-pinned by the export snapshot and expected-hashes record)"
+    },
+    {
+      "path": "orchestrator/manifest.py",
+      "sha256_at_frozen_commit": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f",
+      "role": "not a QuTiP file: the membership rule and COMMITTABLE_SUFFIXES, whose digest the QuTiP export predeclaration names (inputs/archive/.../predeclaration.txt:25); the general policy is unchanged"
+    },
+    {
+      "path": "experiments/qutip-a-readout-crosscheck/qutip_branch_a_launcher_asgrowth.py",
+      "sha256_at_frozen_commit": "4f34781953db2fd4791827065ef5fc7003f899b7d96069059263ac81b7b2e711",
+      "role": "revised launcher that wrote the qualification and the execution record"
+    },
+    {
+      "path": "experiments/qutip-a-readout-crosscheck/RESOURCE-RULE-APPROVAL.json",
+      "sha256_at_frozen_commit": "7d38e9de97595391003bdd4943d2dd8352bc5a2c0ef9254c5c5dc71af9a122bf",
+      "role": "owner approval of the address-space-growth rule, as consumed by the launcher"
+    },
+    {
+      "path": "experiments/qutip-a-readout-crosscheck/ATTEMPT-LEDGER.QUTIP-A-READOUT-CROSSCHECK-v1-110a2e0-attempt1.json",
+      "sha256_at_frozen_commit": "d1b632938aca4a091fcfd865a5b1e46bd547ce725fb6450f9c1967e1408ba7ee",
+      "role": "one-attempt ledger entry; the attempt is spent"
+    },
+    {
+      "path": "experiments/qutip-a-readout-crosscheck/EXECUTION-LOG.json",
+      "sha256_at_frozen_commit": "efde298390b5335543441db9e5fd8212ddae05497e8eed294016559e534fd370",
+      "role": "post-run execution log (not pinned by any execution-time record; frozen here)"
+    },
+    {
+      "path": "experiments/qutip-a-readout-crosscheck/README.md",
+      "sha256_at_frozen_commit": "faec47656d804238902f470aacd8935fac620d87f416d6fa8dcbb1ca036b257e",
+      "role": "post-run bundle README (not pinned by any execution-time record; frozen here)"
+    }
+  ],
+  "in_scope_palace_code_unpinned": {
+    "paths": [
+      "solvers/palace/__init__.py",
+      "solvers/palace/adapter.py",
+      "solvers/palace/analytic.py",
+      "solvers/palace/config.py",
+      "solvers/palace/mesh.py",
+      "solvers/palace/outputs.py",
+      "solvers/palace/verification.py",
+      "solvers/palace/golden/GOLDEN.sha256",
+      "solvers/palace/golden/QMHP-CEM-A-RF-000001.json",
+      "scripts/palace_golden_run.py",
+      "scripts/palace_verify_campaign.py",
+      "docker/palace.Dockerfile",
+      ".github/workflows/palace-golden.yml",
+      ".github/workflows/palace-verify.yml"
+    ],
+    "shared_modules_also_used": [
+      "contracts/",
+      "evaluator/",
+      "orchestrator/environment.py",
+      "orchestrator/manifest.py",
+      "orchestrator/pipeline.py",
+      "solvers/__init__.py",
+      "solvers/adapter.py",
+      "models/"
+    ],
+    "note": "The Palace-specific code at the frozen commit that the golden and verification scripts use. They also use shared, not Palace-specific modules (shared_modules_also_used): the gate evaluator, the manifest writer, the environment recorder, validate_convergence() and the nominal device model. The other modules in solvers/palace/ (coupled_*, mesh_inspection, mode_admission, port_diagnostic) belong to the out-of-scope coupled-candidate work. Each Palace record was produced by the code at its own recorded git commit, so these files are cited, not pinned. Editing the Palace-specific files on main or palace/** triggers a Palace workflow (EXC-P13); the shared modules are not trigger paths."
+  },
+  "claims": [
+    {
+      "id": "REL-PAL-01",
+      "scope": "palace-benchmark",
+      "status": "VERIFIED",
+      "statement": "The Palace execution path (prepare, run, parse, validate_convergence) has executed end to end for the empty Object 001 PEC box 13 times. Every PALACE-GOLDEN record has outcome CONVERGED, palace_run returncode 0 and outcome 'completed', solver_version 0.13.0+a61c8cbe0cac (Palace commit a61c8cbe0cacf496cde3c62e93085fae0d6299ac), one MPI process, and no warning line in its Palace log.",
+      "facts": {
+        "records": [
+          "PALACE-GOLDEN-20260915T014639Z",
+          "PALACE-GOLDEN-20260915T015804Z",
+          "PALACE-GOLDEN-20260915T025408Z",
+          "PALACE-GOLDEN-20260915T030418Z",
+          "PALACE-GOLDEN-20260915T050927Z",
+          "PALACE-GOLDEN-20260915T063105Z",
+          "PALACE-GOLDEN-20260915T065025Z",
+          "PALACE-GOLDEN-20260915T091128Z",
+          "PALACE-GOLDEN-20260915T115911Z",
+          "PALACE-GOLDEN-20260915T225434Z",
+          "PALACE-GOLDEN-20260915T233133Z",
+          "PALACE-GOLDEN-20260916T023201Z",
+          "PALACE-GOLDEN-20260920T120817Z"
+        ],
+        "outcome": "CONVERGED",
+        "run_returncode": 0,
+        "run_outcome": "completed",
+        "solver_version": "0.13.0+a61c8cbe0cac",
+        "palace_commit": "a61c8cbe0cacf496cde3c62e93085fae0d6299ac",
+        "mpi_processes": 1
+      },
+      "evidence": [
+        {
+          "path": "results/PALACE-GOLDEN-20260915T014639Z/execution_record.json",
+          "what": "representative; the same fields were read in all 13 records"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T014639Z/QMHP-CEM-A-RF-000001/solver/palace_run.json",
+          "what": "representative"
+        }
+      ],
+      "limitations": [
+        "Empty vacuum PEC box only: the chip dielectric, recess, launch bores and lid are not modelled.",
+        "All 13 runs used locally built images on GitHub-hosted runners; repo_digest is null in every record and the images are not retained in the repository (see EXC-P04).",
+        "Workflow run IDs appear only in commit subjects and docs, not inside the records."
+      ]
+    },
+    {
+      "id": "REL-PAL-02",
+      "scope": "palace-benchmark",
+      "status": "QUALIFIED",
+      "statement": "All four requested TM_mn0 modes agree with the closed form in all 13 golden records, with the same numbers in every record. Palace: 9.635896241, 15.23545129, 15.23570396, 19.27229929 GHz. Closed form: 9.635694545471965, 15.235370800676153 (twice), 19.27138909094393 GHz. Worst relative deviation 4.7230588919842275e-05, against the 0.02 golden tolerance and the 1e-4 expected deviation (both ENGINEERING-RULEs of the adapter).",
+      "facts": {
+        "records": [
+          "PALACE-GOLDEN-20260915T014639Z",
+          "PALACE-GOLDEN-20260915T015804Z",
+          "PALACE-GOLDEN-20260915T025408Z",
+          "PALACE-GOLDEN-20260915T030418Z",
+          "PALACE-GOLDEN-20260915T050927Z",
+          "PALACE-GOLDEN-20260915T063105Z",
+          "PALACE-GOLDEN-20260915T065025Z",
+          "PALACE-GOLDEN-20260915T091128Z",
+          "PALACE-GOLDEN-20260915T115911Z",
+          "PALACE-GOLDEN-20260915T225434Z",
+          "PALACE-GOLDEN-20260915T233133Z",
+          "PALACE-GOLDEN-20260916T023201Z",
+          "PALACE-GOLDEN-20260920T120817Z"
+        ],
+        "eigenmodes_GHz": [
+          9.635896241,
+          15.23545129,
+          15.23570396,
+          19.27229929
+        ],
+        "closed_form_GHz": [
+          9.635694545471965,
+          15.235370800676153,
+          15.235370800676153,
+          19.27138909094393
+        ],
+        "relative_deviation": [
+          2.093212140361309e-05,
+          5.283056441538736e-06,
+          2.1867490342474858e-05,
+          4.7230588919842275e-05
+        ],
+        "worst_relative_deviation": 4.7230588919842275e-05,
+        "tolerance": 0.02,
+        "expected_relative_deviation": 0.0001
+      },
+      "evidence": [
+        {
+          "path": "results/PALACE-GOLDEN-20260915T014639Z/execution_record.json",
+          "what": "analytic_check; identical in all 13 records"
+        },
+        {
+          "path": "solvers/palace/config.py",
+          "lines_at_frozen_commit": "62, 73"
+        }
+      ],
+      "limitations": [
+        "Height-blind by construction. The record's own analytic_check.note: 'All requested modes are TM_mn0 of the empty box: this comparison verifies the X/Y extent and unit scaling, not the cavity height.'",
+        "One mesh (1200 tetrahedra, order 2, 9848 DOF).",
+        "The tolerances are ENGINEERING-RULEs, not physical requirements; agreement is not an error bound."
+      ]
+    },
+    {
+      "id": "REL-PAL-03",
+      "scope": "palace-benchmark",
+      "status": "VERIFIED",
+      "statement": "Eigensolver convergence on the golden mesh: convergence status CONVERGED with metric eigenmode_backward_error_max 2.021497504e-11 in 10 records and 2.021494287e-11 in 3 records, against the 1e-6 ENGINEERING-RULE.",
+      "facts": {
+        "backward_error_groups": [
+          {
+            "value": 2.021497504e-11,
+            "records": [
+              "PALACE-GOLDEN-20260915T014639Z",
+              "PALACE-GOLDEN-20260915T015804Z",
+              "PALACE-GOLDEN-20260915T030418Z",
+              "PALACE-GOLDEN-20260915T050927Z",
+              "PALACE-GOLDEN-20260915T065025Z",
+              "PALACE-GOLDEN-20260915T091128Z",
+              "PALACE-GOLDEN-20260915T115911Z",
+              "PALACE-GOLDEN-20260915T225434Z",
+              "PALACE-GOLDEN-20260916T023201Z",
+              "PALACE-GOLDEN-20260920T120817Z"
+            ]
+          },
+          {
+            "value": 2.021494287e-11,
+            "records": [
+              "PALACE-GOLDEN-20260915T025408Z",
+              "PALACE-GOLDEN-20260915T063105Z",
+              "PALACE-GOLDEN-20260915T233133Z"
+            ]
+          }
+        ],
+        "tolerance": 1e-06
+      },
+      "evidence": [
+        {
+          "path": "results/PALACE-GOLDEN-20260915T014639Z/execution_record.json",
+          "what": "convergence block"
+        },
+        {
+          "path": "solvers/palace/config.py",
+          "lines_at_frozen_commit": "40, 45"
+        }
+      ],
+      "limitations": [
+        "This is eigensolver convergence on the mesh given, not mesh convergence (mesh convergence is REL-PAL-06).",
+        "The backward error is a residual measure, not a derived error bound on the frequencies."
+      ]
+    },
+    {
+      "id": "REL-PAL-04",
+      "scope": "palace-benchmark",
+      "status": "QUALIFIED",
+      "statement": "Frequency-level reproducibility across the 13 golden records: exactly one four-frequency tuple, one mesh digest, one config digest and one set of gate verdicts. Byte-level solver output is NOT reproducible: eig.csv takes two byte patterns, 19877b1e... in 10 records and da6f7d0d... in 3 records; error-indicators.csv varies with it. The real parts of eig.csv are identical between the two patterns.",
+      "facts": {
+        "eig_csv_sha256_groups": [
+          {
+            "sha256": "19877b1e7acad8f2787b7d193a23a906bb1b8f9385c3a6cb53dd4bafb505fdfa",
+            "records": [
+              "PALACE-GOLDEN-20260915T014639Z",
+              "PALACE-GOLDEN-20260915T015804Z",
+              "PALACE-GOLDEN-20260915T030418Z",
+              "PALACE-GOLDEN-20260915T050927Z",
+              "PALACE-GOLDEN-20260915T065025Z",
+              "PALACE-GOLDEN-20260915T091128Z",
+              "PALACE-GOLDEN-20260915T115911Z",
+              "PALACE-GOLDEN-20260915T225434Z",
+              "PALACE-GOLDEN-20260916T023201Z",
+              "PALACE-GOLDEN-20260920T120817Z"
+            ]
+          },
+          {
+            "sha256": "da6f7d0d1f8f385db87a41d32d398b3c239fa98f4d1b330c5557dbe3351adc32",
+            "records": [
+              "PALACE-GOLDEN-20260915T025408Z",
+              "PALACE-GOLDEN-20260915T063105Z",
+              "PALACE-GOLDEN-20260915T233133Z"
+            ]
+          }
+        ],
+        "mesh_sha256": "7602c8c3815d1d76f670789328729389e2b83c978cce23e5557c9cfc48b2e3db",
+        "config_sha256": "8f4675f052d2092c6250f26f842a370c8ea9348bd602bc312fc6bad7d29709d9"
+      },
+      "evidence": [
+        {
+          "path": "results/PALACE-GOLDEN-20260915T014639Z/QMHP-CEM-A-RF-000001/solver/postpro/eig.csv",
+          "sha256_at_frozen_commit": "19877b1e7acad8f2787b7d193a23a906bb1b8f9385c3a6cb53dd4bafb505fdfa"
+        },
+        {
+          "path": "results/PALACE-GOLDEN-20260915T025408Z/QMHP-CEM-A-RF-000001/solver/postpro/eig.csv",
+          "sha256_at_frozen_commit": "da6f7d0d1f8f385db87a41d32d398b3c239fa98f4d1b330c5557dbe3351adc32"
+        }
+      ],
+      "limitations": [
+        "The eig.csv digest is not a fixed constant; no future run can be required to match it.",
+        "The cause of the two patterns is not established. The pattern recurred after the thread pin, does not follow the image ID, and the same 10/3 split also appears in host-side output that takes no Palace input (see EXC-P02).",
+        "The 13 records span 6 distinct image IDs (7 across all 17 Palace records)."
+      ]
+    },
+    {
+      "id": "REL-PAL-05",
+      "scope": "palace-benchmark",
+      "status": "QUALIFIED",
+      "statement": "The gate verdicts recorded for the empty box are identical in all 13 golden records: overall_status INCOMPLETE; COLLISION PASS; P4PRE_SPECTRAL PASS ('Readout-side pre-check only — full P4 has NOT passed'); P6E2_FILTER INCOMPLETE; TOLERANCE and COUPLING_EXTRACTION NOT-EVALUATED; P6E6_JOINT, P0D, P1, P3, P5 and P7 HARDWARE-GATED.",
+      "recorded_verdicts": {
+        "overall_status": "INCOMPLETE",
+        "gates": {
+          "COLLISION": "PASS",
+          "COUPLING_EXTRACTION": "NOT-EVALUATED",
+          "P0D": "HARDWARE-GATED",
+          "P1": "HARDWARE-GATED",
+          "P3": "HARDWARE-GATED",
+          "P4PRE_SPECTRAL": "PASS",
+          "P5": "HARDWARE-GATED",
+          "P6E2_FILTER": "INCOMPLETE",
+          "P6E6_JOINT": "HARDWARE-GATED",
+          "P7": "HARDWARE-GATED",
+          "TOLERANCE": "NOT-EVALUATED"
+        }
+      },
+      "facts": {
+        "records": [
+          "PALACE-GOLDEN-20260915T014639Z",
+          "PALACE-GOLDEN-20260915T015804Z",
+          "PALACE-GOLDEN-20260915T025408Z",
+          "PALACE-GOLDEN-20260915T030418Z",
+          "PALACE-GOLDEN-20260915T050927Z",
+          "PALACE-GOLDEN-20260915T063105Z",
+          "PALACE-GOLDEN-20260915T065025Z",
+          "PALACE-GOLDEN-20260915T091128Z",
+          "PALACE-GOLDEN-20260915T115911Z",
+          "PALACE-GOLDEN-20260915T225434Z",
+          "PALACE-GOLDEN-20260915T233133Z",
+          "PALACE-GOLDEN-20260916T023201Z",
+          "PALACE-GOLDEN-20260920T120817Z"
+        ],
+        "overall_status": "INCOMPLETE",
+        "gate_status": {
+          "COLLISION": "PASS",
+          "COUPLING_EXTRACTION": "NOT-EVALUATED",
+          "P0D": "HARDWARE-GATED",
+          "P1": "HARDWARE-GATED",
+          "P3": "HARDWARE-GATED",
+          "P4PRE_SPECTRAL": "PASS",
+          "P5": "HARDWARE-GATED",
+          "P6E2_FILTER": "INCOMPLETE",
+          "P6E6_JOINT": "HARDWARE-GATED",
+          "P7": "HARDWARE-GATED",
+          "TOLERANCE": "NOT-EVALUATED"
+        }
+      },
+      "evidence": [
+        {
+          "path": "results/PALACE-GOLDEN-20260915T014639Z/execution_record.json",
+          "what": "gates; statuses identical in all 13 records; COLLISION measured takes two values (EXC-P02)"
+        },
+        {
+          "path": "orchestrator/pipeline.py",
+          "lines_at_frozen_commit": "125-132"
+        },
+        {
+          "path": "evaluator/computational.py",
+          "lines_at_frozen_commit": "20-61"
+        }
+      ],
+      "limitations": [
+        "Only the P4PRE_SPECTRAL PASS describes the empty box: no simulated empty-box mode lies within 13 MHz of the 4.30 GHz readout root. The COLLISION PASS (|omega24 - f_readout| = 98.4132 MHz >= 13 MHz) is computed by dressed_system.dressed_spectrum() for the frozen Branch-A NOMINAL device model and reads no Palace output; its evidence_class SOLVED refers to that model calculation, not to the EM solve.",
+        "Neither PASS is evidence about the Object 001 package or the device (REL-PAL-N1).",
+        "The TOLERANCE reason text embedded in every record is stale (see EXC-P09)."
+      ]
+    },
+    {
+      "id": "REL-PAL-06",
+      "scope": "palace-benchmark",
+      "status": "QUALIFIED",
+      "statement": "Mesh refinement of the 22 x 22 x 1.5 mm empty box is PASS against the predeclared ENGINEERING-RULE (finest error and final-two-level change both <= 1e-4, at least 3 levels) in all three complete campaign records (065055Z, 091242Z, 115901Z), with identical frequencies. Levels L1/L2/L3: 9848/20936/36708 DOF; max relative analytic error 4.7230588919842275e-05, 6.754523789468446e-06, 7.274563513265209e-06; change vs previous level 4.047415351226741e-05 and 1.4028992543569777e-05.",
+      "recorded_verdicts": {
+        "PALACE-VERIFY-20260915T063014Z": "INCOMPLETE",
+        "PALACE-VERIFY-20260915T065055Z": "PASS",
+        "PALACE-VERIFY-20260915T091242Z": "PASS",
+        "PALACE-VERIFY-20260915T115901Z": "PASS"
+      },
+      "facts": {
+        "table_record": "PALACE-VERIFY-20260915T091242Z",
+        "dof": [
+          9848,
+          20936,
+          36708
+        ],
+        "max_abs_relative_analytic_error": [
+          4.7230588919842275e-05,
+          6.754523789468446e-06,
+          7.274563513265209e-06
+        ],
+        "max_abs_relative_change_vs_previous_level": [
+          null,
+          4.047415351226741e-05,
+          1.4028992543569777e-05
+        ],
+        "reasons": [
+          "finest error 7.275e-06, final-two-level change 1.403e-05, all levels CONVERGED"
+        ]
+      },
+      "evidence": [
+        {
+          "path": "results/PALACE-VERIFY-20260915T091242Z/summary.json",
+          "what": "mesh_convergence"
+        },
+        {
+          "path": "solvers/palace/verification.py",
+          "lines_at_frozen_commit": "48-51"
+        }
+      ],
+      "limitations": [
+        "The error is not monotone: the maximum error at L3 exceeds that at L2, and the (2,2,0) error changes sign between them.",
+        "No order of convergence or asymptotic range is established. The refinement span is a factor of 2 in h, and the final-two-level change is larger than the finest analytic error.",
+        "Only height-independent TM_mn0 modes are refined, so this objective is blind to Z.",
+        "PASS is against a predeclared ENGINEERING-RULE, not a derived error bound."
+      ]
+    },
+    {
+      "id": "REL-PAL-07",
+      "scope": "palace-benchmark",
+      "status": "QUALIFIED",
+      "statement": "Height sensitivity of the AUXILIARY 22 x 22 x 7.0/7.7 mm box, mode (0,1,1), is PASS in 091242Z and 115901Z: delta_f_palace -1.8467315100000015 GHz against delta_f_exact -1.8466170624533156 GHz, relative disagreement 6.197687057750454e-05 (rule <= 0.01), shift-to-uncertainty ratio 792.8985280693356 (rule >= 10). It is INCOMPLETE in 065055Z (earlier analysis code). The quarantined 063014Z carries a verdict field, but that run was aborted and the field is not counted (EXC-P01).",
+      "recorded_verdicts": {
+        "PALACE-VERIFY-20260915T063014Z": "BLOCKED",
+        "PALACE-VERIFY-20260915T065055Z": "INCOMPLETE",
+        "PALACE-VERIFY-20260915T091242Z": "PASS",
+        "PALACE-VERIFY-20260915T115901Z": "PASS"
+      },
+      "facts": {
+        "records_pass": [
+          "PALACE-VERIFY-20260915T091242Z",
+          "PALACE-VERIFY-20260915T115901Z"
+        ],
+        "delta_f_palace_GHz": -1.8467315100000015,
+        "delta_f_exact_GHz": -1.8466170624533156,
+        "relative_disagreement": 6.197687057750454e-05,
+        "shift_to_uncertainty_ratio": 792.8985280693356,
+        "numerical_uncertainty_GHz": 0.0023289449999985834,
+        "levels_identified": 2,
+        "label": "AUXILIARY taller box (22 x 22 x 7.0 mm against 7.7 mm); not a verification of Object 001"
+      },
+      "evidence": [
+        {
+          "path": "results/PALACE-VERIFY-20260915T091242Z/summary.json",
+          "what": "height.aux_height"
+        },
+        {
+          "path": "solvers/palace/verification.py",
+          "lines_at_frozen_commit": "53-56"
+        }
+      ],
+      "limitations": [
+        "An AUXILIARY box; the record labels it 'not a verification of Object 001'.",
+        "Exactly the minimum two levels, paired by index with different mesh lengths per height.",
+        "The 'numerical uncertainty' 0.0023289449999985834 GHz is a two-level change, not a derived bound.",
+        "The 065055Z INCOMPLETE verdict comes from an earlier analysis code revision (see EXC-P06)."
+      ]
+    },
+    {
+      "id": "REL-PAL-08",
+      "scope": "palace-benchmark",
+      "status": "BLOCKED",
+      "statement": "Height sensitivity of the Object 001 box (22 x 22 mm, 1.5 mm against 1.65 mm) is not established. The rule-level meshes (estimated 545325 and 459651 DOF) exceed the declared 400000-DOF runner budget and were never launched; both exploratory d/3 runs hit the 3600 s timeout in every complete campaign. The recorded verdict is BLOCKED in 091242Z and 115901Z and INCOMPLETE in 065055Z. The quarantined 063014Z's verdict field is not counted (EXC-P01).",
+      "recorded_verdicts": {
+        "PALACE-VERIFY-20260915T063014Z": "BLOCKED",
+        "PALACE-VERIFY-20260915T065055Z": "INCOMPLETE",
+        "PALACE-VERIFY-20260915T091242Z": "BLOCKED",
+        "PALACE-VERIFY-20260915T115901Z": "BLOCKED"
+      },
+      "facts": {
+        "timeouts_3600s": {
+          "PALACE-VERIFY-20260915T065055Z": [
+            "object001_height-d1.5-L1",
+            "object001_height-d1.65-L1"
+          ],
+          "PALACE-VERIFY-20260915T091242Z": [
+            "object001_height-d1.5-L1",
+            "object001_height-d1.65-L1"
+          ],
+          "PALACE-VERIFY-20260915T115901Z": [
+            "object001_height-d1.5-L1",
+            "object001_height-d1.65-L1"
+          ]
+        }
+      },
+      "evidence": [
+        {
+          "path": "results/PALACE-VERIFY-20260915T091242Z/summary.json",
+          "what": "height.object001_height and runs"
+        },
+        {
+          "path": "solvers/palace/verification.py",
+          "lines_at_frozen_commit": "67, 71"
+        }
+      ],
+      "limitations": [
+        "The timeouts measure the GitHub-hosted runner's capacity, not the physics.",
+        "The Z extent of the Object 001 box is unverified by any executed record."
+      ]
+    },
+    {
+      "id": "REL-PAL-09",
+      "scope": "palace-benchmark",
+      "status": "VERIFIED",
+      "statement": "Two of the three complete verification campaigns reproduce each other. 091242Z and 115901Z have identical frequencies and verdict tables, and byte-identical eig.csv for all 7 converged runs. 065055Z has the same real frequencies but different eig.csv bytes in all 7 runs.",
+      "facts": {
+        "byte_identical_091242Z_115901Z": [
+          "aux_height-d7-L1",
+          "aux_height-d7-L2",
+          "aux_height-d7.7-L1",
+          "aux_height-d7.7-L2",
+          "ladder-L1",
+          "ladder-L2",
+          "ladder-L3"
+        ],
+        "differ_065055Z": [
+          "aux_height-d7-L1",
+          "aux_height-d7-L2",
+          "aux_height-d7.7-L1",
+          "aux_height-d7.7-L2",
+          "ladder-L1",
+          "ladder-L2",
+          "ladder-L3"
+        ]
+      },
+      "evidence": [
+        {
+          "path": "results/PALACE-VERIFY-20260915T091242Z/summary.json"
+        },
+        {
+          "path": "results/PALACE-VERIFY-20260915T115901Z/summary.json"
+        }
+      ],
+      "limitations": [
+        "091242Z and 115901Z ran different images (f41ad915 and 2440f8d0); byte identity holds for this pair only and is not a general property. The same image f41ad915 produced both golden eig.csv patterns in ladder-L1 (065055Z vs 091242Z)."
+      ]
+    },
+    {
+      "id": "REL-PAL-10",
+      "scope": "palace-benchmark",
+      "status": "VERIFIED",
+      "statement": "The committed Palace records are byte-intact. The 16 manifested Palace records verify in both directions against their own execution-time manifest.sha256 (the only unlisted file, campaign.sha256 in the three complete VERIFY records, is outside the membership rule). The quarantined 063014Z has no register; its decision-relevant files match their content pins. This is enforced on every CI run by tests/test_frozen_evidence.py.",
+      "evidence": [
+        {
+          "path": "tests/test_frozen_evidence.py",
+          "lines_at_frozen_commit": "55-82, 95-163, 186"
+        },
+        {
+          "path": "orchestrator/manifest.py",
+          "sha256_at_frozen_commit": "66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f"
+        }
+      ],
+      "limitations": [
+        "File immutability only. It does not judge whether any verdict is justified."
+      ]
+    },
+    {
+      "id": "REL-PAL-N1",
+      "scope": "palace-benchmark",
+      "status": "NOT-ESTABLISHED",
+      "statement": "That any golden gate verdict (including the COLLISION and P4PRE_SPECTRAL PASS) is evidence about the Object 001 package or the device.",
+      "evidence": [
+        {
+          "path": "docs/palace-execution.md",
+          "lines_at_frozen_commit": "154-157, 309-311"
+        }
+      ],
+      "limitations": []
+    },
+    {
+      "id": "REL-PAL-N2",
+      "scope": "palace-benchmark",
+      "status": "NOT-ESTABLISHED",
+      "statement": "Real Palace validation of Object 001 (spec section 15 v0.2 scope): the package with chip, recess, launches and lid, including its Z extent and its lowest package mode. Only the empty PEC box was solved.",
+      "evidence": [
+        {
+          "path": "QMHP-CEM_v0.1_Spec.md",
+          "lines_at_frozen_commit": "1400-1403"
+        },
+        {
+          "path": "docs/palace-execution.md",
+          "lines_at_frozen_commit": "38-39"
+        }
+      ],
+      "limitations": []
+    },
+    {
+      "id": "REL-PAL-N3",
+      "scope": "palace-benchmark",
+      "status": "NOT-ESTABLISHED",
+      "statement": "Any error bound, convergence order or physical/model uncertainty for the Palace frequencies. The numbers above are numerical agreements against predeclared engineering rules.",
+      "evidence": [
+        {
+          "path": "solvers/palace/verification.py",
+          "lines_at_frozen_commit": "44-76"
+        }
+      ],
+      "limitations": []
+    },
+    {
+      "id": "REL-PAL-N4",
+      "scope": "palace-benchmark",
+      "status": "NOT-ESTABLISHED",
+      "statement": "A Palace run of the 3x3 Object 001 sweep (spec section 8.5). The docs say it ran as a workflow artifact; no committed record exists.",
+      "evidence": [
+        {
+          "path": "docs/palace-execution.md",
+          "lines_at_frozen_commit": "185-193, 311-314"
+        }
+      ],
+      "limitations": []
+    },
+    {
+      "id": "REL-QT-01",
+      "scope": "qutip-fixed-point-bundle",
+      "status": "QUALIFIED",
+      "statement": "Classification of the one QUTIP-A-READOUT-CROSSCHECK-v1 execution, stated in three separate parts that must always be quoted together: numerical cross-check PASS 11/11 (per-check checker verdicts against the frozen engineering thresholds); execution integrity VERIFIED; protocol conformance QUALIFIED: RESOURCE-LIMIT DEVIATION. No tool issued an overall scientific verdict, and the release does not state one. This is not an unqualified overall scientific PASS.",
+      "classification": {
+        "numerical_cross_check": "PASS 11/11 (per-check checker verdicts)",
+        "execution_integrity": "VERIFIED",
+        "protocol_conformance": "QUALIFIED: RESOURCE-LIMIT DEVIATION",
+        "overall_scientific_verdict": "NOT ISSUED"
+      },
+      "evidence": [
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/checker-output/result.json",
+          "sha256_at_frozen_commit": "bf3b642ce850556ddea4590218a7ffd93d3af45ccdc0577edf1ebc866f9a47ee",
+          "what": "checks; scientific_verdict 'NOT ISSUED BY THIS TOOL'"
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/launcher-final.json",
+          "sha256_at_frozen_commit": "0c4f9c716295b57df7cb7caa8a2efe53b130544cbe926b38e23d4ef41164631f",
+          "what": "classification; exit_code_zero_is_not_a_pass true"
+        },
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/EXECUTION-LOG.json",
+          "sha256_at_frozen_commit": "efde298390b5335543441db9e5fd8212ddae05497e8eed294016559e534fd370"
+        },
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/README.md",
+          "sha256_at_frozen_commit": "faec47656d804238902f470aacd8935fac620d87f416d6fa8dcbb1ca036b257e"
+        }
+      ],
+      "limitations": [
+        "See REL-QT-02 to REL-QT-QN8 and EXC-Q01."
+      ]
+    },
+    {
+      "id": "REL-QT-02",
+      "scope": "qutip-fixed-point-bundle",
+      "status": "VERIFIED",
+      "statement": "The record carries checker verdict PASS for all 11 named checks, every recorded value is within its recorded limit, and every recorded limit equals the frozen-rules value (frozen-rules sha256 42e1c2a9...). Recorded values: ordered eigenvalues 9.947598300641403e-14 GHz (limit 1e-10); pulls up to 2.6645352591003757e-11 MHz (limit 1e-06); sink line and emission up to 2.6645352591003757e-14 GHz (limit 1e-09); f8 weight 4.163336342344337e-17 (limit 1e-10); label assignment equal to the baseline; and, checker-attested only (EXC-Q04), the Hamiltonian entry difference 1.1102230246251565e-16 GHz (limit 1e-12) and the independent Hermiticity defect 4.983043024956605e-15 GHz (limit 1e-12).",
+      "facts": {
+        "checks": {
+          "dressed_emission_GHz": {
+            "verdict": "PASS",
+            "limit_rule": "max_sink_line_or_emission_abs_diff_GHz",
+            "value": 2.1316282072803006e-14,
+            "limit": 1e-09
+          },
+          "f8_weight": {
+            "verdict": "PASS",
+            "limit_rule": "max_f8_weight_abs_diff",
+            "value": 4.163336342344337e-17,
+            "limit": 1e-10
+          },
+          "hamiltonian_max_entry": {
+            "verdict": "PASS",
+            "limit_rule": "max_hamiltonian_entry_abs_diff_GHz",
+            "value": 1.1102230246251565e-16,
+            "limit": 1e-12
+          },
+          "hermiticity": {
+            "verdict": "PASS",
+            "limit_rule": "max_hamiltonian_hermiticity_defect_GHz",
+            "limit": 1e-12,
+            "independent_defect_GHz": 4.983043024956605e-15,
+            "baseline_defect_GHz": 4.983043024956606e-15
+          },
+          "labels": {
+            "verdict": "PASS",
+            "limit_rule": "label_min_overlap, label_min_margin"
+          },
+          "ordered_eigenvalues_max": {
+            "verdict": "PASS",
+            "limit_rule": "max_ordered_eigenvalue_abs_diff_GHz",
+            "value": 9.947598300641403e-14,
+            "limit": 1e-10
+          },
+          "pull_MHz_level0": {
+            "verdict": "PASS",
+            "limit_rule": "max_pull_or_contrast_abs_diff_MHz",
+            "value": 5.329070518200751e-12,
+            "limit": 1e-06
+          },
+          "pull_MHz_level1": {
+            "verdict": "PASS",
+            "limit_rule": "max_pull_or_contrast_abs_diff_MHz",
+            "value": 2.6645352591003757e-11,
+            "limit": 1e-06
+          },
+          "pull_MHz_level2": {
+            "verdict": "PASS",
+            "limit_rule": "max_pull_or_contrast_abs_diff_MHz",
+            "value": 5.329070518200751e-12,
+            "limit": 1e-06
+          },
+          "sink_line_GHz": {
+            "verdict": "PASS",
+            "limit_rule": "max_sink_line_or_emission_abs_diff_GHz",
+            "value": 2.6645352591003757e-14,
+            "limit": 1e-09
+          },
+          "sink_logical_contrast_MHz": {
+            "verdict": "PASS",
+            "limit_rule": "max_pull_or_contrast_abs_diff_MHz",
+            "value": 2.1316282072803006e-11,
+            "limit": 1e-06
+          }
+        },
+        "frozen_rules_sha256": "42e1c2a9963b92b7a3d54ff86bdebae479b8aee9a81fbd519821d32b1f3c57d6"
+      },
+      "evidence": [
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/checker-output/result.json",
+          "sha256_at_frozen_commit": "bf3b642ce850556ddea4590218a7ffd93d3af45ccdc0577edf1ebc866f9a47ee"
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/inputs/archive/qmhp-qutip-branch-a-approval-110a2e0/frozen-rules.json",
+          "sha256_at_frozen_commit": "42e1c2a9963b92b7a3d54ff86bdebae479b8aee9a81fbd519821d32b1f3c57d6"
+        }
+      ],
+      "limitations": [
+        "Thresholds are ENGINEERING-RULE (rules_status 'FROZEN-BY-HUMAN-APPROVAL (ENGINEERING-RULE, not MASTER-FROZEN)'), not error bounds.",
+        "Two values (the Hamiltonian entry difference and the independent Hermiticity defect) are checker-attested only and cannot be recomputed from the record (REL-QT-03, EXC-Q04)."
+      ]
+    },
+    {
+      "id": "REL-QT-03",
+      "scope": "qutip-fixed-point-bundle",
+      "status": "QUALIFIED",
+      "statement": "Arithmetic consistency of the record, recomputed for this register with plain Python floats (no NumPy, no QuTiP) from checker-output/raw.json and the preserved CEM snapshot: the ordered eigenvalue difference, the seven observable differences and the baseline Hermiticity defect (max |H_ij - conj(H_ji)| over the snapshot's 120 x 120 baseline_H) are bit-equal to the recorded values; the QuTiP-side label assignment equals the baseline for all six (level, photon) pairs, with minimum overlap 0.9748795693300384 and minimum margin 0.9519391671150013 (rules 0.5 and 0.1).",
+      "facts": {
+        "recomputed": {
+          "baseline_hermiticity": 4.983043024956606e-15,
+          "dressed_emission_GHz": 2.1316282072803006e-14,
+          "f8_weight": 4.163336342344337e-17,
+          "labels_equal_baseline": true,
+          "min_qutip_margin": 0.9519391671150013,
+          "min_qutip_overlap": 0.9748795693300384,
+          "ordered_eigenvalues_max": 9.947598300641403e-14,
+          "pull_MHz_level0": 5.329070518200751e-12,
+          "pull_MHz_level1": 2.6645352591003757e-11,
+          "pull_MHz_level2": 5.329070518200751e-12,
+          "sink_line_GHz": 2.6645352591003757e-14,
+          "sink_logical_contrast_MHz": 2.1316282072803006e-11
+        }
+      },
+      "evidence": [
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/checker-output/raw.json",
+          "sha256_at_frozen_commit": "b0f0876f1d304bc83e303f55ba399ffdf5d7a48fe882680f1e0b0c4736aef959"
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/inputs/archive/qmhp-qutip-branch-a-export-110a2e0-attempt1/branch-a-reference-v1.json",
+          "sha256_at_frozen_commit": "bb09bcbd68a83a2e99a3530cc73e2c5083966322d7eb2fb453fb846fb27222b9"
+        }
+      ],
+      "limitations": [
+        "This recomputes the comparison from recorded outputs and shared inputs. It is an arithmetic consistency check, not independent confirmation (CLAUDE.md section 7).",
+        "The QuTiP-side values themselves (eigenvalues, overlaps, observables) cannot be regenerated without re-running QuTiP."
+      ]
+    },
+    {
+      "id": "REL-QT-04",
+      "scope": "qutip-fixed-point-bundle",
+      "status": "VERIFIED",
+      "statement": "Execution integrity of the in-repository chain. Each of the four QUTIP-A records verifies in both directions against its own execution-time register (25/25, 3/3, 31/31, 38/38 entries), and each register's digest equals its pin in tests/test_frozen_evidence.py. The checker-output manifest digest 273bfcc3... equals the one the checker printed; the ledger's receipt_sha256 equals the committed receipt's digest; the ledger's launcher_sha256 equals the committed launcher; the checker and schema copies inside the record equal the repository files; checker.stderr is empty.",
+      "facts": {
+        "receipt_sha256": "7e648fdd9b5f071dd4c5bcb39d1650e72911aaacf4c4721f05bce945ae89eda7",
+        "checker_output_manifest_sha256": "273bfcc3f5e0112021b1c537bc4cf504e0f930b366d1a7d1d3f7b8bed406bdec",
+        "launcher_sha256": "4f34781953db2fd4791827065ef5fc7003f899b7d96069059263ac81b7b2e711"
+      },
+      "evidence": [
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/attempt-receipt.json",
+          "sha256_at_frozen_commit": "7e648fdd9b5f071dd4c5bcb39d1650e72911aaacf4c4721f05bce945ae89eda7"
+        },
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/ATTEMPT-LEDGER.QUTIP-A-READOUT-CROSSCHECK-v1-110a2e0-attempt1.json",
+          "sha256_at_frozen_commit": "d1b632938aca4a091fcfd865a5b1e46bd547ce725fb6450f9c1967e1408ba7ee"
+        },
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/qutip_branch_a_launcher_asgrowth.py",
+          "sha256_at_frozen_commit": "4f34781953db2fd4791827065ef5fc7003f899b7d96069059263ac81b7b2e711"
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/checker.stdout",
+          "sha256_at_frozen_commit": "c063f918a14232816a3dcb73f90bc49491657935d1bc08776d51176930618e4b"
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/checker.stderr",
+          "sha256_at_frozen_commit": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "limitations": [
+        "The in-repository chain only. Custody claims resting on the owner's Mac-side shasum and the uploaded archives are ASSERTED (REL-QT-10).",
+        "The ledger, EXECUTION-LOG.json and the bundle README were pinned by no execution-time record or test before this register (EXC-Q09)."
+      ]
+    },
+    {
+      "id": "REL-QT-05",
+      "scope": "qutip-fixed-point-bundle",
+      "status": "VERIFIED",
+      "statement": "The three supporting records are what they say, and none is a scientific attempt. BLOCKED: status BLOCKED-PREFLIGHT, checker_launched false, attempt_consumed false. DIAGNOSTIC: status 'DIAGNOSTIC ONLY; NOT QMHP EVIDENCE'. CONTROL-TEST: status QUALIFICATION-PASSED, mode 'PRE-FLIGHT QUALIFICATION ONLY', checker_launched false, attempt_receipt_written false, attempt_ledger_touched false, ledger absent before and after.",
+      "facts": {
+        "blocked": {
+          "status": "BLOCKED-PREFLIGHT",
+          "checker_launched": false,
+          "attempt_consumed": false
+        },
+        "diagnostic": {
+          "status": "DIAGNOSTIC ONLY; NOT QMHP EVIDENCE"
+        },
+        "qualification": {
+          "attempt_ledger_touched": false,
+          "attempt_receipt_written": false,
+          "checker_launched": false,
+          "ledger_present_after": false,
+          "ledger_present_before": false,
+          "mode": "PRE-FLIGHT QUALIFICATION ONLY",
+          "record_kind": "launcher-control-test (NOT QMHP scientific evidence)",
+          "status": "QUALIFICATION-PASSED"
+        }
+      },
+      "evidence": [
+        {
+          "path": "results/QUTIP-A-LAUNCH-BLOCKED-20260926T025352Z/launcher-final.json",
+          "sha256_at_frozen_commit": "724b3350d17f6803786afe1ad564ad6cb1b155b8599d255a002b840e294fd8d5"
+        },
+        {
+          "path": "results/QUTIP-A-MAC-MEMORY-DIAGNOSTIC-20260926T045655Z/diagnostic.json",
+          "sha256_at_frozen_commit": "d589c8fe0a3ccab8ed6d3cd87039fd19dc1abed01a23b0779c6e73b2405643c2"
+        },
+        {
+          "path": "results/QUTIP-A-LAUNCHER-CONTROL-TEST-20260926T060642Z/qualification-final.json",
+          "sha256_at_frozen_commit": "63efd14536f413da442e62a426fec0e7327ae23c235b98416858c0333aff822a"
+        }
+      ],
+      "limitations": []
+    },
+    {
+      "id": "REL-QT-06",
+      "scope": "qutip-fixed-point-bundle",
+      "status": "QUALIFIED",
+      "statement": "Protocol conformance. Honoured: runtime versions python 3.9.6, numpy 2.0.2, scipy 1.13.1 and qutip 5.0.4 equal the frozen approved runtime; wall_time_limit_s 60 was enforced by the launcher; permitted_attempts 1 was enforced by an O_EXCL ledger; the eigensolver string is as frozen. NOT honoured: the frozen memory_limit_MB = 1024 was recorded but not enforced. The checker ran under the separately approved address-space-growth control QUTIP-A-MACOS-AS-GROWTH-LIMIT-v1 (RLIMIT_AS soft = hard = baseline VSZ + 1073741824 bytes), which is not a total-memory or resident-memory limit.",
+      "facts": {
+        "frozen_memory_limit_MB": 1024,
+        "wall_time_limit_s": 60,
+        "permitted_attempts": 1,
+        "approved_runtime": {
+          "numpy_version": "2.0.2",
+          "python_version": "3.9.6",
+          "qutip_version": "5.0.4",
+          "scipy_version": "1.13.1"
+        }
+      },
+      "evidence": [
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/inputs/archive/qmhp-qutip-branch-a-approval-110a2e0/frozen-rules.json",
+          "sha256_at_frozen_commit": "42e1c2a9963b92b7a3d54ff86bdebae479b8aee9a81fbd519821d32b1f3c57d6"
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/launcher-final.json",
+          "sha256_at_frozen_commit": "0c4f9c716295b57df7cb7caa8a2efe53b130544cbe926b38e23d4ef41164631f"
+        },
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/checker-output/attempt.json",
+          "sha256_at_frozen_commit": "f2ab95d506f1ca45214eaf26cdcf5ecff55062e306273f4a359107f22cea989a"
+        },
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/RESOURCE-RULE-APPROVAL.json",
+          "sha256_at_frozen_commit": "7d38e9de97595391003bdd4943d2dd8352bc5a2c0ef9254c5c5dc71af9a122bf"
+        }
+      ],
+      "limitations": [
+        "The deviation is carried as EXC-Q01. The frozen-rules file was not edited to accommodate it."
+      ]
+    },
+    {
+      "id": "REL-QT-07",
+      "scope": "qutip-fixed-point-bundle",
+      "status": "VERIFIED",
+      "statement": "The compared model, as recorded in the export snapshot (source commit 110a2e0; the exporter recorded source_tree_clean true): Nq 10, Nph 12, dimension 120, tensor order [fluxonium, resonator]; readout 4.301974466 GHz (MASTER-FROZEN), held fixed, no root search; coupling g = 0.15 GHz classified VERIFIED-COMPUTATIONAL with coupling_is_geometry_derived false; EC/EJ/EL 0.6/5.72/1.58 GHz, phi_ext = pi.",
+      "facts": {
+        "source_commit": "110a2e00198e5aab6093ad70b7d06ac8127ae550",
+        "source_tree_clean": true,
+        "Nq": 10,
+        "Nph": 12,
+        "dimension": 120,
+        "tensor_order": [
+          "fluxonium",
+          "resonator"
+        ],
+        "readout_GHz": 4.301974466,
+        "root_search_performed": false,
+        "coupling_g_GHz": 0.15,
+        "coupling_classification": "VERIFIED-COMPUTATIONAL",
+        "coupling_is_geometry_derived": false,
+        "EC_over_h_GHz": 0.6,
+        "EJ_over_h_GHz": 5.72,
+        "EL_over_h_GHz": 1.58
+      },
+      "evidence": [
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/inputs/archive/qmhp-qutip-branch-a-export-110a2e0-attempt1/branch-a-reference-v1.json",
+          "sha256_at_frozen_commit": "bb09bcbd68a83a2e99a3530cc73e2c5083966322d7eb2fb453fb846fb27222b9"
+        }
+      ],
+      "limitations": [
+        "g = 0.150 GHz is a reference coefficient from the release readout-replication script. It is not geometry-derived or S1-extracted and must not be presented as either (REL-QT-QN5).",
+        "source_tree_clean is the exporter's own record. That the export ran once rests on its approval record (one permitted attempt) and the run-attempt1 files; it is not re-measured here."
+      ]
+    },
+    {
+      "id": "REL-QT-08",
+      "scope": "qutip-fixed-point-bundle",
+      "status": "VERIFIED",
+      "statement": "The bridge bytes at the frozen commit are the bytes the evidence pins: the checker, schema, exporter, protocol document and the source files named in expected-hashes.json all hash to their pinned values, and the checker and schema copies inside the execution record are byte-identical to the repository files.",
+      "facts": {
+        "expected_hashes_pinned": {
+          "scripts/export_qutip_branch_a_reference.py": "7ad7cafa5a30d154976cfca945afd9925d4eb09e3a4e015d5232239ce79a0182",
+          "schemas/qutip/branch-a-reference-v1.schema.json": "a65958dbb6c0c1407c5368b66abaf524a85d5a8ddb928e50d68b80504c234cfe",
+          "docs/qutip/branch-a-fixed-point-crosscheck-v1.md": "0caeb9e7189d61d6bf4bc9418a5357f3148fd94e67ceabe5b5ab57176daa6730",
+          "models/fluxonium.py": "e797ea4acc13a221e436fc7da8996e48e999a088374339f082cb16e285cccc2c",
+          "models/dressed_system.py": "eaa7f18674d23e9e07fcb6c63ac3950368cf14b859c0529afb6174390203547d",
+          "contracts/master.py": "be0b447aa6cf52d28364c5ea87050d9921c725f77d709bdf9fdc10dc766dc5e2",
+          "master/qmhp_v158f_requirements.yaml": "b4f92c4cd05b77258706577909f6d1bb17073468bd6cfbc8126ce37942a7adde",
+          "pyproject.toml": "b26642acb58638be3477c1e6f72b139e3dc2b6f8074a2922414b2abf409f8dc9",
+          "uv.lock": "107a13f00febe62d1e3dbee42ff0e65205746f04aa92fbb350d7aa03b003d498"
+        }
+      },
+      "evidence": [
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/inputs/archive/qmhp-qutip-branch-a-preservation-110a2e0-attempt1/expected-hashes.json",
+          "sha256_at_frozen_commit": "b667aad5841de92a0c135f8551bc0ecde29f487cb4d354e647af778f195e0a24"
+        },
+        {
+          "path": "tools/qutip_bridge/check_branch_a_reference.py",
+          "sha256_at_frozen_commit": "9f0798c5b307aa455a3bd6482ab5b46c513d448413de9e8aa14ae48d2733e2b1"
+        },
+        {
+          "path": "schemas/qutip/branch-a-reference-v1.schema.json",
+          "sha256_at_frozen_commit": "a65958dbb6c0c1407c5368b66abaf524a85d5a8ddb928e50d68b80504c234cfe"
+        },
+        {
+          "path": "scripts/export_qutip_branch_a_reference.py",
+          "sha256_at_frozen_commit": "7ad7cafa5a30d154976cfca945afd9925d4eb09e3a4e015d5232239ce79a0182"
+        },
+        {
+          "path": "docs/qutip/branch-a-fixed-point-crosscheck-v1.md",
+          "sha256_at_frozen_commit": "0caeb9e7189d61d6bf4bc9418a5357f3148fd94e67ceabe5b5ab57176daa6730"
+        }
+      ],
+      "limitations": [
+        "Editing any of these files would break byte equality with the executed record's pinned inputs; the stale text they carry is reconciled only by the addendum (EXC-Q07)."
+      ]
+    },
+    {
+      "id": "REL-QT-09",
+      "scope": "qutip-fixed-point-bundle",
+      "status": "QUALIFIED",
+      "statement": "What the cross-check establishes: at one frozen operating point, QuTiP's operator/tensor assembly of the declared finite Branch-A model, fed the CEM-exported spectrum and charge matrix, reproduced the CEM-assembled 120 x 120 Hamiltonian to a maximum entry difference of 1.1102230246251565e-16 GHz (limit 1e-12 GHz). The independently exercised part is the coupling-term and tensor-order assembly.",
+      "evidence": [
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/checker-output/result.json",
+          "sha256_at_frozen_commit": "bf3b642ce850556ddea4590218a7ffd93d3af45ccdc0577edf1ebc866f9a47ee",
+          "what": "checks.hamiltonian_max_entry; scope"
+        }
+      ],
+      "limitations": [
+        "The value is checker-attested; the QuTiP Hamiltonian is not stored, so it cannot be recomputed.",
+        "The size is consistent with floating-point round-off; no error bound was derived."
+      ]
+    },
+    {
+      "id": "REL-QT-10",
+      "scope": "qutip-fixed-point-bundle",
+      "status": "ASSERTED",
+      "statement": "Owner authorisation and external custody. The frozen rules (OWNER-APPROVAL-2026-09-26-QUTIP-A-v1), the resource rule (OWNER-APPROVAL-2026-09-26-QUTIP-A-AS-GROWTH-RULE-v1) and the execution (OWNER-APPROVAL-2026-09-26-QUTIP-A-REAL-EXECUTION-v2) were approved by the owner in the working session; the committed records are byte-identical to the uploaded archives, whose digests the owner confirmed on the Mac.",
+      "evidence": [
+        {
+          "path": "experiments/qutip-a-readout-crosscheck/EXECUTION-LOG.json",
+          "sha256_at_frozen_commit": "efde298390b5335543441db9e5fd8212ddae05497e8eed294016559e534fd370",
+          "what": "approvals; not_committed"
+        }
+      ],
+      "limitations": [
+        "The approval identifiers and approval-file digests are recorded at execution time and verified; the human authorisation itself is a session statement that repository files cannot prove.",
+        "The upload archives are binary, stay with the owner and are not in the repository; their digests and the Mac-side screenshots cannot be recomputed here."
+      ]
+    },
+    {
+      "id": "REL-QT-QN1",
+      "scope": "qutip-fixed-point-bundle",
+      "status": "NOT-ESTABLISHED",
+      "statement": "That agreement beyond the Hamiltonian (ordered eigenvalues, labels, the seven observables) is independent confirmation of CEM's eigensolve, labelling or observables. The eigensolver (numpy.linalg.eigh), the labelling rule, the observable formulas and all inputs are shared.",
+      "evidence": [
+        {
+          "path": "docs/qutip/branch-a-fixed-point-crosscheck-v1.md",
+          "lines_at_frozen_commit": "23-29, 79",
+          "sha256_at_frozen_commit": "0caeb9e7189d61d6bf4bc9418a5357f3148fd94e67ceabe5b5ab57176daa6730"
+        }
+      ],
+      "limitations": []
+    },
+    {
+      "id": "REL-QT-QN2",
+      "scope": "qutip-fixed-point-bundle",
+      "status": "NOT-ESTABLISHED",
+      "statement": "Anything about the static fluxonium spectrum or charge matrix, EM extraction, geometry, truncation or continuum convergence, hardware, the coupling g, the QMHP architecture, or any readout frequency other than 4.301974466 GHz.",
+      "evidence": [
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/checker-output/result.json",
+          "sha256_at_frozen_commit": "bf3b642ce850556ddea4590218a7ffd93d3af45ccdc0577edf1ebc866f9a47ee",
+          "what": "scope"
+        }
+      ],
+      "limitations": []
+    },
+    {
+      "id": "REL-QT-QN3",
+      "scope": "qutip-fixed-point-bundle",
+      "status": "NOT-ESTABLISHED",
+      "statement": "That the recorded differences are an error bound or say anything about physical accuracy or model uncertainty.",
+      "evidence": [
+        {
+          "path": "docs/qutip/branch-a-fixed-point-crosscheck-v1.md",
+          "lines_at_frozen_commit": "130",
+          "sha256_at_frozen_commit": "0caeb9e7189d61d6bf4bc9418a5357f3148fd94e67ceabe5b5ab57176daa6730"
+        }
+      ],
+      "limitations": []
+    },
+    {
+      "id": "REL-QT-QN4",
+      "scope": "qutip-fixed-point-bundle",
+      "status": "NOT-ESTABLISHED",
+      "statement": "That the cross-check resolves the FLAGGED cross_implementation regression pins (F8 weight, sink pull, logical pull). They stay FLAGGED-FOR-REVIEW (EXC-R02).",
+      "evidence": [
+        {
+          "path": "docs/regression-pins.md",
+          "lines_at_frozen_commit": "40-54"
+        }
+      ],
+      "limitations": []
+    },
+    {
+      "id": "REL-QT-QN5",
+      "scope": "qutip-fixed-point-bundle",
+      "status": "NOT-ESTABLISHED",
+      "statement": "That g = 0.150 GHz is a geometry-derived, S1-extracted or physically correct coupling for the device. Its VERIFIED-COMPUTATIONAL classification is verified; physical correctness is not.",
+      "evidence": [
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/inputs/archive/qmhp-qutip-branch-a-export-110a2e0-attempt1/branch-a-reference-v1.json",
+          "sha256_at_frozen_commit": "bb09bcbd68a83a2e99a3530cc73e2c5083966322d7eb2fb453fb846fb27222b9",
+          "what": "coupling_classification, coupling_is_geometry_derived, coupling_note"
+        }
+      ],
+      "limitations": []
+    },
+    {
+      "id": "REL-QT-QN6",
+      "scope": "qutip-fixed-point-bundle",
+      "status": "NOT-ESTABLISHED",
+      "statement": "That a repository test exercises the QuTiP assembly path. QuTiP is not a declared dependency; the contract tests use synthetic fixtures, and the only QuTiP-assembly test is skipped where QuTiP is absent. The single Mac execution is evidence, not a test.",
+      "evidence": [
+        {
+          "path": "tests/test_qutip_bridge_contract.py",
+          "lines_at_frozen_commit": "698-704"
+        },
+        {
+          "path": "pyproject.toml"
+        }
+      ],
+      "limitations": []
+    },
+    {
+      "id": "REL-QT-QN7",
+      "scope": "qutip-fixed-point-bundle",
+      "status": "NOT-ESTABLISHED",
+      "statement": "That the checker's memory use was bounded or measured. The only evidence is completion with empty stderr and no MemoryError. In the runtime probe of the execution run, imports alone grew the virtual size by 421871616 bytes (about 402 MiB) of the 1073741824-byte growth allowance.",
+      "evidence": [
+        {
+          "path": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/launcher-final.json",
+          "sha256_at_frozen_commit": "0c4f9c716295b57df7cb7caa8a2efe53b130544cbe926b38e23d4ef41164631f"
+        }
+      ],
+      "limitations": []
+    },
+    {
+      "id": "REL-QT-QN8",
+      "scope": "qutip-fixed-point-bundle",
+      "status": "NOT-ESTABLISHED",
+      "statement": "Linked numerical-library (BLAS/LAPACK/Accelerate) provenance for the Mac run. RUNTIME-VERSIONS-MATCHED compares __version__ strings only (EXC-Q03).",
+      "evidence": [
+        {
+          "path": "tools/qutip_bridge/check_branch_a_reference.py",
+          "lines_at_frozen_commit": "842-859",
+          "sha256_at_frozen_commit": "9f0798c5b307aa455a3bd6482ab5b46c513d448413de9e8aa14ae48d2733e2b1"
+        }
+      ],
+      "limitations": []
+    },
+    {
+      "id": "REL-BD-01",
+      "scope": "release-boundary",
+      "status": "UNSUPPORTED",
+      "statement": "openEMS is explicitly unsupported. OpenemsSolver.preflight() always raises SolverUnavailable ('the openEMS container invocation is not implemented in QMHP-CEM v0.1'), even when the container runtime is present; prepare() and run() call preflight(), and parse() raises. The CLI returns exit code 4 on SolverUnavailable. No openEMS execution record exists.",
+      "evidence": [
+        {
+          "path": "solvers/openems/adapter.py",
+          "lines_at_frozen_commit": "46-75",
+          "sha256_at_frozen_commit": "4f2d47edd1a172b70772934a8901d3d954385cb95d662f9e5e4dbf0e60cfca42"
+        },
+        {
+          "path": "orchestrator/cem.py",
+          "lines_at_frozen_commit": "78-80"
+        },
+        {
+          "path": "docker/openems.Dockerfile",
+          "lines_at_frozen_commit": "9",
+          "sha256_at_frozen_commit": "9d1ffa521f9f5d6fd8932768ab7195dad80b8575de5586365c472ca6591b4300"
+        },
+        {
+          "path": "solvers/openems/__init__.py",
+          "sha256_at_frozen_commit": "cb748a732d7a4094ee0ae13c5fbb203ff4e8f1846986e0f753f855a8285e367a"
+        },
+        {
+          "path": "solvers/adapter.py",
+          "lines_at_frozen_commit": "133-155",
+          "what": "registry: get_adapter resolves 'openems'"
+        }
+      ],
+      "limitations": [
+        "The CLI help still lists 'openems' among the registered solvers."
+      ]
+    },
+    {
+      "id": "REL-BD-02",
+      "scope": "release-boundary",
+      "status": "UNSUPPORTED",
+      "statement": "Planar chip geometry (geometry/chip_planar) is explicitly unsupported. readout_resonator, stepped_filter and run_drc unconditionally raise PlanarGeometryNotImplemented.",
+      "evidence": [
+        {
+          "path": "geometry/chip_planar/cells.py",
+          "lines_at_frozen_commit": "23-24, 57-79",
+          "sha256_at_frozen_commit": "9f42f4cad6c273b133203426d5fefe6a7faba11158d2336dc0fb47336b2fd1b1"
+        },
+        {
+          "path": "geometry/chip_planar/__init__.py",
+          "sha256_at_frozen_commit": "b915175c4a47bff69094fcf8c53a5102b8fea171b3d5a6cf260d1ed2dbfcc69d"
+        }
+      ],
+      "limitations": []
+    },
+    {
+      "id": "REL-BD-03",
+      "scope": "release-boundary",
+      "status": "UNSUPPORTED",
+      "statement": "PicoGK package geometry (geometry/package_picogk) is explicitly unsupported. Program.cs reports 'NOT IMPLEMENTED in v0.1' and returns 3; Object001Package.Generate throws NotImplementedException; driver.generate reports available=False with or without .NET.",
+      "evidence": [
+        {
+          "path": "geometry/package_picogk/Program.cs",
+          "lines_at_frozen_commit": "52-60",
+          "sha256_at_frozen_commit": "108c94b546d595d2ff18c71a80f6283631b552c9d142b4a9cd030b828853127d"
+        },
+        {
+          "path": "geometry/package_picogk/Object001Package.cs",
+          "lines_at_frozen_commit": "35-46",
+          "sha256_at_frozen_commit": "f6a0a08dca393febc4c653fd93a384ac13b4b31274272a0a8c3c1ddf9332e862"
+        },
+        {
+          "path": "geometry/package_picogk/driver.py",
+          "lines_at_frozen_commit": "81-135",
+          "sha256_at_frozen_commit": "9601a81f30f7ac8b236afe7b0ae57046795d1bf47814c58b9e05bbd0dd24ae1f"
+        },
+        {
+          "path": "geometry/package_picogk/__init__.py",
+          "sha256_at_frozen_commit": "e889a38e7ff026c3dbfac8fe17ef9d79915ea0e7cb50e42a6cfa0b7299614a02"
+        },
+        {
+          "path": "geometry/package_picogk/QmhpCem.Geometry.csproj",
+          "sha256_at_frozen_commit": "d6aefcecdd4975da4ecfb2ef2af85d0259df80d83e2ca4f8579a4ae0a682044f"
+        },
+        {
+          "path": "geometry/package_picogk/README.md",
+          "sha256_at_frozen_commit": "cfbd527602adcf1f328fe85150f1970393fbf22c1223203320caac1034f0272e"
+        }
+      ],
+      "limitations": [
+        "The with-.NET behaviour is read from the code; it was not executed.",
+        "The pipeline still transitions a candidate to GEOMETRY_GENERATED after a failed generation; the state name must not be read as meaning geometry exists."
+      ]
+    },
+    {
+      "id": "REL-BD-04",
+      "scope": "release-boundary",
+      "status": "OUT-OF-SCOPE",
+      "statement": "Outside the release, with no release claim: the coupled-candidate campaign (COUPLED-*, ROUTE-A-SYNTHETIC, docs/coupled-candidate, first-moment), E1 (E1-S1-LOWER-BOUND-*), the static studies (STATIC-ANCHOR-TEST-*, STATIC-REFINEMENT-STUDY-*), the V2A audit (docs/v2a, tools/v2a), mock sweeps, and the README's V2A and mock-sweep sections. Their records remain evidence under tests/test_frozen_evidence.py; this register neither endorses nor withdraws them.",
+      "evidence": [
+        {
+          "path": "README.md",
+          "lines_at_frozen_commit": "75-79, 99-123"
+        }
+      ],
+      "limitations": []
+    }
+  ]
+}
