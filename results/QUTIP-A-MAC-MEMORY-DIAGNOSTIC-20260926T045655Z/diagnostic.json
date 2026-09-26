@@ -1,0 +1,331 @@
+{
+ "diagnostic": "mac-memory-limit-diagnostic",
+ "status": "DIAGNOSTIC ONLY; NOT QMHP EVIDENCE",
+ "utc": "20260926T045655Z",
+ "script_sha256": "1cc3c52195b9fe4201dd88de1b57eae531121c8c2e58ad3578dee7b099be916f",
+ "measurements": {
+  "M1_launcher_equivalent": {
+   "argv_tail": [],
+   "cap_s": 60.0,
+   "killed_at_cap": false,
+   "spawn_error": "SubprocessError: Exception occurred in preexec_fn."
+  },
+  "M1_outcome": "REPRODUCED",
+  "M2_each_limit_alone": {
+   "RLIMIT_AS": {
+    "argv_tail": [],
+    "cap_s": 60.0,
+    "killed_at_cap": false,
+    "spawn_error": null,
+    "returncode": 0,
+    "stdout_tail": [
+     "CHILD {\"rlimit_as\": [9223372036854775807, 9223372036854775807], \"rlimit_data\": [9223372036854775807, 9223372036854775807]}"
+    ],
+    "stderr_tail": [],
+    "report": {
+     "rlimit_as": [
+      9223372036854775807,
+      9223372036854775807
+     ],
+     "rlimit_data": [
+      9223372036854775807,
+      9223372036854775807
+     ]
+    },
+    "preexec_results": [
+     {
+      "limit": "RLIMIT_AS",
+      "result": "REJECTED",
+      "errno": 22,
+      "errno_name": "EINVAL",
+      "strerror": "Invalid argument"
+     }
+    ]
+   },
+   "RLIMIT_DATA": {
+    "argv_tail": [],
+    "cap_s": 60.0,
+    "killed_at_cap": false,
+    "spawn_error": null,
+    "returncode": 0,
+    "stdout_tail": [
+     "CHILD {\"rlimit_as\": [9223372036854775807, 9223372036854775807], \"rlimit_data\": [9223372036854775807, 9223372036854775807]}"
+    ],
+    "stderr_tail": [],
+    "report": {
+     "rlimit_as": [
+      9223372036854775807,
+      9223372036854775807
+     ],
+     "rlimit_data": [
+      9223372036854775807,
+      9223372036854775807
+     ]
+    },
+    "preexec_results": [
+     {
+      "limit": "RLIMIT_DATA",
+      "result": "REJECTED",
+      "errno": 22,
+      "errno_name": "EINVAL",
+      "strerror": "Invalid argument"
+     }
+    ]
+   }
+  },
+  "M3_as_ladder": {
+   "argv_tail": [
+    "1",
+    "2",
+    "4",
+    "8",
+    "16",
+    "32",
+    "64",
+    "128",
+    "256",
+    "512",
+    "1024",
+    "2048",
+    "4096"
+   ],
+   "cap_s": 60.0,
+   "killed_at_cap": false,
+   "spawn_error": null,
+   "returncode": 0,
+   "stdout_tail": [
+    "CHILD {\"size_before\": {\"vsz_bytes\": 445712318464, \"rss_bytes\": 11436032}, \"rlimit_as_before\": [9223372036854775807, 9223372036854775807], \"tries\": [{\"result\": \"REJECTED\", \"soft\": 1073741824, \"hard\": 9223372036854775807, \"errno\": 22, \"errno_name\": \"EINVAL\", \"strerror\": \"Invalid argument\", \"gib\": 1}, {\"result\": \"REJECTED\", \"soft\": 2147483648, \"hard\": 9223372036854775807, \"errno\": 22, \"errno_name\": \"EINVAL\", \"strerror\": \"Invalid argument\", \"gib\": 2}, {\"result\": \"REJECTED\", \"soft\": 4294967296, \"hard\": 9223372036854775807, \"errno\": 22, \"errno_name\": \"EINVAL\", \"strerror\": \"Invalid argument\", \"gib\": 4}, {\"result\": \"REJECTED\", \"soft\": 8589934592, \"hard\": 9223372036854775807, \"errno\": 22, \"errno_name\": \"EINVAL\", \"strerror\": \"Invalid argument\", \"gib\": 8}, {\"result\": \"REJECTED\", \"soft\": 17179869184, \"hard\": 9223372036854775807, \"errno\": 22, \"errno_name\": \"EINVAL\", \"strerror\": \"Invalid argument\", \"gib\": 16}, {\"result\": \"REJECTED\", \"soft\": 34359738368, \"hard\": 9223372036854775807, \"errno\": 22, \"errno_name\": \"EINVAL\", \"strerror\": \"Invalid argument\", \"gib\": 32}, {\"result\": \"REJECTED\", \"soft\": 68719476736, \"hard\": 9223372036854775807, \"errno\": 22, \"errno_name\": \"EINVAL\", \"strerror\": \"Invalid argument\", \"gib\": 64}, {\"result\": \"REJECTED\", \"soft\": 137438953472, \"hard\": 9223372036854775807, \"errno\": 22, \"errno_name\": \"EINVAL\", \"strerror\": \"Invalid argument\", \"gib\": 128}, {\"result\": \"REJECTED\", \"soft\": 274877906944, \"hard\": 9223372036854775807, \"errno\": 22, \"errno_name\": \"EINVAL\", \"strerror\": \"Invalid argument\", \"gib\": 256}, {\"result\": \"ACCEPTED\", \"soft\": 549755813888, \"hard\": 9223372036854775807, \"gib\": 512}], \"smallest_accepted_gib\": 512, \"restore\": {\"result\": \"ACCEPTED\", \"soft\": 9223372036854775807, \"hard\": 9223372036854775807}}"
+   ],
+   "stderr_tail": [],
+   "report": {
+    "size_before": {
+     "vsz_bytes": 445712318464,
+     "rss_bytes": 11436032
+    },
+    "rlimit_as_before": [
+     9223372036854775807,
+     9223372036854775807
+    ],
+    "tries": [
+     {
+      "result": "REJECTED",
+      "soft": 1073741824,
+      "hard": 9223372036854775807,
+      "errno": 22,
+      "errno_name": "EINVAL",
+      "strerror": "Invalid argument",
+      "gib": 1
+     },
+     {
+      "result": "REJECTED",
+      "soft": 2147483648,
+      "hard": 9223372036854775807,
+      "errno": 22,
+      "errno_name": "EINVAL",
+      "strerror": "Invalid argument",
+      "gib": 2
+     },
+     {
+      "result": "REJECTED",
+      "soft": 4294967296,
+      "hard": 9223372036854775807,
+      "errno": 22,
+      "errno_name": "EINVAL",
+      "strerror": "Invalid argument",
+      "gib": 4
+     },
+     {
+      "result": "REJECTED",
+      "soft": 8589934592,
+      "hard": 9223372036854775807,
+      "errno": 22,
+      "errno_name": "EINVAL",
+      "strerror": "Invalid argument",
+      "gib": 8
+     },
+     {
+      "result": "REJECTED",
+      "soft": 17179869184,
+      "hard": 9223372036854775807,
+      "errno": 22,
+      "errno_name": "EINVAL",
+      "strerror": "Invalid argument",
+      "gib": 16
+     },
+     {
+      "result": "REJECTED",
+      "soft": 34359738368,
+      "hard": 9223372036854775807,
+      "errno": 22,
+      "errno_name": "EINVAL",
+      "strerror": "Invalid argument",
+      "gib": 32
+     },
+     {
+      "result": "REJECTED",
+      "soft": 68719476736,
+      "hard": 9223372036854775807,
+      "errno": 22,
+      "errno_name": "EINVAL",
+      "strerror": "Invalid argument",
+      "gib": 64
+     },
+     {
+      "result": "REJECTED",
+      "soft": 137438953472,
+      "hard": 9223372036854775807,
+      "errno": 22,
+      "errno_name": "EINVAL",
+      "strerror": "Invalid argument",
+      "gib": 128
+     },
+     {
+      "result": "REJECTED",
+      "soft": 274877906944,
+      "hard": 9223372036854775807,
+      "errno": 22,
+      "errno_name": "EINVAL",
+      "strerror": "Invalid argument",
+      "gib": 256
+     },
+     {
+      "result": "ACCEPTED",
+      "soft": 549755813888,
+      "hard": 9223372036854775807,
+      "gib": 512
+     }
+    ],
+    "smallest_accepted_gib": 512,
+    "restore": {
+     "result": "ACCEPTED",
+     "soft": 9223372036854775807,
+     "hard": 9223372036854775807
+    }
+   }
+  },
+  "M4_as_enforcement": {
+   "argv_tail": [],
+   "cap_s": 60.0,
+   "killed_at_cap": false,
+   "spawn_error": null,
+   "returncode": 0,
+   "stdout_tail": [
+    "CHILD {\"size_before\": {\"vsz_bytes\": 445712121856, \"rss_bytes\": 11550720}, \"rlimit_as_before\": [9223372036854775807, 9223372036854775807], \"as_soft_limit_bytes\": 446785863680, \"setrlimit\": {\"result\": \"ACCEPTED\", \"soft\": 446785863680, \"hard\": 9223372036854775807}, \"refused\": true, \"refusal\": \"OSError: [Errno 12] Cannot allocate memory\", \"mapped_untouched_bytes\": 1073741824}"
+   ],
+   "stderr_tail": [],
+   "report": {
+    "size_before": {
+     "vsz_bytes": 445712121856,
+     "rss_bytes": 11550720
+    },
+    "rlimit_as_before": [
+     9223372036854775807,
+     9223372036854775807
+    ],
+    "as_soft_limit_bytes": 446785863680,
+    "setrlimit": {
+     "result": "ACCEPTED",
+     "soft": 446785863680,
+     "hard": 9223372036854775807
+    },
+    "refused": true,
+    "refusal": "OSError: [Errno 12] Cannot allocate memory",
+    "mapped_untouched_bytes": 1073741824
+   }
+  },
+  "M4_outcome": "ENFORCED",
+  "M5_outcome": "NOT-TESTED",
+  "M6_control_no_cap": {
+   "argv_tail": [
+    "no-cap"
+   ],
+   "cap_s": 120.0,
+   "killed_at_cap": false,
+   "spawn_error": null,
+   "returncode": 0,
+   "stdout_tail": [
+    "CHILD {\"mode\": \"no-cap\", \"rlimit_as\": [9223372036854775807, 9223372036854775807], \"rlimit_data\": [9223372036854775807, 9223372036854775807], \"numpy\": \"2.0.2\", \"scipy\": \"1.13.1\", \"qutip\": \"5.0.4\"}"
+   ],
+   "stderr_tail": [],
+   "report": {
+    "mode": "no-cap",
+    "rlimit_as": [
+     9223372036854775807,
+     9223372036854775807
+    ],
+    "rlimit_data": [
+     9223372036854775807,
+     9223372036854775807
+    ],
+    "numpy": "2.0.2",
+    "scipy": "1.13.1",
+    "qutip": "5.0.4"
+   },
+   "outcome": "IMPORTED"
+  },
+  "M6a_data_cap": {
+   "outcome": "NOT-TESTED",
+   "reason": "RLIMIT_DATA = 1 GiB was not accepted in M2"
+  },
+  "M6b_as_relative": {
+   "argv_tail": [
+    "as-relative"
+   ],
+   "cap_s": 120.0,
+   "killed_at_cap": false,
+   "spawn_error": null,
+   "returncode": 0,
+   "stdout_tail": [
+    "CHILD {\"mode\": \"as-relative\", \"size_before\": {\"vsz_bytes\": 445711745024, \"rss_bytes\": 11468800}, \"setrlimit\": {\"result\": \"ACCEPTED\", \"soft\": 446785486848, \"hard\": 9223372036854775807}, \"rlimit_as\": [446785486848, 9223372036854775807], \"rlimit_data\": [9223372036854775807, 9223372036854775807], \"numpy\": \"2.0.2\", \"scipy\": \"1.13.1\", \"qutip\": \"5.0.4\"}"
+   ],
+   "stderr_tail": [],
+   "report": {
+    "mode": "as-relative",
+    "size_before": {
+     "vsz_bytes": 445711745024,
+     "rss_bytes": 11468800
+    },
+    "setrlimit": {
+     "result": "ACCEPTED",
+     "soft": 446785486848,
+     "hard": 9223372036854775807
+    },
+    "rlimit_as": [
+     446785486848,
+     9223372036854775807
+    ],
+    "rlimit_data": [
+     9223372036854775807,
+     9223372036854775807
+    ],
+    "numpy": "2.0.2",
+    "scipy": "1.13.1",
+    "qutip": "5.0.4"
+   },
+   "outcome": "IMPORTED"
+  }
+ },
+ "host": {
+  "sw_vers": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.2\nBuildVersion:\t\t25G83",
+  "uname": "Darwin Brodies-Mac-mini.local 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:11:03 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T8132 arm64",
+  "machine": "arm64",
+  "python": "3.9.6 (default, May 22 2026, 11:13:45) \n[Clang 21.0.0 (clang-2100.1.1.101)]",
+  "executable": "/Library/Developer/CommandLineTools/usr/bin/python3",
+  "RLIMIT_AS": 5,
+  "RLIMIT_DATA": 2,
+  "RLIMIT_RSS": 5,
+  "parent_rlimit_as": [
+   9223372036854775807,
+   9223372036854775807
+  ],
+  "parent_rlimit_data": [
+   9223372036854775807,
+   9223372036854775807
+  ],
+  "parent_size": {
+   "vsz_bytes": 445713186816,
+   "rss_bytes": 15302656
+  }
+ },
+ "completed": true
+}

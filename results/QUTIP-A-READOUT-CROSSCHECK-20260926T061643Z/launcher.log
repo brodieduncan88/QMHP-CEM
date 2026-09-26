@@ -1,0 +1,9 @@
+2026-09-26T06:16:43.755554Z launcher /Users/brodieduncan/qmhp-qutip-run/qutip_branch_a_launcher_asgrowth.py (sha256 4f34781953db2fd4791827065ef5fc7003f899b7d96069059263ac81b7b2e711) under /Library/Developer/CommandLineTools/usr/bin/python3
+2026-09-26T06:16:43.845832Z archive verified: 17 files match PRESERVATION-SHA256SUMS and the pins
+2026-09-26T06:16:43.859909Z checker and schema match the pinned bytes at 110a2e00198e5aab6093ad70b7d06ac8127ae550
+2026-09-26T06:16:43.864005Z frozen rules: wall 60s, 1 attempt, runtime {'python_version': '3.9.6', 'numpy_version': '2.0.2', 'scipy_version': '1.13.1', 'qutip_version': '5.0.4'}; memory_limit_MB = 1024 recorded as frozen, NOT enforced
+2026-09-26T06:16:44.774585Z runtime probe passed under RLIMIT_AS soft = hard = 446786519040 bytes (baseline VSZ 445712777216 + 1073741824)
+2026-09-26T06:16:44.958619Z memory probe passed under RLIMIT_AS soft = hard = 446786682880 bytes (baseline VSZ 445712941056 + 1073741824)
+2026-09-26T06:16:46.065476Z group_kill probe passed under RLIMIT_AS soft = hard = 446786060288 bytes (baseline VSZ 445712318464 + 1073741824)
+2026-09-26T06:16:46.105036Z receipt written and attempt consumed (/Users/brodieduncan/.qmhp-qutip-branch-a-launch-ledger/QUTIP-A-READOUT-CROSSCHECK-v1-110a2e0-attempt1.json); sending GO
+2026-09-26T06:16:46.754125Z checker finished: status EXECUTION-COMPLETED, exit 0

@@ -1,0 +1,47 @@
+manifest.verify problems: none
+non-committable files (correct call, default suffixes): none
+
+[provenance]
+  protocol_id: QUTIP-A-READOUT-CROSSCHECK-v1
+  payload_kind: CEM-EXPORT
+  source_commit: 110a2e00198e5aab6093ad70b7d06ac8127ae550
+  source_tree_clean: True
+  master_revision: v1.5.8f
+  readout_GHz: 4.301974466
+  root_search_performed: False
+  coupling_g_GHz: 0.15
+  coupling_classification: VERIFIED-COMPUTATIONAL
+  coupling_is_geometry_derived: False
+  Nq: 10
+  Nph: 12
+  dimension: 120
+  tensor_order: ['fluxonium', 'resonator']
+  baseline_eigensolver: numpy.linalg.eigh (UPLO='L')
+  source_file_hashes: 6 files, all match the predeclared hashes
+  baseline_implementation_hashes: 3 files, all match the predeclared hashes
+
+[runtime]
+  python_version: 3.11.15
+  numpy_version: 2.4.6
+  scipy_version: 1.17.1
+  platform: Linux-6.18.44-fc-v37-x86_64-with-glibc2.39
+  started_utc: 2026-09-25T23:06:52.613612Z
+  ended_utc: 2026-09-25T23:06:52.668628Z
+  wall_seconds: 0.03621585100000857
+
+[diagnostics]
+  hamiltonian_hermiticity_defect_max_abs: 4.983043024956606e-15
+  charge_matrix_hermiticity_defect_max_abs: 4.440892098500626e-16
+  skipped_charge_elements: 13
+  duplicate_label_assignment: False
+  eigh_calls_captured: 1
+
+[labels] (frozen label rule: overlap >= 0.50, margin >= 0.10; it applies to the QuTiP-side assignment)
+  (lvl,ph) bare dressed  energy_GHz            overlap              runner-up (idx, overlap)     margin
+  (0,0)      0    0     -0.000869587904400611 0.99990497460393835  ( 10, 8.402179e-05)  0.99982095281701555
+  (0,1)      1    3     4.29159779769685     0.99037778871702076  (  5, 9.420278e-03)  0.98095751058053304
+  (1,0)     12    1     0.174218105806877    0.99981112248398629  (  6, 1.622264e-04)  0.99964889606583807
+  (1,1)     13    4     4.48491373769646     0.9876155050297144   (  2, 1.181538e-02)  0.97580012783384884
+  (2,0)     24    2     3.56927446756497     0.98793675524862712  (  4, 1.181564e-02)  0.97612111131297763
+  (2,1)     25    6     7.86174185315807     0.9748795693300375   (  9, 2.294040e-02)  0.95193916711499871
+  minimum overlap 0.974880, minimum margin 0.951939

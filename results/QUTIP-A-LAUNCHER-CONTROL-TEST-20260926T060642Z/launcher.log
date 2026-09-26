@@ -1,0 +1,9 @@
+2026-09-26T06:06:42.387773Z QUALIFICATION ONLY: launcher /Users/brodieduncan/qmhp-qutip-run/qutip_branch_a_launcher_asgrowth.py (sha256 4f34781953db2fd4791827065ef5fc7003f899b7d96069059263ac81b7b2e711) under /Library/Developer/CommandLineTools/usr/bin/python3
+2026-09-26T06:06:42.414135Z proposed rule QUTIP-A-MACOS-AS-GROWTH-LIMIT-v1: RLIMIT_AS soft = hard = baseline VSZ + 1073741824 bytes (address-space GROWTH limit; NOT a total-memory limit)
+2026-09-26T06:06:42.496162Z archive verified: 17 files match PRESERVATION-SHA256SUMS and the pins
+2026-09-26T06:06:42.507817Z checker and schema match the pinned bytes at 110a2e00198e5aab6093ad70b7d06ac8127ae550
+2026-09-26T06:06:42.512291Z frozen rules: wall 60s, 1 attempt, runtime {'python_version': '3.9.6', 'numpy_version': '2.0.2', 'scipy_version': '1.13.1', 'qutip_version': '5.0.4'}; memory_limit_MB = 1024 recorded as frozen, NOT enforced
+2026-09-26T06:06:43.421382Z runtime probe passed under RLIMIT_AS soft = hard = 446785847296 bytes (baseline VSZ 445712105472 + 1073741824)
+2026-09-26T06:06:43.655922Z memory probe passed under RLIMIT_AS soft = hard = 446786158592 bytes (baseline VSZ 445712416768 + 1073741824)
+2026-09-26T06:06:44.765876Z group_kill probe passed under RLIMIT_AS soft = hard = 446785961984 bytes (baseline VSZ 445712220160 + 1073741824)
+2026-09-26T06:06:44.770382Z qualification status: QUALIFICATION-PASSED

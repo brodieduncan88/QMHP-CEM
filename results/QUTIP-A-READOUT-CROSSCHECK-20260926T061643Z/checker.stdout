@@ -1,0 +1,2 @@
+VALIDATED: QUTIP-A-READOUT-CROSSCHECK-v1 (snapshot sha256 bb09bcbd68a83a2e99a3530cc73e2c5083966322d7eb2fb453fb846fb27222b9, expected-hashes record sha256 b667aad5841de92a0c135f8551bc0ecde29f487cb4d354e647af778f195e0a24); no calculation performed
+COMPLETED; record at /Users/brodieduncan/qmhp-qutip-branch-a-qutip-110a2e0-attempt1-asgrowth/checker-output (manifest sha256 273bfcc3f5e0112021b1c537bc4cf504e0f930b366d1a7d1d3f7b8bed406bdec)

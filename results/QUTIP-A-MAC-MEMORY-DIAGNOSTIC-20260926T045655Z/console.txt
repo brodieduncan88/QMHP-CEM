@@ -1,0 +1,37 @@
+Mac memory-limit diagnostic (dummy processes only; no QMHP data; nothing is launched)
+script sha256 1cc3c52195b9fe4201dd88de1b57eae531121c8c2e58ad3578dee7b099be916f
+python 3.9.6 at /Library/Developer/CommandLineTools/usr/bin/python3 (arm64)
+this process: virtual size 415.10 GiB, resident 0.01 GiB
+
+M1  the launcher's own apply_memory_cap(1 GiB) in preexec_fn of a dummy child
+    REPRODUCED  SubprocessError: Exception occurred in preexec_fn.
+
+M2  which call fails: each limit alone at 1 GiB, set in preexec_fn via the C library
+    RLIMIT_AS   REJECTED (errno 22 EINVAL: Invalid argument)
+    RLIMIT_DATA REJECTED (errno 22 EINVAL: Invalid argument)
+
+M3  RLIMIT_AS: smallest accepted soft limit on the ladder [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096] GiB
+    fresh child's virtual size: 415.10 GiB
+    smallest accepted: 512 GiB
+    rejections: errno ['22 EINVAL']
+
+M4  is RLIMIT_AS enforced: soft limit = own size + 1 GiB, then untouched mappings up to 2 GiB
+    ENFORCED: refused after 1.00 GiB of new mappings (OSError: [Errno 12] Cannot allocate memory)
+
+M5  is RLIMIT_DATA enforced: the launcher's memory probe under RLIMIT_DATA = 1 GiB
+    NOT-TESTED: RLIMIT_DATA = 1 GiB was not accepted in M2
+
+M6  can the approved runtime import numpy, scipy, qutip under a cap (import only)
+    no-cap          IMPORTED  numpy 2.0.2 scipy 1.13.1 qutip 5.0.4
+    data-cap        NOT-TESTED (RLIMIT_DATA not accepted)
+    as-relative     IMPORTED  numpy 2.0.2 scipy 1.13.1 qutip 5.0.4
+
+Summary (facts only; no verdict on the launcher):
+  M1 launcher-equivalent cap: REPRODUCED
+  M2 RLIMIT_AS = 1 GiB in preexec_fn: REJECTED EINVAL
+  M2 RLIMIT_DATA = 1 GiB in preexec_fn: REJECTED EINVAL
+  M4 RLIMIT_AS enforcement (own size + 1 GiB): ENFORCED
+  M5 RLIMIT_DATA enforcement (1 GiB): NOT-TESTED
+  M6 imports: no-cap IMPORTED, data-cap NOT-TESTED, as-relative IMPORTED
+
+Nothing was launched. The QMHP launch record and ledger were not touched.

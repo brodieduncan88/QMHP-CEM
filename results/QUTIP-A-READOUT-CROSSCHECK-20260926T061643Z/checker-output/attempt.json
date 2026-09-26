@@ -1,0 +1,61 @@
+{
+ "protocol_id": "QUTIP-A-READOUT-CROSSCHECK-v1",
+ "attempt": 1,
+ "status": "STARTED",
+ "started_utc": "2026-09-26T06:16:46.603698Z",
+ "snapshot_sha256": "bb09bcbd68a83a2e99a3530cc73e2c5083966322d7eb2fb453fb846fb27222b9",
+ "schema_sha256": "a65958dbb6c0c1407c5368b66abaf524a85d5a8ddb928e50d68b80504c234cfe",
+ "expected_sha256": "b667aad5841de92a0c135f8551bc0ecde29f487cb4d354e647af778f195e0a24",
+ "frozen_rules": {
+  "protocol_id": "QUTIP-A-READOUT-CROSSCHECK-v1",
+  "rules_status": "FROZEN-BY-HUMAN-APPROVAL (ENGINEERING-RULE, not MASTER-FROZEN)",
+  "approval_reference": "OWNER-APPROVAL-2026-09-26-QUTIP-A-v1",
+  "thresholds": {
+   "max_hamiltonian_entry_abs_diff_GHz": 1e-12,
+   "max_ordered_eigenvalue_abs_diff_GHz": 1e-10,
+   "max_pull_or_contrast_abs_diff_MHz": 1e-06,
+   "max_sink_line_or_emission_abs_diff_GHz": 1e-09,
+   "max_f8_weight_abs_diff": 1e-10
+  },
+  "label_min_overlap": 0.5,
+  "label_min_margin": 0.1,
+  "max_hamiltonian_hermiticity_defect_GHz": 1e-12,
+  "wall_time_limit_s": 60,
+  "memory_limit_MB": 1024,
+  "permitted_attempts": 1,
+  "eigensolver": "numpy.linalg.eigh (UPLO='L') on Qobj.full()",
+  "approved_runtime": {
+   "python_version": "3.9.6",
+   "numpy_version": "2.0.2",
+   "scipy_version": "1.13.1",
+   "qutip_version": "5.0.4"
+  }
+ },
+ "frozen_rules_sha256": "42e1c2a9963b92b7a3d54ff86bdebae479b8aee9a81fbd519821d32b1f3c57d6",
+ "runtime": {
+  "python_version": "3.9.6",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "machine": "arm64",
+  "numpy_version": "2.0.2",
+  "scipy_version": "1.13.1",
+  "qutip_version": "5.0.4"
+ },
+ "runtime_gate": {
+  "python_version": {
+   "approved": "3.9.6",
+   "actual": "3.9.6"
+  },
+  "numpy_version": {
+   "approved": "2.0.2",
+   "actual": "2.0.2"
+  },
+  "scipy_version": {
+   "approved": "1.13.1",
+   "actual": "1.13.1"
+  },
+  "qutip_version": {
+   "approved": "5.0.4",
+   "actual": "5.0.4"
+  }
+ }
+}

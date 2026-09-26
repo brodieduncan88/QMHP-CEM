@@ -1,0 +1,218 @@
+{
+ "protocol_id": "QUTIP-A-READOUT-CROSSCHECK-v1",
+ "attempt": 1,
+ "status": "RECEIPT-WRITTEN-BEFORE-CALCULATION",
+ "written_utc": "2026-09-26T06:16:46.098629Z",
+ "source_commit": "110a2e00198e5aab6093ad70b7d06ac8127ae550",
+ "launcher": {
+  "launcher_id": "qutip-branch-a-launcher-asgrowth-v1",
+  "launcher_path": "/Users/brodieduncan/qmhp-qutip-run/qutip_branch_a_launcher_asgrowth.py",
+  "launcher_sha256": "4f34781953db2fd4791827065ef5fc7003f899b7d96069059263ac81b7b2e711",
+  "python": "3.9.6 (default, May 22 2026, 11:13:45) \n[Clang 21.0.0 (clang-2100.1.1.101)]",
+  "executable": "/Library/Developer/CommandLineTools/usr/bin/python3",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "machine": "arm64"
+ },
+ "execution_approval_reference": "OWNER-APPROVAL-2026-09-26-QUTIP-A-REAL-EXECUTION-v2",
+ "resource_rule_approval": {
+  "approval_path": "/Users/brodieduncan/qmhp-qutip-run/resource-rule-approval.json",
+  "approval_sha256": "7d38e9de97595391003bdd4943d2dd8352bc5a2c0ef9254c5c5dc71af9a122bf",
+  "approval_reference": "OWNER-APPROVAL-2026-09-26-QUTIP-A-AS-GROWTH-RULE-v1",
+  "qualification_record": "/Users/brodieduncan/qmhp-qutip-launcher-control-test-20260926T060642Z",
+  "qualification_final_sha256": "63efd14536f413da442e62a426fec0e7327ae23c235b98416858c0333aff822a"
+ },
+ "inputs": {
+  "archive_sha256": "949ff07b393be684709422abdb9295aecc4379f3642ea6f1bfbe5615434fae6a",
+  "qmhp-qutip-branch-a-approval-110a2e0/approval-attempt1.json": "a6559309677532e1e65aae657f3431b2ca36b956fe5b398ab02f8f8ca96cfef6",
+  "qmhp-qutip-branch-a-approval-110a2e0/frozen-rules.json": "42e1c2a9963b92b7a3d54ff86bdebae479b8aee9a81fbd519821d32b1f3c57d6",
+  "qmhp-qutip-branch-a-export-110a2e0-attempt1/branch-a-reference-v1.json": "bb09bcbd68a83a2e99a3530cc73e2c5083966322d7eb2fb453fb846fb27222b9",
+  "qmhp-qutip-branch-a-preservation-110a2e0-attempt1/expected-hashes.json": "b667aad5841de92a0c135f8551bc0ecde29f487cb4d354e647af778f195e0a24",
+  "checker_sha256": "9f0798c5b307aa455a3bd6482ab5b46c513d448413de9e8aa14ae48d2733e2b1",
+  "schema_sha256": "a65958dbb6c0c1407c5368b66abaf524a85d5a8ddb928e50d68b80504c234cfe",
+  "wall_time_limit_s": 60,
+  "frozen_memory_limit_MB": 1024,
+  "frozen_memory_limit_status": "The frozen rule memory_limit_MB = 1024 is verified present and unchanged in the hash-pinned frozen-rules file and is recorded here as frozen. It is NOT enforced by this launcher, which cannot apply a 1024 MB total address-space limit on the target Mac, and it is NOT reinterpreted. Execution under QUTIP-A-MACOS-AS-GROWTH-LIMIT-v1 requires that rule's own human approval.",
+  "approved_runtime": {
+   "python_version": "3.9.6",
+   "numpy_version": "2.0.2",
+   "scipy_version": "1.13.1",
+   "qutip_version": "5.0.4"
+  }
+ },
+ "limits": {
+  "wall_time_limit_s": 60,
+  "wall_enforcement": "launcher-supervised SIGKILL of the child's process group at wall_time_limit_s after GO; not a kernel wall-clock limit",
+  "resource_rule": "QUTIP-A-MACOS-AS-GROWTH-LIMIT-v1",
+  "resource_rule_sha256": "0eb2942c1cfd6a0649156a8deece9e084875c490b60ce50755c8563541602a56",
+  "checker_process_limit": {
+   "baseline_vsz_bytes": 445712842752,
+   "baseline_rss_bytes": 12484608,
+   "kernel_vsz_bytes": 445712842752,
+   "kernel_rss_bytes": 12484608,
+   "launcher_measured_vsz_bytes": 445712842752,
+   "launcher_measured_rss_bytes": 12500992,
+   "rlimit_as_soft_bytes": 446786584576,
+   "rlimit_as_hard_bytes": 446786584576,
+   "permitted_growth_bytes": 1073741824,
+   "intended_limit_bytes": 446786584576
+  },
+  "limitation": "NOT ESTABLISHED: this mechanism has NOT established that physical memory committed later inside virtual-address regions already reserved before the limit was applied is bounded by the 1024 MiB growth allowance. RLIMIT_AS counts growth of the process's virtual address space; pages first touched inside regions that were already reserved at the baseline are not counted against it (on the owner's Mac a fresh Python process already reserved about 415 GiB). It is also not a limit on resident memory, and a process the checker starts would inherit the same absolute RLIMIT_AS value rather than a growth allowance of its own.",
+  "frozen_memory_rule": "The frozen rule memory_limit_MB = 1024 is verified present and unchanged in the hash-pinned frozen-rules file and is recorded here as frozen. It is NOT enforced by this launcher, which cannot apply a 1024 MB total address-space limit on the target Mac, and it is NOT reinterpreted. Execution under QUTIP-A-MACOS-AS-GROWTH-LIMIT-v1 requires that rule's own human approval.",
+  "attempts": "one: O_EXCL ledger entry /Users/brodieduncan/.qmhp-qutip-branch-a-launch-ledger/QUTIP-A-READOUT-CROSSCHECK-v1-110a2e0-attempt1.json written before GO"
+ },
+ "checker_process_armed_report": {
+  "pid": 81949,
+  "growth_bytes": 1073741824,
+  "target": "/Users/brodieduncan/qmhp-qutip-branch-a-qutip-110a2e0-attempt1-asgrowth/inputs/check_branch_a_reference.py",
+  "platform": "darwin",
+  "rlimit_as_before": [
+   9223372036854775807,
+   9223372036854775807
+  ],
+  "baseline_vsz_bytes": 445712842752,
+  "baseline_rss_bytes": 12484608,
+  "kernel_vsz_bytes": 445712842752,
+  "kernel_rss_bytes": 12484608,
+  "intended_limit_bytes": 446786584576,
+  "setrlimit": {
+   "result": "ACCEPTED",
+   "soft": 446786584576,
+   "hard": 446786584576
+  },
+  "rlimit_as_readback": [
+   446786584576,
+   446786584576
+  ]
+ },
+ "checker_process_external_measurement": {
+  "vsz_bytes": 445712842752,
+  "rss_bytes": 12500992
+ },
+ "probes_summary": {
+  "rule_id": "QUTIP-A-MACOS-AS-GROWTH-LIMIT-v1",
+  "rule_text": "QUTIP-A-MACOS-AS-GROWTH-LIMIT-v1 (PROPOSED; requires separate human approval before scientific execution). memory_growth_limit_MiB = 1024. Before any scientific code runs, the child Python process that will run the QUTIP-A-READOUT-CROSSCHECK-v1 checker measures its own baseline virtual address-space size (VSZ) and sets RLIMIT_AS, soft and hard both, to baseline_virtual_address_space_bytes + 1,073,741,824 bytes, and reads both values back. This is an ADDRESS-SPACE GROWTH LIMIT. It is NOT a 1 GiB total-memory limit and must never be described as one. It does not reinterpret, replace or enforce the frozen rule memory_limit_MB = 1024, which remains recorded as frozen.",
+  "rule_text_sha256": "0eb2942c1cfd6a0649156a8deece9e084875c490b60ce50755c8563541602a56",
+  "rule_status": "PROPOSED; requires separate human approval before scientific execution",
+  "memory_growth_limit_MiB": 1024,
+  "permitted_growth_bytes": 1073741824,
+  "limitation": "NOT ESTABLISHED: this mechanism has NOT established that physical memory committed later inside virtual-address regions already reserved before the limit was applied is bounded by the 1024 MiB growth allowance. RLIMIT_AS counts growth of the process's virtual address space; pages first touched inside regions that were already reserved at the baseline are not counted against it (on the owner's Mac a fresh Python process already reserved about 415 GiB). It is also not a limit on resident memory, and a process the checker starts would inherit the same absolute RLIMIT_AS value rather than a growth allowance of its own.",
+  "frozen_memory_rule": "The frozen rule memory_limit_MB = 1024 is verified present and unchanged in the hash-pinned frozen-rules file and is recorded here as frozen. It is NOT enforced by this launcher, which cannot apply a 1024 MB total address-space limit on the target Mac, and it is NOT reinterpreted. Execution under QUTIP-A-MACOS-AS-GROWTH-LIMIT-v1 requires that rule's own human approval.",
+  "per_probe_limit": {
+   "runtime": {
+    "baseline_vsz_bytes": 445712777216,
+    "baseline_rss_bytes": 12664832,
+    "kernel_vsz_bytes": 445712777216,
+    "kernel_rss_bytes": 12664832,
+    "launcher_measured_vsz_bytes": 445712777216,
+    "launcher_measured_rss_bytes": 12664832,
+    "rlimit_as_soft_bytes": 446786519040,
+    "rlimit_as_hard_bytes": 446786519040,
+    "permitted_growth_bytes": 1073741824,
+    "intended_limit_bytes": 446786519040
+   },
+   "memory": {
+    "baseline_vsz_bytes": 445712941056,
+    "baseline_rss_bytes": 12681216,
+    "kernel_vsz_bytes": 445712941056,
+    "kernel_rss_bytes": 12681216,
+    "launcher_measured_vsz_bytes": 445712941056,
+    "launcher_measured_rss_bytes": 12681216,
+    "rlimit_as_soft_bytes": 446786682880,
+    "rlimit_as_hard_bytes": 446786682880,
+    "permitted_growth_bytes": 1073741824,
+    "intended_limit_bytes": 446786682880
+   },
+   "group_kill": {
+    "baseline_vsz_bytes": 445712318464,
+    "baseline_rss_bytes": 12681216,
+    "kernel_vsz_bytes": 445712318464,
+    "kernel_rss_bytes": 12681216,
+    "launcher_measured_vsz_bytes": 445712318464,
+    "launcher_measured_rss_bytes": 12681216,
+    "rlimit_as_soft_bytes": 446786060288,
+    "rlimit_as_hard_bytes": 446786060288,
+    "permitted_growth_bytes": 1073741824,
+    "intended_limit_bytes": 446786060288
+   }
+  },
+  "memory_probe": {
+   "requested_bytes": 1610612736,
+   "chunk_bytes": 16777216,
+   "allocated_touched_bytes": 1056964608,
+   "refused": true,
+   "vsz_before_bytes": 445712941056,
+   "rss_before_bytes": 12976128,
+   "vsz_at_end_bytes": 446771986432,
+   "rss_at_end_bytes": 1072005120,
+   "vsz_growth_at_refusal_bytes": 1059045376,
+   "rss_growth_bytes": 1059028992,
+   "headroom_at_refusal_bytes": 14696448
+  },
+  "runtime_versions": {
+   "python_version": "3.9.6",
+   "numpy_version": "2.0.2",
+   "scipy_version": "1.13.1",
+   "qutip_version": "5.0.4",
+   "executable": "/Library/Developer/CommandLineTools/usr/bin/python3"
+  },
+  "probe_exit_states": {
+   "runtime": {
+    "spawn_error": null,
+    "arm_problems": [],
+    "go_sent": true,
+    "returncode": 0,
+    "signal": null,
+    "killed_by_launcher": false,
+    "interrupted": false,
+    "group_cleared": true,
+    "elapsed_s": 0.881507,
+    "elapsed_after_go_s": 0.8415363329999999
+   },
+   "memory": {
+    "spawn_error": null,
+    "arm_problems": [],
+    "go_sent": true,
+    "returncode": 3,
+    "signal": null,
+    "killed_by_launcher": false,
+    "interrupted": false,
+    "group_cleared": true,
+    "elapsed_s": 0.1569233750000001,
+    "elapsed_after_go_s": 0.12912270799999992
+   },
+   "group_kill": {
+    "spawn_error": null,
+    "arm_problems": [],
+    "go_sent": true,
+    "returncode": -9,
+    "signal": 9,
+    "killed_by_launcher": true,
+    "interrupted": false,
+    "group_cleared": true,
+    "elapsed_s": 1.0281172909999998,
+    "elapsed_after_go_s": 1.00236475
+   }
+  }
+ },
+ "target": "/Users/brodieduncan/qmhp-qutip-branch-a-qutip-110a2e0-attempt1-asgrowth/inputs/check_branch_a_reference.py",
+ "target_args": [
+  "--snapshot",
+  "/Users/brodieduncan/qmhp-qutip-branch-a-qutip-110a2e0-attempt1-asgrowth/inputs/archive/qmhp-qutip-branch-a-export-110a2e0-attempt1/branch-a-reference-v1.json",
+  "--schema",
+  "/Users/brodieduncan/qmhp-qutip-branch-a-qutip-110a2e0-attempt1-asgrowth/inputs/branch-a-reference-v1.schema.json",
+  "--expected",
+  "/Users/brodieduncan/qmhp-qutip-branch-a-qutip-110a2e0-attempt1-asgrowth/inputs/archive/qmhp-qutip-branch-a-preservation-110a2e0-attempt1/expected-hashes.json",
+  "--expected-sha256",
+  "b667aad5841de92a0c135f8551bc0ecde29f487cb4d354e647af778f195e0a24",
+  "--execute",
+  "--frozen-rules",
+  "/Users/brodieduncan/qmhp-qutip-branch-a-qutip-110a2e0-attempt1-asgrowth/inputs/archive/qmhp-qutip-branch-a-approval-110a2e0/frozen-rules.json",
+  "--frozen-rules-sha256",
+  "42e1c2a9963b92b7a3d54ff86bdebae479b8aee9a81fbd519821d32b1f3c57d6",
+  "--output",
+  "/Users/brodieduncan/qmhp-qutip-branch-a-qutip-110a2e0-attempt1-asgrowth/checker-output"
+ ],
+ "cwd": "/Users/brodieduncan/qmhp-qutip-branch-a-qutip-110a2e0-attempt1-asgrowth/inputs",
+ "stdout": "checker.stdout",
+ "stderr": "checker.stderr"
+}

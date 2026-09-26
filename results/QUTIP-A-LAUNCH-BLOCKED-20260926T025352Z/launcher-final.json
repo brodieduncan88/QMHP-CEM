@@ -1,0 +1,37 @@
+{
+ "protocol_id": "QUTIP-A-READOUT-CROSSCHECK-v1",
+ "source_commit": "110a2e00198e5aab6093ad70b7d06ac8127ae550",
+ "launcher": {
+  "launcher_path": "/Users/brodieduncan/qmhp-qutip-run/qutip_branch_a_launcher.py",
+  "launcher_sha256": "9d70d90423f594c07dfcb115dead09534b8689dc01012bf80dbe667102dc968d",
+  "python": "3.9.6 (default, May 22 2026, 11:13:45) \n[Clang 21.0.0 (clang-2100.1.1.101)]",
+  "executable": "/Library/Developer/CommandLineTools/usr/bin/python3",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "machine": "arm64"
+ },
+ "execution_approval_reference": "OWNER-APPROVAL-2026-09-26-QUTIP-A-REAL-EXECUTION-v1",
+ "scientific_verdict": "NOT ISSUED BY THE LAUNCHER OR THE CHECKER; named checks are reported verbatim and any verdict is a human decision",
+ "exit_code_zero_is_not_a_pass": true,
+ "inputs": {
+  "archive_sha256": "949ff07b393be684709422abdb9295aecc4379f3642ea6f1bfbe5615434fae6a",
+  "qmhp-qutip-branch-a-approval-110a2e0/approval-attempt1.json": "a6559309677532e1e65aae657f3431b2ca36b956fe5b398ab02f8f8ca96cfef6",
+  "qmhp-qutip-branch-a-approval-110a2e0/frozen-rules.json": "42e1c2a9963b92b7a3d54ff86bdebae479b8aee9a81fbd519821d32b1f3c57d6",
+  "qmhp-qutip-branch-a-export-110a2e0-attempt1/branch-a-reference-v1.json": "bb09bcbd68a83a2e99a3530cc73e2c5083966322d7eb2fb453fb846fb27222b9",
+  "qmhp-qutip-branch-a-preservation-110a2e0-attempt1/expected-hashes.json": "b667aad5841de92a0c135f8551bc0ecde29f487cb4d354e647af778f195e0a24",
+  "checker_sha256": "9f0798c5b307aa455a3bd6482ab5b46c513d448413de9e8aa14ae48d2733e2b1",
+  "schema_sha256": "a65958dbb6c0c1407c5368b66abaf524a85d5a8ddb928e50d68b80504c234cfe",
+  "wall_time_limit_s": 60,
+  "memory_limit_MB": 1024,
+  "approved_runtime": {
+   "python_version": "3.9.6",
+   "numpy_version": "2.0.2",
+   "scipy_version": "1.13.1",
+   "qutip_version": "5.0.4"
+  }
+ },
+ "status": "BLOCKED-PREFLIGHT",
+ "message": "the memory cap could not be applied (SubprocessError: Exception occurred in preexec_fn.)",
+ "checker_launched": false,
+ "attempt_consumed": false,
+ "ended_utc": "2026-09-26T02:53:52.330788Z"
+}

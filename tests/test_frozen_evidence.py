@@ -136,6 +136,50 @@ STATIC_ANCHOR_DIGESTS = {
 QUARANTINED = {UNMANIFESTED_RECORD: UNMANIFESTED_DIGESTS,
                STATIC_ANCHOR_RECORD: STATIC_ANCHOR_DIGESTS}
 
+#: Records written OUTSIDE this repository, on the owner's Mac, for QUTIP-A-READOUT-
+#: CROSSCHECK-v1. The first launcher (sha256 9d70d904...) wrote the blocked launch, the
+#: dummy-only memory diagnostic script wrote its own record, and the revised launcher
+#: (experiments/qutip-a-readout-crosscheck/qutip_branch_a_launcher_asgrowth.py) wrote the
+#: qualification and the one execution. Each record's execution-time register is its
+#: writer's own sha256sum-format manifest. It lists EVERY file of the record, not only the
+#: decision-relevant suffixes, and is not named manifest.sha256. No manifest.sha256 is
+#: written for them: that would be an operator's register written after the run. Each is
+#: verified against its own register in both directions, and the register's bytes are
+#: pinned, so that a file cannot be changed and its register rewritten to agree.
+#: {record: (register file name, sha256 of the register)}
+LAUNCHER_REGISTERED = {
+    "QUTIP-A-LAUNCH-BLOCKED-20260926T025352Z":
+        ("launcher-manifest.sha256",
+         "546de29f88e8ce46ec890e9ec28fae79a5646ecb9bb030b669ea8edc9d4e1826"),
+    "QUTIP-A-MAC-MEMORY-DIAGNOSTIC-20260926T045655Z":
+        ("SHA256SUMS",
+         "d0e341588cc932064beb6207c48d5e3698c98aff25be717194870856cf91fa81"),
+    "QUTIP-A-LAUNCHER-CONTROL-TEST-20260926T060642Z":
+        ("qualification-manifest.sha256",
+         "b5443d4195848248f817a37c14c341d2fcc3b8e930d88e96b0968750e813b3fc"),
+    "QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z":
+        ("launcher-manifest.sha256",
+         "a6bfdcd36e643457571ccc30fc84bd7bfcb91d113ff8f7f037b035fa96881ce3"),
+}
+
+#: What each externally registered record IS. Only the execution record is scientific
+#: evidence; the other three are supporting provenance and are never additional attempts.
+LAUNCHER_REGISTERED_CLASS = {
+    "QUTIP-A-LAUNCH-BLOCKED-20260926T025352Z":
+        "SUPPORTING EXECUTION PROVENANCE: first launcher, BLOCKED-PREFLIGHT; checker not "
+        "launched, attempt not consumed; not scientific evidence",
+    "QUTIP-A-MAC-MEMORY-DIAGNOSTIC-20260926T045655Z":
+        "SUPPORTING CONTROL PROVENANCE: dummy-only memory-limit diagnostic; not a QMHP or "
+        "QuTiP calculation; not scientific evidence",
+    "QUTIP-A-LAUNCHER-CONTROL-TEST-20260926T060642Z":
+        "SUPPORTING CONTROL PROVENANCE: pre-flight qualification with dummy probes; no "
+        "checker, no receipt, no ledger; not scientific evidence",
+    "QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z":
+        "SCIENTIFIC EVIDENCE: the one approved QUTIP-A-READOUT-CROSSCHECK-v1 execution; "
+        "numerical cross-check PASS 11/11, execution integrity VERIFIED, protocol "
+        "conformance QUALIFIED (resource-limit deviation)",
+}
+
 #: sha256 over the canonical {record: sha256(its manifest.sha256)} map. Per-record
 #: verification cannot catch a file that was mutated AND its manifest rewritten to
 #: agree; this can, because the manifest's own bytes change.
@@ -173,7 +217,7 @@ def evidence_mismatches(root: Path = RESULTS, *,
     expect = MANIFESTED_RECORDS if expect_manifested is None else expect_manifested
     out: list[str] = []
     present = {r.name for r in records(root)}
-    for name in sorted(present - expect - set(QUARANTINED)):
+    for name in sorted(present - expect - set(QUARANTINED) - set(LAUNCHER_REGISTERED)):
         out.append(f"{name}: a record not incorporated into the integrity record")
     for name in sorted(expect - present):
         out.append(f"{name}: incorporated but absent from disk")
@@ -182,6 +226,31 @@ def evidence_mismatches(root: Path = RESULTS, *,
             continue
         for finding in manifest.verify(record):
             out.append(f"{record.name}/{finding}")
+    return out
+
+
+def register_mismatches(record: Path, register: str) -> list[str]:
+    """Both directions against a sha256sum-format register that lists every file of the
+    record (any suffix, hidden files included) except the register itself."""
+    path = record / register
+    if not path.is_file():
+        return [f"{register} is missing from {record}"]
+    recorded: dict[str, str] = {}
+    for line in path.read_text().splitlines():
+        if line.strip():
+            digest, _, rel = line.partition("  ")
+            recorded[rel] = digest
+    actual = {p.relative_to(record).as_posix(): manifest.file_digest(p)
+              for p in sorted(record.rglob("*")) if p.is_file()}
+    actual.pop(register, None)
+    out: list[str] = []
+    for rel, digest in sorted(recorded.items()):
+        if rel not in actual:
+            out.append(f"{rel}: recorded in {register} but missing from disk")
+        elif actual[rel] != digest:
+            out.append(f"{rel}: content changed since {register} was written")
+    for rel in sorted(set(actual) - set(recorded)):
+        out.append(f"{rel}: present on disk but absent from {register}")
     return out
 
 
@@ -195,10 +264,94 @@ def test_every_committed_record_verifies_against_its_own_manifest():
 
 def test_the_record_set_is_exactly_the_pinned_one():
     present = {r.name for r in records()}
-    assert present == MANIFESTED_RECORDS | set(QUARANTINED), {
-        "unincorporated": sorted(present - MANIFESTED_RECORDS - set(QUARANTINED)),
-        "missing": sorted((MANIFESTED_RECORDS | set(QUARANTINED)) - present)}
+    pinned = MANIFESTED_RECORDS | set(QUARANTINED) | set(LAUNCHER_REGISTERED)
+    assert present == pinned, {
+        "unincorporated": sorted(present - pinned),
+        "missing": sorted(pinned - present)}
     assert len(MANIFESTED_RECORDS) == 34 and len(QUARANTINED) == 2
+    assert len(LAUNCHER_REGISTERED) == 4
+    assert set(LAUNCHER_REGISTERED_CLASS) == set(LAUNCHER_REGISTERED)
+
+
+def test_the_supporting_records_say_what_they_are_in_their_own_files():
+    """Classification is checked against each record's own bytes, not asserted: the
+    blocked launch never launched the checker nor consumed the attempt, the diagnostic
+    declares itself not QMHP evidence, the qualification launched nothing, and only the
+    execution record reports a completed checker run."""
+    blocked = json.loads((RESULTS / "QUTIP-A-LAUNCH-BLOCKED-20260926T025352Z"
+                          / "launcher-final.json").read_text())
+    assert blocked["status"] == "BLOCKED-PREFLIGHT"
+    assert blocked["checker_launched"] is False and blocked["attempt_consumed"] is False
+    diagnostic = json.loads((RESULTS / "QUTIP-A-MAC-MEMORY-DIAGNOSTIC-20260926T045655Z"
+                             / "diagnostic.json").read_text())
+    assert diagnostic["status"] == "DIAGNOSTIC ONLY; NOT QMHP EVIDENCE"
+    qualification = json.loads((RESULTS / "QUTIP-A-LAUNCHER-CONTROL-TEST-20260926T060642Z"
+                                / "qualification-final.json").read_text())
+    assert qualification["mode"] == "PRE-FLIGHT QUALIFICATION ONLY"
+    assert qualification["checker_launched"] is False
+    assert qualification["attempt_receipt_written"] is False
+    execution = json.loads((RESULTS / "QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z"
+                            / "launcher-final.json").read_text())
+    assert execution["status"] == "EXECUTION-COMPLETED"
+    assert execution["checker_launched"] is True and execution["attempt_consumed"] is True
+    assert sorted(execution["classification"]["named_check_verdicts_verbatim"].values()) \
+        == ["PASS"] * 11
+    assert "NOT ISSUED" in execution["scientific_verdict"]
+
+
+@pytest.mark.parametrize("name", sorted(LAUNCHER_REGISTERED))
+def test_each_launcher_registered_record_verifies_against_its_own_register(name):
+    """Every file, whatever its suffix, against the register the external launcher wrote
+    at execution time; and the register itself against its pinned digest."""
+    register, pinned = LAUNCHER_REGISTERED[name]
+    record = RESULTS / name
+    assert record.is_dir()
+    assert not (record / "manifest.sha256").exists(), \
+        "no operator-written manifest.sha256 may be added to an externally registered record"
+    assert register_mismatches(record, register) == []
+    assert manifest.file_digest(record / register) == pinned
+
+
+def test_the_register_check_rejects_mutation_deletion_addition_and_a_rewritten_register(
+        tmp_path: Path):
+    """Negative controls for register_mismatches on a synthetic record written in the
+    launcher's register format, including a file kind manifest.verify() would ignore."""
+    record = tmp_path / "SYNTHETIC-LAUNCHER-RECORD"
+    (record / "preflight").mkdir(parents=True)
+    (record / "final.json").write_text('{"status": "EXECUTION-COMPLETED"}\n')
+    (record / "preflight" / "probe.stdout").write_text("MEMPROBE {}\n")
+    rows = sorted((p.relative_to(record).as_posix(), manifest.file_digest(p))
+                  for p in record.rglob("*") if p.is_file())
+    (record / "register.sha256").write_text("".join(f"{d}  {r}\n" for r, d in rows))
+    assert register_mismatches(record, "register.sha256") == []
+
+    (record / "preflight" / "probe.stdout").write_text("MEMPROBE {\"refused\": false}\n")
+    assert register_mismatches(record, "register.sha256") == [
+        "preflight/probe.stdout: content changed since register.sha256 was written"]
+    (record / "preflight" / "probe.stdout").write_text("MEMPROBE {}\n")
+
+    (record / "final.json").unlink()
+    assert register_mismatches(record, "register.sha256") == [
+        "final.json: recorded in register.sha256 but missing from disk"]
+    (record / "final.json").write_text('{"status": "EXECUTION-COMPLETED"}\n')
+
+    (record / ".DS_Store").write_text("x")
+    assert register_mismatches(record, "register.sha256") == [
+        ".DS_Store: present on disk but absent from register.sha256"]
+    (record / ".DS_Store").unlink()
+    assert register_mismatches(record, "register.sha256") == []
+
+    # a mutation with the register rewritten to agree verifies clean per record; the
+    # pinned register digest is what refuses it
+    before = manifest.file_digest(record / "register.sha256")
+    (record / "final.json").write_text('{"status": "PASS"}\n')
+    rows = sorted((p.relative_to(record).as_posix(), manifest.file_digest(p))
+                  for p in record.rglob("*") if p.is_file() and p.name != "register.sha256")
+    (record / "register.sha256").write_text("".join(f"{d}  {r}\n" for r, d in rows))
+    assert register_mismatches(record, "register.sha256") == []
+    assert manifest.file_digest(record / "register.sha256") != before
+    assert register_mismatches(record, "missing.sha256") == [
+        f"missing.sha256 is missing from {record}"]
 
 
 def test_the_manifests_themselves_cannot_be_rewritten():

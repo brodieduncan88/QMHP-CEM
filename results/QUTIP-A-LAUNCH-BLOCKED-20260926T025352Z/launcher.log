@@ -1,0 +1,5 @@
+2026-09-26T02:53:52.200796Z launcher /Users/brodieduncan/qmhp-qutip-run/qutip_branch_a_launcher.py (sha256 9d70d90423f594c07dfcb115dead09534b8689dc01012bf80dbe667102dc968d) under /Library/Developer/CommandLineTools/usr/bin/python3
+2026-09-26T02:53:52.299291Z archive verified: 17 files match PRESERVATION-SHA256SUMS and the pins
+2026-09-26T02:53:52.312059Z checker and schema match the pinned bytes at 110a2e00198e5aab6093ad70b7d06ac8127ae550
+2026-09-26T02:53:52.316000Z frozen rules: wall 60s, memory 1024 MB, 1 attempt, runtime {'python_version': '3.9.6', 'numpy_version': '2.0.2', 'scipy_version': '1.13.1', 'qutip_version': '5.0.4'}
+2026-09-26T02:53:52.324675Z BLOCKED-PREFLIGHT: the memory cap could not be applied (SubprocessError: Exception occurred in preexec_fn.)

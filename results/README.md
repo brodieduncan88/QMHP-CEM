@@ -48,3 +48,29 @@ writes to none of them. Its own `report.md` is rendered only after
 `summary.json` and the record pointer are written, so a presentation failure
 cannot destroy the evidence, and `scripts/check_record_files.py` refuses any
 file kind the record may not carry.
+
+## QuTiP cross-check records (external launcher)
+
+Four `QUTIP-A-*` records were written on the owner's Mac, not by a driver in this
+repository, and are committed byte for byte as delivered:
+
+- `QUTIP-A-LAUNCH-BLOCKED-20260926T025352Z/`: supporting execution provenance. The first
+  launcher stopped at BLOCKED-PREFLIGHT; the checker was not launched and the attempt was
+  not consumed.
+- `QUTIP-A-MAC-MEMORY-DIAGNOSTIC-20260926T045655Z/`: supporting control provenance. A
+  dummy-only memory-limit diagnostic; not a QMHP or QuTiP calculation.
+- `QUTIP-A-LAUNCHER-CONTROL-TEST-20260926T060642Z/`: supporting control provenance.
+  Pre-flight qualification with dummy probes; no checker was launched.
+- `QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/`: scientific evidence. The one approved
+  QUTIP-A-READOUT-CROSSCHECK-v1 execution: numerical cross-check PASS 11/11, execution
+  integrity VERIFIED, protocol conformance QUALIFIED (resource-limit deviation). It is
+  not an unqualified overall scientific PASS.
+
+Their execution-time registers are the writers' own sha256sum-format manifests
+(`launcher-manifest.sha256`, `SHA256SUMS`, `qualification-manifest.sha256`). These list
+every file, not only the decision-relevant suffixes, and none is written as a
+`manifest.sha256` now. `tests/test_frozen_evidence.py` verifies each record against its
+register and pins the register's digest. Their non-standard text file kinds are a narrow,
+record-specific exception; the general evidence file-type policy is unchanged. See
+`experiments/qutip-a-readout-crosscheck/` for the approvals, the ledger and the
+execution log.

@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "qmhp-cem.qutip-branch-a-reference/1",
+  "title": "QMHP-CEM Branch-A fixed-point reference snapshot for QUTIP-A-READOUT-CROSSCHECK-v1",
+  "$comment": "PREPARED, NOT APPROVED, NOT EXECUTED. Keywords are restricted to the subset the standalone checker enforces: type, required, properties, additionalProperties, const, enum, items, minItems, maxItems, minimum, maximum, exclusiveMinimum, pattern, minLength. Annotation keywords ($schema, $id, $comment, title, description) are ignored. The checker adds semantic checks (finite values, exact square shapes, ordering, block structure, label consistency) and external hash checks that this schema cannot express.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "protocol_id", "payload_kind", "evidence_scope",
+    "repository", "source_commit", "source_tree_clean", "source_file_hashes",
+    "master_revision", "master_file", "master_file_sha256",
+    "branch", "input_classifications", "units",
+    "EC_over_h_GHz", "EJ_over_h_GHz", "EL_over_h_GHz", "phi_ext_rad", "phi_ext_symbolic",
+    "phase_grid_definition",
+    "Nq", "Nph", "dimension", "tensor_order", "flat_index",
+    "readout_GHz", "readout_source", "root_search_performed",
+    "coupling_g_GHz", "coupling_classification", "coupling_is_geometry_derived", "coupling_note",
+    "logical_states", "sink_state",
+    "frequencies_GHz", "charge_matrix_real", "charge_matrix_imag",
+    "charge_element_skip_threshold", "charge_element_skip_rule",
+    "baseline_H_real", "baseline_H_imag",
+    "baseline_eigensolver", "baseline_eigenvalues",
+    "label_convention", "baseline_labels",
+    "baseline_observables", "baseline_diagnostics",
+    "baseline_runtime", "baseline_implementation_hashes"
+  ],
+  "properties": {
+    "schema": {"const": "qmhp-cem.qutip-branch-a-reference/1"},
+    "protocol_id": {"const": "QUTIP-A-READOUT-CROSSCHECK-v1"},
+    "payload_kind": {
+      "description": "SYNTHETIC-TEST-FIXTURE payloads exist only inside unit tests; the checker refuses to execute them and they are never evidence.",
+      "enum": ["CEM-EXPORT", "SYNTHETIC-TEST-FIXTURE"]
+    },
+    "evidence_scope": {
+      "const": "Independent QuTiP operator/tensor assembly of the same declared finite Branch-A fluxonium-readout model at one fixed readout frequency, followed by a controlled numerical comparison with the CEM baseline. The eigensolver (numpy.linalg.eigh), the labelling rule and the observable formulas are shared with CEM, not independent. It does not validate the supplied static spectrum, electromagnetic extraction, geometry, continuum convergence, hardware, coupling extraction or the QMHP architecture."
+    },
+    "repository": {"const": "brodieduncan88/QMHP-CEM"},
+    "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "source_tree_clean": {"const": true},
+    "source_file_hashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "models/fluxonium.py", "models/dressed_system.py", "contracts/master.py",
+        "master/qmhp_v158f_requirements.yaml", "pyproject.toml", "uv.lock"
+      ],
+      "properties": {
+        "models/fluxonium.py": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "models/dressed_system.py": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "contracts/master.py": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "master/qmhp_v158f_requirements.yaml": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "pyproject.toml": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "uv.lock": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "master_revision": {"const": "v1.5.8f"},
+    "master_file": {"const": "master/qmhp_v158f_requirements.yaml"},
+    "master_file_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "branch": {"const": "A"},
+    "input_classifications": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "device_parameters", "phase_grid", "truncation", "readout_GHz", "coupling_g_GHz",
+        "frequencies_and_charge_matrix", "baseline", "comparison_thresholds"
+      ],
+      "properties": {
+        "device_parameters": {"const": "MASTER-FROZEN"},
+        "phase_grid": {"const": "MASTER-FROZEN / VERIFIED-COMPUTATIONAL"},
+        "truncation": {"const": "MASTER-FROZEN"},
+        "readout_GHz": {"const": "MASTER-FROZEN"},
+        "coupling_g_GHz": {"const": "VERIFIED-COMPUTATIONAL"},
+        "frequencies_and_charge_matrix": {"const": "COMPUTED-AT-EXPORT (not a master classification)"},
+        "baseline": {"const": "COMPUTED-AT-EXPORT (not a master classification)"},
+        "comparison_thresholds": {"const": "PROPOSED ENGINEERING-RULE, not approved, not carried in this payload"}
+      }
+    },
+    "units": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["energies", "frequencies", "hamiltonian", "coupling", "pulls", "phase", "charge_matrix", "f8_weight"],
+      "properties": {
+        "energies": {"const": "GHz (E/h)"},
+        "frequencies": {"const": "GHz"},
+        "hamiltonian": {"const": "GHz (H/h)"},
+        "coupling": {"const": "GHz"},
+        "pulls": {"const": "MHz"},
+        "phase": {"const": "rad"},
+        "charge_matrix": {"const": "dimensionless"},
+        "f8_weight": {"const": "dimensionless"}
+      }
+    },
+    "EC_over_h_GHz": {"const": 0.6},
+    "EJ_over_h_GHz": {"const": 5.72},
+    "EL_over_h_GHz": {"const": 1.58},
+    "phi_ext_rad": {"const": 3.141592653589793},
+    "phi_ext_symbolic": {"const": "pi"},
+    "phase_grid_definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grid_points", "phase_min_symbolic", "phase_max_symbolic", "phase_min_rad",
+        "phase_max_rad", "kinetic_operator", "hamiltonian", "charge_operator", "eigensolver"
+      ],
+      "properties": {
+        "grid_points": {"const": 3201},
+        "phase_min_symbolic": {"const": "-8*pi"},
+        "phase_max_symbolic": {"const": "+8*pi"},
+        "phase_min_rad": {"const": -25.132741228718345},
+        "phase_max_rad": {"const": 25.132741228718345},
+        "kinetic_operator": {"const": "second_difference"},
+        "hamiltonian": {"const": "H = -4 E_C d2/dphi2 + 0.5 E_L phi^2 - E_J cos(phi - phi_ext)"},
+        "charge_operator": {"const": "n_ij = -i <i|d/dphi|j>, numpy.gradient on the same grid"},
+        "eigensolver": {"const": "scipy.linalg.eigh_tridiagonal, select='i', lowest 10"}
+      }
+    },
+    "Nq": {"const": 10},
+    "Nph": {"const": 12},
+    "dimension": {"const": 120},
+    "tensor_order": {"const": ["fluxonium", "resonator"]},
+    "flat_index": {"const": "level*Nph + photon"},
+    "readout_GHz": {"const": 4.301974466},
+    "readout_source": {
+      "const": "master dressed_system.production_convention.root_GHz, held fixed; no root search is performed by the exporter or the checker"
+    },
+    "root_search_performed": {"const": false},
+    "coupling_g_GHz": {"const": 0.15},
+    "coupling_classification": {"const": "VERIFIED-COMPUTATIONAL"},
+    "coupling_is_geometry_derived": {"const": false},
+    "coupling_note": {
+      "const": "Reference coefficient from the release readout-replication script (g = 0.150 GHz). It is not a geometry-derived or S1-extracted coupling and must not be presented as one."
+    },
+    "logical_states": {"const": [0, 2]},
+    "sink_state": {"const": 1},
+    "frequencies_GHz": {"type": "array", "minItems": 10, "maxItems": 10, "items": {"type": "number"}},
+    "charge_matrix_real": {
+      "type": "array", "minItems": 10, "maxItems": 10,
+      "items": {"type": "array", "minItems": 10, "maxItems": 10, "items": {"type": "number"}}
+    },
+    "charge_matrix_imag": {
+      "type": "array", "minItems": 10, "maxItems": 10,
+      "items": {"type": "array", "minItems": 10, "maxItems": 10, "items": {"type": "number"}}
+    },
+    "charge_element_skip_threshold": {"const": 1e-14},
+    "charge_element_skip_rule": {
+      "const": "elements with abs(n_ij) < 1e-14 are omitted from the Hamiltonian assembly (existing models/dressed_system.py convention); the unmodified charge matrix above is the evidence"
+    },
+    "baseline_H_real": {
+      "type": "array", "minItems": 120, "maxItems": 120,
+      "items": {"type": "array", "minItems": 120, "maxItems": 120, "items": {"type": "number"}}
+    },
+    "baseline_H_imag": {
+      "type": "array", "minItems": 120, "maxItems": 120,
+      "items": {"type": "array", "minItems": 120, "maxItems": 120, "items": {"type": "number"}}
+    },
+    "baseline_eigensolver": {"const": "numpy.linalg.eigh (UPLO='L')"},
+    "baseline_eigenvalues": {"type": "array", "minItems": 120, "maxItems": 120, "items": {"type": "number"}},
+    "label_convention": {
+      "const": "for each bare state (level, photon) with level in {0,1,2} and photon in {0,1}: the dressed eigenvector index maximising |<bare|dressed>|^2 (numpy.argmax; first maximum on exact ties)"
+    },
+    "baseline_labels": {
+      "type": "array", "minItems": 6, "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "level", "photon", "bare_index", "dressed_index", "energy_GHz",
+          "overlap", "runner_up_index", "runner_up_overlap"
+        ],
+        "properties": {
+          "level": {"type": "integer", "enum": [0, 1, 2]},
+          "photon": {"type": "integer", "enum": [0, 1]},
+          "bare_index": {"type": "integer", "minimum": 0, "maximum": 119},
+          "dressed_index": {"type": "integer", "minimum": 0, "maximum": 119},
+          "energy_GHz": {"type": "number"},
+          "overlap": {"type": "number", "minimum": 0, "maximum": 1.000000001, "description": "Upper limit 1.000000001 is schema/floating-point slack for a squared eigenvector component, not a scientific acceptance tolerance; label ambiguity is judged only by the frozen label rule."},
+          "runner_up_index": {"type": "integer", "minimum": 0, "maximum": 119},
+          "runner_up_overlap": {"type": "number", "minimum": 0, "maximum": 1.000000001, "description": "Same floating-point slack as overlap; not an acceptance tolerance."}
+        }
+      }
+    },
+    "baseline_observables": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pull_MHz_level0", "pull_MHz_level1", "pull_MHz_level2",
+        "logical_pull_MHz", "sink_pull_MHz", "sink_logical_contrast_MHz",
+        "sink_line_GHz", "dressed_emission_GHz", "f8_weight"
+      ],
+      "properties": {
+        "pull_MHz_level0": {"type": "number"},
+        "pull_MHz_level1": {"type": "number"},
+        "pull_MHz_level2": {"type": "number"},
+        "logical_pull_MHz": {"type": "number"},
+        "sink_pull_MHz": {"type": "number"},
+        "sink_logical_contrast_MHz": {"type": "number"},
+        "sink_line_GHz": {"type": "number"},
+        "dressed_emission_GHz": {"type": "number"},
+        "f8_weight": {"type": "number", "minimum": 0}
+      }
+    },
+    "baseline_diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hamiltonian_hermiticity_defect_max_abs", "charge_matrix_hermiticity_defect_max_abs",
+        "skipped_charge_elements", "duplicate_label_assignment", "eigh_calls_captured"
+      ],
+      "properties": {
+        "hamiltonian_hermiticity_defect_max_abs": {"type": "number", "minimum": 0},
+        "charge_matrix_hermiticity_defect_max_abs": {"type": "number", "minimum": 0},
+        "skipped_charge_elements": {"type": "integer", "minimum": 0, "maximum": 100},
+        "duplicate_label_assignment": {"type": "boolean"},
+        "eigh_calls_captured": {"const": 1}
+      }
+    },
+    "baseline_runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "python_version", "numpy_version", "scipy_version", "platform",
+        "started_utc", "ended_utc", "wall_seconds"
+      ],
+      "properties": {
+        "python_version": {"type": "string", "minLength": 1},
+        "numpy_version": {"type": "string", "minLength": 1},
+        "scipy_version": {"type": "string", "minLength": 1},
+        "platform": {"type": "string", "minLength": 1},
+        "started_utc": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$"},
+        "ended_utc": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$"},
+        "wall_seconds": {"type": "number", "minimum": 0}
+      }
+    },
+    "baseline_implementation_hashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scripts/export_qutip_branch_a_reference.py",
+        "schemas/qutip/branch-a-reference-v1.schema.json",
+        "docs/qutip/branch-a-fixed-point-crosscheck-v1.md"
+      ],
+      "properties": {
+        "scripts/export_qutip_branch_a_reference.py": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "schemas/qutip/branch-a-reference-v1.schema.json": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "docs/qutip/branch-a-fixed-point-crosscheck-v1.md": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

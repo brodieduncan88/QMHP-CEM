@@ -1,0 +1,255 @@
+{
+ "record": "execution log of the one approved QUTIP-A-READOUT-CROSSCHECK-v1 attempt (revised launcher under the address-space growth rule QUTIP-A-MACOS-AS-GROWTH-LIMIT-v1)",
+ "written_by": "the operator's assistant after the run, from the archives the owner uploaded; the two record directories are byte-identical to those archives and are otherwise untouched",
+ "written_utc": "2026-09-26T06:54:40Z",
+ "final_classification": {
+  "numerical_cross_check": "PASS: 11/11 named checks, each a checker verdict against the frozen engineering thresholds",
+  "execution_integrity": "VERIFIED: byte-identical records verified against the launcher's execution-time manifest; ledger -> receipt chain; spawn/arm -> receipt -> ledger -> GO order; pinned inputs; Mac-side upload digest equal",
+  "protocol_conformance": "QUALIFIED: RESOURCE-LIMIT DEVIATION. The execution used the separately approved 1024 MiB address-space-GROWTH control (QUTIP-A-MACOS-AS-GROWTH-LIMIT-v1: RLIMIT_AS soft = hard = the checker process's own baseline VSZ + 1,073,741,824 bytes), not the original 1024 MB total-memory interpretation of the frozen rule memory_limit_MB = 1024, which could not be applied on the Mac and was not enforced.",
+  "overall": "NOT an unqualified overall scientific PASS. No overall scientific verdict is issued; the limitations below stand."
+ },
+ "executed_by": "the owner, by hand in Terminal on their Mac mini (macOS-26.6.2-arm64-arm-64bit); the assistant executed nothing",
+ "authorisation": {
+  "frozen_engineering_rules": "OWNER-APPROVAL-2026-09-26-QUTIP-A-v1 (frozen-rules.json sha256 42e1c2a9963b92b7a3d54ff86bdebae479b8aee9a81fbd519821d32b1f3c57d6, inside the preserved archive)",
+  "resource_rule": {
+   "reference": "OWNER-APPROVAL-2026-09-26-QUTIP-A-AS-GROWTH-RULE-v1",
+   "file": "experiments/qutip-a-readout-crosscheck/RESOURCE-RULE-APPROVAL.json",
+   "sha256": "7d38e9de97595391003bdd4943d2dd8352bc5a2c0ef9254c5c5dc71af9a122bf",
+   "basis": "given by the owner in the working session on 2026-09-26 ('ok approve') after reviewing the verified qualification record; the file is a byte-identical reconstruction of the one the launcher consumed (its sha256 equals the digest the launcher recorded)"
+  },
+  "execution": {
+   "reference": "OWNER-APPROVAL-2026-09-26-QUTIP-A-REAL-EXECUTION-v2",
+   "basis": "the same owner message; confirm token RUN-ONE-APPROVED-QUTIP-A-ATTEMPT"
+  },
+  "note": "The approvals are statements made by the owner in the working session. The records reference them by id and digest but cannot prove them on their own. The resource-rule text embedded in the records still reads PROPOSED because that text is hash-pinned; its approval is the file above."
+ },
+ "history": {
+  "first_launcher_blocked": {
+   "dir": "results/QUTIP-A-LAUNCH-BLOCKED-20260926T025352Z",
+   "original_dir": "/Users/brodieduncan/qmhp-qutip-branch-a-qutip-110a2e0-attempt1",
+   "register": "launcher-manifest.sha256",
+   "register_sha256": "546de29f88e8ce46ec890e9ec28fae79a5646ecb9bb030b669ea8edc9d4e1826",
+   "classification": "SUPPORTING EXECUTION PROVENANCE, not scientific evidence and not an additional scientific attempt",
+   "launcher_sha256": "9d70d90423f594c07dfcb115dead09534b8689dc01012bf80dbe667102dc968d (first launcher; its file is not in this bundle)",
+   "status": "BLOCKED-PREFLIGHT",
+   "checker_launched": false,
+   "attempt_consumed": false,
+   "cause": "macOS rejected RLIMIT_AS and RLIMIT_DATA = 1 GiB (EINVAL) in preexec_fn at 2026-09-26T02:53:52Z"
+  },
+  "mac_memory_diagnostic": {
+   "dir": "results/QUTIP-A-MAC-MEMORY-DIAGNOSTIC-20260926T045655Z",
+   "original_dir": "/Users/brodieduncan/qmhp-mac-memory-diagnostic-20260926T045655Z",
+   "register": "SHA256SUMS",
+   "register_sha256": "d0e341588cc932064beb6207c48d5e3698c98aff25be717194870856cf91fa81",
+   "classification": "SUPPORTING CONTROL PROVENANCE: dummy processes only; not a QMHP or QuTiP calculation; not scientific evidence",
+   "script_sha256": "1cc3c52195b9fe4201dd88de1b57eae531121c8c2e58ad3578dee7b099be916f",
+   "findings": "every fresh Python process ~415.1 GiB virtual size; RLIMIT_AS and RLIMIT_DATA = 1 GiB both rejected (EINVAL); smallest accepted RLIMIT_AS on the ladder 512 GiB; own size + 1 GiB accepted and enforced (new mappings refused at exactly 1.00 GiB); numpy/scipy/qutip import under it"
+  },
+  "upload_archive_sha256": "7f180ac4b1c2a7cbb6d41bf5eaf2bf7a164d7ea7f87ab831aede6777a045adb3 (both history records; confirmed by the owner's shasum on the Mac)"
+ },
+ "launcher": {
+  "file": "experiments/qutip-a-readout-crosscheck/qutip_branch_a_launcher_asgrowth.py",
+  "sha256": "4f34781953db2fd4791827065ef5fc7003f899b7d96069059263ac81b7b2e711",
+  "mac_side_check": "the owner's shasum before the run printed the same digest (screenshot in the session)",
+  "interpreter": "/Library/Developer/CommandLineTools/usr/bin/python3"
+ },
+ "records": {
+  "execution": {
+   "dir": "results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z",
+   "original_dir": "/Users/brodieduncan/qmhp-qutip-branch-a-qutip-110a2e0-attempt1-asgrowth",
+   "register": "launcher-manifest.sha256",
+   "register_sha256": "a6bfdcd36e643457571ccc30fc84bd7bfcb91d113ff8f7f037b035fa96881ce3",
+   "register_note": "written by the launcher at execution time; sha256sum format; lists every file of the record except itself (38)",
+   "upload_archive_sha256": "eb017c5dc5679d8d8fbe5dad9ac95d4c732409669b9db8e9bec47d9c53af0146",
+   "upload_archive_mac_side_sha256": "eb017c5dc5679d8d8fbe5dad9ac95d4c732409669b9db8e9bec47d9c53af0146 (owner's shasum on the Mac, screenshot in the session)",
+   "classification": "SCIENTIFIC EVIDENCE: the one approved execution"
+  },
+  "qualification": {
+   "dir": "results/QUTIP-A-LAUNCHER-CONTROL-TEST-20260926T060642Z",
+   "original_dir": "/Users/brodieduncan/qmhp-qutip-launcher-control-test-20260926T060642Z",
+   "register": "qualification-manifest.sha256",
+   "register_sha256": "b5443d4195848248f817a37c14c341d2fcc3b8e930d88e96b0968750e813b3fc",
+   "qualification_final_sha256": "63efd14536f413da442e62a426fec0e7327ae23c235b98416858c0333aff822a",
+   "status": "QUALIFICATION-PASSED",
+   "mode": "PRE-FLIGHT QUALIFICATION ONLY",
+   "upload_archive_sha256": "522bb9fc3eeb75d71a217e3679563bd25380068c50dc0e31014a7718a642983c",
+   "upload_archive_mac_side_sha256": "522bb9fc3eeb75d71a217e3679563bd25380068c50dc0e31014a7718a642983c (owner's shasum on the Mac, screenshot in the session)",
+   "classification": "SUPPORTING CONTROL PROVENANCE, not scientific evidence"
+  }
+ },
+ "attempt_ledger": {
+  "file": "experiments/qutip-a-readout-crosscheck/ATTEMPT-LEDGER.QUTIP-A-READOUT-CROSSCHECK-v1-110a2e0-attempt1.json",
+  "sha256": "d1b632938aca4a091fcfd865a5b1e46bd547ce725fb6450f9c1967e1408ba7ee",
+  "original_path": "~/.qmhp-qutip-branch-a-launch-ledger/QUTIP-A-READOUT-CROSSCHECK-v1-110a2e0-attempt1.json",
+  "receipt_sha256_named": "7e648fdd9b5f071dd4c5bcb39d1650e72911aaacf4c4721f05bce945ae89eda7",
+  "receipt_sha256_measured": "7e648fdd9b5f071dd4c5bcb39d1650e72911aaacf4c4721f05bce945ae89eda7",
+  "meaning": "the one approved attempt is spent"
+ },
+ "not_committed": {
+  "archive": "qmhp-qutip-branch-a-export-110a2e0-attempt1-preserved.tar.gz sha256 949ff07b393be684709422abdb9295aecc4379f3642ea6f1bfbe5615434fae6a (binary; stays with the owner). Its 17 files are inside both records under inputs/archive/, byte-identical and verified against the PRESERVATION-SHA256SUMS they contain; the archive digest itself appears in the records as a launcher report and was confirmed by the owner's shasum -c on the Mac before the run.",
+  "upload_archives": "three uploaded .tar.gz archives (binary), referenced by digest only: 7f180ac4b1c2a7cbb6d41bf5eaf2bf7a164d7ea7f87ab831aede6777a045adb3 (blocked launch + diagnostic), 522bb9fc3eeb75d71a217e3679563bd25380068c50dc0e31014a7718a642983c (qualification), eb017c5dc5679d8d8fbe5dad9ac95d4c732409669b9db8e9bec47d9c53af0146 (execution + ledger)"
+ },
+ "timeline_utc": {
+  "launcher_start": "2026-09-26T06:16:43.755554Z",
+  "checker_process_spawned_and_armed": "2026-09-26T06:16:46.069674Z",
+  "receipt_written": "2026-09-26T06:16:46.098629Z",
+  "ledger_written": "2026-09-26T06:16:46.102222Z",
+  "go_sent": "2026-09-26T06:16:46.109051Z",
+  "checker_result_ended": "2026-09-26T06:16:46.636634Z",
+  "launcher_final": "2026-09-26T06:16:46.754103Z"
+ },
+ "checker_run": {
+  "returncode": 0,
+  "signal": null,
+  "killed_by_launcher": false,
+  "elapsed_after_go_s": 0.6250569160000001,
+  "stderr_bytes": 0,
+  "launcher_status": "EXECUTION-COMPLETED",
+  "checker_execution_status": "COMPLETED",
+  "provenance_qualification_verbatim": "INPUTS-HASH-VERIFIED; RUNTIME-VERSIONS-MATCHED (python, numpy, scipy and qutip versions equal the frozen-rules approved runtime; platform and linked libraries are recorded, not qualified)",
+  "provenance_note": "contrary to that string, no linked-library (BLAS/LAPACK) information is recorded; RUNTIME-VERSIONS-MATCHED compares __version__ strings only"
+ },
+ "checker_process_limit": {
+  "baseline_vsz_bytes": 445712842752,
+  "baseline_rss_bytes": 12484608,
+  "kernel_vsz_bytes": 445712842752,
+  "kernel_rss_bytes": 12484608,
+  "launcher_measured_vsz_bytes": 445712842752,
+  "launcher_measured_rss_bytes": 12500992,
+  "rlimit_as_soft_bytes": 446786584576,
+  "rlimit_as_hard_bytes": 446786584576,
+  "permitted_growth_bytes": 1073741824,
+  "intended_limit_bytes": 446786584576
+ },
+ "named_checks_verbatim": {
+  "hermiticity": {
+   "verdict": "PASS",
+   "abs_difference": null,
+   "limit": 1e-12,
+   "limit_rule": "max_hamiltonian_hermiticity_defect_GHz",
+   "independent_defect_GHz": 4.983043024956605e-15,
+   "baseline_defect_GHz": 4.983043024956606e-15,
+   "assignment_matches_baseline": null
+  },
+  "hamiltonian_max_entry": {
+   "verdict": "PASS",
+   "abs_difference": 1.1102230246251565e-16,
+   "limit": 1e-12,
+   "limit_rule": "max_hamiltonian_entry_abs_diff_GHz",
+   "independent_defect_GHz": null,
+   "baseline_defect_GHz": null,
+   "assignment_matches_baseline": null
+  },
+  "ordered_eigenvalues_max": {
+   "verdict": "PASS",
+   "abs_difference": 9.947598300641403e-14,
+   "limit": 1e-10,
+   "limit_rule": "max_ordered_eigenvalue_abs_diff_GHz",
+   "independent_defect_GHz": null,
+   "baseline_defect_GHz": null,
+   "assignment_matches_baseline": null
+  },
+  "labels": {
+   "verdict": "PASS",
+   "abs_difference": null,
+   "limit": null,
+   "limit_rule": "label_min_overlap, label_min_margin",
+   "independent_defect_GHz": null,
+   "baseline_defect_GHz": null,
+   "assignment_matches_baseline": true
+  },
+  "pull_MHz_level0": {
+   "verdict": "PASS",
+   "abs_difference": 5.329070518200751e-12,
+   "limit": 1e-06,
+   "limit_rule": "max_pull_or_contrast_abs_diff_MHz",
+   "independent_defect_GHz": null,
+   "baseline_defect_GHz": null,
+   "assignment_matches_baseline": null
+  },
+  "pull_MHz_level1": {
+   "verdict": "PASS",
+   "abs_difference": 2.6645352591003757e-11,
+   "limit": 1e-06,
+   "limit_rule": "max_pull_or_contrast_abs_diff_MHz",
+   "independent_defect_GHz": null,
+   "baseline_defect_GHz": null,
+   "assignment_matches_baseline": null
+  },
+  "pull_MHz_level2": {
+   "verdict": "PASS",
+   "abs_difference": 5.329070518200751e-12,
+   "limit": 1e-06,
+   "limit_rule": "max_pull_or_contrast_abs_diff_MHz",
+   "independent_defect_GHz": null,
+   "baseline_defect_GHz": null,
+   "assignment_matches_baseline": null
+  },
+  "sink_logical_contrast_MHz": {
+   "verdict": "PASS",
+   "abs_difference": 2.1316282072803006e-11,
+   "limit": 1e-06,
+   "limit_rule": "max_pull_or_contrast_abs_diff_MHz",
+   "independent_defect_GHz": null,
+   "baseline_defect_GHz": null,
+   "assignment_matches_baseline": null
+  },
+  "sink_line_GHz": {
+   "verdict": "PASS",
+   "abs_difference": 2.6645352591003757e-14,
+   "limit": 1e-09,
+   "limit_rule": "max_sink_line_or_emission_abs_diff_GHz",
+   "independent_defect_GHz": null,
+   "baseline_defect_GHz": null,
+   "assignment_matches_baseline": null
+  },
+  "dressed_emission_GHz": {
+   "verdict": "PASS",
+   "abs_difference": 2.1316282072803006e-14,
+   "limit": 1e-09,
+   "limit_rule": "max_sink_line_or_emission_abs_diff_GHz",
+   "independent_defect_GHz": null,
+   "baseline_defect_GHz": null,
+   "assignment_matches_baseline": null
+  },
+  "f8_weight": {
+   "verdict": "PASS",
+   "abs_difference": 4.163336342344337e-17,
+   "limit": 1e-10,
+   "limit_rule": "max_f8_weight_abs_diff",
+   "independent_defect_GHz": null,
+   "baseline_defect_GHz": null,
+   "assignment_matches_baseline": null
+  }
+ },
+ "scientific_verdict": "NONE ISSUED. The checker issued a verdict per named check against the frozen engineering thresholds; no tool issued an overall scientific verdict, and none is recorded here.",
+ "verification_by_the_assistant_2026_09_26": [
+  "both upload digests equal the owner's Mac-side shasum",
+  "each record verifies against its execution-time register in both directions (execution 38/38, qualification 31/31); checker-output/manifest.sha256 (273bfcc3...) verifies and equals the digest the checker printed",
+  "ledger receipt_sha256 equals the receipt; order spawn/arm -> receipt -> ledger -> GO -> first checker timestamp",
+  "checker, schema, snapshot, expected-hashes and frozen-rules copies match their pins; the 17 archive files match PRESERVATION-SHA256SUMS",
+  "the 120 eigenvalue differences, the seven observable differences and the baseline Hermiticity defect recompute exactly from raw.json and the preserved CEM snapshot; every limit equals the frozen rules; the label assignment equals the baseline's",
+  "two read-only reviewers re-derived these from the raw files and found no error",
+  "the blocked launch record verifies 25/25 against its launcher-manifest.sha256 and the diagnostic 3/3 against its SHA256SUMS; both are byte-identical to the uploaded archive"
+ ],
+ "not_recomputable_from_the_record": [
+  "hamiltonian_max_entry (the QuTiP Hamiltonian is not stored)",
+  "the independent Hermiticity defect",
+  "the QuTiP label overlaps",
+  "the QuTiP f8_weight value (eigenvectors not stored)"
+ ],
+ "not_established": [
+  "agreement beyond the Hamiltonian is not independent: the eigensolver (numpy.linalg.eigh, different NumPy builds on Linux x86_64 and macOS arm64), the labelling rule and the observable formulas are shared with CEM; all model inputs (spectrum, charge matrix, g = 0.150 GHz, readout 4.301974466 GHz, truncation 10x12) are CEM-exported and shared; the independently exercised part is the coupling-term and tensor-order assembly",
+  "the differences are cross-implementation numerical agreement consistent in size with floating-point round-off; no error bound was derived; they say nothing about physical accuracy or model uncertainty",
+  "nothing about the static spectrum, EM extraction, geometry, truncation or continuum convergence, hardware, the coupling g (a verified-computational reference, not geometry-derived) or the QMHP architecture; one fixed readout frequency, no root search",
+  "the frozen memory_limit_MB = 1024 was NOT enforced; the run relied on the separately approved growth rule, which has NOT established that memory committed later inside regions reserved before the limit was applied is bounded, and is not a total-memory or resident-memory limit",
+  "the checker's own memory use was not measured; the only evidence is completion with empty stderr and no MemoryError (imports alone used about 402 MiB of the 1 GiB growth allowance in the probes)"
+ ],
+ "file_kinds_note": "NARROW RECORD-SPECIFIC EXCEPTION approved by the owner on 2026-09-26; the repository's general evidence file-type policy (orchestrator.manifest.COMMITTABLE_SUFFIXES) is unchanged. The four registered records contain small text files whose suffixes are outside it (.py, .stdout, .stderr, .log, the run-attempt1.* timing files, and PRESERVATION-SHA256SUMS without a suffix). They are committed because they already existed in the records as written, are covered by each record's own register, and are required to preserve the record byte for byte. Nothing was renamed, converted, normalised, rewritten or omitted inside any record; only the enclosing directory names follow the results/ convention (originals listed above). No binary file is committed.",
+ "reading_notes": [
+  "checker.stdout line 1 ('VALIDATED ... no calculation performed') is the checker's validation stage in the same process, not a second run",
+  "checker-output/attempt.json keeps status STARTED by design (written once, never rewritten); COMPLETED is in result.json",
+  "the pinned checker's docstring still says 'PREPARED, NOT APPROVED, NOT EXECUTED'; that is stale text inside hash-pinned bytes"
+ ],
+ "disclosure": "While preparing this bundle, the assistant ran an integrity-guard mutation test on the WORKING COPY of results/QUTIP-A-READOUT-CROSSCHECK-20260926T061643Z/checker-output/result.json: one space byte was appended, the guard reported the change, and the file was restored from a copy taken before the test. The restored file's sha256 equals the original bf3b642ce850556ddea4590218a7ffd93d3af45ccdc0577edf1ebc866f9a47ee (the value in both launcher-manifest.sha256 and checker-output/manifest.sha256), the whole record again verifies against launcher-manifest.sha256 and is byte-identical to a fresh extraction of the uploaded archive, and no altered version was ever staged or committed. The test was not repeated on any evidence record; the guard's negative controls use synthetic records."
+}

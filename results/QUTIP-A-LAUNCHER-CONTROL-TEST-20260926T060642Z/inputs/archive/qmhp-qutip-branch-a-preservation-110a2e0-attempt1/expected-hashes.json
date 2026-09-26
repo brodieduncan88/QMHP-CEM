@@ -1,0 +1,20 @@
+{
+ "protocol_id": "QUTIP-A-READOUT-CROSSCHECK-v1",
+ "snapshot_sha256": "bb09bcbd68a83a2e99a3530cc73e2c5083966322d7eb2fb453fb846fb27222b9",
+ "schema_sha256": "a65958dbb6c0c1407c5368b66abaf524a85d5a8ddb928e50d68b80504c234cfe",
+ "source_commit": "110a2e00198e5aab6093ad70b7d06ac8127ae550",
+ "source_file_hashes": {
+  "models/fluxonium.py": "e797ea4acc13a221e436fc7da8996e48e999a088374339f082cb16e285cccc2c",
+  "models/dressed_system.py": "eaa7f18674d23e9e07fcb6c63ac3950368cf14b859c0529afb6174390203547d",
+  "contracts/master.py": "be0b447aa6cf52d28364c5ea87050d9921c725f77d709bdf9fdc10dc766dc5e2",
+  "master/qmhp_v158f_requirements.yaml": "b4f92c4cd05b77258706577909f6d1bb17073468bd6cfbc8126ce37942a7adde",
+  "pyproject.toml": "b26642acb58638be3477c1e6f72b139e3dc2b6f8074a2922414b2abf409f8dc9",
+  "uv.lock": "107a13f00febe62d1e3dbee42ff0e65205746f04aa92fbb350d7aa03b003d498"
+ },
+ "master_file_sha256": "b4f92c4cd05b77258706577909f6d1bb17073468bd6cfbc8126ce37942a7adde",
+ "baseline_implementation_hashes": {
+  "scripts/export_qutip_branch_a_reference.py": "7ad7cafa5a30d154976cfca945afd9925d4eb09e3a4e015d5232239ce79a0182",
+  "schemas/qutip/branch-a-reference-v1.schema.json": "a65958dbb6c0c1407c5368b66abaf524a85d5a8ddb928e50d68b80504c234cfe",
+  "docs/qutip/branch-a-fixed-point-crosscheck-v1.md": "0caeb9e7189d61d6bf4bc9418a5357f3148fd94e67ceabe5b5ab57176daa6730"
+ }
+}

@@ -1,0 +1,25 @@
+QUTIP-A-READOUT-CROSSCHECK-v1 - Branch-A export, attempt 1 of 1 - PREDECLARATION (written before the run)
+written_utc: 2026-09-25T23:06:40Z
+repository: /home/user/QMHP-CEM  branch: qutip/branch-a-fixed-point-crosscheck-v1-prep  commit: 110a2e00198e5aab6093ad70b7d06ac8127ae550
+tree_clean: yes
+interpreter: /usr/bin/python3.11 via .venv (3.11.15 numpy 2.4.6 scipy 1.17.1)
+uv.lock sha256: 107a13f00febe62d1e3dbee42ff0e65205746f04aa92fbb350d7aa03b003d498
+frozen-rules sha256: 42e1c2a9963b92b7a3d54ff86bdebae479b8aee9a81fbd519821d32b1f3c57d6
+approval sha256: a6559309677532e1e65aae657f3431b2ca36b956fe5b398ab02f8f8ca96cfef6
+output (must not exist): /root/qmhp-qutip-branch-a-export-110a2e0-attempt1
+command: timeout --kill-after=5s 120s env PYTHONDONTWRITEBYTECODE=1 .venv/bin/python scripts/export_qutip_branch_a_reference.py --execute --output /root/qmhp-qutip-branch-a-export-110a2e0-attempt1 --approval /root/qmhp-qutip-branch-a-approval-110a2e0/approval-attempt1.json --approval-sha256 a6559309677532e1e65aae657f3431b2ca36b956fe5b398ab02f8f8ca96cfef6
+hard wall-clock cap: 120 s (SIGTERM), SIGKILL at 125 s
+permitted attempts: 1. On BLOCKED, FAILED or timeout: preserve everything, report, STOP. No retry, no parameter change.
+no root search (the exporter's guard raises on every root-search entry point); no QuTiP; no Palace.
+source and implementation file sha256 at the commit:
+e797ea4acc13a221e436fc7da8996e48e999a088374339f082cb16e285cccc2c  models/fluxonium.py
+eaa7f18674d23e9e07fcb6c63ac3950368cf14b859c0529afb6174390203547d  models/dressed_system.py
+be0b447aa6cf52d28364c5ea87050d9921c725f77d709bdf9fdc10dc766dc5e2  contracts/master.py
+b4f92c4cd05b77258706577909f6d1bb17073468bd6cfbc8126ce37942a7adde  master/qmhp_v158f_requirements.yaml
+b26642acb58638be3477c1e6f72b139e3dc2b6f8074a2922414b2abf409f8dc9  pyproject.toml
+107a13f00febe62d1e3dbee42ff0e65205746f04aa92fbb350d7aa03b003d498  uv.lock
+7ad7cafa5a30d154976cfca945afd9925d4eb09e3a4e015d5232239ce79a0182  scripts/export_qutip_branch_a_reference.py
+a65958dbb6c0c1407c5368b66abaf524a85d5a8ddb928e50d68b80504c234cfe  schemas/qutip/branch-a-reference-v1.schema.json
+0caeb9e7189d61d6bf4bc9418a5357f3148fd94e67ceabe5b5ab57176daa6730  docs/qutip/branch-a-fixed-point-crosscheck-v1.md
+9f0798c5b307aa455a3bd6482ab5b46c513d448413de9e8aa14ae48d2733e2b1  tools/qutip_bridge/check_branch_a_reference.py
+66a68dd40b8b2644efa8d204e723f27fe0a8e2127d038853e28271b8280d463f  orchestrator/manifest.py

@@ -1,0 +1,9 @@
+{
+ "protocol_id": "QUTIP-A-READOUT-CROSSCHECK-v1",
+ "resource_rule_id": "QUTIP-A-MACOS-AS-GROWTH-LIMIT-v1",
+ "resource_rule_text_sha256": "0eb2942c1cfd6a0649156a8deece9e084875c490b60ce50755c8563541602a56",
+ "acknowledges_limitation_not_established": true,
+ "acknowledges_frozen_memory_limit_MB_not_enforced": true,
+ "approval_reference": "OWNER-APPROVAL-2026-09-26-QUTIP-A-AS-GROWTH-RULE-v1",
+ "qualification_final_sha256": "63efd14536f413da442e62a426fec0e7327ae23c235b98416858c0333aff822a"
+}

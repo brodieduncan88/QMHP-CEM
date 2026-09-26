@@ -1,0 +1,11 @@
+{
+ "protocol_id": "QUTIP-A-READOUT-CROSSCHECK-v1",
+ "source_commit": "110a2e00198e5aab6093ad70b7d06ac8127ae550",
+ "output": "/root/qmhp-qutip-branch-a-export-110a2e0-attempt1",
+ "approved_by": "repository owner, in the Claude Code session, under OWNER-APPROVAL-2026-09-26-QUTIP-A-v1",
+ "scope": "ONE Branch-A fixed-point CEM export attempt with scripts/export_qutip_branch_a_reference.py --execute at the fixed readout 4.301974466 GHz; no root search; 120 s hard wall-clock timeout; no retry; no parameter change on failure; no QuTiP execution",
+ "approval_reference": "OWNER-APPROVAL-2026-09-26-QUTIP-A-v1",
+ "permitted_attempts": 1,
+ "frozen_rules_sha256": "42e1c2a9963b92b7a3d54ff86bdebae479b8aee9a81fbd519821d32b1f3c57d6",
+ "note": "Written by the agent from the owner's instruction. Not by itself proof of human authorisation."
+}
