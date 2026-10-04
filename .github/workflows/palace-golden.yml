@@ -8,14 +8,19 @@
 # results/PALACE-GOLDEN-<UTC>/ with the execution record, the Palace log, the
 # input and output hashes and the gate report. Every run uploads that record.
 # Repository writeback is a separate, least-privilege job and is available only
-# on an explicitly opted-in manual dispatch; push-triggered solver jobs receive
-# a read-only token and never write to the branch.
+# on an explicitly opted-in manual dispatch; the solver job receives a
+# read-only token and never writes to the branch.
 #
-# Triggers: manual dispatch on any branch; and a push to `main` or to a
-# `palace/**` development branch that touches a dependency of the real-solver
-# path. Pull requests do not run it because the build is long. A maintainer may
-# opt into committing the exact uploaded record when manually dispatching a
-# branch; the writeback job cannot run for a push or tag.
+# Trigger: manual dispatch only. A Palace solve is a consequential execution
+# (CLAUDE.md sections 2-3), so no push, pull request or schedule starts it. The
+# first job, `authorize`, runs scripts/palace_dispatch_gate.py and refuses the
+# dispatch unless `expected_sha` equals the executed commit and
+# `declaration_ref` names a committed predeclaration under
+# .github/palace-declarations/ that pins this workflow, every input, the
+# approval reference and a budget within the job timeout. The solving job then
+# waits on the protected `palace-solver` environment, whose required reviewer
+# is the human approval. A maintainer may still opt into committing the exact
+# uploaded record; the writeback job cannot run for a tag.
 #
 # The record directory this run created is identified by the pointer file the
 # harness writes, never by globbing results/PALACE-GOLDEN-*: earlier records
@@ -28,9 +33,22 @@ name: Palace golden run
 on:
   workflow_dispatch:
     inputs:
+      expected_sha:
+        description: "Full 40-character hash of the commit being dispatched (must equal the executed commit)"
+        required: true
+        type: string
+      declaration_ref:
+        description: "Committed predeclaration, e.g. .github/palace-declarations/<name>.json"
+        required: true
+        type: string
+      approval_ref:
+        description: "Where the owner approved this declaration (must equal the declaration's approval_ref)"
+        required: true
+        type: string
       mpi_processes:
         description: "MPI processes for the Palace run"
         default: "1"
+        type: string
       commit_results:
         description: "Commit this run's exact record back to the selected branch"
         type: boolean
@@ -38,48 +56,44 @@ on:
       run_sweep:
         description: "Also run the 3x3 Object 001 sweep with Palace (uploaded as an artifact only)"
         type: boolean
-        default: true
-  push:
-    branches:
-      - main
-      - "palace/**"
-    paths:
-      - ".github/workflows/palace-golden.yml"
-      - "docker/palace.Dockerfile"
-      - "pyproject.toml"
-      - "uv.lock"
-      - "config/**"
-      - "contracts/**"
-      - "evaluator/**"
-      - "geometry/**"
-      - "master/**"
-      - "models/**"
-      - "orchestrator/**"
-      - "solvers/**"
-      - "scripts/palace_golden_run.py"
-      - "sweeps/**"
-      - "tests/test_palace.py"
-      - "tests/test_workflows.py"
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
   group: palace-golden-${{ github.ref }}
-  cancel-in-progress: true   # a newer push supersedes an older build; nothing is committed before the end
+  cancel-in-progress: false  # an approved solve is never silently superseded by a later dispatch
 
 env:
   IMAGE: qmhp-cem/palace:0.13.0
-  MPI_PROCESSES: ${{ inputs.mpi_processes || '1' }}
-  # On a push the inputs context is empty and RUN_SWEEP defaults to true; on a
-  # dispatch the boolean input is used as given. Repository writeback is not
-  # represented as an environment value: the separate job's condition is the
-  # authority boundary.
-  RUN_SWEEP: ${{ github.event_name != 'workflow_dispatch' || inputs.run_sweep }}
+  MPI_PROCESSES: ${{ inputs.mpi_processes }}
+  # Repository writeback is not represented as an environment value: the
+  # separate job's condition is the authority boundary.
+  RUN_SWEEP: ${{ inputs.run_sweep }}
 
 jobs:
+  # No solver step runs until this job passes. It checks consistency only;
+  # the human approval is the palace-solver environment's required reviewer.
+  authorize:
+    name: check the dispatch against its predeclaration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Refuse unless a matching predeclaration is committed
+        env:
+          DISPATCH_INPUTS: ${{ toJSON(inputs) }}
+        run: python3 scripts/palace_dispatch_gate.py --workflow palace-golden --timeout-cap-minutes 360
+
   golden:
     name: build the image, run the golden candidate
+    needs: authorize
+    environment: palace-solver
     runs-on: ubuntu-latest
     timeout-minutes: 360
     outputs:

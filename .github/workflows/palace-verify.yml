@@ -10,21 +10,41 @@
 # typed results, comparison tables, mode-matching decisions, the summary, the
 # report and a manifest, which is re-hashed (a mismatch fails the job) and
 # uploaded. Repository writeback is isolated in a separate least-privilege job
-# and requires an explicit opt-in on a manual branch dispatch. Push-triggered
-# solver jobs receive a read-only token and never write to the repository.
+# and requires an explicit opt-in on a manual branch dispatch. The solver job
+# receives a read-only token and never writes to the repository.
 #
-# Triggers: manual dispatch; a push to `main` or a `palace/**` branch that
-# touches any load-bearing campaign dependency. An opted-in writeback changes
-# only `results/`, which does not match the filter and therefore cannot loop.
+# Trigger: manual dispatch only. A Palace solve is a consequential execution
+# (CLAUDE.md sections 2-3), so no push, pull request or schedule starts it. The
+# first job, `authorize`, runs scripts/palace_dispatch_gate.py and refuses the
+# dispatch unless `expected_sha` equals the executed commit and
+# `declaration_ref` names a committed predeclaration under
+# .github/palace-declarations/ that pins this workflow, every input, the
+# approval reference and a budget within the job timeout. The solving job then
+# waits on the protected `palace-solver` environment, whose required reviewer
+# is the human approval. A maintainer may still opt into committing the exact
+# uploaded record; the writeback job cannot run for a tag.
 
 name: Palace verification campaign
 
 on:
   workflow_dispatch:
     inputs:
+      expected_sha:
+        description: "Full 40-character hash of the commit being dispatched (must equal the executed commit)"
+        required: true
+        type: string
+      declaration_ref:
+        description: "Committed predeclaration, e.g. .github/palace-declarations/<name>.json"
+        required: true
+        type: string
+      approval_ref:
+        description: "Where the owner approved this declaration (must equal the declaration's approval_ref)"
+        required: true
+        type: string
       only:
         description: "Space-separated run names to execute (empty = the whole campaign)"
         default: ""
+        type: string
       commit_results:
         description: "Commit this run's exact record back to the selected branch"
         type: boolean
@@ -33,37 +53,41 @@ on:
         description: "Omit field probes (only for an image built without GSLIB)"
         type: boolean
         default: false
-  push:
-    branches:
-      - main
-      - "palace/**"
-    paths:
-      - ".github/workflows/palace-verify.yml"
-      - "docker/palace.Dockerfile"
-      - "pyproject.toml"
-      - "uv.lock"
-      - "contracts/**"
-      - "orchestrator/**"
-      - "scripts/palace_verify_campaign.py"
-      - "solvers/**"
-      - "tests/test_palace.py"
-      - "tests/test_workflows.py"
 
 permissions:
   contents: read
 
 concurrency:
   group: palace-verify-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false  # an approved campaign is never silently superseded
 
 env:
   IMAGE: qmhp-cem/palace:0.13.0
   ONLY: ${{ inputs.only || '' }}
-  NO_PROBES: ${{ github.event_name == 'workflow_dispatch' && inputs.no_probes }}
+  NO_PROBES: ${{ inputs.no_probes }}
 
 jobs:
+  # No solver step runs until this job passes. It checks consistency only;
+  # the human approval is the palace-solver environment's required reviewer.
+  authorize:
+    name: check the dispatch against its predeclaration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Refuse unless a matching predeclaration is committed
+        env:
+          DISPATCH_INPUTS: ${{ toJSON(inputs) }}
+        run: python3 scripts/palace_dispatch_gate.py --workflow palace-verify --timeout-cap-minutes 350
+
   verify:
     name: build the image, run the verification campaign
+    needs: authorize
+    environment: palace-solver
     runs-on: ubuntu-latest
     timeout-minutes: 350
     outputs:
