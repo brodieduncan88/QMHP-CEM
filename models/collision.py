@@ -6,6 +6,8 @@ are implemented here and in the corresponding physics-model modules.
 
 from __future__ import annotations
 
+import math
+
 from contracts import master
 from models import dressed_system, fluxonium
 
@@ -19,7 +21,14 @@ def separation_MHz(omega24_GHz: float, f_readout_GHz: float) -> float:
     """|omega24 - f_readout| in MHz.
 
     Units are explicit throughout: inputs GHz, output MHz (spec §7.3).
+
+    Raises ``ValueError`` for a non-finite input: an infinite or NaN frequency
+    is not a measured or simulated quantity, and an infinite separation would
+    otherwise clear the gate.
     """
+    for name, value in (("omega24_GHz", omega24_GHz), ("f_readout_GHz", f_readout_GHz)):
+        if not math.isfinite(value):
+            raise ValueError(f"non-finite {name} ({value!r}) cannot be screened")
     return abs(omega24_GHz - f_readout_GHz) * 1000.0
 
 

@@ -44,6 +44,12 @@ class CollisionGate(Gate):
                 f"adjudicated from this record."
             )
 
+        if not (math.isfinite(omega24) and math.isfinite(f_readout)):
+            return self._incomplete(
+                "quantum results contain a non-finite omega24 or readout "
+                "frequency; non-finite scientific data cannot close a gate."
+            )
+
         threshold = collision_model.minimum_separation_MHz()
         separation = collision_model.separation_MHz(omega24, f_readout)
         passed = collision_model.passes(omega24, f_readout)
