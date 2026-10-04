@@ -20,27 +20,29 @@ run. JSON files are created atomically from a same-directory temporary file.
 
 Completion is final. Once a candidate directory holds ``gate_report.json`` the
 store writes nothing more into it, and once the batch holds
-``batch_report.json`` the store writes nothing more into the batch. A target
-path may not contain ``..`` or pass through a symbolic link below the batch
-directory, so one candidate cannot be written through another's path. The
-completion check and the write happen under one exclusive lock on the batch
-directory, so a writer cannot pass the check and land its file after a
-concurrent completion.
+``manifest.sha256`` the store writes nothing more into the batch. Public store
+writes accept batch-relative paths only; absolute paths, ``..`` and symbolic
+links below the batch are refused. The completion check and the write happen
+under one exclusive lock on the batch directory, so a cooperating writer
+cannot pass the check and land its file after a concurrent completion.
 
 What this does not cover: code that writes into a batch without the store
 (the solver adapters and the geometry driver write their own files before
-completion), and processes that do not take the lock.
+completion), processes that do not take the lock, a static writer inventory,
+cross-process stress evidence, or crash cleanup of a temporary file left by a
+hard-killed writer. The final path is never published partially.
 """
 
 from __future__ import annotations
 
 import contextlib
 import fcntl
+import hashlib
 import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from contracts.master import REPO_ROOT
 
@@ -49,7 +51,8 @@ DEFAULT_RESULTS_ROOT = REPO_ROOT / "results"
 #: A candidate directory holding this file is complete.
 CANDIDATE_COMPLETION_MARKER = "gate_report.json"
 #: A batch directory holding this file is complete.
-BATCH_COMPLETION_MARKER = "batch_report.json"
+BATCH_COMPLETION_MARKER = "manifest.sha256"
+
 
 class ResultAlreadyExists(RuntimeError):
     """An attempt was made to reopen or overwrite a result (spec §11.3)."""
@@ -81,8 +84,18 @@ class BatchStore:
     # --- candidate directories ---------------------------------------------
 
     def candidate_dir(self, candidate_id: str) -> Path:
-        path = self.batch_dir / candidate_id
-        self._relative_target(path)
+        relative = self._require_relative(Path(candidate_id))
+        if len(relative.parts) != 1:
+            raise ValueError(
+                f"candidate id {candidate_id!r} must name one directory"
+            )
+        if relative.name.casefold() in {
+            BATCH_COMPLETION_MARKER.casefold(),
+            "batch_report.json".casefold(),
+            CANDIDATE_COMPLETION_MARKER.casefold(),
+        }:
+            raise ValueError(f"candidate id {candidate_id!r} is a reserved name")
+        path = self._absolute_target(relative)
         with self._batch_lock():
             if (self.batch_dir / BATCH_COMPLETION_MARKER).exists():
                 raise ResultAlreadyExists(self.batch_dir)
@@ -97,20 +110,84 @@ class BatchStore:
 
         The content is flushed to a temporary file in the target directory,
         then hard-linked into place. Creating the link is atomic and fails if
-        another writer already created ``path``. The temporary file is always
-        removed, including on a racing-write failure.
+        another writer already created ``path``. The temporary file is removed
+        on ordinary success and Python exceptions, including a racing-write
+        failure; a hard-killed process can leave that hidden temporary file.
         """
-        path = Path(path)
-        relative = self._relative_target(path)
+        relative = self._require_relative(Path(path))
+        target = self._absolute_target(relative)
+        first = relative.parts[0].casefold()
+        if first == BATCH_COMPLETION_MARKER.casefold():
+            raise ValueError(
+                f"{BATCH_COMPLETION_MARKER} is reserved for seal_batch()"
+            )
+        if first == "batch_report.json".casefold() and (
+            len(relative.parts) > 1 or relative.parts[0] != "batch_report.json"
+        ):
+            raise ValueError("batch_report.json may be created only as a file")
+        if (
+            len(relative.parts) >= 2
+            and relative.parts[1].casefold()
+            == CANDIDATE_COMPLETION_MARKER.casefold()
+            and (
+                len(relative.parts) > 2
+                or relative.parts[1] != CANDIDATE_COMPLETION_MARKER
+            )
+        ):
+            raise ValueError(
+                f"{CANDIDATE_COMPLETION_MARKER} may be created only as a file"
+            )
         body = json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n"
 
         with self._batch_lock():
             self._refuse_if_completed(relative)
-            path.parent.mkdir(parents=True, exist_ok=True)
+            target.parent.mkdir(parents=True, exist_ok=True)
             # Re-checked after mkdir: no component below the batch may be a link.
-            self._relative_target(path)
-            self._create(path, body)
-        return path
+            self._absolute_target(relative)
+            self._create(target, body)
+        return target
+
+    def seal_batch(
+        self,
+        build_manifest: Callable[[], tuple[str, str]],
+        expected_sha256: str,
+    ) -> tuple[Path, str]:
+        """Atomically publish the manifest that marks this batch complete."""
+        marker = self.batch_dir / BATCH_COMPLETION_MARKER
+        report = self.batch_dir / "batch_report.json"
+        with self._batch_lock():
+            if marker.exists():
+                raise ResultAlreadyExists(marker)
+            if report.is_symlink() or not report.is_file():
+                raise RuntimeError(
+                    "batch_report.json must be a regular file before sealing"
+                )
+            try:
+                embedded = json.loads(report.read_text())["manifest_sha256"]
+            except (json.JSONDecodeError, KeyError, TypeError) as exc:
+                raise RuntimeError(
+                    "batch_report.json has no valid manifest_sha256"
+                ) from exc
+            if embedded != expected_sha256:
+                raise RuntimeError(
+                    "batch_report.json manifest_sha256 differs from the "
+                    "expected preview digest"
+                )
+
+            body, reported_sha256 = build_manifest()
+            actual_sha256 = hashlib.sha256(body.encode()).hexdigest()
+            if reported_sha256 != actual_sha256:
+                raise RuntimeError(
+                    "manifest builder reported a digest that does not match "
+                    "its body; refusing to publish a completion marker"
+                )
+            if actual_sha256 != expected_sha256:
+                raise RuntimeError(
+                    "manifest preview changed while finalizing the batch; "
+                    "refusing to publish a completion marker"
+                )
+            self._create(marker, body)
+        return marker, actual_sha256
 
     def _create(self, path: Path, body: str) -> None:
         temporary: Path | None = None
@@ -138,40 +215,43 @@ class BatchStore:
     def write_model(self, path: Path, model) -> Path:  # noqa: ANN001 - pydantic model
         return self.write_json(path, model.model_dump(mode="json", by_alias=True))
 
-    def _relative_target(self, path: Path) -> Path:
-        """Return ``path`` relative to the batch, refusing any indirection.
-
-        Refused: a path outside the batch, a path containing ``..``, the batch
-        directory itself, and any path with a symbolic link at or below the
-        batch directory. The check is lexical and then per component, so a
-        link cannot redirect a write into another candidate or out of the batch.
-        """
-        if ".." in Path(path).parts:
-            raise ValueError(f"result path {path} contains '..'; refusing traversal")
-        absolute = Path(os.path.abspath(path))
-        batch = Path(os.path.abspath(self.batch_dir))
-        try:
-            relative = absolute.relative_to(batch)
-        except ValueError as exc:
+    def _require_relative(self, path: Path) -> Path:
+        """Validate and return a batch-relative public store path."""
+        relative = Path(path)
+        if relative.is_absolute():
             raise ValueError(
-                f"result path {path} is outside batch directory {self.batch_dir}"
-            ) from exc
-        if not relative.parts:
-            raise ValueError(f"result path {path} is the batch directory itself")
+                f"result path {path} is absolute; use a batch-relative path"
+            )
+        if not relative.parts or relative == Path("."):
+            raise ValueError(f"result path {path} does not name a file")
+        if ".." in relative.parts:
+            raise ValueError(f"result path {path} contains '..'; refusing traversal")
+        return relative
+
+    def _absolute_target(self, relative: Path) -> Path:
+        """Resolve a validated relative path, refusing any indirection.
+
+        A symbolic link may not redirect a write into another candidate or out
+        of the batch. Callers must first pass the public path through
+        :meth:`_require_relative`.
+        """
+        relative = self._require_relative(relative)
+        batch = Path(os.path.abspath(self.batch_dir))
+        absolute = batch / relative
         try:
             absolute.resolve().relative_to(batch.resolve())
         except ValueError as exc:
             raise ValueError(
-                f"result path {path} is outside batch directory {self.batch_dir}"
+                f"result path {relative} is outside batch directory {self.batch_dir}"
             ) from exc
         current = batch
         for part in relative.parts:
             current = current / part
             if current.is_symlink():
                 raise ValueError(
-                    f"result path {path} passes through the symbolic link {current}"
+                    f"result path {relative} passes through the symbolic link {current}"
                 )
-        return relative
+        return absolute
 
     def _refuse_if_completed(self, relative: Path) -> None:
         """Refuse a write into a completed batch or candidate directory."""

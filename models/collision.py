@@ -12,6 +12,24 @@ from contracts import master
 from models import dressed_system, fluxonium
 
 
+class NonFiniteDomainError(ValueError):
+    """A public physics input is not a finite real value."""
+
+    def __init__(self, parameter: str, value: object) -> None:
+        self.parameter = parameter
+        self.value = value
+        self.domain = "finite real"
+        super().__init__(
+            f"non-finite {parameter} ({value!r}) is outside the domain "
+            f"{self.domain!r}"
+        )
+
+
+def _require_finite(parameter: str, value: float) -> None:
+    if not math.isfinite(value):
+        raise NonFiniteDomainError(parameter, value)
+
+
 def minimum_separation_MHz() -> float:
     """Frozen minimum |omega24 - f_readout| in MHz (MASTER-FROZEN)."""
     return master.get("collision.minimum_abs_omega24_minus_readout_MHz")
@@ -27,8 +45,7 @@ def separation_MHz(omega24_GHz: float, f_readout_GHz: float) -> float:
     otherwise clear the gate.
     """
     for name, value in (("omega24_GHz", omega24_GHz), ("f_readout_GHz", f_readout_GHz)):
-        if not math.isfinite(value):
-            raise ValueError(f"non-finite {name} ({value!r}) cannot be screened")
+        _require_finite(name, value)
     return abs(omega24_GHz - f_readout_GHz) * 1000.0
 
 
@@ -87,6 +104,14 @@ def screen(
     Passing no arguments screens the frozen Branch-A nominal device. Passing
     perturbed energies screens one draw of a tolerance ensemble.
     """
+    for name, value in (
+        ("EC_GHz", EC_GHz),
+        ("EJ_GHz", EJ_GHz),
+        ("EL_GHz", EL_GHz),
+    ):
+        if value is not None:
+            _require_finite(name, value)
+
     if EC_GHz is None and EJ_GHz is None and EL_GHz is None:
         spectrum = fluxonium.nominal_spectrum()
         root = dressed_system.nominal_root()

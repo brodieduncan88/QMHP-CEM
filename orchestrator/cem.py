@@ -98,6 +98,17 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
         print(f"error: no batch_report.json in {batch_dir}", file=sys.stderr)
         return 2
 
+    findings = manifest.verify(batch_dir)
+    if findings:
+        print(
+            f"error: batch is not sealed by a valid manifest ({len(findings)} "
+            "discrepancies)",
+            file=sys.stderr,
+        )
+        for finding in findings:
+            print(f"  ! {finding}", file=sys.stderr)
+        return 5
+
     report = json.loads(report_path.read_text())
     print(f"batch      : {report['batch_id']}")
     print(f"solver     : {report['solver']}")
