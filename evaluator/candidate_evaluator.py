@@ -54,34 +54,8 @@ def evaluate_candidate(
             f"candidate master_revision {candidate.master_revision!r} does not "
             f"match loaded frozen master {current_revision!r}"
         )
-    if solver_results is not None:
-        if solver_results.candidate_id != candidate.candidate_id:
-            raise ValueError(
-                f"solver result candidate_id {solver_results.candidate_id!r} "
-                f"does not match candidate {candidate.candidate_id!r}"
-            )
-        if (
-            solver_results.master_revision is not None
-            and solver_results.master_revision != candidate.master_revision
-        ):
-            raise ValueError(
-                f"solver result master_revision "
-                f"{solver_results.master_revision!r} does not match candidate "
-                f"revision {candidate.master_revision!r}"
-            )
-    if quantum_results is not None:
-        if quantum_results.candidate_id != candidate.candidate_id:
-            raise ValueError(
-                f"quantum result candidate_id {quantum_results.candidate_id!r} "
-                f"does not match candidate {candidate.candidate_id!r}"
-            )
-        if quantum_results.master_revision != candidate.master_revision:
-            raise ValueError(
-                f"quantum result master_revision "
-                f"{quantum_results.master_revision!r} does not match candidate "
-                f"revision {candidate.master_revision!r}"
-            )
-
+    # GateInputs refuses evidence that belongs to another candidate or master
+    # revision before any gate runs (evaluator.base.require_evidence_identity).
     inputs = GateInputs(candidate, solver_results, quantum_results)
     results = [gate_type().evaluate(inputs) for gate_type in GATE_TYPES]
     synthetic = bool(

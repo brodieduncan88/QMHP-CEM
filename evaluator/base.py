@@ -29,9 +29,57 @@ class GateInputs:
         solver_results: SolverResults | None = None,
         quantum_results: QuantumResults | None = None,
     ) -> None:
+        # The identity check lives here, not only in evaluate_candidate, so no
+        # gate can be evaluated on another candidate's evidence by building
+        # its inputs directly.
+        require_evidence_identity(candidate, solver_results, quantum_results)
         self.candidate = candidate
         self.solver_results = solver_results
         self.quantum_results = quantum_results
+
+
+def require_evidence_identity(
+    candidate,  # noqa: ANN001 - contracts.Candidate, avoid circular import
+    solver_results: SolverResults | None,
+    quantum_results: QuantumResults | None,
+) -> None:
+    """Refuse evidence that does not belong to ``candidate``.
+
+    Raises ``ValueError`` before any gate runs when a solver or quantum
+    record names a different candidate or master revision. A legacy solver
+    record without ``master_revision`` is checked on its candidate id only.
+    With no candidate there is nothing to attribute the evidence to, so there
+    is nothing to check; :func:`evaluator.evaluate_candidate` always passes one.
+    """
+    if candidate is None:
+        return
+    if solver_results is not None:
+        if solver_results.candidate_id != candidate.candidate_id:
+            raise ValueError(
+                f"solver result candidate_id {solver_results.candidate_id!r} "
+                f"does not match candidate {candidate.candidate_id!r}"
+            )
+        if (
+            solver_results.master_revision is not None
+            and solver_results.master_revision != candidate.master_revision
+        ):
+            raise ValueError(
+                f"solver result master_revision "
+                f"{solver_results.master_revision!r} does not match candidate "
+                f"revision {candidate.master_revision!r}"
+            )
+    if quantum_results is not None:
+        if quantum_results.candidate_id != candidate.candidate_id:
+            raise ValueError(
+                f"quantum result candidate_id {quantum_results.candidate_id!r} "
+                f"does not match candidate {candidate.candidate_id!r}"
+            )
+        if quantum_results.master_revision != candidate.master_revision:
+            raise ValueError(
+                f"quantum result master_revision "
+                f"{quantum_results.master_revision!r} does not match candidate "
+                f"revision {candidate.master_revision!r}"
+            )
 
 
 class Gate(abc.ABC):
