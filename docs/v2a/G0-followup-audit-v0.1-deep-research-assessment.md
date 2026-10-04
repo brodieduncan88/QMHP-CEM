@@ -10,12 +10,6 @@
 | Registration | the three items to freeze before M3 are given executable form in [`m3-coherent-prescreen-registration.md`](m3-coherent-prescreen-registration.md) |
 | Verification | [`verification.md`](verification.md) records what was independently reproduced, what it adds, and what is not verified. The text below is kept as received. |
 
-> **Citation verification boundary.** The keys are provisional mappings of
-> opaque citation tokens, not confirmed citations. The recorded environment
-> could not retrieve any primary source in full text, so neither bibliographic
-> identity nor attributed claims should be treated as source-verified. The
-> arithmetic reproduction is independent of that literature-verification gap.
-
 ## Executive disposition
 
 **The follow-up audit is technically coherent and materially strengthens the V2A programme. I agree with its top-level disposition: PHYSICAL G0 REMAINS BLOCKED.**

@@ -40,7 +40,7 @@ from models import PhysicsNotImplemented
 from models import collision as collision_model
 from models import dressed_system, purcell, tolerance
 from models.dressed_system import RootNotBracketed
-from orchestrator import environment, manifest
+from orchestrator import batch_manifest, environment
 from orchestrator.lifecycle import CandidateLifecycle
 from orchestrator.results_store import (
     DEFAULT_RESULTS_ROOT,
@@ -479,7 +479,7 @@ def run_sweep(
             "hardware_gated_count": counts[GateStatus.HARDWARE_GATED],
             "incomplete_count": counts[GateStatus.INCOMPLETE],
             "batch_outcome": outcome.value,
-            "manifest_sha256": manifest.MANIFEST_DIGEST_PLACEHOLDER,
+            "manifest_sha256": batch_manifest.MANIFEST_DIGEST_PLACEHOLDER,
             "environment": environment.record(
                 started_utc=started,
                 solver_name=name,
@@ -493,7 +493,7 @@ def run_sweep(
             "notes": _batch_notes(outcomes, adapter),
         }
     )
-    _, manifest_sha256 = manifest.preview_with_batch_report(
+    _, manifest_sha256 = batch_manifest.preview_with_batch_report(
         store.batch_dir,
         report_draft.model_dump(mode="json", by_alias=True),
     )
@@ -501,7 +501,7 @@ def run_sweep(
     final_payload["manifest_sha256"] = manifest_sha256
     report = BatchReport.model_validate(final_payload)
     store.write_model(store.batch_dir / "batch_report.json", report)
-    _, written_digest = manifest.write(
+    _, written_digest = batch_manifest.write(
         store.batch_dir,
         self_referential_report=True,
         exclusive=True,

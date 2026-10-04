@@ -13,6 +13,7 @@ import json
 import re
 from pathlib import Path
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -164,7 +165,45 @@ def test_repository_selects_dotnet_9_even_when_a_newer_sdk_is_installed():
     }
 
 
+#: On this successor integration branch the two first-moment workflows are not main's
+#: registration stubs: they are the reviewed execution workflows, and their exact bytes
+#: are bound by owner decisions. first-moment-n2r.yml is bound by the armed execution
+#: approval (experiments/first-moment-diagnostic/EXECUTION-APPROVAL.json,
+#: one_attempt.workflow_sha256); first-moment-image.yml by the synthetic-qualification
+#: pin in tests/test_first_moment_diagnostic.py. Main's hygiene edits to them (action
+#: pins) would silently invalidate those bindings, so the bound bytes are kept and these
+#: two files are checked against their bindings instead. Changing either needs a new
+#: approval, not an edit here.
+APPROVAL_BOUND_WORKFLOWS = {
+    "first-moment-image.yml": "d7f77d63e1ad3e29595eb79c9b0aaac5c1c936f3efd17486c5bfd6ef70f6bac5",
+    "first-moment-n2r.yml": "aaf5139a8e7ae110ef55b3858a8baf9ea85c6d25540c11e493794c558539173f",
+}
+EXECUTION_APPROVAL = ROOT / "experiments" / "first-moment-diagnostic" / "EXECUTION-APPROVAL.json"
+
+
+def _sha256(path: Path) -> str:
+    import hashlib
+
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_approval_bound_workflows_match_their_bindings():
+    for name, digest in APPROVAL_BOUND_WORKFLOWS.items():
+        assert _sha256(WORKFLOWS / name) == digest, f"{name}: bytes differ from the binding"
+        wf = _load(WORKFLOWS / name)
+        assert set(wf["on"]) == {"workflow_dispatch"}, name
+    if EXECUTION_APPROVAL.is_file():
+        approval = json.loads(EXECUTION_APPROVAL.read_text())
+        block = approval["one_attempt"]
+        assert block["workflow_path"] == ".github/workflows/first-moment-n2r.yml"
+        assert block["workflow_sha256"] == APPROVAL_BOUND_WORKFLOWS["first-moment-n2r.yml"]
+
+
 def test_first_moment_files_are_registration_only_on_main():
+    if (ROOT / "experiments" / "first-moment-diagnostic").is_dir():
+        pytest.skip("this tree carries the first-moment support bundle; the workflows are "
+                    "the approval-bound execution workflows, checked by "
+                    "test_approval_bound_workflows_match_their_bindings")
     expected_ref = "refs/heads/palace/physical-coupled-candidate"
     for path, job in (
         (FIRST_MOMENT_IMAGE, "build-and-qualify"),
@@ -182,6 +221,10 @@ def test_first_moment_files_are_registration_only_on_main():
 
 def test_every_external_action_is_pinned_to_a_full_commit_sha():
     for path in sorted(WORKFLOWS.glob("*.yml")):
+        if path.name in APPROVAL_BOUND_WORKFLOWS:
+            # exempt only while the bytes equal the binding; any edit removes the exemption
+            assert _sha256(path) == APPROVAL_BOUND_WORKFLOWS[path.name], path.name
+            continue
         workflow = _load(path)
         uses = []
         for job in workflow["jobs"].values():

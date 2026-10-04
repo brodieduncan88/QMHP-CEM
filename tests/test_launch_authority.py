@@ -80,11 +80,13 @@ WORKFLOW_TRIGGERS: dict[str, dict] = {
         "push_branches": ["palace/**"],
         "push_paths": [".github/pilot-approval.json"],
     },
+    # Narrowed on 2026-10-04 (PR #12, after merging main's #10 had started a golden run
+    # and a verification campaign unannounced): manual dispatch only, behind a committed
+    # predeclaration and the protected palace-solver environment.
     "palace-golden.yml": {
-        "events": ["push", "workflow_dispatch"],
-        "push_branches": ["main", "palace/**"],
-        "push_paths": [".github/workflows/palace-golden.yml", "docker/palace.Dockerfile",
-                       "solvers/palace/**", "scripts/palace_golden_run.py"],
+        "events": ["workflow_dispatch"],
+        "push_branches": None,
+        "push_paths": None,
     },
     "palace-order1-ladder.yml": {
         "events": ["push", "workflow_dispatch"],
@@ -92,10 +94,9 @@ WORKFLOW_TRIGGERS: dict[str, dict] = {
         "push_paths": [".github/ladder-approval.json"],
     },
     "palace-verify.yml": {
-        "events": ["push", "workflow_dispatch"],
-        "push_branches": ["main", "palace/**"],
-        "push_paths": [".github/workflows/palace-verify.yml",
-                       "scripts/palace_verify_campaign.py", "solvers/palace/verification.py"],
+        "events": ["workflow_dispatch"],
+        "push_branches": None,
+        "push_paths": None,
     },
 }
 
@@ -205,7 +206,7 @@ def test_a_widened_or_added_solver_trigger_is_rejected(tmp_path: Path):
     cases = {
         "a widened path filter": (lambda d: edit(d, "palace-order1-ladder.yml", widen_paths),
                                   "push_paths"),
-        "an added branch": (lambda d: edit(d, "palace-golden.yml", add_branch),
+        "an added branch": (lambda d: edit(d, "palace-coupled-pilot.yml", add_branch),
                             "push_branches"),
         "the path filter removed": (lambda d: edit(d, "palace-order1-ladder.yml",
                                                    drop_the_path_filter), "UNFILTERED"),

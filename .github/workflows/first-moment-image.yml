@@ -27,9 +27,8 @@
 # TRIGGER. workflow_dispatch ONLY - no push, no pull_request, no schedule - and
 # the dispatch must type the confirmation string, so an accidental click does
 # not start a 1-2 hour build. GitHub registers dispatchable workflows only from
-# the default branch, so this registration file must remain on main. Dispatch
-# must select `palace/physical-coupled-candidate`, whose reviewed support bundle
-# is checked by digest during the run.
+# the default branch, so this file must reach main before it can be dispatched
+# at all; dispatching then runs the version at the chosen ref.
 #
 # DISPATCH INPUT HANDLING. No ${{ }} expansion is ever placed inside a `run:`
 # script. GitHub substitutes expressions as TEXT before bash parses the script,
@@ -85,18 +84,6 @@ jobs:
     runs-on: ubuntu-latest        # the approved runner class; no escalation
     timeout-minutes: 120          # declared before dispatch; the job is killed at the cap
     steps:
-      - name: Refuse a ref without the reviewed support bundle
-        env:
-          SELECTED_REF: ${{ github.ref }}
-        run: |
-          set -euo pipefail
-          if [ "$SELECTED_REF" != "refs/heads/palace/physical-coupled-candidate" ]; then
-            echo "REFUSED: this file is registration-only on the default branch." >&2
-            echo "Dispatch the reviewed palace/physical-coupled-candidate branch;" >&2
-            echo "main intentionally does not contain the required support bundle." >&2
-            exit 1
-          fi
-
       - name: Refuse an unconfirmed dispatch
         env:
           CONFIRM: ${{ inputs.confirm }}   # DATA, not shell source
@@ -107,9 +94,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+      - uses: actions/checkout@v4
 
       - name: Record what is actually checked out
         env:
@@ -153,7 +138,7 @@ jobs:
           df -h /
 
       - name: Download the preserved image archive
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0 (what @v4 resolved to on 2026-10-04)
+        uses: actions/download-artifact@v4
         with:
           name: first-moment-image-35691886143
           run-id: 35691886143
@@ -250,7 +235,7 @@ jobs:
             echo "the preserved wrapper does not document --launcher-args" >&2; exit 1; }
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
           python-version: "3.11"
@@ -394,7 +379,7 @@ jobs:
 
       - name: Upload every qualification artefact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@v4
         with:
           # A NEW artefact. Run 35691886143 and its artefact are not touched, and the
           # 200 MB image archive is NOT re-uploaded: it is already preserved there under

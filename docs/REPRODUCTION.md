@@ -125,8 +125,10 @@ uv run python tools/qutip_bridge/check_branch_a_reference.py \
 frozen-evidence test pins the record set, so a new directory in `results/` fails it. The same
 applies to `cem sweep`, which writes a `BATCH-*` directory.
 
-**Pushes can start solver workflows.** A push to `main` or `palace/**` that touches the Palace
-paths starts `palace-golden.yml` or `palace-verify.yml`.
+**Solver workflows.** At `cd5c1b2` a push to `main` or `palace/**` touching the Palace paths
+started `palace-golden.yml` or `palace-verify.yml`. On the successor integration branch (from
+2026-10-04) both run on manual dispatch only, behind a committed predeclaration
+(`.github/palace-declarations/`) and the protected `palace-solver` environment.
 
 ### 5.1 The Palace golden run
 
@@ -144,7 +146,10 @@ does not match; 6, the gate evaluation raised.
 
 - the four frequencies are 9.635896241, 15.23545129, 15.23570396 and 19.27229929 GHz;
 - the maximum backward error is about 2.02 × 10⁻¹¹;
-- the gate verdicts are the same.
+- the gate verdicts are the same. **Not on the successor integration branch:** there the Palace
+  adapter declares the empty-cavity domain incomplete, so `P4PRE_SPECTRAL` is `INCOMPLETE` for a
+  new run where the 13 frozen records say `PASS`. A rerun there reproduces the frequencies and
+  the convergence figure, not that gate verdict; the frozen records are unchanged.
 
 **These are not expected to match:**
 

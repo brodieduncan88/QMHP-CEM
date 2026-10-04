@@ -227,9 +227,16 @@ def test_the_approval_names_exactly_one_approved_experiment():
     # And the rules it runs under are the unchanged ones.
     assert approval["constraints"]["dof_budget"] == BUDGET
     assert approval["constraints"]["per_solve_wall_clock_cap_s"] == 2700
-    golden = (REPO_ROOT / ".github" / "workflows" / "palace-golden.yml").read_text()
-    for path in ("solvers/palace/**", "docker/palace.Dockerfile", "scripts/palace_golden_run.py"):
-        assert path in golden
+    # Committing the candidate must not start a golden solve. Since 2026-10-04 (PR #12)
+    # the golden workflow has no push trigger at all; if one is ever restored, its solver
+    # paths must be the ones named here and the candidate must still lie outside them.
+    import yaml
+
+    golden = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "palace-golden.yml").read_text())
+    push = (golden.get("on", golden.get(True)) or {}).get("push")
+    if push is not None:
+        for path in ("solvers/palace/**", "docker/palace.Dockerfile", "scripts/palace_golden_run.py"):
+            assert path in push.get("paths", [])
     assert not str(CANDIDATE.relative_to(REPO_ROOT)).startswith(("solvers/palace", "docker"))
 
 

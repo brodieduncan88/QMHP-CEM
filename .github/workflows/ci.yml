@@ -74,6 +74,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       # The pinned module declares a newer toolchain than this line; Go's default
       # GOTOOLCHAIN=auto fetches it from the same module proxy that serves the pin.

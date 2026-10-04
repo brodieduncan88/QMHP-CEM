@@ -11,7 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from contracts.common import BatchOutcome, CandidateState, Classification, GateStatus
-from orchestrator import environment, manifest, pipeline
+from orchestrator import batch_manifest, environment, manifest, pipeline
 from orchestrator.lifecycle import CandidateLifecycle, InvalidTransition
 from orchestrator.results_store import BatchStore, ResultAlreadyExists
 from solvers import SolverUnavailable, get_adapter
@@ -105,7 +105,7 @@ def test_manifest_verifies_clean(object001_sweep, results_root):
     report, _ = pipeline.run_sweep(
         object001_sweep, solver_name="mock", results_root=results_root
     )
-    assert manifest.verify(results_root / report.batch_id) == []
+    assert batch_manifest.verify(results_root / report.batch_id) == []
 
 
 def test_batch_report_identifies_the_completed_manifest(
@@ -134,7 +134,7 @@ def test_manifest_detects_tampered_embedded_manifest_digest(
     payload["manifest_sha256"] = "0" * 64
     report_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
-    findings = manifest.verify(batch_dir)
+    findings = batch_manifest.verify(batch_dir)
     assert any("does not identify the completed manifest" in f for f in findings)
 
 
@@ -148,7 +148,7 @@ def test_manifest_detects_tampering(object001_sweep, results_root):
     payload["overall_status"] = "PASS"
     target.write_text(json.dumps(payload))
 
-    findings = manifest.verify(batch_dir)
+    findings = batch_manifest.verify(batch_dir)
     assert any("content changed" in f for f in findings)
 
 
@@ -158,7 +158,7 @@ def test_manifest_detects_deletion(object001_sweep, results_root):
     )
     batch_dir = results_root / report.batch_id
     (batch_dir / report.candidate_ids[0] / "candidate.json").unlink()
-    assert any("missing from disk" in f for f in manifest.verify(batch_dir))
+    assert any("missing from disk" in f for f in batch_manifest.verify(batch_dir))
 
 
 def test_manifest_excludes_only_relative_cache_paths(tmp_path):

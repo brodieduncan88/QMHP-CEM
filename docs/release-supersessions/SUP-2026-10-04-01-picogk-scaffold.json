@@ -1,0 +1,40 @@
+{
+  "schema": "qmhp-cem.release-supersession/1",
+  "id": "SUP-2026-10-04-01",
+  "status": "SUPERSEDES THE TREE BINDING OF TWO FILES AND ONE FILE SET. Edits no register, record or claim.",
+  "supersedes": {
+    "register": "docs/release/CLAIM-REGISTER.json",
+    "register_sha256": "1a03d8dc793089f4029a9d8abc439e58fbabf84187ddb3e25610b78e7f1e39c9",
+    "register_revision": 1,
+    "frozen_from_commit": "ba076d9d972077a7a3e256a6404ab455fd748461",
+    "frozen_release_branch_head": "1ebc07ad67e0af6ff2d790c4d181b0558d632d62"
+  },
+  "decision_ref": "Owner decision, working session 2026-10-04: preserve qutip/branch-a-fixed-point-crosscheck-v1-prep at 1ebc07a unchanged; build a successor integration branch from that commit; merge the secured main with full history; use a new superseding register rather than editing frozen records.",
+  "cause": "PR #10 (commit da1def2, merged to main as 79844b7) changed two tree-bound PicoGK scaffold files and added a separate .NET test project beside them. The frozen register binds those bytes and that file set, so the release test fails closed on the merged tree until the change is superseded explicitly.",
+  "changed_bound_files": [
+    {
+      "path": "geometry/package_picogk/QmhpCem.Geometry.csproj",
+      "sha256_at_frozen_commit": "d6aefcecdd4975da4ecfb2ef2af85d0259df80d83e2ca4f8579a4ae0a682044f",
+      "sha256_superseding": "3807955121409536224bf416b3dea66e0903448ccb99b6674f252fad1e763692",
+      "introduced_by": "da1def2",
+      "change": "Adds <Compile Remove=\"tests/**/*.cs\" /> so the separate test project's sources are not compiled into the application executable. No package, target or build output of the application changes."
+    },
+    {
+      "path": "geometry/package_picogk/README.md",
+      "sha256_at_frozen_commit": "cfbd527602adcf1f328fe85150f1970393fbf22c1223203320caac1034f0272e",
+      "sha256_superseding": "d9653f9771a9c3010144b28ee9d73305a54b39d30b6a6f67dd5bb23afa985c6a",
+      "introduced_by": "da1def2",
+      "change": "Adds one paragraph saying tests/QmhpCem.Geometry.Tests.csproj exercises candidate parsing, CLI refusal and the generator's refusal to fabricate geometry, and that these are scaffold tests, not the section 7.6 geometry acceptance tests."
+    }
+  ],
+  "file_set_additions": {
+    "geometry/package_picogk/": ["tests"]
+  },
+  "claims_assessed": [
+    {
+      "id": "REL-BD-03",
+      "assessment": "STILL HOLDS. Program.cs, Object001Package.cs, driver.py and __init__.py are byte-identical to their frozen pins; Program.cs still reports NOT IMPLEMENTED and returns 3, and Object001Package.Generate still throws NotImplementedException. The added tests assert that refusal; they implement no geometry. The test project is built and run by default CI (ci.yml, dotnet job); the application itself is still never run to produce geometry."
+    }
+  ],
+  "unchanged": "Every other tree-bound digest, every other exact file set, every in-scope record and register, and every claim and exception text. A change to any of them still fails tests/test_release_registers.py."
+}

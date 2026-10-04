@@ -73,6 +73,15 @@ RELEASE_SHA256 = {
     "STATUS-ADDENDUM-2026-09-26.md": "36c80082de2f8d2078ac92610fa24512931219eb8953edf0c803580371392b2d",
 }
 
+#: Supersessions of the tree binding, outside docs/release/ so the frozen files stay
+#: byte-identical. Each is pinned like a release file: supersede again, never edit. A
+#: supersession may only replace the pin of a named tree-bound file whose frozen digest it
+#: quotes, and add names to an exact file set; every other binding is unchanged.
+SUPERSESSIONS = REPO_ROOT / "docs" / "release-supersessions"
+SUPERSESSION_SHA256 = {
+    "SUP-2026-10-04-01-picogk-scaffold.json": "1260bce9c5c988683ec212417bef69f2f550776585e5310e1f7acc4f9a34f6ec",
+}
+
 #: Records in a release-scope family (PALACE-GOLDEN, PALACE-VERIFY, QUTIP-A) committed
 #: after the freeze. They are NOT part of this release and must be named here deliberately,
 #: so that a new record can never be read as covered by claims frozen before it existed.
@@ -148,6 +157,32 @@ def exception_register() -> dict:
 
 def by_id(register: dict, key: str) -> dict[str, dict]:
     return {item["id"]: item for item in register[key]}
+
+
+def supersessions() -> list[dict]:
+    """The pinned supersessions, always read from the repository (not a test mirror)."""
+    return [load_strict((SUPERSESSIONS / name).read_text()) for name in sorted(SUPERSESSION_SHA256)]
+
+
+def superseded_pins() -> dict[str, tuple[str, str]]:
+    """{path: (frozen digest, superseding digest)} for every superseded tree-bound file."""
+    return {f["path"]: (f["sha256_at_frozen_commit"], f["sha256_superseding"])
+            for s in supersessions() for f in s["changed_bound_files"]}
+
+
+def effective_pin(path: str, frozen: str) -> str:
+    """The pin a tree-bound file must match: the superseding digest only when a
+    supersession names this path AND quotes exactly this frozen digest."""
+    superseded = superseded_pins().get(path)
+    return superseded[1] if superseded is not None and superseded[0] == frozen else frozen
+
+
+def file_set_additions() -> dict[str, list[str]]:
+    out: dict[str, list[str]] = {}
+    for s in supersessions():
+        for directory, names in s["file_set_additions"].items():
+            out.setdefault(directory, []).extend(names)
+    return out
 
 
 def load(path: Path) -> dict:
@@ -272,7 +307,7 @@ def digest_problems(claims: dict, exceptions: dict, root: Path = REPO_ROOT) -> l
         if not path.is_file():
             out.append(f"{e['path']}: cited but missing")
         elif "sha256_at_frozen_commit" in e and tree_bound(e["path"], prefixes) \
-                and sha256(path) != e["sha256_at_frozen_commit"]:
+                and sha256(path) != effective_pin(e["path"], e["sha256_at_frozen_commit"]):
             out.append(f"{e['path']}: changed since the frozen commit")
     palace = claims["in_scope_palace_code_unpinned"]
     for listed in palace["paths"] + palace["shared_modules_also_used"]:
@@ -302,10 +337,11 @@ def digest_problems(claims: dict, exceptions: dict, root: Path = REPO_ROOT) -> l
 
 def file_set_problems(claims: dict, root: Path = REPO_ROOT) -> list[str]:
     out: list[str] = []
+    additions = file_set_additions()
     for directory, names in claims["tree_binding"]["exact_file_sets"].items():
         present = sorted(p.name for p in (root / directory).iterdir()
                          if p.name not in {"__pycache__", "bin", "obj"}) if (root / directory).is_dir() else []
-        if present != names:
+        if present != sorted(names + additions.get(directory, [])):
             out.append(f"{directory}: holds {present}, not the frozen file set")
     return out
 
@@ -364,7 +400,8 @@ LAUNCH_PRIMITIVES = (("subprocess", "Popen"), ("os", "system"), ("os", "popen"),
 def refusal_pins(claims: dict) -> dict[str, str]:
     """{path: sha256} of the files the unsupported-path claims bind."""
     c = by_id(claims, "claims")
-    return {e["path"]: e["sha256_at_frozen_commit"] for cid in ("REL-BD-01", "REL-BD-02", "REL-BD-03")
+    return {e["path"]: effective_pin(e["path"], e["sha256_at_frozen_commit"])
+            for cid in ("REL-BD-01", "REL-BD-02", "REL-BD-03")
             for e in c[cid]["evidence"] if "sha256_at_frozen_commit" in e}
 
 
@@ -669,6 +706,55 @@ def test_the_release_files_are_exactly_the_pinned_ones():
     assert present == sorted(RELEASE_SHA256), present
     for name, pinned in RELEASE_SHA256.items():
         assert sha256(RELEASE / name) == pinned, f"{name} changed: supersede it, do not edit it"
+
+
+def test_the_supersessions_are_exactly_the_pinned_ones():
+    present = sorted(p.name for p in SUPERSESSIONS.iterdir())
+    assert present == sorted(SUPERSESSION_SHA256), present
+    for name, pinned in SUPERSESSION_SHA256.items():
+        assert sha256(SUPERSESSIONS / name) == pinned, f"{name} changed: supersede it, do not edit it"
+
+
+def test_each_supersession_binds_this_register_and_quotes_the_frozen_pins():
+    claims = claim_register()
+    prefixes = claims["tree_binding"]["must_still_match"]
+    frozen = {e["path"]: e["sha256_at_frozen_commit"]
+              for item in claims["claims"] for e in item["evidence"] if "sha256_at_frozen_commit" in e}
+    for s in supersessions():
+        assert s["schema"] == "qmhp-cem.release-supersession/1"
+        assert s["supersedes"]["register_sha256"] == sha256(RELEASE / "CLAIM-REGISTER.json")
+        assert s["supersedes"]["register_revision"] == claims["register_revision"]
+        assert s["supersedes"]["frozen_from_commit"] == FROZEN_FROM == claims["frozen_from_commit"]
+        for f in s["changed_bound_files"]:
+            assert tree_bound(f["path"], prefixes), f["path"]
+            assert f["sha256_at_frozen_commit"] == frozen[f["path"]], f["path"]
+            assert f["sha256_superseding"] == sha256(REPO_ROOT / f["path"]), f["path"]
+        for directory, names in s["file_set_additions"].items():
+            assert directory in claims["tree_binding"]["exact_file_sets"], directory
+            assert not set(names) & set(claims["tree_binding"]["exact_file_sets"][directory])
+        assert {c["id"] for c in s["claims_assessed"]} <= {c["id"] for c in claims["claims"]}
+
+
+def test_a_supersession_excuses_only_the_files_it_names(tmp_path: Path):
+    """Another bound file that drifts still fails, and a superseded file that drifts again
+    (bytes no longer equal to the superseding digest) fails too."""
+    claims, exceptions = claim_register(), exception_register()
+    c = copy.deepcopy(claims)
+    entry = next(e for e in by_id(c, "claims")["REL-BD-03"]["evidence"]
+                 if e["path"] == "geometry/package_picogk/Program.cs")
+    entry["sha256_at_frozen_commit"] = "0" * 64
+    assert digest_problems(c, exceptions) == ["geometry/package_picogk/Program.cs: changed since the frozen commit"]
+    c = copy.deepcopy(claims)
+    entry = next(e for e in by_id(c, "claims")["REL-BD-03"]["evidence"]
+                 if e["path"] == "geometry/package_picogk/README.md")
+    entry["sha256_at_frozen_commit"] = "1" * 64   # no longer the digest the supersession quotes
+    assert digest_problems(c, exceptions) == ["geometry/package_picogk/README.md: changed since the frozen commit"]
+    copied = tmp_path / "geometry" / "package_picogk"
+    shutil.copytree(REPO_ROOT / "geometry" / "package_picogk", copied,
+                    ignore=shutil.ignore_patterns("__pycache__", "bin", "obj"))
+    (copied / "extra.cs").write_text("// not named by any supersession\n")
+    assert [p.split(":")[0] for p in file_set_problems(claims, tmp_path)
+            if p.startswith("geometry/package_picogk/")] == ["geometry/package_picogk/"]
 
 
 def test_the_registers_parse_strictly_and_are_well_formed():

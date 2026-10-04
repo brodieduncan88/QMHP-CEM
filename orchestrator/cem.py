@@ -25,7 +25,7 @@ import yaml
 from contracts import master
 from contracts.common import BatchOutcome, GateStatus
 from contracts.sweep import SweepDefinition
-from orchestrator import manifest, pipeline
+from orchestrator import batch_manifest, pipeline
 from solvers import SolverUnavailable, registered_names
 from solvers.mock.adapter import FIXTURES
 
@@ -134,7 +134,7 @@ def cmd_report(args: argparse.Namespace) -> int:
     print(f"outcome        : {report['batch_outcome']}")
     print(f"rng seed       : {report.get('rng_seed')}")
 
-    findings = manifest.verify(batch_dir)
+    findings = batch_manifest.verify(batch_dir)
     if findings:
         print(f"manifest       : {len(findings)} DISCREPANCIES")
         for finding in findings:
@@ -169,7 +169,7 @@ def cmd_verify_results(args: argparse.Namespace) -> int:
     """
     worst = 0
     for root in args.roots:
-        findings = manifest.verify(root)
+        findings = batch_manifest.verify(root)
         if findings:
             print(f"{root}: MISMATCH")
             for finding in findings:
