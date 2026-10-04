@@ -4,23 +4,24 @@
 # container from docker/palace.Dockerfile (Palace v0.13.0 and its superbuild
 # dependencies: 818 s for the superbuild on a 4-vCPU hosted runner in run
 # 34917157266, under two minutes once the layer cache is warm) and then
-# executes the frozen golden candidate in it. Every outcome writes results/PALACE-GOLDEN-<UTC>/ with the
-# execution record, the Palace log, the input and output hashes and the gate
-# report, and commits that directory back to the branch so the evidence is
-# in the repository whether the run succeeded or not.
+# executes the frozen golden candidate in it. Every outcome writes
+# results/PALACE-GOLDEN-<UTC>/ with the execution record, the Palace log, the
+# input and output hashes and the gate report. Every run uploads that record.
+# Repository writeback is a separate, least-privilege job and is available only
+# on an explicitly opted-in manual dispatch; push-triggered solver jobs receive
+# a read-only token and never write to the branch.
 #
 # Triggers: manual dispatch on any branch; and a push to `main` or to a
-# `palace/**` development branch that touches the Palace path. The record is
-# committed back to the branch the run was on, so `main` accumulates the
-# records of merged changes and a `palace/*` branch those of its own
-# development. The bot's own results commit does not match the path filter
-# and does not re-trigger the workflow. Pull requests do not run it: the
-# build is long and the results commit needs write access to the branch.
+# `palace/**` development branch that touches a dependency of the real-solver
+# path. Pull requests do not run it because the build is long. A maintainer may
+# opt into committing the exact uploaded record when manually dispatching a
+# branch; the writeback job cannot run for a push or tag.
 #
 # The record directory this run created is identified by the pointer file the
 # harness writes, never by globbing results/PALACE-GOLDEN-*: earlier records
 # are committed alongside it. Its manifest is re-hashed and a mismatch fails
-# the job, after the record has been uploaded and committed for inspection.
+# the job, after the record has been uploaded and, when explicitly requested,
+# written back for inspection.
 
 name: Palace golden run
 
@@ -31,9 +32,9 @@ on:
         description: "MPI processes for the Palace run"
         default: "1"
       commit_results:
-        description: "Commit results/PALACE-GOLDEN-* back to this branch"
+        description: "Commit this run's exact record back to the selected branch"
         type: boolean
-        default: true
+        default: false
       run_sweep:
         description: "Also run the 3x3 Object 001 sweep with Palace (uploaded as an artifact only)"
         type: boolean
@@ -45,11 +46,23 @@ on:
     paths:
       - ".github/workflows/palace-golden.yml"
       - "docker/palace.Dockerfile"
-      - "solvers/palace/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "config/**"
+      - "contracts/**"
+      - "evaluator/**"
+      - "geometry/**"
+      - "master/**"
+      - "models/**"
+      - "orchestrator/**"
+      - "solvers/**"
       - "scripts/palace_golden_run.py"
+      - "sweeps/**"
+      - "tests/test_palace.py"
+      - "tests/test_workflows.py"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: palace-golden-${{ github.ref }}
@@ -58,11 +71,10 @@ concurrency:
 env:
   IMAGE: qmhp-cem/palace:0.13.0
   MPI_PROCESSES: ${{ inputs.mpi_processes || '1' }}
-  # On a push the inputs context is empty and both default to true; on a
-  # dispatch the boolean input is used as given. (A loose `== ''` test would
-  # not do: GitHub coerces both false and '' to 0, so unticking the box
-  # would have had no effect.)
-  COMMIT_RESULTS: ${{ github.event_name != 'workflow_dispatch' || inputs.commit_results }}
+  # On a push the inputs context is empty and RUN_SWEEP defaults to true; on a
+  # dispatch the boolean input is used as given. Repository writeback is not
+  # represented as an environment value: the separate job's condition is the
+  # authority boundary.
   RUN_SWEEP: ${{ github.event_name != 'workflow_dispatch' || inputs.run_sweep }}
 
 jobs:
@@ -70,8 +82,12 @@ jobs:
     name: build the image, run the golden candidate
     runs-on: ubuntu-latest
     timeout-minutes: 360
+    outputs:
+      record_created: ${{ steps.package.outputs.record_created }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # The Palace superbuild needs several GB of scratch; hosted runners
       # ship large toolchains this job never uses.
@@ -80,10 +96,10 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h /
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - name: Build the Palace image (pinned base, apt snapshot, Palace tag)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
           file: docker/palace.Dockerfile
@@ -100,7 +116,7 @@ jobs:
           docker run --rm --network none "$IMAGE" --help | head -n 3
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           enable-cache: true
           python-version: "3.11"
@@ -164,27 +180,36 @@ jobs:
         continue-on-error: true
         run: uv run cem sweep sweeps/object001_grid.yaml --solver palace --results-root sweep-results
 
+      - name: Package the exact record for optional writeback
+        id: package
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ -z "${GOLDEN_RECORD:-}" ] || [ ! -d "$GOLDEN_RECORD" ]; then
+            echo "record_created=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          record_name="$(basename "$GOLDEN_RECORD")"
+          case "$record_name" in
+            PALACE-GOLDEN-*) ;;
+            *) echo "refusing unexpected record name: $record_name" >&2; exit 1 ;;
+          esac
+          mkdir -p workflow-artifacts
+          tar -C results -czf workflow-artifacts/palace-golden-writeback.tar.gz "$record_name"
+          (cd workflow-artifacts && sha256sum palace-golden-writeback.tar.gz \
+            > palace-golden-writeback.sha256)
+          echo "record_created=true" >> "$GITHUB_OUTPUT"
+
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: palace-golden-${{ github.run_id }}
           path: |
             ${{ steps.record.outputs.path }}
             sweep-results
+            workflow-artifacts
           if-no-files-found: warn
-
-      - name: Commit the golden record to the branch
-        if: always() && env.COMMIT_RESULTS == 'true'
-        run: |
-          if [ -z "$GOLDEN_RECORD" ]; then echo "no golden record to commit"; exit 0; fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$GOLDEN_RECORD"
-          outcome="$(uv run python -c "import json,sys; print(json.load(open(sys.argv[1]))['outcome'])" "$GOLDEN_RECORD/execution_record.json")"
-          git commit -m "Record Palace golden run ${{ github.run_id }}: ${outcome}, golden step ${{ steps.golden.outcome }}, manifest ${{ steps.manifest.outcome }}" -m "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          git pull --rebase --autostash origin "${{ github.ref_name }}"
-          git push origin "HEAD:${{ github.ref_name }}"
 
       - name: Fail the job if the golden run or the manifest check did not succeed
         if: always() && (steps.golden.outcome != 'success' || steps.manifest.outcome == 'failure')
@@ -192,3 +217,84 @@ jobs:
           echo "golden run step: ${{ steps.golden.outcome }}"
           echo "manifest check : ${{ steps.manifest.outcome }}"
           exit 1
+
+  # No solver, build or third-party build action receives a write token. This
+  # small job alone may write, and only after a maintainer explicitly opts in
+  # on a manual branch dispatch. The archive is the exact record uploaded by
+  # the read-only job; its checksum and path are checked before extraction.
+  writeback:
+    name: commit the dispatched record
+    needs: golden
+    if: >-
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref_type == 'branch' &&
+      inputs.commit_results &&
+      needs.golden.outputs.record_created == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Download this run's record archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+        run: gh run download "$RUN_ID" --name "palace-golden-$RUN_ID" --dir "$RUNNER_TEMP/writeback"
+
+      - name: Verify, extract and commit only the record
+        env:
+          TARGET_REF: ${{ github.ref_name }}
+          RUN_ID: ${{ github.run_id }}
+          SERVER_URL: ${{ github.server_url }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/writeback/workflow-artifacts/palace-golden-writeback.tar.gz"
+          checksum="$RUNNER_TEMP/writeback/workflow-artifacts/palace-golden-writeback.sha256"
+          (cd "$(dirname "$archive")" && sha256sum -c "$(basename "$checksum")")
+          record_name="$(python3 - "$archive" <<'PY'
+          import pathlib
+          import sys
+          import tarfile
+
+          with tarfile.open(sys.argv[1], "r:gz") as archive:
+              members = archive.getmembers()
+          if not members:
+              raise SystemExit("refusing an empty record archive")
+          roots = set()
+          for member in members:
+              path = pathlib.PurePosixPath(member.name)
+              if path.is_absolute() or ".." in path.parts or not path.parts:
+                  raise SystemExit(f"refusing unsafe archive path: {member.name}")
+              if member.issym() or member.islnk():
+                  raise SystemExit(f"refusing archive link: {member.name}")
+              roots.add(path.parts[0])
+          if len(roots) != 1:
+              raise SystemExit(f"refusing multiple archive roots: {sorted(roots)}")
+          print(roots.pop())
+          PY
+          )"
+          case "$record_name" in
+            PALACE-GOLDEN-*) ;;
+            *) echo "refusing unexpected archive root: $record_name" >&2; exit 1 ;;
+          esac
+          mkdir -p results
+          if [ -e "results/$record_name" ]; then
+            echo "refusing to overwrite existing record: results/$record_name" >&2
+            exit 1
+          fi
+          tar -xzf "$archive" -C results
+          record="results/$record_name"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "$record"
+          git commit -m "Record Palace golden run $RUN_ID" \
+            -m "Workflow run: $SERVER_URL/$REPOSITORY/actions/runs/$RUN_ID"
+          git pull --rebase origin "$TARGET_REF"
+          git push origin "HEAD:$TARGET_REF"

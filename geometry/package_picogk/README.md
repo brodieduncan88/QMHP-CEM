@@ -20,6 +20,11 @@ is absent, `driver.generate()` reports geometry as unavailable and the pipeline
 continues, recording plainly that no geometry was produced. It never fabricates
 an STL.
 
+`tests/QmhpCem.Geometry.Tests.csproj` exercises the boundary that is implemented:
+candidate parsing, CLI refusal and the invariant that the unimplemented
+generator throws instead of fabricating geometry. These are scaffold tests,
+not the unchecked §7.6 geometry acceptance tests listed below.
+
 ## Boundary
 
 ```

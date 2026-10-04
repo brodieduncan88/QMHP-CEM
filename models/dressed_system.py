@@ -25,10 +25,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+from types import MappingProxyType
+from typing import Mapping
 
 import numpy as np
 import numpy.linalg as la
-from scipy.optimize import brentq
+from scipy.optimize import brentq, linear_sum_assignment
 
 from contracts import master
 from models.fluxonium import DEFAULT_LEVELS, StaticSpectrum, nominal_spectrum, solve_static
@@ -94,9 +96,17 @@ class DressedSolution:
     #: Eigenvectors of the full coupled Hamiltonian.
     eigenvectors: np.ndarray
     #: Map (level, photon) -> (energy, eigenindex) from adiabatic labelling.
-    labels: dict[tuple[int, int], tuple[float, int]]
+    labels: Mapping[tuple[int, int], tuple[float, int]]
     Nq: int
     Nph: int
+
+    def __post_init__(self) -> None:
+        """Freeze array/mapping payloads, including cached nominal solutions."""
+        for name in ("pulls_MHz", "eigenvalues", "eigenvectors"):
+            owned = np.array(getattr(self, name), copy=True)
+            owned.setflags(write=False)
+            object.__setattr__(self, name, owned)
+        object.__setattr__(self, "labels", MappingProxyType(dict(self.labels)))
 
     @property
     def logical_pull_MHz(self) -> float:
@@ -191,11 +201,7 @@ def solve_dressed(
     eigenvalues, eigenvectors = la.eigh(H)
     overlap = np.abs(eigenvectors) ** 2
 
-    labels: dict[tuple[int, int], tuple[float, int]] = {}
-    for level in (0, 1, 2):
-        for photon in (0, 1):
-            index = int(np.argmax(overlap[level * Nph + photon, :]))
-            labels[(level, photon)] = (float(eigenvalues[index]), index)
+    labels = _assign_bare_labels(eigenvalues, overlap, Nph)
 
     pulls = (
         np.array(
@@ -216,6 +222,31 @@ def solve_dressed(
         Nq=Nq,
         Nph=Nph,
     )
+
+
+def _assign_bare_labels(
+    eigenvalues: np.ndarray,
+    overlap: np.ndarray,
+    Nph: int,
+) -> dict[tuple[int, int], tuple[float, int]]:
+    """Assign the six tracked bare states to six distinct dressed states.
+
+    Independent per-row ``argmax`` can assign the same dressed eigenvector to
+    multiple bare labels around an avoided crossing.  The maximum-weight
+    bipartite assignment preserves the reference implementation's bare-overlap
+    convention while making the labelling one-to-one.
+    """
+    bare_labels = [(level, photon) for level in (0, 1, 2) for photon in (0, 1)]
+    bare_rows = np.array([level * Nph + photon for level, photon in bare_labels])
+    row_indices, eigen_indices = linear_sum_assignment(
+        overlap[bare_rows, :], maximize=True
+    )
+    assigned: dict[tuple[int, int], tuple[float, int]] = {}
+    for local_row, eigen_index in zip(row_indices, eigen_indices, strict=True):
+        label = bare_labels[int(local_row)]
+        index = int(eigen_index)
+        assigned[label] = (float(eigenvalues[index]), index)
+    return assigned
 
 
 def solve_dressed_root(

@@ -6,7 +6,8 @@ single :class:`contracts.results.GateReport`.
 
 from __future__ import annotations
 
-from contracts.common import GateStatus, Severity
+from contracts import master
+from contracts.common import Classification, GateStatus, Severity
 from contracts.results import GATE_REPORT_SCHEMA, GateReport, QuantumResults, SolverResults
 from evaluator.base import Gate, GateInputs
 from evaluator.computational import (
@@ -47,8 +48,49 @@ def evaluate_candidate(
     quantum_results: QuantumResults | None = None,
 ) -> GateReport:
     """Evaluate all gates for a candidate."""
+    current_revision = master.master_revision()
+    if candidate.master_revision != current_revision:
+        raise ValueError(
+            f"candidate master_revision {candidate.master_revision!r} does not "
+            f"match loaded frozen master {current_revision!r}"
+        )
+    if solver_results is not None:
+        if solver_results.candidate_id != candidate.candidate_id:
+            raise ValueError(
+                f"solver result candidate_id {solver_results.candidate_id!r} "
+                f"does not match candidate {candidate.candidate_id!r}"
+            )
+        if (
+            solver_results.master_revision is not None
+            and solver_results.master_revision != candidate.master_revision
+        ):
+            raise ValueError(
+                f"solver result master_revision "
+                f"{solver_results.master_revision!r} does not match candidate "
+                f"revision {candidate.master_revision!r}"
+            )
+    if quantum_results is not None:
+        if quantum_results.candidate_id != candidate.candidate_id:
+            raise ValueError(
+                f"quantum result candidate_id {quantum_results.candidate_id!r} "
+                f"does not match candidate {candidate.candidate_id!r}"
+            )
+        if quantum_results.master_revision != candidate.master_revision:
+            raise ValueError(
+                f"quantum result master_revision "
+                f"{quantum_results.master_revision!r} does not match candidate "
+                f"revision {candidate.master_revision!r}"
+            )
+
     inputs = GateInputs(candidate, solver_results, quantum_results)
     results = [gate_type().evaluate(inputs) for gate_type in GATE_TYPES]
+    synthetic = bool(
+        solver_results is not None
+        and (
+            solver_results.synthetic
+            or solver_results.solver.classification is Classification.TEST_FIXTURE
+        )
+    )
 
     return GateReport.model_validate(
         {
@@ -57,6 +99,7 @@ def evaluate_candidate(
             "master_revision": candidate.master_revision,
             "overall_status": roll_up(results).value,
             "gates": [r.model_dump() for r in results],
+            "synthetic": synthetic,
         }
     )
 

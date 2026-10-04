@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -26,12 +27,30 @@ def _run(command: list[str]) -> str | None:
 
 
 def uv_version() -> str | None:
-    version = _run(["uv", "--version"])
-    return version.split()[-1] if version else None
+    output = _run(["uv", "--version"])
+    if not output:
+        return None
+    # Current uv builds may append a commit, platform, or installation source;
+    # the version is the token immediately following the executable name.
+    match = re.search(r"(?:^|\n)uv\s+([^\s]+)", output)
+    return match.group(1) if match else None
 
 
 def git_commit() -> str | None:
-    return _run(["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"])
+    commit = _run(["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"])
+    if commit is None:
+        return None
+    dirty = _run(
+        [
+            "git",
+            "-C",
+            str(REPO_ROOT),
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=normal",
+        ]
+    )
+    return f"{commit}+dirty" if dirty else commit
 
 
 def dependency_lock_sha256() -> str | None:
@@ -47,8 +66,14 @@ def record(
     solver_version: str | None = None,
     solver_identity: str | None = None,
     ended_utc: datetime | None = None,
+    git_revision: str | None = None,
 ) -> EnvironmentRecord:
-    """Build the environment record required in every batch manifest."""
+    """Build the environment record required in every batch manifest.
+
+    ``picogk_version`` is the exact version configured in the C# project, not
+    a claim that its runtime was available. ``dotnet_version is None`` records
+    that the configured PicoGK toolchain could not execute in this environment.
+    """
     geometry_env = picogk_driver.environment_record()
     return EnvironmentRecord(
         os=f"{platform.system()} {platform.release()}",
@@ -59,7 +84,7 @@ def record(
         dotnet_version=geometry_env["dotnet_version"],
         picogk_version=geometry_env["picogk_version"],
         shapekernel_revision=geometry_env["shapekernel_revision"],
-        git_commit=git_commit(),
+        git_commit=git_revision or git_commit(),
         solver_version=solver_version,
         solver_identity=solver_identity or solver_name,
         started_utc=started_utc,

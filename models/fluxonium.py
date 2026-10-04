@@ -52,6 +52,18 @@ class StaticSpectrum:
     #: Eigenvectors on the phase grid, column i is state i.
     eigenvectors: np.ndarray
 
+    def __post_init__(self) -> None:
+        """Own immutable arrays so cached nominal results cannot be poisoned."""
+        for name in (
+            "frequencies_GHz",
+            "charge_matrix",
+            "phase_grid",
+            "eigenvectors",
+        ):
+            owned = np.array(getattr(self, name), copy=True)
+            owned.setflags(write=False)
+            object.__setattr__(self, name, owned)
+
     def f(self, upper: int, lower: int = 0) -> float:
         """Transition frequency f_{upper,lower} in GHz."""
         return float(self.frequencies_GHz[upper] - self.frequencies_GHz[lower])

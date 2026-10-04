@@ -23,7 +23,7 @@ from pathlib import Path
 import yaml
 
 from contracts import master
-from contracts.common import GateStatus
+from contracts.common import BatchOutcome, GateStatus
 from contracts.sweep import SweepDefinition
 from orchestrator import manifest, pipeline
 from solvers import SolverUnavailable, registered_names
@@ -80,7 +80,9 @@ def cmd_sweep(args: argparse.Namespace) -> int:
         return 4
 
     _print_batch(report, outcomes)
-    return 0
+    # NO_FEASIBLE_DESIGN_FOUND and BLOCKED are valid scientific outcomes.
+    # An execution-level solver failure is not, and must be visible to CI.
+    return 4 if report.batch_outcome is BatchOutcome.SOLVER_FAILURE else 0
 
 
 def cmd_simulate(args: argparse.Namespace) -> int:

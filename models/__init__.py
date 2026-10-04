@@ -1,13 +1,13 @@
 """QMHP-CEM physics models (spec §5).
 
-v0.1 status: the physics models are NOT implemented. Each entry point raises
-:class:`models._stub.PhysicsNotImplemented` carrying the frozen regression pins
-it must reproduce. Conventions that are not physics — the tolerance RNG draw
-stream, the collision threshold comparison, the coupling-extraction
-consistency rule — ARE implemented.
+The static spectrum, dressed-system root, Purcell estimates, collision screen,
+and tolerance ensemble are implemented and regression-tested against the
+frozen conventions.  Some deliberately incomplete paths — notably the two
+independent coupling extractions — still raise
+:class:`models._stub.PhysicsNotImplemented` rather than fabricate evidence.
 
-Callers must treat PhysicsNotImplemented as "this quantity is unavailable" and
-record it, never as a reason to substitute a plausible value.
+Callers must treat ``PhysicsNotImplemented`` as "this quantity is unavailable"
+and record it, never as a reason to substitute a plausible value.
 """
 
 from models._stub import PhysicsNotImplemented

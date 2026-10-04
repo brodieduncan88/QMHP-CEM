@@ -5,10 +5,10 @@ Per candidate::
     DEFINED -> VALIDATED -> GEOMETRY_GENERATED -> SOLVER_INPUT_PREPARED
             -> SOLVED -> QUANTUM_EVALUATED -> GATES_EVALUATED -> terminal
 
-The quantum step is where v0.1 stops short: the physics models are stubs, so
-the step records which quantities are unavailable instead of inventing them.
-Dependent gates then report INCOMPLETE, and candidates terminate INCOMPLETE.
-That is the correct v0.1 outcome, not a bug to work around.
+Implemented quantum models run where their inputs exist. Coupling extraction
+and hardware evidence remain unavailable in v0.1, so dependent gates record
+that boundary instead of inventing values. An unresolved hard gate terminates
+the candidate as INCOMPLETE or HARDWARE-GATED.
 """
 
 from __future__ import annotations
@@ -42,7 +42,11 @@ from models import dressed_system, purcell, tolerance
 from models.dressed_system import RootNotBracketed
 from orchestrator import environment, manifest
 from orchestrator.lifecycle import CandidateLifecycle
-from orchestrator.results_store import DEFAULT_RESULTS_ROOT, BatchStore
+from orchestrator.results_store import (
+    DEFAULT_RESULTS_ROOT,
+    BatchStore,
+    ResultAlreadyExists,
+)
 from solvers import RunContext, SolverAdapter, get_adapter
 
 
@@ -56,7 +60,12 @@ class CandidateOutcome:
     solver_results: SolverResults | None = None
     quantum_results: QuantumResults | None = None
     geometry: Any = None
+    solver_failed: bool = False
     notes: list[str] = field(default_factory=list)
+
+
+class RecordBindingError(ValueError):
+    """A result belongs to a different candidate or master revision."""
 
 
 # --- candidate construction -------------------------------------------------
@@ -65,7 +74,19 @@ class CandidateOutcome:
 def load_base_candidate(path: Path) -> Candidate:
     """Load and validate a base candidate YAML."""
     with Path(path).open() as fh:
-        return Candidate.model_validate(yaml.safe_load(fh))
+        candidate = Candidate.model_validate(yaml.safe_load(fh))
+    _require_current_master(candidate)
+    return candidate
+
+
+def _require_current_master(candidate: Candidate) -> None:
+    """Refuse to evaluate a candidate against a different authority set."""
+    active_revision = master.master_revision()
+    if candidate.master_revision != active_revision:
+        raise RecordBindingError(
+            f"candidate master_revision {candidate.master_revision!r} does not "
+            f"match active frozen master {active_revision!r}"
+        )
 
 
 def _set_by_path(payload: dict[str, Any], dotted: str, value: Any) -> None:
@@ -103,6 +124,7 @@ def evaluate_quantum(
     candidate: Candidate,
     solver_results: SolverResults,
     tolerance_samples: int = 0,
+    rng_seed: int = 0,
 ) -> QuantumResults:
     """Run the quantum-device layer for a candidate.
 
@@ -115,12 +137,15 @@ def evaluate_quantum(
             which is the sweep default: each device costs a full static solve
             plus a bracketed root search, so a 400-device ensemble per
             candidate would dominate the run.
+        rng_seed: Batch seed recorded in the sweep definition. It is combined
+            with the candidate ID to create a deterministic independent stream.
     """
     unavailable: list[str] = []
     dressed: dict[str, Any] = {}
     collision_block: dict[str, Any] = {}
     purcell_block: dict[str, Any] = {}
     tolerance_block: dict[str, Any] = {}
+    value_provenance: dict[str, Classification] = {}
 
     try:
         spectrum = dressed_system.dressed_spectrum()
@@ -136,16 +161,42 @@ def evaluate_quantum(
                 "coupling_g_GHz": spectrum["coupling_g_GHz"],
             }
         )
+        value_provenance.update(
+            {
+                "dressed_system.root_GHz": Classification.SOLVED,
+                "dressed_system.logical_pull_MHz": Classification.SOLVED,
+                "dressed_system.sink_pull_MHz": Classification.SOLVED,
+                "dressed_system.sink_logical_contrast_MHz": Classification.SOLVED,
+                "dressed_system.sink_line_GHz": Classification.SOLVED,
+                "dressed_system.Nq": Classification.MASTER_FROZEN,
+                "dressed_system.Nph": Classification.MASTER_FROZEN,
+                "dressed_system.coupling_g_GHz": (
+                    Classification.VERIFIED_COMPUTATIONAL
+                ),
+            }
+        )
         purcell_block.update(
             {
                 "f8_weight": spectrum["purcell_weight"],
                 "emission_GHz": spectrum["dressed_f12_GHz"],
             }
         )
+        value_provenance.update(
+            {
+                "purcell.f8_weight": Classification.SOLVED,
+                "purcell.emission_GHz": Classification.SOLVED,
+            }
+        )
         collision_block.update(
             {
                 "omega24_GHz": spectrum["omega24_GHz"],
                 "f_readout_GHz": spectrum["root_GHz"],
+            }
+        )
+        value_provenance.update(
+            {
+                "collision.omega24_GHz": Classification.SOLVED,
+                "collision.f_readout_GHz": Classification.SOLVED,
             }
         )
     except (PhysicsNotImplemented, RootNotBracketed) as exc:
@@ -163,8 +214,11 @@ def evaluate_quantum(
     if tolerance_samples > 0:
         try:
             tolerance_block = tolerance.evaluate_ensemble(
-                seed=_tolerance_seed(candidate), n_devices=tolerance_samples
+                seed=_tolerance_seed(candidate, rng_seed),
+                n_devices=tolerance_samples,
             )
+            value_provenance["tolerance"] = Classification.SOLVED
+            value_provenance["tolerance.seed"] = Classification.QMHP_CEM_NORMATIVE
         except PhysicsNotImplemented as exc:
             unavailable.append(f"tolerance: {exc}")
     else:
@@ -197,15 +251,36 @@ def evaluate_quantum(
                     "results, not through the device Hamiltonian."
                 ),
             },
+            "value_provenance": value_provenance,
             "unavailable": unavailable,
         }
     )
 
 
-def _tolerance_seed(candidate: Candidate) -> int:
-    """Deterministic per-candidate RNG seed, recorded in the manifest."""
-    digest = hashlib.sha256(candidate.candidate_id.encode()).hexdigest()
+def _tolerance_seed(candidate: Candidate, sweep_seed: int) -> int:
+    """Derive a deterministic candidate seed from the recorded sweep seed."""
+    material = f"{sweep_seed}:{candidate.candidate_id}".encode()
+    digest = hashlib.sha256(material).hexdigest()
     return int(digest[:8], 16)
+
+
+def _require_record_binding(
+    candidate: Candidate,
+    record: SolverResults | QuantumResults | GateReport,
+    label: str,
+) -> None:
+    """Ensure a result cannot be used to adjudicate a different candidate."""
+    if record.candidate_id != candidate.candidate_id:
+        raise RecordBindingError(
+            f"{label} candidate_id {record.candidate_id!r} does not match "
+            f"candidate {candidate.candidate_id!r}"
+        )
+    record_revision = getattr(record, "master_revision", None)
+    if record_revision is not None and record_revision != candidate.master_revision:
+        raise RecordBindingError(
+            f"{label} master_revision {record_revision!r} does not match "
+            f"candidate revision {candidate.master_revision!r}"
+        )
 
 
 # --- per-candidate ----------------------------------------------------------
@@ -216,8 +291,10 @@ def run_candidate(
     store: BatchStore,
     run_id: str,
     tolerance_samples: int = 0,
+    rng_seed: int = 0,
 ) -> CandidateOutcome:
     """Take one candidate through the full lifecycle."""
+    _require_current_master(candidate)
     lifecycle = CandidateLifecycle(candidate.candidate_id)
     candidate_dir = store.candidate_dir(candidate.candidate_id)
     notes: list[str] = []
@@ -244,6 +321,7 @@ def run_candidate(
 
         raw = adapter.run(prepared)
         solver_results = adapter.validate_convergence(adapter.parse(raw))
+        _require_record_binding(candidate, solver_results, "solver result")
         lifecycle.to(CandidateState.SOLVED)
         store.write_model(solver_dir / "solver_results.json", solver_results)
     except Exception as exc:  # noqa: BLE001 - any solver failure is recorded, never hidden
@@ -258,11 +336,18 @@ def run_candidate(
             candidate=candidate,
             state=lifecycle.state,
             geometry=geometry,
+            solver_failed=True,
             notes=notes,
         )
 
     # -> QUANTUM_EVALUATED
-    quantum_results = evaluate_quantum(candidate, solver_results, tolerance_samples)
+    quantum_results = evaluate_quantum(
+        candidate,
+        solver_results,
+        tolerance_samples,
+        rng_seed,
+    )
+    _require_record_binding(candidate, quantum_results, "quantum result")
     lifecycle.to(CandidateState.QUANTUM_EVALUATED)
     store.write_model(candidate_dir / "quantum_results.json", quantum_results)
     if quantum_results.unavailable:
@@ -273,6 +358,7 @@ def run_candidate(
 
     # -> GATES_EVALUATED -> terminal
     gate_report = evaluate_candidate(candidate, solver_results, quantum_results)
+    _require_record_binding(candidate, gate_report, "gate report")
     lifecycle.to(CandidateState.GATES_EVALUATED)
     lifecycle.to(_terminal_state(gate_report.overall_status))
     store.write_model(candidate_dir / "gate_report.json", gate_report)
@@ -292,12 +378,14 @@ def run_candidate(
 
 
 def batch_id(started: datetime, results_root: Path | None = None) -> str:
-    """Build a unique batch ID.
+    """Return the next apparently available batch ID without reserving it.
 
     Batch IDs are second-resolution for legibility, so two sweeps started
     within the same second would collide. A collision is disambiguated with a
     numeric suffix rather than reusing the directory: reusing it would trip the
-    append-only guard and lose a legitimate second run.
+    append-only guard and lose a legitimate second run. Callers that create a
+    batch must use :func:`_allocate_batch_store`, whose exclusive mkdir closes
+    the check/create race; this helper remains for display and compatibility.
     """
     base = f"BATCH-{started.strftime('%Y%m%dT%H%M%SZ')}"
     root = Path(results_root or DEFAULT_RESULTS_ROOT)
@@ -308,6 +396,25 @@ def batch_id(started: datetime, results_root: Path | None = None) -> str:
         if not (root / candidate).exists():
             return candidate
     raise RuntimeError(f"could not allocate a unique batch id from {base}")
+
+
+def _allocate_batch_store(
+    started: datetime, results_root: Path | None = None
+) -> BatchStore:
+    """Atomically reserve a timestamp-based batch directory.
+
+    ``batch_id`` is useful for display and compatibility, but its existence
+    check alone cannot prevent a cross-process race. BatchStore performs an
+    exclusive mkdir; collisions are retried with deterministic suffixes.
+    """
+    base = f"BATCH-{started.strftime('%Y%m%dT%H%M%SZ')}"
+    for suffix in range(1, 1000):
+        candidate = base if suffix == 1 else f"{base}-{suffix:03d}"
+        try:
+            return BatchStore(candidate, results_root)
+        except ResultAlreadyExists:
+            continue
+    raise RuntimeError(f"could not atomically allocate a batch id from {base}")
 
 
 def run_sweep(
@@ -325,6 +432,9 @@ def run_sweep(
             (spec §10.5).
     """
     started = datetime.now(timezone.utc)
+    # Capture the source revision before results written under the repository
+    # can themselves make the working tree dirty.
+    git_revision = environment.git_commit()
     name = solver_name or sweep.solver
 
     adapter = get_adapter(name)
@@ -335,52 +445,72 @@ def run_sweep(
     base = load_base_candidate(master.REPO_ROOT / sweep.base_candidate)
     candidates = build_candidates(sweep, base)
 
-    bid = batch_id(started, results_root)
-    store = BatchStore(bid, results_root)
+    store = _allocate_batch_store(started, results_root)
+    bid = store.batch_id
     run_id = f"RUN-{bid}"
 
     outcomes = [
-        run_candidate(c, adapter, store, run_id, tolerance_samples)
+        run_candidate(
+            c,
+            adapter,
+            store,
+            run_id,
+            tolerance_samples,
+            sweep.rng_seed,
+        )
         for c in candidates
     ]
 
     counts = _count(outcomes)
     outcome = _batch_outcome(outcomes)
 
-    # The manifest must cover every candidate artifact, so it is written before
-    # the batch report; the batch report then records the manifest digest.
-    _, manifest_sha256 = manifest.write(store.batch_dir)
-
-    report = BatchReport.model_validate(
+    # Build a draft using the canonical self-reference placeholder. Manifest
+    # v2 can then preview its final bytes, letting both report and manifest be
+    # created exactly once with a mutually consistent digest.
+    report_draft = BatchReport.model_validate(
         {
             "schema": BATCH_REPORT_SCHEMA,
             "batch_id": bid,
             "solver": name,
+            "synthetic": adapter.classification is Classification.TEST_FIXTURE,
             "candidate_count": len(outcomes),
             "pass_count": counts[GateStatus.PASS],
             "fail_count": counts[GateStatus.FAIL],
             "hardware_gated_count": counts[GateStatus.HARDWARE_GATED],
             "incomplete_count": counts[GateStatus.INCOMPLETE],
             "batch_outcome": outcome.value,
-            "manifest_sha256": manifest_sha256,
+            "manifest_sha256": manifest.MANIFEST_DIGEST_PLACEHOLDER,
             "environment": environment.record(
                 started_utc=started,
                 solver_name=name,
                 solver_version=solver_version(adapter),
                 solver_identity=solver_identity(adapter),
                 ended_utc=datetime.now(timezone.utc),
+                git_revision=git_revision,
             ).model_dump(mode="json"),
             "rng_seed": sweep.rng_seed,
             "candidate_ids": [o.candidate.candidate_id for o in outcomes],
             "notes": _batch_notes(outcomes, adapter),
         }
     )
+    _, manifest_sha256 = manifest.preview_with_batch_report(
+        store.batch_dir,
+        report_draft.model_dump(mode="json", by_alias=True),
+    )
+    final_payload = report_draft.model_dump(mode="json", by_alias=True)
+    final_payload["manifest_sha256"] = manifest_sha256
+    report = BatchReport.model_validate(final_payload)
     store.write_model(store.batch_dir / "batch_report.json", report)
-
-    # Rewrite the manifest so it also covers batch_report.json, then record the
-    # final digest alongside it. The report's own manifest_sha256 necessarily
-    # predates its existence; manifest.verify() checks the final tree.
-    manifest.write(store.batch_dir)
+    _, written_digest = manifest.write(
+        store.batch_dir,
+        self_referential_report=True,
+        exclusive=True,
+    )
+    if written_digest != manifest_sha256:
+        raise RuntimeError(
+            "manifest preview changed while finalizing the batch; refusing "
+            "to return an internally inconsistent report"
+        )
 
     return report, outcomes
 
@@ -431,12 +561,28 @@ def solver_identity(adapter: SolverAdapter) -> str:
 
 
 def _count(outcomes: list[CandidateOutcome]) -> dict[GateStatus, int]:
+    """Count terminal outcomes plus overlapping hardware-gate coverage.
+
+    PASS, FAIL and INCOMPLETE count mutually exclusive candidate terminal
+    states. ``hardware_gated_count`` has different semantics in spec §3.5: it
+    counts candidates carrying at least one unresolved hardware gate, including
+    candidates that also terminated FAIL on a computational hard gate.
+    """
     counts = {status: 0 for status in GateStatus}
     for outcome in outcomes:
-        try:
-            counts[GateStatus(outcome.state.value)] += 1
-        except ValueError:
-            pass
+        terminal_status = {
+            CandidateState.PASS: GateStatus.PASS,
+            CandidateState.FAIL: GateStatus.FAIL,
+            CandidateState.INCOMPLETE: GateStatus.INCOMPLETE,
+        }.get(outcome.state)
+        if terminal_status is not None:
+            counts[terminal_status] += 1
+
+        if outcome.gate_report is not None and any(
+            gate.status is GateStatus.HARDWARE_GATED
+            for gate in outcome.gate_report.gates
+        ):
+            counts[GateStatus.HARDWARE_GATED] += 1
     return counts
 
 
@@ -452,11 +598,16 @@ def _batch_outcome(outcomes: list[CandidateOutcome]) -> BatchOutcome:
     if not outcomes:
         return BatchOutcome.INCOMPLETE
 
+    if any(o.solver_failed for o in outcomes):
+        return BatchOutcome.SOLVER_FAILURE
+
     states = [o.state for o in outcomes]
     if any(s is CandidateState.PASS for s in states):
         return BatchOutcome.FEASIBLE_CANDIDATE_FOUND
     if any(s is CandidateState.INCOMPLETE for s in states):
         return BatchOutcome.INCOMPLETE
+    if all(s is CandidateState.HARDWARE_GATED for s in states):
+        return BatchOutcome.BLOCKED
     if all(s in (CandidateState.FAIL, CandidateState.HARDWARE_GATED) for s in states):
         if any(s is CandidateState.FAIL for s in states):
             return BatchOutcome.NO_FEASIBLE_DESIGN_FOUND

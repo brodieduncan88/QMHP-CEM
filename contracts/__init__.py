@@ -30,6 +30,7 @@ from contracts.results import (
     GateResult,
     QuantumResults,
     SolverIdentity,
+    SolverCapabilities,
     SolverResults,
 )
 from contracts.sweep import SweepDefinition
@@ -52,6 +53,7 @@ __all__ = [
     "QuantumResults",
     "Severity",
     "SolverIdentity",
+    "SolverCapabilities",
     "SolverResults",
     "SweepDefinition",
     "TERMINAL_STATES",

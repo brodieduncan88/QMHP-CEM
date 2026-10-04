@@ -254,3 +254,38 @@ def test_perturbed_device_can_fail_the_screen():
     )
     assert result["passes"] is False
     assert result["separation_MHz"] < 13.0
+
+
+# --- cached-result integrity ------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "attribute",
+    ["frequencies_GHz", "charge_matrix", "phase_grid", "eigenvectors"],
+)
+def test_cached_static_spectrum_arrays_are_read_only(spectrum, attribute):
+    array = getattr(spectrum, attribute)
+    assert array.flags.writeable is False
+    with pytest.raises(ValueError):
+        array.flat[0] = 0
+
+
+def test_cached_dressed_solution_payload_is_read_only():
+    solution = dressed_system.nominal_solution()
+    for array in (solution.pulls_MHz, solution.eigenvalues, solution.eigenvectors):
+        assert array.flags.writeable is False
+        with pytest.raises(ValueError):
+            array.flat[0] = 0
+    with pytest.raises(TypeError):
+        solution.labels[(0, 0)] = (0.0, 0)
+
+
+def test_dressed_labels_are_a_one_to_one_assignment():
+    """Even competing overlap maxima cannot reuse one dressed eigenvector."""
+    eigenvalues = np.arange(6, dtype=float)
+    overlap = np.eye(6) * 0.9
+    overlap[:, 0] = 1.0  # independent argmax would label every row as state 0
+    labels = dressed_system._assign_bare_labels(eigenvalues, overlap, Nph=2)
+    assigned_indices = [index for _, index in labels.values()]
+    assert len(assigned_indices) == 6
+    assert len(set(assigned_indices)) == 6

@@ -74,6 +74,7 @@ class MockSolver(SolverAdapter):
             work_dir=run_context.work_dir,
             payload={
                 "candidate_sha256": digest,
+                "master_revision": candidate.master_revision,
                 "fixture": self.fixture,
                 "frequency_start_GHz": run_context.frequency_start_GHz,
                 "frequency_stop_GHz": run_context.frequency_stop_GHz,
@@ -112,6 +113,7 @@ class MockSolver(SolverAdapter):
             {
                 "schema": SOLVER_RESULTS_SCHEMA,
                 "candidate_id": prepared.candidate_id,
+                "master_revision": payload["master_revision"],
                 "solver": SolverIdentity(
                     name=self.name,
                     version=self.version,
@@ -135,6 +137,11 @@ class MockSolver(SolverAdapter):
                 "z_parameters": {},
                 "eigenmodes": [m.model_dump() for m in eigenmodes],
                 "artifacts": [],
+                "capabilities": {
+                    "eigenmode_spectrum": True,
+                    "p4pre_spectral_domain_complete": True,
+                    "domain_kind": "TEST_FIXTURE",
+                },
                 "synthetic": True,
                 "notes": [SYNTHETIC_NOTE, f"fixture={fixture}"],
             }
