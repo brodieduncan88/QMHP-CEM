@@ -37,27 +37,46 @@ def _steps(workflow: dict, job: str = "golden") -> list[dict]:
     return workflow["jobs"][job]["steps"]
 
 
-def test_golden_workflow_triggers_are_maintained_not_a_session_branch():
-    wf = _load(GOLDEN)
-    on = wf["on"]
-    assert "workflow_dispatch" in on
-    push = on["push"]
-    assert push["branches"] == ["main", "palace/**"]
-    assert set(push["paths"]) >= {
-        ".github/workflows/palace-golden.yml",
-        "docker/palace.Dockerfile",
-        "pyproject.toml",
-        "uv.lock",
-        "contracts/**",
-        "evaluator/**",
-        "models/**",
-        "orchestrator/**",
-        "solvers/**",
-        "scripts/palace_golden_run.py",
-        "tests/test_palace.py",
-    }
-    assert "pull_request" not in on
-    assert "claude/" not in GOLDEN.read_text()
+def test_real_solver_workflows_are_manual_dispatch_only():
+    """A Palace solve is consequential (CLAUDE.md sections 2-3): no push, pull
+    request or schedule may start one. Merging a code change must not solve."""
+    for path in (GOLDEN, VERIFY):
+        wf = _load(path)
+        assert set(wf["on"]) == {"workflow_dispatch"}, path.name
+        assert "claude/" not in path.read_text()
+
+
+def test_real_solver_dispatch_requires_the_declaration_inputs():
+    for path in (GOLDEN, VERIFY):
+        inputs = _load(path)["on"]["workflow_dispatch"]["inputs"]
+        for name in ("expected_sha", "declaration_ref", "approval_ref"):
+            assert inputs[name]["required"] is True, (path.name, name)
+            assert inputs[name]["type"] == "string", (path.name, name)
+            assert "default" not in inputs[name], (path.name, name)
+
+
+def test_solver_jobs_wait_on_the_gate_and_the_protected_environment():
+    for path, compute_job, workflow, cap in (
+        (GOLDEN, "golden", "palace-golden", 360),
+        (VERIFY, "verify", "palace-verify", 350),
+    ):
+        wf = _load(path)
+        job = wf["jobs"][compute_job]
+        assert job["needs"] == "authorize"
+        assert job["environment"] == "palace-solver"
+        assert job["timeout-minutes"] == cap
+        gate = wf["jobs"]["authorize"]
+        assert "environment" not in gate and "permissions" not in gate
+        step = next(s for s in gate["steps"] if "palace_dispatch_gate.py" in s.get("run", ""))
+        assert f"--workflow {workflow}" in step["run"]
+        assert f"--timeout-cap-minutes {cap}" in step["run"]
+        # inputs reach the gate as data in the environment, never interpolated into shell
+        assert step["env"]["DISPATCH_INPUTS"] == "${{ toJSON(inputs) }}"
+        assert "${{" not in step["run"]
+        checkout = next(s for s in gate["steps"] if s.get("uses", "").startswith("actions/checkout@"))
+        assert checkout["with"]["fetch-depth"] == 0
+        assert checkout["with"]["persist-credentials"] is False
+        assert wf["concurrency"]["cancel-in-progress"] is False
 
 
 def test_golden_workflow_acts_on_the_record_it_created_not_a_glob():
@@ -118,21 +137,6 @@ def test_real_solver_jobs_are_read_only_and_writeback_is_manual_only():
 
         dispatch = wf["on"]["workflow_dispatch"]["inputs"]
         assert dispatch["commit_results"]["default"] is False
-
-
-def test_verification_workflow_tracks_all_load_bearing_paths():
-    paths = set(_load(VERIFY)["on"]["push"]["paths"])
-    assert paths >= {
-        ".github/workflows/palace-verify.yml",
-        "docker/palace.Dockerfile",
-        "pyproject.toml",
-        "uv.lock",
-        "contracts/**",
-        "orchestrator/**",
-        "scripts/palace_verify_campaign.py",
-        "solvers/**",
-        "tests/test_palace.py",
-    }
 
 
 def test_default_ci_has_no_write_token_or_persisted_checkout_credentials():

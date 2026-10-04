@@ -9,8 +9,9 @@ physical requirement, and nothing is evidence about the physical package.
 
 The campaign is defined in `solvers/palace/verification.py` (frozen into
 `campaign.json` with its sha256 in every record), executed by
-`scripts/palace_verify_campaign.py`, and run unattended by
-`.github/workflows/palace-verify.yml`. Records go to
+`scripts/palace_verify_campaign.py`, and run by
+`.github/workflows/palace-verify.yml` on manual dispatch only, behind the same
+predeclaration gate and protected environment as the golden run. Records go to
 `results/PALACE-VERIFY-<UTC>/`, append-only; the five `PALACE-GOLDEN-*`
 records are not touched.
 
