@@ -443,6 +443,7 @@ class PalaceSolver(SolverAdapter):
         payload: dict[str, Any] = {
             "adapter_version": self.version,
             "candidate_sha256": candidate_sha256,
+            "master_revision": candidate.master_revision,
             "solver_domain_mm": domain.as_dict(),
             "solver_domain_size_mm": list(domain.size_mm),
             "mesh": mesh_record.as_dict(),
@@ -757,6 +758,7 @@ class PalaceSolver(SolverAdapter):
             {
                 "schema": SOLVER_RESULTS_SCHEMA,
                 "candidate_id": raw.prepared.candidate_id,
+                "master_revision": payload["master_revision"],
                 "solver": SolverIdentity(
                     name=self.name,
                     version=version_string,
@@ -771,6 +773,14 @@ class PalaceSolver(SolverAdapter):
                 "z_parameters": {},
                 "eigenmodes": [m.model_dump() for m in eigenmodes],
                 "artifacts": [a.model_dump() for a in artifacts],
+                "capabilities": {
+                    "eigenmode_spectrum": True,
+                    # This milestone solves only the empty PEC cavity.  It can
+                    # reveal a conflict in that partial domain, but absence of
+                    # one must not yield a physical-candidate P4PRE PASS.
+                    "p4pre_spectral_domain_complete": False,
+                    "domain_kind": "EMPTY_CAVITY",
+                },
                 "synthetic": False,
                 "notes": notes,
             }

@@ -61,6 +61,12 @@ class Gate(abc.ABC):
     def allowed_statuses(self) -> tuple[GateStatus, ...]:
         return tuple(GateStatus(s) for s in self.definition["allowed_statuses"])
 
+    @property
+    def required_evidence(self) -> tuple[Classification, ...]:
+        return tuple(
+            Classification(value) for value in self.definition["required_evidence"]
+        )
+
     # --- evaluation ---------------------------------------------------------
 
     @abc.abstractmethod
@@ -80,6 +86,47 @@ class Gate(abc.ABC):
                 f"not among its frozen allowed statuses "
                 f"{[s.value for s in self.allowed_statuses]} "
                 f"(master/validation_gates.yaml)"
+            )
+        if result.status in {
+            GateStatus.PASS,
+            GateStatus.FAIL,
+            GateStatus.EXTRACTION_INCONSISTENT,
+        }:
+            fixture_exception = (
+                result.evidence_class is Classification.TEST_FIXTURE
+                and inputs.solver_results is not None
+                and inputs.solver_results.synthetic
+                and inputs.solver_results.solver.classification
+                is Classification.TEST_FIXTURE
+            )
+            if (
+                result.evidence_class not in self.required_evidence
+                and not fixture_exception
+            ):
+                raise RuntimeError(
+                    f"gate {self.gate_id} emitted adjudicating status "
+                    f"{result.status.value} from evidence class "
+                    f"{result.evidence_class}; frozen required_evidence is "
+                    f"{[value.value for value in self.required_evidence]}. "
+                    "Only an explicitly synthetic TEST_FIXTURE solver may "
+                    "exercise an adjudicating fixture path."
+                )
+        if result.severity is not self.severity:
+            raise RuntimeError(
+                f"gate {self.gate_id} returned severity {result.severity!r}; "
+                f"the frozen definition requires {self.severity!r}"
+            )
+        if result.hardware_required is not self.hardware_required:
+            raise RuntimeError(
+                f"gate {self.gate_id} returned hardware_required="
+                f"{result.hardware_required}; the frozen definition requires "
+                f"{self.hardware_required}"
+            )
+        if result.spec_section != self.spec_section:
+            raise RuntimeError(
+                f"gate {self.gate_id} returned spec_section "
+                f"{result.spec_section!r}; the frozen definition requires "
+                f"{self.spec_section!r}"
             )
         return result
 

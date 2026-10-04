@@ -1,0 +1,15 @@
+<Project Sdk="MSTest.Sdk/4.3.3">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TestingExtensionsProfile>None</TestingExtensionsProfile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../QmhpCem.Geometry.csproj" />
+  </ItemGroup>
+
+</Project>

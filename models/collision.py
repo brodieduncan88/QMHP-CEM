@@ -1,8 +1,7 @@
 """Collision screen (spec §4.6, §6.2).
 
-The collision *rule* is a frozen threshold comparison and is implemented here.
-Computing omega24 is physics and requires the dressed system (spec §5.2), so
-:func:`omega24` is a stub.
+The frozen threshold rule and the static/dressed quantities needed to apply it
+are implemented here and in the corresponding physics-model modules.
 """
 
 from __future__ import annotations

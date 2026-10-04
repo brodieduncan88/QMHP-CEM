@@ -118,10 +118,25 @@ class StrictModel(BaseModel):
     rejected on core scientific records.
     """
 
-    model_config = ConfigDict(extra="forbid", validate_assignment=True, frozen=False)
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+        frozen=False,
+        # Scientific records must never admit IEEE-754 sentinels as data.
+        # Comparisons against NaN are always false and can otherwise turn a
+        # failed threshold comparison into a false PASS downstream.  Infinity
+        # is likewise not a meaningful measured or simulated quantity in a
+        # JSON evidence record.
+        allow_inf_nan=False,
+    )
 
 
 class FrozenModel(StrictModel):
     """Strict and immutable. Used for records that must not mutate in place."""
 
-    model_config = ConfigDict(extra="forbid", validate_assignment=True, frozen=True)
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+        frozen=True,
+        allow_inf_nan=False,
+    )

@@ -16,6 +16,7 @@ from evaluator.base import GateInputs
 from evaluator.computational import (
     CollisionGate,
     CouplingExtractionGate,
+    P4PreSpectralGate,
     P6E2FilterGate,
     ToleranceGate,
 )
@@ -56,6 +57,11 @@ def solver_with_stopband(attenuation_dB: float) -> SolverResults:
             },
             "frequency_GHz": [EMISSION_GHz, 5.0],
             "s_parameters": {"S21_dB": [-attenuation_dB, -1.0]},
+            "capabilities": {
+                "eigenmode_spectrum": True,
+                "p4pre_spectral_domain_complete": True,
+                "domain_kind": "TEST_FIXTURE",
+            },
             "synthetic": True,
         }
     )
@@ -106,6 +112,20 @@ def test_collision_incomplete_when_omega24_missing(seed_candidate):
     assert result.status is GateStatus.INCOMPLETE
 
 
+def test_adjudicating_gate_rejects_wrong_real_evidence_class(seed_candidate):
+    wrong_class = quantum(
+        classification="ENGINEERING-SEED",
+        collision={
+            "omega24_GHz": READOUT_GHz + 0.020,
+            "f_readout_GHz": READOUT_GHz,
+        },
+    )
+    with pytest.raises(RuntimeError, match="required_evidence"):
+        CollisionGate().evaluate(
+            GateInputs(seed_candidate, quantum_results=wrong_class)
+        )
+
+
 # --- P6E2_FILTER boundaries at 34 / 36 dB (spec §12.5) ----------------------
 
 
@@ -139,6 +159,14 @@ def test_filter_pass_does_not_close_hardware_p6e2(seed_candidate):
     assert result.hardware_required is False
 
 
+def test_explicit_synthetic_fixture_may_exercise_adjudicating_path(seed_candidate):
+    result = P6E2FilterGate().evaluate(
+        GateInputs(seed_candidate, solver_results=solver_with_stopband(40.0))
+    )
+    assert result.status is GateStatus.PASS
+    assert result.evidence_class is Classification.TEST_FIXTURE
+
+
 def test_filter_incomplete_without_sample_at_emission_frequency(seed_candidate):
     results = SolverResults.model_validate(
         {
@@ -163,6 +191,61 @@ def test_filter_incomplete_without_sample_at_emission_frequency(seed_candidate):
     )
     result = P6E2FilterGate().evaluate(GateInputs(seed_candidate, solver_results=results))
     assert result.status is GateStatus.INCOMPLETE
+
+
+# --- P4PRE domain coverage --------------------------------------------------
+
+
+def _solver_for_p4(*, complete: bool, modes_GHz: list[float]) -> SolverResults:
+    payload = solver_with_stopband(40.0).model_dump(mode="json", by_alias=True)
+    payload["eigenmodes"] = [
+        {"frequency_GHz": frequency, "label": f"mode-{index}"}
+        for index, frequency in enumerate(modes_GHz)
+    ]
+    payload["capabilities"] = {
+        "eigenmode_spectrum": True,
+        "p4pre_spectral_domain_complete": complete,
+        "domain_kind": "TEST_FIXTURE" if complete else "PARTIAL",
+    }
+    return SolverResults.model_validate(payload)
+
+
+def test_p4pre_absence_cannot_pass_for_incomplete_domain(seed_candidate):
+    result = P4PreSpectralGate().evaluate(
+        GateInputs(
+            seed_candidate,
+            solver_results=_solver_for_p4(complete=False, modes_GHz=[7.0]),
+            quantum_results=quantum(dressed_system={"root_GHz": READOUT_GHz}),
+        )
+    )
+    assert result.status is GateStatus.INCOMPLETE
+    assert "not declared complete" in result.reason
+
+
+def test_p4pre_complete_fixture_domain_is_explicitly_synthetic(seed_candidate):
+    result = P4PreSpectralGate().evaluate(
+        GateInputs(
+            seed_candidate,
+            solver_results=_solver_for_p4(complete=True, modes_GHz=[7.0]),
+            quantum_results=quantum(dressed_system={"root_GHz": READOUT_GHz}),
+        )
+    )
+    assert result.status is GateStatus.PASS
+    assert result.evidence_class is Classification.TEST_FIXTURE
+    assert "TEST_FIXTURE" in result.reason
+
+
+def test_p4pre_partial_domain_can_still_reveal_a_conflict(seed_candidate):
+    result = P4PreSpectralGate().evaluate(
+        GateInputs(
+            seed_candidate,
+            solver_results=_solver_for_p4(
+                complete=False, modes_GHz=[READOUT_GHz + 0.001]
+            ),
+            quantum_results=quantum(dressed_system={"root_GHz": READOUT_GHz}),
+        )
+    )
+    assert result.status is GateStatus.FAIL
 
 
 # --- COUPLING_EXTRACTION (spec §5.5, §12.5) ---------------------------------
@@ -288,6 +371,54 @@ def test_full_report_covers_every_registered_gate(seed_candidate):
 
     report = evaluate_candidate(seed_candidate)
     assert {g.gate_id for g in report.gates} == {t.gate_id for t in GATE_TYPES}
+
+
+def test_full_fixture_report_is_marked_synthetic(seed_candidate):
+    report = evaluate_candidate(
+        seed_candidate,
+        solver_results=solver_with_stopband(40.0),
+        quantum_results=quantum(dressed_system={"root_GHz": READOUT_GHz}),
+    )
+    assert report.synthetic is True
+    assert any(
+        gate.evidence_class is Classification.TEST_FIXTURE for gate in report.gates
+    )
+
+
+def test_candidate_evaluator_rejects_mismatched_solver_candidate(seed_candidate):
+    solver = solver_with_stopband(40.0).model_copy(
+        update={"candidate_id": "QMHP-CEM-A-RF-999999"}
+    )
+    with pytest.raises(ValueError, match="solver result candidate_id"):
+        evaluate_candidate(seed_candidate, solver_results=solver)
+
+
+def test_candidate_evaluator_rejects_candidate_for_another_master(seed_candidate):
+    candidate = seed_candidate.model_copy(
+        update={"master_revision": "different-revision"}
+    )
+    with pytest.raises(ValueError, match="loaded frozen master"):
+        evaluate_candidate(candidate)
+
+
+def test_candidate_evaluator_rejects_mismatched_solver_revision(seed_candidate):
+    solver = solver_with_stopband(40.0).model_copy(
+        update={"master_revision": "different-revision"}
+    )
+    with pytest.raises(ValueError, match="solver result master_revision"):
+        evaluate_candidate(seed_candidate, solver_results=solver)
+
+
+def test_candidate_evaluator_rejects_mismatched_quantum_identity(seed_candidate):
+    result = quantum().model_copy(update={"candidate_id": "QMHP-CEM-A-RF-999999"})
+    with pytest.raises(ValueError, match="quantum result candidate_id"):
+        evaluate_candidate(seed_candidate, quantum_results=result)
+
+
+def test_candidate_evaluator_rejects_mismatched_quantum_revision(seed_candidate):
+    result = quantum().model_copy(update={"master_revision": "different-revision"})
+    with pytest.raises(ValueError, match="quantum result master_revision"):
+        evaluate_candidate(seed_candidate, quantum_results=result)
 
 
 def test_hard_fail_dominates_roll_up():

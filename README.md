@@ -30,11 +30,12 @@ is reported as a successful batch rather than a software failure.
 
 ---
 
-## Status: v0.1 scaffold
+## Status: v0.1 research scaffold
 
-The repository structure, frozen requirements layer, data contracts, gate
-evaluator, solver boundary and orchestrator are **implemented and tested**. The
-physics and geometry generation are **not**.
+The frozen requirements layer, data contracts, most physics models, gate
+evaluator, solver boundary and orchestrator are implemented. The physical
+geometry and end-to-end EM path are not: the real Palace path currently proves
+an empty-box eigenmode workflow, not an Object 001 device solve.
 
 | Layer | Status |
 |---|---|
@@ -42,25 +43,28 @@ physics and geometry generation are **not**.
 | `contracts/` Pydantic v2 records | Implemented |
 | `evaluator/` gate logic and evidence boundary | Implemented |
 | `solvers/` adapter boundary + deterministic mock | Implemented |
-| `orchestrator/` lifecycle, append-only store, manifests, CLI | Implemented |
+| `orchestrator/` lifecycle, protected result store, manifests, CLI | Implemented |
 | `models/` physics (§5) | **Implemented** and regression-tested against the frozen pins |
 | `geometry/chip_planar/` gdsfactory cells (§7.1) | **Not implemented** |
 | `geometry/package_picogk/` Object 001 (§7.2) | **Not implemented** — C# project skeleton only |
 | `solvers/palace` | **v0.2 execution path implemented and executed**: mesh, config, container run, parse, provenance. Genuine Palace v0.13.0 runs recorded under `results/PALACE-GOLDEN-*/` (empty Object 001 box, four modes within 5e-5 of closed form, frequencies identical to every printed digit across four runs). See [`docs/palace-execution.md`](docs/palace-execution.md) |
 | `solvers/palace` verification | **v0.2 mesh-refinement and height-sensitive campaign**: three meshes of the golden box, an auxiliary 22 × 22 × 7.0/7.7 mm Z benchmark, bounded Object 001 height attempts; records under `results/PALACE-VERIFY-*/`. See [`docs/palace-verification.md`](docs/palace-verification.md) |
-| `solvers/openems` | Wired; container invocation not implemented |
-| `reference/` vendored v1.5.8f release bundle | Vendored, 27/29 hash-verified |
+| `solvers/openems` | Adapter skeleton only; preflight deliberately refuses execution |
+| `reference/` vendored v1.5.8f release bundle | Vendored; 27/29 listed files shipped and hash-verified, 2 declared but absent |
 
 The physics reproduces the frozen dressed root **exactly** (4.301974466 GHz at
 1e-10), along with the static spectrum, the sink line and the dressed emission
 frequency. Three pins reproduce only to ~2e-6 and are **flagged, not absorbed**
 — see [`docs/regression-pins.md`](docs/regression-pins.md).
 
-A mock sweep still tops out at `INCOMPLETE`, but now for a precise reason:
+A default mock sweep tops out at `INCOMPLETE`, for a precise reason:
 `COUPLING_EXTRACTION` is a HARD gate requiring *both* an eigenmode and a
 black-box extraction from a real EM solver, which the mock `TEST_FIXTURE`
 cannot supply. Every other computationally evaluable gate adjudicates.
-Reaching `FEASIBLE_CANDIDATE_FOUND` requires Palace or openEMS.
+The named mock fixtures exercise terminal-state logic but carry no scientific
+evidentiary weight. `FEASIBLE_CANDIDATE_FOUND` is not reachable through either
+real adapter currently shipped on `main`: Palace lacks the physical geometry
+and black-box extraction, while openEMS is an execution-refusing skeleton.
 
 **v0.2 (in progress):** the Palace execution path is implemented and has
 been executed, for real. `PalaceSolver` meshes the empty Object 001
@@ -78,13 +82,26 @@ gates on that result are `INCOMPLETE`, as they must be for an eigenmode-only
 solve of an empty box. See
 [`docs/palace-execution.md`](docs/palace-execution.md).
 
+### First-moment workflow registration
+
+The two `first-moment-*` workflow files on `main` are **registration files**, not
+a merged implementation. GitHub exposes manual workflows only when their
+definitions exist on the default branch. Their Dockerfile, patch, fixtures,
+launchers and prepared scientific inputs live on the reviewed
+`palace/physical-coupled-candidate` branch and are intentionally absent from
+`main`. The registration versions on `main` refuse any dispatch whose selected
+ref is not that branch. The N2R execution also requires a separately reviewed,
+run-bound approval matching the selected revision and exact run.
+
 ---
 
 ## Audit record: V2A G0
 
 Separate from the CEM software layer, the repository carries the deep-research
 assessment of the QMHP-CoPro V2A G0 follow-up audit v0.1, with its arithmetic
-reproduced and its citations resolved.
+reproduced. Its opaque citation markers have been mapped to likely works, but
+the sources and attributed claims were **not** verified from full text in the
+recorded environment; see [`docs/v2a/references.md`](docs/v2a/references.md).
 
 | Path | What it is |
 |---|---|
@@ -188,7 +205,7 @@ QMHP-CEM/
 ├── QMHP-CEM_v0.1_Spec.md   # the specification (authority level 2)
 ├── master/                 # frozen machine-readable requirements (level 3)
 ├── contracts/              # Pydantic v2 records + frozen-master loader
-├── models/                 # physics (spec §5) — stubs in v0.1
+├── models/                 # implemented physics models (spec §5)
 ├── evaluator/              # validation gates (spec §6)
 ├── geometry/
 │   ├── chip_planar/        # gdsfactory planar cells (spec §7.1)
@@ -217,6 +234,13 @@ structural and must not be collapsed (spec §9).
 5. Generated outputs
 
 Code may not alter a higher-authority object to make a test or candidate pass.
+
+The repository also records unresolved authority and provenance questions. In
+particular, the recorded master-PDF digest matches neither vendored PDF, and
+the specification's replication-status table cannot be fully demonstrated from
+the scripts present in the vendored bundle. These are human adjudication items,
+not values for code or tests to silently repair. See
+[`docs/authority-reconciliation.md`](docs/authority-reconciliation.md).
 
 ---
 

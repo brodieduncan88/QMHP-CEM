@@ -1,9 +1,9 @@
 """Computational gates (spec §6.2 – §6.5, §5.5).
 
 These gates compare already-computed quantities against frozen thresholds.
-They do not compute physics. When the quantity they need is unavailable —
-which in v0.1 is the normal case, because the physics models are stubs — they
-return INCOMPLETE or NOT-EVALUATED rather than inventing a value.
+They do not compute physics. When a required stage was not run, failed, or did
+not produce a quantity, they return INCOMPLETE or NOT-EVALUATED rather than
+inventing a value.
 """
 
 from __future__ import annotations
@@ -26,8 +26,8 @@ class CollisionGate(Gate):
         quantum = inputs.quantum_results
         if quantum is None:
             return self._incomplete(
-                "no quantum results available; the dressed-system model "
-                "(spec §5.2) is not implemented in v0.1, so omega24 is unknown."
+                "no quantum results or dressed-system output is available, so "
+                "omega24 cannot be adjudicated."
             )
 
         omega24 = quantum.collision.get("omega24_GHz")
@@ -40,8 +40,8 @@ class CollisionGate(Gate):
             ]
             return self._incomplete(
                 f"quantum results are missing {', '.join(missing)}; omega24 is "
-                f"produced by the dressed-system spectrum, which is not "
-                f"implemented in v0.1."
+                f"produced by the dressed-system spectrum and cannot be "
+                f"adjudicated from this record."
             )
 
         threshold = collision_model.minimum_separation_MHz()
@@ -87,6 +87,11 @@ class P6E2FilterGate(Gate):
             return self._incomplete(
                 f"solver results carry no S21 sample at the dressed emission "
                 f"frequency {emission_GHz} GHz; cannot evaluate the stopband."
+            )
+        if not math.isfinite(attenuation):
+            return self._incomplete(
+                "solver results contain a non-finite S21 sample at the dressed "
+                "emission frequency; non-finite scientific data cannot close a gate."
             )
 
         if attenuation < minimum_dB:
@@ -139,9 +144,17 @@ class P4PreSpectralGate(Gate):
             readout_GHz = quantum.dressed_system.get("root_GHz")
         if readout_GHz is None:
             return self._incomplete(
-                "the dressed readout root is unknown (dressed-system model not "
-                "implemented in v0.1); the readout-side spectral pre-check "
-                "cannot run. This is not a statement about full P4."
+                "the dressed readout root is absent from the quantum results; "
+                "the readout-side spectral pre-check cannot run. This is not "
+                "a statement about full P4."
+            )
+
+        coverage = solver.capabilities
+        if not coverage.eigenmode_spectrum:
+            return self._not_evaluated(
+                "the solver record does not assert an eigenmode-spectrum "
+                "capability, so its mode list cannot adjudicate this pre-check. "
+                "This is not a statement about full P4."
             )
 
         conflicts = [
@@ -169,12 +182,21 @@ class P4PreSpectralGate(Gate):
                 margin=separation - self.MODE_CLEARANCE_MHz,
             )
 
+        if not coverage.p4pre_spectral_domain_complete:
+            return self._incomplete(
+                f"the solver's {coverage.domain_kind} domain is not declared "
+                "complete for the P4PRE spectral census; absence of a mode in a "
+                "partial domain cannot produce PASS. This is not a statement "
+                "about full P4."
+            )
+
         return self._result(
             GateStatus.PASS,
             reason=(
                 f"no simulated mode within {self.MODE_CLEARANCE_MHz} MHz of the "
                 f"readout root {readout_GHz:.6f} GHz. Readout-side pre-check "
-                f"only — full P4 has NOT passed (spec §6.4)."
+                f"over the declared {coverage.domain_kind} domain only — full "
+                f"P4 has NOT passed (spec §6.4)."
             ),
             evidence_class=solver.solver.classification,
             threshold=self.MODE_CLEARANCE_MHz,
@@ -191,9 +213,8 @@ class ToleranceGate(Gate):
         quantum = inputs.quantum_results
         if quantum is None or not quantum.tolerance:
             return self._not_evaluated(
-                "no tolerance ensemble was evaluated; per-device evaluation "
-                "requires the static and dressed models (spec §5.1/§5.2), which "
-                "are not implemented in v0.1."
+                "no tolerance ensemble was evaluated for this record; request "
+                "tolerance samples to adjudicate the ensemble gate."
             )
 
         required = (

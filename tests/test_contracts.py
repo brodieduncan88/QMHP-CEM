@@ -7,15 +7,17 @@ import copy
 import pytest
 from pydantic import ValidationError
 
-from contracts import Candidate, GateReport, SolverResults
+from contracts import BatchReport, Candidate, GateReport, SolverResults
 from contracts.candidate import CANDIDATE_SCHEMA, candidate_id
 from contracts.common import Classification, GateStatus, Severity
 from contracts.results import (
+    BATCH_REPORT_SCHEMA,
     GATE_REPORT_SCHEMA,
     SOLVER_RESULTS_SCHEMA,
     GateResult,
     QuantumResults,
 )
+from evaluator import evaluate_candidate
 
 
 # --- round trips ------------------------------------------------------------
@@ -79,6 +81,13 @@ def test_negative_dimension_rejected(payload):
 
 def test_zero_dimension_rejected(payload):
     payload["parameters"]["lid"]["thickness_mm"] = 0.0
+    with pytest.raises(ValidationError):
+        Candidate.model_validate(payload)
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf")])
+def test_non_finite_candidate_dimension_rejected(payload, value):
+    payload["parameters"]["chip"]["width_mm"] = value
     with pytest.raises(ValidationError):
         Candidate.model_validate(payload)
 
@@ -186,6 +195,25 @@ def test_test_fixture_must_be_marked_synthetic():
         SolverResults.model_validate(payload)
 
 
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf")])
+def test_non_finite_solver_values_rejected(value):
+    payload = _solver_payload(s_parameters={"S21_dB": [value, -2.0]})
+    with pytest.raises(ValidationError):
+        SolverResults.model_validate(payload)
+
+
+def test_complete_p4pre_coverage_requires_an_eigenmode_capability():
+    payload = _solver_payload(
+        capabilities={
+            "eigenmode_spectrum": False,
+            "p4pre_spectral_domain_complete": True,
+            "domain_kind": "TEST_FIXTURE",
+        }
+    )
+    with pytest.raises(ValidationError, match="eigenmode_spectrum"):
+        SolverResults.model_validate(payload)
+
+
 # --- quantum results --------------------------------------------------------
 
 
@@ -198,6 +226,33 @@ def test_quantum_results_cannot_be_measured():
                 "candidate_id": "QMHP-CEM-A-RF-000001",
                 "master_revision": "v1.5.8f",
                 "classification": "MEASURED",
+            }
+        )
+
+
+def test_nested_non_finite_quantum_value_rejected():
+    with pytest.raises(ValidationError, match="collision.omega24_GHz"):
+        QuantumResults.model_validate(
+            {
+                "schema": "qmhp-cem.quantum-results/0.1.0",
+                "candidate_id": "QMHP-CEM-A-RF-000001",
+                "master_revision": "v1.5.8f",
+                "classification": "SOLVED",
+                "collision": {"omega24_GHz": float("nan")},
+            }
+        )
+
+
+def test_quantum_value_provenance_must_reference_a_present_value():
+    with pytest.raises(ValidationError, match="does not identify"):
+        QuantumResults.model_validate(
+            {
+                "schema": "qmhp-cem.quantum-results/0.1.0",
+                "candidate_id": "QMHP-CEM-A-RF-000001",
+                "master_revision": "v1.5.8f",
+                "classification": "SOLVED",
+                "collision": {"omega24_GHz": 4.4},
+                "value_provenance": {"collision.missing": "SOLVED"},
             }
         )
 
@@ -259,3 +314,85 @@ def test_computational_gate_may_pass_on_solved_evidence():
         hardware_required=False,
     )
     assert result.status is GateStatus.PASS
+
+
+def test_gate_report_rejects_forged_hardware_metadata(seed_candidate):
+    report = evaluate_candidate(seed_candidate)
+    payload = report.model_dump(mode="json", by_alias=True)
+    p7 = next(gate for gate in payload["gates"] if gate["gate_id"] == "P7")
+    p7["hardware_required"] = False
+    with pytest.raises(ValidationError, match="hardware_required"):
+        GateReport.model_validate(payload)
+
+
+def test_gate_report_rejects_incorrect_overall_rollup(seed_candidate):
+    report = evaluate_candidate(seed_candidate)
+    payload = report.model_dump(mode="json", by_alias=True)
+    payload["overall_status"] = "PASS"
+    with pytest.raises(ValidationError, match="roll-up"):
+        GateReport.model_validate(payload)
+
+
+def test_gate_report_rejects_wrong_adjudicating_evidence(seed_candidate):
+    report = evaluate_candidate(seed_candidate)
+    payload = report.model_dump(mode="json", by_alias=True)
+    collision = next(
+        gate for gate in payload["gates"] if gate["gate_id"] == "COLLISION"
+    )
+    # The unevaluated baseline has no adjudicating collision result, so forge
+    # a superficially plausible PASS and prove the load-time contract rejects
+    # its non-SOLVED evidence class.
+    collision.update(
+        status="PASS",
+        evidence_class="ENGINEERING-SEED",
+        measured=20.0,
+        threshold=13.0,
+        units="MHz",
+        margin=7.0,
+    )
+    with pytest.raises(ValidationError, match="required_evidence"):
+        GateReport.model_validate(payload)
+
+
+def _batch_payload(**overrides):
+    payload = {
+        "schema": BATCH_REPORT_SCHEMA,
+        "batch_id": "BATCH-TEST",
+        "solver": "palace",
+        "candidate_count": 1,
+        "pass_count": 0,
+        "fail_count": 0,
+        "hardware_gated_count": 0,
+        "incomplete_count": 1,
+        "batch_outcome": "INCOMPLETE",
+        "manifest_sha256": "a" * 64,
+        "candidate_ids": ["QMHP-CEM-A-RF-000001"],
+    }
+    payload.update(overrides)
+    return payload
+
+
+def test_batch_report_rejects_duplicate_candidate_ids():
+    with pytest.raises(ValidationError, match="duplicates"):
+        BatchReport.model_validate(
+            _batch_payload(
+                candidate_count=2,
+                incomplete_count=2,
+                candidate_ids=[
+                    "QMHP-CEM-A-RF-000001",
+                    "QMHP-CEM-A-RF-000001",
+                ],
+            )
+        )
+
+
+def test_batch_report_rejects_malformed_manifest_digest():
+    with pytest.raises(ValidationError, match="manifest_sha256"):
+        BatchReport.model_validate(_batch_payload(manifest_sha256="not-a-digest"))
+
+
+def test_fixture_batch_requires_top_level_synthetic_marker():
+    with pytest.raises(ValidationError, match="synthetic=True"):
+        BatchReport.model_validate(
+            _batch_payload(notes=["solver evidence class: TEST_FIXTURE"])
+        )
