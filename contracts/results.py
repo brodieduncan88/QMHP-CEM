@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 import math
 import re
-from numbers import Real
+from numbers import Rational, Real
 from typing import Any, Literal
 
-from pydantic import Field, model_validator
+import numpy as np
+from pydantic import BaseModel, Field, model_validator
 
 from contracts import master
 from contracts.common import (
@@ -28,23 +30,42 @@ BATCH_REPORT_SCHEMA = "qmhp-cem.batch-report/0.1.0"
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
-def _non_finite_path(value: Any, path: str) -> str | None:
+def non_finite_path(value: Any, path: str) -> str | None:
     """Return the first path containing NaN/Inf in an untyped result block.
 
     Pydantic's ``allow_inf_nan=False`` protects typed float fields.  Quantum
     result blocks deliberately remain extensible ``dict[str, Any]`` records,
     so their nested values need an explicit recursive check.
     """
+    # Arbitrary-precision integers and Fractions are finite by construction;
+    # converting a very large one to float can itself overflow.
+    if isinstance(value, Rational) and not isinstance(value, bool):
+        return None
+    if isinstance(value, Decimal):
+        return path if not value.is_finite() else None
     if isinstance(value, Real) and not isinstance(value, bool):
         return path if not math.isfinite(float(value)) else None
+    if isinstance(value, BaseModel):
+        for field_name in type(value).model_fields:
+            found = non_finite_path(
+                getattr(value, field_name), f"{path}.{field_name}"
+            )
+            if found is not None:
+                return found
+    if isinstance(value, np.ndarray):
+        for index in np.ndindex(value.shape):
+            suffix = "".join(f"[{part}]" for part in index)
+            found = non_finite_path(value[index], f"{path}{suffix}")
+            if found is not None:
+                return found
     if isinstance(value, dict):
         for key, nested in value.items():
-            found = _non_finite_path(nested, f"{path}.{key}")
+            found = non_finite_path(nested, f"{path}.{key}")
             if found is not None:
                 return found
     elif isinstance(value, (list, tuple)):
         for index, nested in enumerate(value):
-            found = _non_finite_path(nested, f"{path}[{index}]")
+            found = non_finite_path(nested, f"{path}[{index}]")
             if found is not None:
                 return found
     return None
@@ -227,7 +248,7 @@ class QuantumResults(StrictModel):
             "tolerance",
             "regression_status",
         ):
-            found = _non_finite_path(getattr(self, field_name), field_name)
+            found = non_finite_path(getattr(self, field_name), field_name)
             if found is not None:
                 raise ValueError(f"non-finite scientific value at {found}")
         result_blocks = {

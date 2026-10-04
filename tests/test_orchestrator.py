@@ -252,17 +252,17 @@ def test_partial_batch_cannot_be_reopened(results_root):
 
 def test_result_files_are_create_only(results_root):
     store = BatchStore("BATCH-TEST", results_root)
-    target = store.batch_dir / "record.json"
+    target = Path("record.json")
     store.write_json(target, {"version": 1})
 
     with pytest.raises(ResultAlreadyExists):
         store.write_json(target, {"version": 2})
-    assert json.loads(target.read_text()) == {"version": 1}
+    assert json.loads((store.batch_dir / target).read_text()) == {"version": 1}
 
 
 def test_result_store_rejects_paths_outside_batch(results_root, tmp_path):
     store = BatchStore("BATCH-TEST", results_root)
-    with pytest.raises(ValueError, match="outside batch directory"):
+    with pytest.raises(ValueError, match="absolute"):
         store.write_json(tmp_path / "escaped.json", {"bad": True})
 
 
@@ -653,6 +653,51 @@ def test_terminal_state_is_reachable_from_gates_evaluated():
 
 
 # --- cem verify-results (the CI manifest gate) ---------------------------------
+
+
+def test_evaluate_cli_refuses_an_unsealed_batch(tmp_path, capsys):
+    from orchestrator import cem
+
+    batch = tmp_path / "BATCH-UNSEALED"
+    batch.mkdir()
+    (batch / "batch_report.json").write_text(
+        json.dumps(
+            {
+                "batch_id": batch.name,
+                "solver": "mock",
+                "batch_outcome": "NO-FEASIBLE-DESIGN-FOUND",
+                "candidate_ids": [],
+            }
+        )
+    )
+
+    assert cem.main(["evaluate", str(batch)]) == 5
+    assert "not sealed" in capsys.readouterr().err
+
+
+def test_evaluate_cli_accepts_a_sealed_batch(tmp_path, capsys):
+    from orchestrator import cem
+
+    store = BatchStore("BATCH-SEALED", tmp_path)
+    draft = {
+        "batch_id": store.batch_id,
+        "solver": "mock",
+        "batch_outcome": "NO-FEASIBLE-DESIGN-FOUND",
+        "candidate_ids": [],
+        "manifest_sha256": batch_manifest.MANIFEST_DIGEST_PLACEHOLDER,
+    }
+    _, expected = batch_manifest.preview_with_batch_report(store.batch_dir, draft)
+    report = dict(draft, manifest_sha256=expected)
+    store.write_json(Path("batch_report.json"), report)
+    store.seal_batch(
+        lambda: batch_manifest.build(
+            store.batch_dir, self_referential_report=True
+        ),
+        expected,
+    )
+
+    assert cem.main(["evaluate", str(store.batch_dir)]) == 0
+    assert "BATCH-SEALED" in capsys.readouterr().out
 
 
 def test_verify_results_cli_fails_on_mismatch_and_leaves_the_tree_alone(tmp_path, capsys):

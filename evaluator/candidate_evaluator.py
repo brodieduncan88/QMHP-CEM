@@ -6,7 +6,6 @@ single :class:`contracts.results.GateReport`.
 
 from __future__ import annotations
 
-from contracts import master
 from contracts.common import Classification, GateStatus, Severity
 from contracts.results import GATE_REPORT_SCHEMA, GateReport, QuantumResults, SolverResults
 from evaluator.base import Gate, GateInputs
@@ -48,14 +47,8 @@ def evaluate_candidate(
     quantum_results: QuantumResults | None = None,
 ) -> GateReport:
     """Evaluate all gates for a candidate."""
-    current_revision = master.master_revision()
-    if candidate.master_revision != current_revision:
-        raise ValueError(
-            f"candidate master_revision {candidate.master_revision!r} does not "
-            f"match loaded frozen master {current_revision!r}"
-        )
     # GateInputs refuses evidence that belongs to another candidate or master
-    # revision before any gate runs (evaluator.base.require_evidence_identity).
+    # revision, and a stale candidate, before any gate runs.
     inputs = GateInputs(candidate, solver_results, quantum_results)
     results = [gate_type().evaluate(inputs) for gate_type in GATE_TYPES]
     synthetic = bool(

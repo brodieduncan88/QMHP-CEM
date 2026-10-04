@@ -297,11 +297,12 @@ def run_candidate(
     _require_current_master(candidate)
     lifecycle = CandidateLifecycle(candidate.candidate_id)
     candidate_dir = store.candidate_dir(candidate.candidate_id)
+    candidate_path = Path(candidate.candidate_id)
     notes: list[str] = []
 
     # DEFINED -> VALIDATED (construction already validated the contract)
     lifecycle.to(CandidateState.VALIDATED)
-    store.write_json(candidate_dir / "candidate.json", candidate.to_ordered_dict())
+    store.write_json(candidate_path / "candidate.json", candidate.to_ordered_dict())
 
     # -> GEOMETRY_GENERATED
     geometry = picogk_driver.generate(candidate, candidate_dir / "geometry")
@@ -311,19 +312,20 @@ def run_candidate(
 
     # -> SOLVER_INPUT_PREPARED -> SOLVED
     solver_dir = candidate_dir / "solver"
+    solver_path = candidate_path / "solver"
     solver_dir.mkdir(parents=True, exist_ok=True)
     context = RunContext(run_id=run_id, work_dir=solver_dir)
 
     try:
         prepared = adapter.prepare(candidate, geometry, context)
         lifecycle.to(CandidateState.SOLVER_INPUT_PREPARED)
-        store.write_json(solver_dir / "solver_input.json", prepared.payload)
+        store.write_json(solver_path / "solver_input.json", prepared.payload)
 
         raw = adapter.run(prepared)
         solver_results = adapter.validate_convergence(adapter.parse(raw))
         _require_record_binding(candidate, solver_results, "solver result")
         lifecycle.to(CandidateState.SOLVED)
-        store.write_model(solver_dir / "solver_results.json", solver_results)
+        store.write_model(solver_path / "solver_results.json", solver_results)
     except Exception as exc:  # noqa: BLE001 - any solver failure is recorded, never hidden
         # SolverUnavailable (spec §10.5), a run that did not complete, an
         # output that could not be parsed, a convergence failure: every one
@@ -349,7 +351,7 @@ def run_candidate(
     )
     _require_record_binding(candidate, quantum_results, "quantum result")
     lifecycle.to(CandidateState.QUANTUM_EVALUATED)
-    store.write_model(candidate_dir / "quantum_results.json", quantum_results)
+    store.write_model(candidate_path / "quantum_results.json", quantum_results)
     if quantum_results.unavailable:
         notes.append(
             f"{len(quantum_results.unavailable)} quantum quantities unavailable: "
@@ -361,7 +363,7 @@ def run_candidate(
     _require_record_binding(candidate, gate_report, "gate report")
     lifecycle.to(CandidateState.GATES_EVALUATED)
     lifecycle.to(_terminal_state(gate_report.overall_status))
-    store.write_model(candidate_dir / "gate_report.json", gate_report)
+    store.write_model(candidate_path / "gate_report.json", gate_report)
 
     return CandidateOutcome(
         candidate=candidate,
@@ -500,16 +502,23 @@ def run_sweep(
     final_payload = report_draft.model_dump(mode="json", by_alias=True)
     final_payload["manifest_sha256"] = manifest_sha256
     report = BatchReport.model_validate(final_payload)
-    store.write_model(store.batch_dir / "batch_report.json", report)
-    _, written_digest = batch_manifest.write(
-        store.batch_dir,
-        self_referential_report=True,
-        exclusive=True,
+    store.write_model(Path("batch_report.json"), report)
+    _, written_digest = store.seal_batch(
+        lambda: batch_manifest.build(
+            store.batch_dir,
+            self_referential_report=True,
+        ),
+        manifest_sha256,
     )
     if written_digest != manifest_sha256:
         raise RuntimeError(
             "manifest preview changed while finalizing the batch; refusing "
             "to return an internally inconsistent report"
+        )
+    findings = batch_manifest.verify(store.batch_dir)
+    if findings:
+        raise RuntimeError(
+            "sealed batch failed manifest verification: " + "; ".join(findings)
         )
 
     return report, outcomes
