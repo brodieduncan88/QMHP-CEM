@@ -20,6 +20,12 @@
     <PackageReference Include="PicoGK" Version="[2.3.0]" />
   </ItemGroup>
 
+  <!-- The SDK's default recursive glob would otherwise compile the separate
+       test project's sources into this executable as application code. -->
+  <ItemGroup>
+    <Compile Remove="tests/**/*.cs" />
+  </ItemGroup>
+
   <!-- LEAP71 ShapeKernel sits above PicoGK and bridges low-level geometry
        operations into the application-specific engineering model. Vendor it as
        a submodule and record the exact Git revision in

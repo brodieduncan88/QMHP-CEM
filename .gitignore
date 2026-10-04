@@ -7,6 +7,8 @@ __pycache__/
 # .NET
 geometry/package_picogk/bin/
 geometry/package_picogk/obj/
+geometry/package_picogk/tests/bin/
+geometry/package_picogk/tests/obj/
 
 # Solver scratch. Results themselves are append-only scientific artifacts and
 # ARE tracked; only transient caches are ignored (spec §11.4).

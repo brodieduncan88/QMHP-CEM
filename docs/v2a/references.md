@@ -1,7 +1,8 @@
 # References cited by the deep-research assessment
 
-The assessment's citation markers were opaque tool tokens (`citeturn…`). They are
-resolved to the keys used in the repository version below.
+The assessment's citation markers were opaque tool tokens (`citeturn…`). They
+are mapped provisionally to the keys used in the repository version below; a
+mapping is not a source verification.
 
 > **Verification limit, applies to every entry.** No source page could be opened
 > from this session. Every scholarly host — `arxiv.org`, `journals.aps.org`,

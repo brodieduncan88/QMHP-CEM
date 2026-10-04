@@ -1,8 +1,7 @@
 """Tolerance ensemble (spec §5.4).
 
-The RNG *convention* is a QMHP-CEM-NORMATIVE convention rather than physics, so
-it is implemented here. What is NOT implemented is the per-draw device
-evaluation, which requires the static and dressed models (spec §5.1/§5.2).
+The RNG *convention* is QMHP-CEM-NORMATIVE rather than physics. Per-draw device
+evaluation uses the implemented static and dressed models (spec §5.1/§5.2).
 
 This convention must never be described as exact reproduction of legacy AMD-C
 finite samples (spec §4.6). Legacy exact finite-sample identities and counts

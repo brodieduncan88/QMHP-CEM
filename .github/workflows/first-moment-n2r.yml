@@ -1,15 +1,25 @@
 # First-moment diagnostic ON N2R: ONE AUTHORISED ATTEMPT.
 #
+# DEFAULT-BRANCH REGISTRATION FILE. Main intentionally carries only this
+# workflow definition. The launcher, authority checker, evaluator, prepared
+# config, mesh, patch and approval mechanism it names are not present on main;
+# they live on the reviewed branch `palace/physical-coupled-candidate`. GitHub
+# requires the workflow file on the default branch to expose workflow_dispatch.
+# The first step refuses every other ref. This registration file does not arm an
+# attempt and is not evidence that the scientific implementation is on main.
+#
 # This is the ONLY workflow that runs a QMHP scientific input through the
 # first-moment diagnostic. It is separate from first-moment-image.yml, which
 # stays synthetic-only and is not modified by this.
 #
-# IT IS INERT UNTIL A HUMAN ARMS IT. The launcher refuses unless
+# IT IS INERT UNLESS A HUMAN ARMS THE SELECTED REVISION. The launcher refuses unless
 # experiments/first-moment-diagnostic/EXECUTION-APPROVAL.json exists, matches
 # the prepared config, mesh and patch digests, NAMES the image it authorises as
-# a full immutable ID, and binds this exact run. That file is deliberately
-# ABSENT; this workflow neither creates nor edits it, and a dispatch without it
-# refuses at the first step that looks.
+# a full immutable ID, and binds this exact run. Main deliberately does not
+# carry that file. A reviewed execution branch may carry an approval for one
+# named run; that approval does not authorise a different run or retry. This
+# workflow never creates or edits an approval, and a dispatch without a matching
+# one refuses before execution.
 #
 # ONE ATTEMPT, AND WHAT MAKES IT ONE. The approval's one_attempt block binds the
 # repository, the workflow-and-ref, ONE run number and attempt 1, all read from
@@ -80,6 +90,18 @@ jobs:
     runs-on: ubuntu-latest        # the approved runner class; no escalation
     timeout-minutes: 90           # WORKFLOW budget, not the solver cap
     steps:
+      - name: Refuse a ref without the reviewed support bundle
+        env:
+          SELECTED_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [ "$SELECTED_REF" != "refs/heads/palace/physical-coupled-candidate" ]; then
+            echo "REFUSED: this file is registration-only on the default branch." >&2
+            echo "Dispatch the reviewed palace/physical-coupled-candidate branch;" >&2
+            echo "main intentionally does not contain the required support bundle." >&2
+            exit 1
+          fi
+
       - name: Refuse an unconfirmed dispatch
         env:
           CONFIRM: ${{ inputs.confirm }}      # DATA, not shell source
@@ -90,7 +112,9 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Refuse unless the reviewed approval is committed
         run: |
@@ -159,7 +183,7 @@ jobs:
           df -h /
 
       - name: Download the preserved image archive
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: first-moment-image-35691886143
           run-id: 35691886143
@@ -193,7 +217,7 @@ jobs:
           rm -rf "$RUNNER_TEMP/preserved"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           enable-cache: true
           python-version: "3.11"
@@ -297,7 +321,7 @@ jobs:
 
       - name: Upload every artefact of the attempt
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: first-moment-n2r-${{ github.run_id }}
           retention-days: ${{ inputs.retention_days }}

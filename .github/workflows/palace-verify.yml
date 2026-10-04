@@ -9,67 +9,103 @@
 # with the frozen definition, every mesh and input deck, Palace's raw output,
 # typed results, comparison tables, mode-matching decisions, the summary, the
 # report and a manifest, which is re-hashed (a mismatch fails the job) and
-# committed back to the branch the run was on.
+# uploaded. Repository writeback is isolated in a separate least-privilege job
+# and requires an explicit opt-in on a manual branch dispatch. The solver job
+# receives a read-only token and never writes to the repository.
 #
-# Triggers: manual dispatch; a push to `main` or a `palace/**` branch that
-# touches the campaign, the executor or this file. The bot's own results
-# commit does not match the filter and does not re-trigger.
+# Trigger: manual dispatch only. A Palace solve is a consequential execution
+# (CLAUDE.md sections 2-3), so no push, pull request or schedule starts it. The
+# first job, `authorize`, runs scripts/palace_dispatch_gate.py and refuses the
+# dispatch unless `expected_sha` equals the executed commit and
+# `declaration_ref` names a committed predeclaration under
+# .github/palace-declarations/ that pins this workflow, every input, the
+# approval reference and a budget within the job timeout. The solving job then
+# waits on the protected `palace-solver` environment, whose required reviewer
+# is the human approval. A maintainer may still opt into committing the exact
+# uploaded record; the writeback job cannot run for a tag.
 
 name: Palace verification campaign
 
 on:
   workflow_dispatch:
     inputs:
+      expected_sha:
+        description: "Full 40-character hash of the commit being dispatched (must equal the executed commit)"
+        required: true
+        type: string
+      declaration_ref:
+        description: "Committed predeclaration, e.g. .github/palace-declarations/<name>.json"
+        required: true
+        type: string
+      approval_ref:
+        description: "Where the owner approved this declaration (must equal the declaration's approval_ref)"
+        required: true
+        type: string
       only:
         description: "Space-separated run names to execute (empty = the whole campaign)"
         default: ""
+        type: string
       commit_results:
-        description: "Commit results/PALACE-VERIFY-* back to this branch"
+        description: "Commit this run's exact record back to the selected branch"
         type: boolean
-        default: true
+        default: false
       no_probes:
         description: "Omit field probes (only for an image built without GSLIB)"
         type: boolean
         default: false
-  push:
-    branches:
-      - main
-      - "palace/**"
-    paths:
-      - ".github/workflows/palace-verify.yml"
-      - "scripts/palace_verify_campaign.py"
-      - "solvers/palace/verification.py"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: palace-verify-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false  # an approved campaign is never silently superseded
 
 env:
   IMAGE: qmhp-cem/palace:0.13.0
   ONLY: ${{ inputs.only || '' }}
-  COMMIT_RESULTS: ${{ github.event_name != 'workflow_dispatch' || inputs.commit_results }}
-  NO_PROBES: ${{ github.event_name == 'workflow_dispatch' && inputs.no_probes }}
+  NO_PROBES: ${{ inputs.no_probes }}
 
 jobs:
+  # No solver step runs until this job passes. It checks consistency only;
+  # the human approval is the palace-solver environment's required reviewer.
+  authorize:
+    name: check the dispatch against its predeclaration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Refuse unless a matching predeclaration is committed
+        env:
+          DISPATCH_INPUTS: ${{ toJSON(inputs) }}
+        run: python3 scripts/palace_dispatch_gate.py --workflow palace-verify --timeout-cap-minutes 350
+
   verify:
     name: build the image, run the verification campaign
+    needs: authorize
+    environment: palace-solver
     runs-on: ubuntu-latest
     timeout-minutes: 350
+    outputs:
+      record_created: ${{ steps.package.outputs.record_created }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Free runner disk
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h /
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - name: Build the Palace image (pinned base, apt snapshot, Palace tag)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
           file: docker/palace.Dockerfile
@@ -84,7 +120,7 @@ jobs:
           docker run --rm --network none --entrypoint /bin/sh "$IMAGE" -c 'cat /opt/palace/PALACE_VERSION /opt/palace/PALACE_COMMIT; echo "OPENBLAS_NUM_THREADS=$OPENBLAS_NUM_THREADS OMP_NUM_THREADS=$OMP_NUM_THREADS"'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           enable-cache: true
           python-version: "3.11"
@@ -135,25 +171,35 @@ jobs:
         continue-on-error: true
         run: uv run cem verify-results "$VERIFY_RECORD"
 
+      - name: Package the exact record for optional writeback
+        id: package
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ -z "${VERIFY_RECORD:-}" ] || [ ! -d "$VERIFY_RECORD" ]; then
+            echo "record_created=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          record_name="$(basename "$VERIFY_RECORD")"
+          case "$record_name" in
+            PALACE-VERIFY-*) ;;
+            *) echo "refusing unexpected record name: $record_name" >&2; exit 1 ;;
+          esac
+          mkdir -p workflow-artifacts
+          tar -C results -czf workflow-artifacts/palace-verify-writeback.tar.gz "$record_name"
+          (cd workflow-artifacts && sha256sum palace-verify-writeback.tar.gz \
+            > palace-verify-writeback.sha256)
+          echo "record_created=true" >> "$GITHUB_OUTPUT"
+
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: palace-verify-${{ github.run_id }}
-          path: ${{ steps.record.outputs.path }}
+          path: |
+            ${{ steps.record.outputs.path }}
+            workflow-artifacts
           if-no-files-found: warn
-
-      - name: Commit the verification record to the branch
-        if: always() && env.COMMIT_RESULTS == 'true'
-        run: |
-          if [ -z "$VERIFY_RECORD" ]; then echo "no verification record to commit"; exit 0; fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$VERIFY_RECORD"
-          verdicts="$(uv run python -c "import json,sys; v=json.load(open(sys.argv[1]))['verdicts']; print('mesh ' + v['mesh_convergence'] + ', aux height ' + v['height_sensitivity_aux'] + ', object001 height ' + v['height_sensitivity_object001'])" "$VERIFY_RECORD/summary.json")"
-          git commit -m "Record Palace verification campaign ${{ github.run_id }}: ${verdicts}; campaign step ${{ steps.campaign.outcome }}, manifest ${{ steps.manifest.outcome }}" -m "Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          git pull --rebase --autostash origin "${{ github.ref_name }}"
-          git push origin "HEAD:${{ github.ref_name }}"
 
       - name: Fail the job if the campaign or the manifest check did not succeed
         if: always() && (steps.campaign.outcome != 'success' || steps.manifest.outcome == 'failure')
@@ -161,3 +207,80 @@ jobs:
           echo "campaign step  : ${{ steps.campaign.outcome }}"
           echo "manifest check : ${{ steps.manifest.outcome }}"
           exit 1
+
+  writeback:
+    name: commit the dispatched record
+    needs: verify
+    if: >-
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref_type == 'branch' &&
+      inputs.commit_results &&
+      needs.verify.outputs.record_created == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Download this run's record archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+        run: gh run download "$RUN_ID" --name "palace-verify-$RUN_ID" --dir "$RUNNER_TEMP/writeback"
+
+      - name: Verify, extract and commit only the record
+        env:
+          TARGET_REF: ${{ github.ref_name }}
+          RUN_ID: ${{ github.run_id }}
+          SERVER_URL: ${{ github.server_url }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/writeback/workflow-artifacts/palace-verify-writeback.tar.gz"
+          checksum="$RUNNER_TEMP/writeback/workflow-artifacts/palace-verify-writeback.sha256"
+          (cd "$(dirname "$archive")" && sha256sum -c "$(basename "$checksum")")
+          record_name="$(python3 - "$archive" <<'PY'
+          import pathlib
+          import sys
+          import tarfile
+
+          with tarfile.open(sys.argv[1], "r:gz") as archive:
+              members = archive.getmembers()
+          if not members:
+              raise SystemExit("refusing an empty record archive")
+          roots = set()
+          for member in members:
+              path = pathlib.PurePosixPath(member.name)
+              if path.is_absolute() or ".." in path.parts or not path.parts:
+                  raise SystemExit(f"refusing unsafe archive path: {member.name}")
+              if member.issym() or member.islnk():
+                  raise SystemExit(f"refusing archive link: {member.name}")
+              roots.add(path.parts[0])
+          if len(roots) != 1:
+              raise SystemExit(f"refusing multiple archive roots: {sorted(roots)}")
+          print(roots.pop())
+          PY
+          )"
+          case "$record_name" in
+            PALACE-VERIFY-*) ;;
+            *) echo "refusing unexpected archive root: $record_name" >&2; exit 1 ;;
+          esac
+          mkdir -p results
+          if [ -e "results/$record_name" ]; then
+            echo "refusing to overwrite existing record: results/$record_name" >&2
+            exit 1
+          fi
+          tar -xzf "$archive" -C results
+          record="results/$record_name"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "$record"
+          git commit -m "Record Palace verification campaign $RUN_ID" \
+            -m "Workflow run: $SERVER_URL/$REPOSITORY/actions/runs/$RUN_ID"
+          git pull --rebase origin "$TARGET_REF"
+          git push origin "HEAD:$TARGET_REF"

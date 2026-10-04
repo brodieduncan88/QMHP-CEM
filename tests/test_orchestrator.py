@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from contracts.common import BatchOutcome, CandidateState, GateStatus
-from orchestrator import manifest, pipeline
+from contracts.common import BatchOutcome, CandidateState, Classification, GateStatus
+from orchestrator import environment, manifest, pipeline
 from orchestrator.lifecycle import CandidateLifecycle, InvalidTransition
 from orchestrator.results_store import BatchStore, ResultAlreadyExists
 from solvers import SolverUnavailable, get_adapter
@@ -65,6 +68,12 @@ def test_unswept_parameters_stay_at_seed_values(object001_sweep, seed_candidate)
         assert candidate.parameters.lid == seed_candidate.parameters.lid
 
 
+def test_candidate_must_target_the_active_frozen_master(seed_candidate):
+    stale = seed_candidate.model_copy(update={"master_revision": "v0.0.0"})
+    with pytest.raises(pipeline.RecordBindingError, match="active frozen master"):
+        pipeline._require_current_master(stale)
+
+
 # --- full sweep -------------------------------------------------------------
 
 
@@ -97,6 +106,36 @@ def test_manifest_verifies_clean(object001_sweep, results_root):
         object001_sweep, solver_name="mock", results_root=results_root
     )
     assert manifest.verify(results_root / report.batch_id) == []
+
+
+def test_batch_report_identifies_the_completed_manifest(
+    object001_sweep, results_root
+):
+    report, _ = pipeline.run_sweep(
+        object001_sweep, solver_name="mock", results_root=results_root
+    )
+    batch_dir = results_root / report.batch_id
+    manifest_body = (batch_dir / "manifest.sha256").read_bytes()
+
+    assert report.manifest_sha256 == hashlib.sha256(manifest_body).hexdigest()
+    stored_report = json.loads((batch_dir / "batch_report.json").read_text())
+    assert stored_report["manifest_sha256"] == report.manifest_sha256
+
+
+def test_manifest_detects_tampered_embedded_manifest_digest(
+    object001_sweep, results_root
+):
+    report, _ = pipeline.run_sweep(
+        object001_sweep, solver_name="mock", results_root=results_root
+    )
+    batch_dir = results_root / report.batch_id
+    report_path = batch_dir / "batch_report.json"
+    payload = json.loads(report_path.read_text())
+    payload["manifest_sha256"] = "0" * 64
+    report_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+    findings = manifest.verify(batch_dir)
+    assert any("does not identify the completed manifest" in f for f in findings)
 
 
 def test_manifest_detects_tampering(object001_sweep, results_root):
@@ -161,6 +200,9 @@ def test_no_feasible_design_found_is_a_successful_batch(object001_sweep, results
     assert report.batch_outcome is BatchOutcome.NO_FEASIBLE_DESIGN_FOUND
     assert report.pass_count == 0
     assert report.fail_count == 9
+    # Coverage counts overlap terminal outcomes: each failed candidate still
+    # carries unresolved hardware gates (spec §3.5 example).
+    assert report.hardware_gated_count == 9
     assert all(o.state is CandidateState.FAIL for o in outcomes)
     assert (results_root / report.batch_id / "batch_report.json").exists()
 
@@ -171,6 +213,16 @@ def test_incomplete_is_not_reported_as_no_feasible_design(object001_sweep, resul
         object001_sweep, solver_name="mock", results_root=results_root
     )
     assert report.batch_outcome is BatchOutcome.INCOMPLETE
+
+
+def test_hardware_only_batch_is_blocked(seed_candidate):
+    outcomes = [
+        pipeline.CandidateOutcome(
+            candidate=seed_candidate,
+            state=CandidateState.HARDWARE_GATED,
+        )
+    ]
+    assert pipeline._batch_outcome(outcomes) is BatchOutcome.BLOCKED
 
 
 # --- append-only (spec §11.3, §12.7) ----------------------------------------
@@ -190,6 +242,37 @@ def test_completed_candidate_cannot_be_overwritten(results_root):
     (candidate_dir / "gate_report.json").write_text("{}")
     with pytest.raises(ResultAlreadyExists):
         store.candidate_dir("QMHP-CEM-A-RF-000001")
+
+
+def test_partial_batch_cannot_be_reopened(results_root):
+    BatchStore("BATCH-PARTIAL", results_root)
+    with pytest.raises(ResultAlreadyExists):
+        BatchStore("BATCH-PARTIAL", results_root)
+
+
+def test_result_files_are_create_only(results_root):
+    store = BatchStore("BATCH-TEST", results_root)
+    target = store.batch_dir / "record.json"
+    store.write_json(target, {"version": 1})
+
+    with pytest.raises(ResultAlreadyExists):
+        store.write_json(target, {"version": 2})
+    assert json.loads(target.read_text()) == {"version": 1}
+
+
+def test_result_store_rejects_paths_outside_batch(results_root, tmp_path):
+    store = BatchStore("BATCH-TEST", results_root)
+    with pytest.raises(ValueError, match="outside batch directory"):
+        store.write_json(tmp_path / "escaped.json", {"bad": True})
+
+
+def test_batch_allocation_retries_an_atomic_collision(results_root):
+    started = datetime(2026, 8, 24, 1, 2, 3, tzinfo=timezone.utc)
+    first = pipeline._allocate_batch_store(started, results_root)
+    second = pipeline._allocate_batch_store(started, results_root)
+
+    assert first.batch_id == "BATCH-20260824T010203Z"
+    assert second.batch_id == "BATCH-20260824T010203Z-002"
 
 
 def test_consecutive_sweeps_do_not_collide(object001_sweep, results_root):
@@ -279,12 +362,51 @@ def test_solver_failure_mid_sweep_ends_the_candidate_incomplete(monkeypatch, obj
         object001_sweep, solver_name="palace", results_root=results_root
     )
     assert report.solver == "palace"
+    assert report.batch_outcome is BatchOutcome.SOLVER_FAILURE
     assert {o.state for o in outcomes} == {CandidateState.INCOMPLETE}
     assert all(any("PalaceRunFailed" in n and "code 137" in n for n in o.notes) for o in outcomes)
     assert all(o.solver_results is None for o in outcomes)
     # The cause is on the batch record too, not only on the in-memory outcome.
     for o in outcomes:
         assert any(n.startswith(f"{o.candidate.candidate_id}: solver failed (PalaceRunFailed)") for n in report.notes)
+
+
+def test_solver_result_for_another_candidate_is_rejected(
+    monkeypatch, object001_sweep, results_root
+):
+    from solvers.mock.adapter import MockSolver
+
+    original = MockSolver.parse
+
+    def wrong_candidate(self, raw_output):
+        result = original(self, raw_output)
+        return result.model_copy(update={"candidate_id": "QMHP-CEM-A-RF-999999"})
+
+    monkeypatch.setattr(MockSolver, "parse", wrong_candidate)
+    report, outcomes = pipeline.run_sweep(
+        object001_sweep, solver_name="mock", results_root=results_root
+    )
+
+    assert report.batch_outcome is BatchOutcome.SOLVER_FAILURE
+    assert all(o.solver_failed for o in outcomes)
+    assert all(any("RecordBindingError" in note for note in o.notes) for o in outcomes)
+
+
+def test_solver_failure_has_nonzero_cli_status(monkeypatch):
+    from orchestrator import cem
+
+    report = SimpleNamespace(batch_outcome=BatchOutcome.SOLVER_FAILURE)
+    monkeypatch.setattr(cem, "load_sweep", lambda _: object())
+    monkeypatch.setattr(cem.pipeline, "run_sweep", lambda *args, **kwargs: (report, []))
+    monkeypatch.setattr(cem, "_print_batch", lambda *args: None)
+    args = SimpleNamespace(
+        sweep=Path("unused.yaml"),
+        solver="mock",
+        results_root=None,
+        fixture="default",
+        tolerance_samples=0,
+    )
+    assert cem.cmd_sweep(args) == 4
 
 
 def test_unknown_solver_is_rejected():
@@ -316,6 +438,7 @@ def test_batch_report_records_synthetic_provenance(object001_sweep, results_root
     report, _ = pipeline.run_sweep(
         object001_sweep, solver_name="mock", results_root=results_root
     )
+    assert report.synthetic is True
     assert any("TEST_FIXTURE" in note for note in report.notes)
     assert any("not hardware validation" in note for note in report.notes)
 
@@ -328,6 +451,27 @@ def test_batch_report_records_environment_and_seed(object001_sweep, results_root
     assert report.environment is not None
     assert report.environment.python_version
     assert report.environment.picogk_version == "2.3.0"
+
+
+def test_uv_version_parser_ignores_trailing_build_metadata(monkeypatch):
+    monkeypatch.setattr(
+        environment,
+        "_run",
+        lambda _: "uv 0.8.15 (Homebrew 2026-08-24)",
+    )
+    assert environment.uv_version() == "0.8.15"
+
+
+def test_git_revision_records_dirty_worktree(monkeypatch):
+    def fake_run(command):
+        if "rev-parse" in command:
+            return "a" * 40
+        if "status" in command:
+            return " M orchestrator/pipeline.py"
+        raise AssertionError(command)
+
+    monkeypatch.setattr(environment, "_run", fake_run)
+    assert environment.git_commit() == f"{'a' * 40}+dirty"
 
 
 def test_quantum_results_are_populated_by_the_physics_models(
@@ -346,6 +490,14 @@ def test_quantum_results_are_populated_by_the_physics_models(
         )
         assert quantum.collision["omega24_GHz"] > 0
         assert quantum.purcell["f8_weight"] > 0
+        assert (
+            quantum.value_provenance["dressed_system.coupling_g_GHz"]
+            is Classification.VERIFIED_COMPUTATIONAL
+        )
+        assert (
+            quantum.value_provenance["dressed_system.root_GHz"]
+            is Classification.SOLVED
+        )
 
 
 def test_quantum_results_still_record_what_is_unavailable(
@@ -383,7 +535,16 @@ def test_tolerance_gate_runs_when_samples_requested(object001_sweep, results_roo
     )
     quantum = outcomes[0].quantum_results
     assert quantum.tolerance["sample_count"] == 4
+    assert quantum.tolerance["seed"] == pipeline._tolerance_seed(
+        outcomes[0].candidate, object001_sweep.rng_seed
+    )
     assert outcomes[0].gate_report.by_id("TOLERANCE").status is GateStatus.PASS
+
+
+def test_recorded_sweep_seed_changes_candidate_tolerance_seed(seed_candidate):
+    first = pipeline._tolerance_seed(seed_candidate, 123)
+    assert first == pipeline._tolerance_seed(seed_candidate, 123)
+    assert first != pipeline._tolerance_seed(seed_candidate, 124)
 
 
 def test_full_pass_is_blocked_only_by_coupling_extraction_and_hardware(
