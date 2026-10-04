@@ -6,8 +6,28 @@ are implemented here and in the corresponding physics-model modules.
 
 from __future__ import annotations
 
+import math
+
 from contracts import master
 from models import dressed_system, fluxonium
+
+
+class NonFiniteDomainError(ValueError):
+    """A public physics input is not a finite real value."""
+
+    def __init__(self, parameter: str, value: object) -> None:
+        self.parameter = parameter
+        self.value = value
+        self.domain = "finite real"
+        super().__init__(
+            f"non-finite {parameter} ({value!r}) is outside the domain "
+            f"{self.domain!r}"
+        )
+
+
+def _require_finite(parameter: str, value: float) -> None:
+    if not math.isfinite(value):
+        raise NonFiniteDomainError(parameter, value)
 
 
 def minimum_separation_MHz() -> float:
@@ -19,7 +39,13 @@ def separation_MHz(omega24_GHz: float, f_readout_GHz: float) -> float:
     """|omega24 - f_readout| in MHz.
 
     Units are explicit throughout: inputs GHz, output MHz (spec §7.3).
+
+    Raises ``ValueError`` for a non-finite input: an infinite or NaN frequency
+    is not a measured or simulated quantity, and an infinite separation would
+    otherwise clear the gate.
     """
+    for name, value in (("omega24_GHz", omega24_GHz), ("f_readout_GHz", f_readout_GHz)):
+        _require_finite(name, value)
     return abs(omega24_GHz - f_readout_GHz) * 1000.0
 
 
@@ -78,6 +104,14 @@ def screen(
     Passing no arguments screens the frozen Branch-A nominal device. Passing
     perturbed energies screens one draw of a tolerance ensemble.
     """
+    for name, value in (
+        ("EC_GHz", EC_GHz),
+        ("EJ_GHz", EJ_GHz),
+        ("EL_GHz", EL_GHz),
+    ):
+        if value is not None:
+            _require_finite(name, value)
+
     if EC_GHz is None and EJ_GHz is None and EL_GHz is None:
         spectrum = fluxonium.nominal_spectrum()
         root = dressed_system.nominal_root()

@@ -150,6 +150,26 @@ def preview_with_batch_report(
     return body, hashlib.sha256(body.encode()).hexdigest()
 
 
+def build(
+    root: Path, *, self_referential_report: bool = False
+) -> tuple[str, str]:
+    """Build a manifest body and digest without publishing the marker."""
+    root = Path(root)
+    entries = collect(root, self_referential_report=self_referential_report)
+
+    if not entries and any(
+        p.is_file() and p.name not in EXCLUDED_NAMES for p in root.rglob("*")
+    ):
+        raise EmptyManifest(
+            f"{root} contains files but none were collected as "
+            f"decision-relevant. Refusing to write an empty manifest over a "
+            f"populated batch (spec §11.4)."
+        )
+
+    body = render(entries, self_referential_report=self_referential_report)
+    return body, hashlib.sha256(body.encode()).hexdigest()
+
+
 def write(
     root: Path,
     filename: str = "manifest.sha256",
@@ -164,18 +184,9 @@ def write(
         a :class:`contracts.results.BatchReport` records.
     """
     root = Path(root)
-    entries = collect(root, self_referential_report=self_referential_report)
-
-    if not entries and any(
-        p.is_file() and p.name not in EXCLUDED_NAMES for p in root.rglob("*")
-    ):
-        raise EmptyManifest(
-            f"{root} contains files but none were collected as "
-            f"decision-relevant. Refusing to write an empty manifest over a "
-            f"populated batch (spec §11.4)."
-        )
-
-    body = render(entries, self_referential_report=self_referential_report)
+    body, digest = build(
+        root, self_referential_report=self_referential_report
+    )
     path = root / filename
     if exclusive:
         temporary: Path | None = None
@@ -201,7 +212,7 @@ def write(
                 temporary.unlink(missing_ok=True)
     else:
         path.write_text(body)
-    return path, hashlib.sha256(body.encode()).hexdigest()
+    return path, digest
 
 
 def verify(root: Path, filename: str = "manifest.sha256") -> list[str]:

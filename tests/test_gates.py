@@ -464,19 +464,20 @@ def _tolerance_block(**overrides) -> dict:
     return block
 
 
-def _tolerance_result(**overrides):
+def _tolerance_result(candidate, **overrides):
     return ToleranceGate().evaluate(
         GateInputs(
-            candidate=None,
+            candidate=candidate,
             solver_results=None,
             quantum_results=quantum(tolerance=_tolerance_block(**overrides)),
         )
     )
 
 
-def test_tolerance_not_evaluated_when_nothing_could_be_screened():
+def test_tolerance_not_evaluated_when_nothing_could_be_screened(seed_candidate):
     """A None rejection rate used to raise TypeError out of the format string."""
     result = _tolerance_result(
+        seed_candidate,
         screened_count=0, unscreened_count=4, pass_count=0, fail_count=0,
         rejection_rate=None,
     )
@@ -484,9 +485,10 @@ def test_tolerance_not_evaluated_when_nothing_could_be_screened():
     assert "could be screened" in result.reason
 
 
-def test_tolerance_quotes_the_screened_count_as_the_denominator():
+def test_tolerance_quotes_the_screened_count_as_the_denominator(seed_candidate):
     """The rate is rejected/screened, so 'over N draws' is the wrong basis."""
     result = _tolerance_result(
+        seed_candidate,
         screened_count=3, unscreened_count=1, pass_count=2, fail_count=1,
         rejection_rate=1 / 3,
     )
@@ -495,12 +497,14 @@ def test_tolerance_quotes_the_screened_count_as_the_denominator():
     assert "1 unscreened" in result.reason
 
 
-def test_tolerance_pass_does_not_assert_a_threshold_was_met():
+def test_tolerance_pass_does_not_assert_a_threshold_was_met(seed_candidate):
     """TOLERANCE is SOFT and the frozen master sets no rejection-rate threshold.
 
     A fully rejected ensemble still reports PASS, so the reason must say what
     that PASS does and does not mean rather than let a reader infer compliance.
     """
-    result = _tolerance_result(pass_count=0, fail_count=4, rejection_rate=1.0)
+    result = _tolerance_result(
+        seed_candidate, pass_count=0, fail_count=4, rejection_rate=1.0
+    )
     assert result.status is GateStatus.PASS
     assert "no rejection-rate threshold" in result.reason

@@ -5,11 +5,12 @@ Gates compare computed quantities against thresholds frozen in
 threshold, and never close a hardware gate on simulated evidence.
 """
 
-from evaluator.base import Gate, GateInputs, HardwareGate
+from evaluator.base import EvidenceIdentityError, Gate, GateInputs, HardwareGate
 from evaluator.candidate_evaluator import GATE_TYPES, evaluate_candidate, roll_up
 
 __all__ = [
     "GATE_TYPES",
+    "EvidenceIdentityError",
     "Gate",
     "GateInputs",
     "HardwareGate",
