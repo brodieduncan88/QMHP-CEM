@@ -9,12 +9,15 @@ not execute the workflows.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
 import yaml
 
-WORKFLOWS = Path(__file__).resolve().parent.parent / ".github" / "workflows"
+ROOT = Path(__file__).resolve().parent.parent
+WORKFLOWS = ROOT / ".github" / "workflows"
+GLOBAL_JSON = ROOT / "global.json"
 GOLDEN = WORKFLOWS / "palace-golden.yml"
 VERIFY = WORKFLOWS / "palace-verify.yml"
 CI = WORKFLOWS / "ci.yml"
@@ -146,6 +149,15 @@ def test_default_ci_runs_the_dotnet_test_project_not_just_a_build():
     assert test["run"].startswith("dotnet test ")
     assert "QmhpCem.Geometry.Tests.csproj" in test["run"]
     assert "--no-build" in test["run"] and "--no-restore" in test["run"]
+
+
+def test_repository_selects_dotnet_9_even_when_a_newer_sdk_is_installed():
+    sdk = json.loads(GLOBAL_JSON.read_text())["sdk"]
+    assert sdk == {
+        "version": "9.0.100",
+        "rollForward": "latestFeature",
+        "allowPrerelease": False,
+    }
 
 
 def test_first_moment_files_are_registration_only_on_main():
