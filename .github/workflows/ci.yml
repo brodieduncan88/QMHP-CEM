@@ -149,6 +149,40 @@ jobs:
             --output "$RUNNER_TEMP/object001-seed"
           shasum -a 256 "$RUNNER_TEMP/object001-seed"/*
 
+      # The manifest's key numbers, readable without downloading the artifact: a table in
+      # the job summary and notices in the check-run annotations.
+      - name: Summarise the seed geometry
+        run: |
+          python3 - "$RUNNER_TEMP/object001-seed/geometry_manifest.json" <<'PY'
+          import json, os, sys
+
+          def prop(s):
+              return s.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A").replace(":", "%3A").replace(",", "%2C")
+
+          def data(s):
+              return s.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+          m = json.load(open(sys.argv[1]))
+          rt = m["generator"]["runtime"]
+          checks = m["acceptance"]["checks"]
+          passed = sum(1 for c in checks if c["passed"])
+          head = f"{m['status']}: {passed}/{len(checks)} acceptance checks passed, voxel {m['generator']['voxel_size_mm']} mm, {rt['native_library']} {rt['native_version']} on {rt['os']}"
+          rows = ["### Object 001 seed geometry", head, "",
+                  "| part | triangles | bytes | volume STL (mm^3) | volume exact (mm^3) | difference | watertight | components | sha256 |",
+                  "|---|---|---|---|---|---|---|---|---|"]
+          print(f"::notice title={prop('Object 001 seed geometry')}::{data(head)}")
+          for name, part in m["parts"].items():
+              diff = part["volume_mm3_stl"] - part["volume_mm3_exact"]
+              rows.append(f"| {name} | {part['triangles']} | {part['bytes']} | {part['volume_mm3_stl']:.3f} | {part['volume_mm3_exact']:.3f} | {diff:+.3f} | {part['watertight']} | {part['components']} | `{part['sha256']}` |")
+              msg = f"{part['triangles']} triangles, {part['bytes']} bytes, volume {part['volume_mm3_stl']:.3f} mm^3 vs exact {part['volume_mm3_exact']:.3f} ({diff:+.3f}), watertight {part['watertight']}"
+              print(f"::notice title={prop(name + '.stl')}::{data(msg)}")
+          for c in checks:
+              if c["id"].endswith((":volume", ":bounds")):
+                  print(f"::notice title={prop(c['id'])}::{data(c['detail'])}")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+              f.write("\n".join(rows) + "\n")
+          PY
+
       - name: Upload the seed geometry
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
