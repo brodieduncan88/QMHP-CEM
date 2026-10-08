@@ -150,10 +150,23 @@ def test_default_ci_has_no_write_token_or_persisted_checkout_credentials():
 
 def test_default_ci_runs_the_dotnet_test_project_not_just_a_build():
     dotnet_steps = _load(CI)["jobs"]["dotnet"]["steps"]
-    test = next(s for s in dotnet_steps if s.get("name") == "Test the implemented scaffold contract")
+    test = next(s for s in dotnet_steps if s.get("name") == "Test the geometry generator (managed layer)")
     assert test["run"].startswith("dotnet test ")
     assert "QmhpCem.Geometry.Tests.csproj" in test["run"]
     assert "--no-build" in test["run"] and "--no-restore" in test["run"]
+
+
+def test_default_ci_runs_the_native_picogk_tests_where_the_runtime_exists():
+    """PicoGK 2.3.0's osx-arm64 runtime needs macOS 26.5+; the job must run there and must
+    fail, not skip, when the runtime does not load."""
+    job = _load(CI)["jobs"]["picogk-native"]
+    assert job["runs-on"] == "macos-26"
+    test = next(s for s in job["steps"] if s.get("name") == "Test the geometry generator, native runtime required")
+    assert test["env"] == {"QMHP_REQUIRE_PICOGK_RUNTIME": "1"}
+    assert test["run"].startswith("dotnet test ") and "QmhpCem.Geometry.Tests.csproj" in test["run"]
+    generate = next(s for s in job["steps"] if s.get("name") == "Generate the Object 001 seed geometry")
+    assert "tests/fixtures/object001_seed.candidate.json" in generate["run"]
+    assert not any("palace" in str(s).lower() for s in job["steps"]), "the geometry job must not reach a solver"
 
 
 def test_repository_selects_dotnet_9_even_when_a_newer_sdk_is_installed():

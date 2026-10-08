@@ -5,12 +5,18 @@ The C#/Python boundary is deliberately thin and file-based::
     input:   candidate.json
     outputs: body.stl, lid.stl, ports.json, geometry_manifest.json
 
-Environment (spec §7.2, §13.2): .NET 9, PicoGK pinned at exactly 2.3.0, LEAP71
-ShapeKernel at a recorded revision.
+Environment (spec §7.2, §13.2): .NET 9 and PicoGK pinned at exactly 2.3.0. The
+Object 001 generator does not use LEAP71 ShapeKernel.
 
-When the .NET toolchain is unavailable the driver reports geometry as
-unavailable rather than raising, so the rest of the pipeline can run and say
-plainly that no geometry was generated. It never fabricates an STL.
+PicoGK 2.3.0 ships native code only for osx-arm64 (macOS 26.5 or later) and win-x64.
+Elsewhere, Linux included, the C# program refuses with exit code 5 and the driver
+reports geometry as unavailable. When the .NET toolchain is missing the driver says
+so without running anything. In every unavailable case the rest of the pipeline can
+run and say plainly that no geometry was generated. Nothing here fabricates an STL.
+
+Geometry counts as generated only when the program exits 0 AND its
+geometry_manifest.json reports every acceptance check passed AND the sha256 it
+records for body.stl, lid.stl and ports.json matches the files on disk.
 """
 
 from __future__ import annotations
@@ -24,13 +30,23 @@ from pathlib import Path
 
 #: Pinned exactly (spec §13.2). A different version is a provenance change.
 PICOGK_VERSION = "2.3.0"
-#: Recorded ShapeKernel revision. Populate when the submodule is vendored.
+#: The Object 001 generator does not use ShapeKernel (spec §7.2: "where required").
 SHAPEKERNEL_REVISION: str | None = None
 
 PROJECT_DIR = Path(__file__).resolve().parent
 PROJECT_FILE = PROJECT_DIR / "QmhpCem.Geometry.csproj"
 
 OUTPUT_FILES = ("body.stl", "lid.stl", "ports.json", "geometry_manifest.json")
+
+#: The C# program's exit codes (Program.cs) and what they mean for the pipeline.
+EXIT_REASONS = {
+    2: "the geometry program refused its input (arguments, candidate or an existing output)",
+    4: "Object 001 geometry failed an acceptance check and nothing was published; "
+       "see geometry_rejected.json",
+    5: "the PicoGK " + PICOGK_VERSION + " native runtime cannot load on this platform "
+       "(it ships osx-arm64 for macOS 26.5+ and win-x64 only)",
+    6: "the geometry program hit an internal error and published nothing",
+}
 
 
 @dataclass
@@ -124,12 +140,13 @@ def generate(candidate, output_dir: Path, timeout_s: int = 600) -> GeometryResul
         )
 
     if completed.returncode != 0:
+        meaning = EXIT_REASONS.get(completed.returncode, "unexpected exit code")
         return GeometryResult(
             candidate_id=candidate.candidate_id,
             available=False,
             reason=(
-                f"the geometry project exited with code {completed.returncode}: "
-                f"{completed.stderr.strip()[:500]}"
+                f"Object 001 geometry was NOT generated: {meaning} "
+                f"(exit code {completed.returncode}): {completed.stderr.strip()[:500]}"
             ),
             output_dir=output_dir,
         )
@@ -152,6 +169,16 @@ def generate(candidate, output_dir: Path, timeout_s: int = 600) -> GeometryResul
             artifacts=artifacts,
         )
 
+    problems = manifest_problems(output_dir, artifacts)
+    if problems:
+        return GeometryResult(
+            candidate_id=candidate.candidate_id,
+            available=False,
+            reason="the geometry manifest does not vouch for the outputs: " + "; ".join(problems),
+            output_dir=output_dir,
+            artifacts=artifacts,
+        )
+
     return GeometryResult(
         candidate_id=candidate.candidate_id,
         available=True,
@@ -159,6 +186,27 @@ def generate(candidate, output_dir: Path, timeout_s: int = 600) -> GeometryResul
         output_dir=output_dir,
         artifacts=artifacts,
     )
+
+
+def manifest_problems(output_dir: Path, artifacts: dict[str, str]) -> list[str]:
+    """Why geometry_manifest.json does not vouch for the files beside it (empty if it does)."""
+    try:
+        manifest = json.loads((Path(output_dir) / "geometry_manifest.json").read_text())
+    except (OSError, ValueError) as exc:
+        return [f"geometry_manifest.json is unreadable: {exc}"]
+    if not isinstance(manifest, dict):
+        return ["geometry_manifest.json is not an object"]
+    out: list[str] = []
+    if manifest.get("status") != "PASSED":
+        out.append(f"status is {manifest.get('status')!r}, not 'PASSED'")
+    acceptance = manifest.get("acceptance")
+    if not isinstance(acceptance, dict) or acceptance.get("all_passed") is not True:
+        out.append("not every acceptance check passed")
+    recorded = manifest.get("outputs_sha256")
+    for name in ("body.stl", "lid.stl", "ports.json"):
+        if not isinstance(recorded, dict) or recorded.get(name) != artifacts.get(name):
+            out.append(f"the sha256 recorded for {name} does not match the file")
+    return out
 
 
 def environment_record() -> dict[str, str | None]:

@@ -1,0 +1,71 @@
+{
+  "schema": "qmhp-cem.release-supersession/1",
+  "id": "SUP-2026-10-08-01",
+  "status": "SUPERSEDES THE TREE BINDING OF FOUR FILES AND ONE FILE SET, AND DECLARES REL-BD-03 NO LONGER TRUE OF THIS TREE. Edits no register, record or claim text.",
+  "supersedes": {
+    "register": "docs/release/CLAIM-REGISTER.json",
+    "register_sha256": "1a03d8dc793089f4029a9d8abc439e58fbabf84187ddb3e25610b78e7f1e39c9",
+    "register_revision": 1,
+    "frozen_from_commit": "ba076d9d972077a7a3e256a6404ab455fd748461",
+    "frozen_release_branch_head": "1ebc07ad67e0af6ff2d790c4d181b0558d632d62"
+  },
+  "decision_ref": "Owner decision, working session 2026-10-08: asked where the PicoGK generator should land, the owner chose 'A: Supersede on integration'. The generator was built at the owner's direction ('For the picoGK https://github.com/leap71/PicoGK_Examples'). This record changes a branch only once that branch contains it.",
+  "cause": "A headless PicoGK 2.3.0 generator for Object 001 replaces the not-implemented stub in geometry/package_picogk. It changes four tree-bound files and adds two source files beside them, and it makes REL-BD-03's statement (Program.cs returns 3; Object001Package.Generate throws; driver.generate reports available=False with or without .NET) false of this tree. The frozen registers are unchanged and still describe the frozen commit, where REL-BD-03 holds.",
+  "changed_bound_files": [
+    {
+      "path": "geometry/package_picogk/Program.cs",
+      "sha256_at_frozen_commit": "108c94b546d595d2ff18c71a80f6283631b552c9d142b4a9cd030b828853127d",
+      "sha256_superseding": "693855d706873682cef53bca441d2d9b3292320c1017723cfe10d325f7327625",
+      "introduced_by": "this commit",
+      "change": "The CLI now runs the generator: strict arguments, --voxel-mm, and exit codes 0 (published), 2 (input), 4 (an acceptance check failed; nothing published), 5 (PicoGK native runtime cannot load), 6 (internal error). Candidate.Load refuses duplicate keys and records the candidate's sha256."
+    },
+    {
+      "path": "geometry/package_picogk/Object001Package.cs",
+      "sha256_at_frozen_commit": "f6a0a08dca393febc4c653fd93a384ac13b4b31274272a0a8c3c1ddf9332e862",
+      "sha256_superseding": "f7b11330de4b467eae4c8eea603180c9b1f33a4a5e0b9370b51b55b40fc88133",
+      "introduced_by": "this commit",
+      "change": "Builds the body and lid headless with PicoGK 2.3.0 (new Library(voxel), no viewer), runs the point-probe and STL read-back checks, and publishes body.stl, lid.stl, ports.json and geometry_manifest.json only when every check passes; otherwise writes geometry_rejected.json and keeps the failed parts under rejected/."
+    },
+    {
+      "path": "geometry/package_picogk/driver.py",
+      "sha256_at_frozen_commit": "9601a81f30f7ac8b236afe7b0ae57046795d1bf47814c58b9e05bbd0dd24ae1f",
+      "sha256_superseding": "88a662c30b7ce3b5c5fa162cca486ab0346ab36f718a3c652d4cfa20d4863832",
+      "introduced_by": "this commit",
+      "change": "Maps the program's exit codes to reasons, and accepts geometry only when the program exits 0 and geometry_manifest.json reports PASSED with sha256 values that match body.stl, lid.stl and ports.json. Without .NET, or on a platform without the PicoGK native runtime, it still reports available=False and runs nothing that fabricates geometry."
+    },
+    {
+      "path": "geometry/package_picogk/README.md",
+      "sha256_at_frozen_commit": "cfbd527602adcf1f328fe85150f1970393fbf22c1223203320caac1034f0272e",
+      "sha256_superseded": "d9653f9771a9c3010144b28ee9d73305a54b39d30b6a6f67dd5bb23afa985c6a",
+      "sha256_superseding": "adb07a0791fc09e8095630bd0ec24efa3bb6b2785641955990fe549a6f225a4a",
+      "introduced_by": "this commit",
+      "change": "Describes the implemented generator, the platforms PicoGK 2.3.0 supports, the exit codes, assumptions A1-A9, the three layers of acceptance checks and what is not established. Supersedes the pin installed by SUP-2026-10-04-01."
+    }
+  ],
+  "file_set_additions": {
+    "geometry/package_picogk/": [
+      "Object001Layout.cs",
+      "StlCheck.cs"
+    ]
+  },
+  "claims_superseded": [
+    {
+      "id": "REL-BD-03",
+      "frozen_status": "UNSUPPORTED",
+      "on_this_tree": "IMPLEMENTED, NOT OWNER-REVIEWED: the PicoGK Object 001 generator runs where PicoGK 2.3.0 ships native code (osx-arm64 on macOS 26.5 or later, and win-x64). On Linux it refuses with exit code 5 and generates nothing. Every dimension is ENGINEERING-SEED; the layout assumptions A1-A9 are generator choices, not approved designs. No geometry output is committed, and nothing here is an electromagnetic result."
+    }
+  ],
+  "claims_assessed": [
+    {
+      "id": "REL-BD-03",
+      "assessment": "NO LONGER HOLDS ON THIS TREE. At the frozen commit it holds unchanged. QmhpCem.Geometry.csproj and __init__.py keep their pins (the csproj at the SUP-2026-10-04-01 digest). REL-BD-01 (openEMS) and REL-BD-02 (planar geometry) are unaffected and are still exercised by the refusal check."
+    }
+  ],
+  "exceptions_assessed": [
+    {
+      "id": "EXC-B02",
+      "assessment": "Spec section 14 items 16 (PicoGK geometry) and 17 (STL, ports and geometry manifest) are implemented on this tree for osx-arm64 and win-x64 only, and are not met on Linux. Item 3 is unchanged: ShapeKernel is not used and SHAPEKERNEL_REVISION stays None. The other items are unchanged."
+    }
+  ],
+  "unchanged": "Every other tree-bound digest, every other exact file set, every in-scope record and register, and every claim and exception text. A change to any of them still fails tests/test_release_registers.py."
+}

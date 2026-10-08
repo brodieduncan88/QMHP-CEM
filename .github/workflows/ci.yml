@@ -101,14 +101,58 @@ jobs:
         with:
           dotnet-version: "9.0.x"
 
-      # The tests currently verify the C#/Python file-boundary scaffold: candidate
-      # parsing, CLI refusal modes and the no-fabricated-geometry invariant. They
-      # do not claim the still-unimplemented §7.6 geometry acceptance checks.
+      # PicoGK 2.3.0 ships no Linux native runtime, so on this runner the tests cover
+      # the managed layer only: the layout and its analytic acceptance checks, the STL
+      # read-back check, the CLI exit codes and the refusal to run without the runtime.
+      # The native tests report inconclusive here; picogk-native below runs them.
       - name: Restore application and test dependencies
         run: dotnet restore geometry/package_picogk/tests/QmhpCem.Geometry.Tests.csproj
 
       - name: Build application and tests
         run: dotnet build geometry/package_picogk/tests/QmhpCem.Geometry.Tests.csproj -c Release --no-restore
 
-      - name: Test the implemented scaffold contract
+      - name: Test the geometry generator (managed layer)
         run: dotnet test geometry/package_picogk/tests/QmhpCem.Geometry.Tests.csproj -c Release --no-build --no-restore
+
+  # The real PicoGK kernel. PicoGK 2.3.0 ships native code only for osx-arm64 and
+  # win-x64, and its osx-arm64 library is built for macOS 26.5 or later (Mach-O
+  # LC_BUILD_VERSION minos), so this job pins macos-26 rather than macos-latest.
+  # QMHP_REQUIRE_PICOGK_RUNTIME=1 turns a runtime that fails to load into a test
+  # failure instead of an inconclusive skip. This builds geometry only: no solver.
+  picogk-native:
+    name: PicoGK geometry (macOS 26 arm64, native runtime)
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Restore application and test dependencies
+        run: dotnet restore geometry/package_picogk/tests/QmhpCem.Geometry.Tests.csproj
+
+      - name: Build application and tests
+        run: dotnet build geometry/package_picogk/tests/QmhpCem.Geometry.Tests.csproj -c Release --no-restore
+
+      - name: Test the geometry generator, native runtime required
+        env:
+          QMHP_REQUIRE_PICOGK_RUNTIME: "1"
+        run: dotnet test geometry/package_picogk/tests/QmhpCem.Geometry.Tests.csproj -c Release --no-build --no-restore
+
+      - name: Generate the Object 001 seed geometry
+        run: |
+          dotnet run --project geometry/package_picogk/QmhpCem.Geometry.csproj -c Release --no-restore -- \
+            --candidate geometry/package_picogk/tests/fixtures/object001_seed.candidate.json \
+            --output "$RUNNER_TEMP/object001-seed"
+          shasum -a 256 "$RUNNER_TEMP/object001-seed"/*
+
+      - name: Upload the seed geometry
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: object001-seed-geometry-${{ github.sha }}
+          path: ${{ runner.temp }}/object001-seed
+          if-no-files-found: error
+          retention-days: 30

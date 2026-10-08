@@ -35,8 +35,10 @@ WHAT IS CHECKED, beyond the freeze:
     the absence of such descriptions rests on human review of the pinned bytes;
   * the unsupported paths refuse here: the registry-resolved openEMS adapter and the
     package-level planar cells are exercised, only while their bytes match the pins and
-    with process-launch primitives disabled, and the PicoGK stub text is checked. An
-    implementation placed outside the bound directories is not detected.
+    with process-launch primitives disabled, and the PicoGK stub text is checked unless a
+    pinned supersession declares REL-BD-03 superseded on this tree (SUP-2026-10-08-01
+    does: the PicoGK generator is implemented). An implementation placed outside the
+    bound directories is not detected.
 
 SCOPE. Like the frozen-evidence guard, this checks bytes, facts and wording against the
 committed evidence. It is not evidence governance: whether a claim is the right reading of
@@ -75,11 +77,15 @@ RELEASE_SHA256 = {
 
 #: Supersessions of the tree binding, outside docs/release/ so the frozen files stay
 #: byte-identical. Each is pinned like a release file: supersede again, never edit. A
-#: supersession may only replace the pin of a named tree-bound file whose frozen digest it
-#: quotes, and add names to an exact file set; every other binding is unchanged.
+#: supersession may only replace the CURRENT pin of a named tree-bound file whose frozen
+#: digest it quotes (a second supersession of the same file names the pin it replaces in
+#: sha256_superseded), add names to an exact file set, and declare a claim no longer true
+#: of this tree (claims_superseded). Every other binding is unchanged, and the frozen
+#: registers keep describing the frozen commit.
 SUPERSESSIONS = REPO_ROOT / "docs" / "release-supersessions"
 SUPERSESSION_SHA256 = {
     "SUP-2026-10-04-01-picogk-scaffold.json": "1260bce9c5c988683ec212417bef69f2f550776585e5310e1f7acc4f9a34f6ec",
+    "SUP-2026-10-08-01-picogk-generator.json": "0c79f0e2b733756521e1bb0375191af8ef63385f1fde0f38076067acb5d1356a",
 }
 
 #: Records in a release-scope family (PALACE-GOLDEN, PALACE-VERIFY, QUTIP-A) committed
@@ -164,17 +170,26 @@ def supersessions() -> list[dict]:
     return [load_strict((SUPERSESSIONS / name).read_text()) for name in sorted(SUPERSESSION_SHA256)]
 
 
-def superseded_pins() -> dict[str, tuple[str, str]]:
-    """{path: (frozen digest, superseding digest)} for every superseded tree-bound file."""
-    return {f["path"]: (f["sha256_at_frozen_commit"], f["sha256_superseding"])
-            for s in supersessions() for f in s["changed_bound_files"]}
-
-
 def effective_pin(path: str, frozen: str) -> str:
-    """The pin a tree-bound file must match: the superseding digest only when a
-    supersession names this path AND quotes exactly this frozen digest."""
-    superseded = superseded_pins().get(path)
-    return superseded[1] if superseded is not None and superseded[0] == frozen else frozen
+    """The pin a tree-bound file must match. Start from the frozen digest and follow, in
+    file-name (date) order, each supersession that names this path, quotes exactly this
+    frozen digest and replaces exactly the current pin (sha256_superseded, the frozen
+    digest when absent). A link that does not continue the chain is ignored, so the file
+    is then held to the last valid pin and fails."""
+    pin = frozen
+    for s in supersessions():
+        for f in s["changed_bound_files"]:
+            if f["path"] == path and f["sha256_at_frozen_commit"] == frozen \
+                    and f.get("sha256_superseded", frozen) == pin:
+                pin = f["sha256_superseding"]
+    return pin
+
+
+def superseded_claims() -> set[str]:
+    """Claims a pinned supersession declares no longer true of this tree. The frozen
+    register is unchanged and still describes the frozen commit; only the refusal checks
+    consult this."""
+    return {c["id"] for s in supersessions() for c in s.get("claims_superseded", [])}
 
 
 def file_set_additions() -> dict[str, list[str]]:
@@ -408,9 +423,10 @@ def refusal_pins(claims: dict) -> dict[str, str]:
 def unsupported_problems(claims: dict, root: Path = REPO_ROOT) -> list[str]:
     """openEMS refuses through the registry, with or without a container runtime; every
     package-level planar cell is the cells function and raises; the PicoGK program is still
-    the not-implemented stub. The refusing code is executed only while every bound file
-    matches its pin, and with every process-launch primitive replaced by one that raises,
-    so a changed adapter cannot launch anything from here."""
+    the not-implemented stub, unless a pinned supersession has superseded REL-BD-03. The
+    refusing code is executed only while every bound file matches its pin, and with every
+    process-launch primitive replaced by one that raises, so a changed adapter cannot
+    launch anything from here."""
     import os
     import subprocess
 
@@ -471,12 +487,13 @@ def unsupported_problems(claims: dict, root: Path = REPO_ROOT) -> list[str]:
     finally:
         for mod, name, original in saved:
             setattr(modules[mod], name, original)
-    picogk = root / "geometry" / "package_picogk"
-    program = (picogk / "Program.cs").read_text()
-    if "geometry generation is NOT IMPLEMENTED in v0.1" not in program or "return 3;" not in program:
-        out.append("PicoGK Program.cs is no longer the not-implemented stub")
-    if "throw new NotImplementedException(" not in (picogk / "Object001Package.cs").read_text():
-        out.append("PicoGK Object001Package.Generate no longer throws")
+    if "REL-BD-03" not in superseded_claims():
+        picogk = root / "geometry" / "package_picogk"
+        program = (picogk / "Program.cs").read_text()
+        if "geometry generation is NOT IMPLEMENTED in v0.1" not in program or "return 3;" not in program:
+            out.append("PicoGK Program.cs is no longer the not-implemented stub")
+        if "throw new NotImplementedException(" not in (picogk / "Object001Package.cs").read_text():
+            out.append("PicoGK Object001Package.Generate no longer throws")
     return out
 
 
@@ -716,10 +733,12 @@ def test_the_supersessions_are_exactly_the_pinned_ones():
 
 
 def test_each_supersession_binds_this_register_and_quotes_the_frozen_pins():
-    claims = claim_register()
+    claims, exceptions = claim_register(), exception_register()
     prefixes = claims["tree_binding"]["must_still_match"]
     frozen = {e["path"]: e["sha256_at_frozen_commit"]
               for item in claims["claims"] for e in item["evidence"] if "sha256_at_frozen_commit" in e}
+    claim = by_id(claims, "claims")
+    chains: dict[str, list[str]] = {}
     for s in supersessions():
         assert s["schema"] == "qmhp-cem.release-supersession/1"
         assert s["supersedes"]["register_sha256"] == sha256(RELEASE / "CLAIM-REGISTER.json")
@@ -728,11 +747,34 @@ def test_each_supersession_binds_this_register_and_quotes_the_frozen_pins():
         for f in s["changed_bound_files"]:
             assert tree_bound(f["path"], prefixes), f["path"]
             assert f["sha256_at_frozen_commit"] == frozen[f["path"]], f["path"]
-            assert f["sha256_superseding"] == sha256(REPO_ROOT / f["path"]), f["path"]
+            chain = chains.setdefault(f["path"], [f["sha256_at_frozen_commit"]])
+            assert f.get("sha256_superseded", f["sha256_at_frozen_commit"]) == chain[-1], \
+                f"{f['path']}: {s['id']} does not replace the current pin"
+            chain.append(f["sha256_superseding"])
         for directory, names in s["file_set_additions"].items():
             assert directory in claims["tree_binding"]["exact_file_sets"], directory
             assert not set(names) & set(claims["tree_binding"]["exact_file_sets"][directory])
-        assert {c["id"] for c in s["claims_assessed"]} <= {c["id"] for c in claims["claims"]}
+        assert {c["id"] for c in s["claims_assessed"]} <= set(claim)
+        for c in s.get("claims_superseded", []):
+            assert claim[c["id"]]["status"] == c["frozen_status"], c["id"]
+        assert {x["id"] for x in s.get("exceptions_assessed", [])} <= set(by_id(exceptions, "exceptions"))
+    for path, chain in chains.items():
+        assert chain[-1] == sha256(REPO_ROOT / path), f"{path}: the end of its supersession chain is not the tree"
+
+
+def test_without_the_generator_supersession_the_implemented_picogk_fails_closed(monkeypatch):
+    """SUP-2026-10-08-01 is the only thing that excuses the implemented PicoGK generator.
+    Without it, every file it supersedes, the new file names and the PicoGK refusal check
+    fail again."""
+    monkeypatch.delitem(SUPERSESSION_SHA256, "SUP-2026-10-08-01-picogk-generator.json")
+    claims, exceptions = claim_register(), exception_register()
+    problems = digest_problems(claims, exceptions)
+    for name in ("Program.cs", "Object001Package.cs", "driver.py", "README.md"):
+        assert f"geometry/package_picogk/{name}: changed since the frozen commit" in problems
+    assert any(p.startswith("geometry/package_picogk/: holds") for p in problems)
+    assert "REL-BD-03" not in superseded_claims()
+    assert "geometry/package_picogk/Program.cs: bytes differ from the register pin; refusal code not executed" \
+        in unsupported_problems(claims)
 
 
 def test_a_supersession_excuses_only_the_files_it_names(tmp_path: Path):
