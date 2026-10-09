@@ -16,7 +16,7 @@ native code for two platforms only:
 | Platform | Runs? |
 |---|---|
 | macOS on Apple Silicon (osx-arm64) | **Yes, on macOS 26.5 or later.** The library's Mach-O `LC_BUILD_VERSION` sets minos 26.5 for `picogk.26.2.dylib` and 26.0 for its bundled dependencies, so an older macOS cannot load it. |
-| Windows x64 (win-x64) | Yes |
+| Windows x64 (win-x64) | **Untested.** PicoGK ships win-x64 native code, so the generator should load there, but no Windows run is recorded: CI has no Windows job. |
 | Linux, including CI's `ubuntu-latest` and the Claude Code sandbox | **No.** No native library is shipped, so the program refuses with exit code 5 and writes nothing. |
 
 In CI, the `dotnet` job on Linux runs the managed layer. The `picogk-native` job on

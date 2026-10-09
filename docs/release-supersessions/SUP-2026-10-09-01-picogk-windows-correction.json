@@ -1,0 +1,48 @@
+{
+  "schema": "qmhp-cem.release-supersession/1",
+  "id": "SUP-2026-10-09-01",
+  "status": "SUPERSEDES THE TREE BINDING OF ONE FILE AND CORRECTS TWO STATEMENTS OF SUP-2026-10-08-01, WHICH STAYS PINNED AND UNEDITED. Edits no register, record, claim text or earlier supersession, and supersedes no claim.",
+  "supersedes": {
+    "register": "docs/release/CLAIM-REGISTER.json",
+    "register_sha256": "1a03d8dc793089f4029a9d8abc439e58fbabf84187ddb3e25610b78e7f1e39c9",
+    "register_revision": 1,
+    "frozen_from_commit": "ba076d9d972077a7a3e256a6404ab455fd748461",
+    "frozen_release_branch_head": "1ebc07ad67e0af6ff2d790c4d181b0558d632d62"
+  },
+  "decision_ref": "Owner decision, working session 2026-10-09: offered 'I can correct the Windows claim in the README and the supersession record with a new supersession record on the development branch', the owner answered 'Yes'.",
+  "cause": "SUP-2026-10-08-01 and the PicoGK README it pins state that the generator runs on win-x64. That was inferred from the PicoGK 2.3.0 package, which ships win-x64 native code, and not observed: the only recorded native executions are CI runs 37859853496 (commit 40fe90b) and 37861657825 (commit 75ab086) on macos-26. No workflow on any branch has a Windows runner, and no record, artifact or job annotation reports a Windows execution. Found on 2026-10-09 while a review the owner shared was checked against the repository.",
+  "changed_bound_files": [
+    {
+      "path": "geometry/package_picogk/README.md",
+      "sha256_at_frozen_commit": "cfbd527602adcf1f328fe85150f1970393fbf22c1223203320caac1034f0272e",
+      "sha256_superseded": "adb07a0791fc09e8095630bd0ec24efa3bb6b2785641955990fe549a6f225a4a",
+      "sha256_superseding": "58c0ab275ce3539f46dfac2636efda851d65e5ecb297c817b6334f7e5469a0ca",
+      "introduced_by": "this commit",
+      "change": "The platform table's win-x64 row said 'Yes' under 'Runs?'. It now says the Windows path is untested: PicoGK ships the native code, but no Windows run is recorded and CI has no Windows job. Nothing else in the file changes. Supersedes the pin installed by SUP-2026-10-08-01."
+    }
+  ],
+  "file_set_additions": {},
+  "corrections": [
+    {
+      "record": "SUP-2026-10-08-01",
+      "field": "claims_superseded[0].on_this_tree",
+      "original_excerpt": "the PicoGK Object 001 generator runs where PicoGK 2.3.0 ships native code (osx-arm64 on macOS 26.5 or later, and win-x64).",
+      "what_was_wrong": "It states as observed that the generator runs on win-x64. That was inferred from the package contents; no Windows execution is recorded.",
+      "corrected": "the PicoGK Object 001 generator's only recorded executions are on osx-arm64, in CI runs 37859853496 (commit 40fe90b) and 37861657825 (commit 75ab086) on macos-26. Both published geometry, which requires every acceptance check to pass. PicoGK 2.3.0 also ships win-x64 native code, but no Windows run is recorded, so the win-x64 path is untested."
+    },
+    {
+      "record": "SUP-2026-10-08-01",
+      "field": "exceptions_assessed[0].assessment",
+      "original_excerpt": "Spec section 14 items 16 (PicoGK geometry) and 17 (STL, ports and geometry manifest) are implemented on this tree for osx-arm64 and win-x64 only, and are not met on Linux.",
+      "what_was_wrong": "Set against 'not met on Linux', it reads as items 16 and 17 being met on win-x64, where no demonstration is recorded.",
+      "corrected": "Spec section 14 items 16 (PicoGK geometry) and 17 (STL, ports and geometry manifest) are implemented on this tree for osx-arm64 and win-x64. They are demonstrated only on osx-arm64, in CI runs 37859853496 (commit 40fe90b) and 37861657825 (commit 75ab086) on macos-26; they are untested on win-x64 and not met on Linux."
+    }
+  ],
+  "claims_assessed": [
+    {
+      "id": "REL-BD-03",
+      "assessment": "STILL NO LONGER HOLDS ON THIS TREE, as SUP-2026-10-08-01 declares; this record supersedes no claim. Only the platform wording of that record's statement is corrected (corrections[0]). At the frozen commit REL-BD-03 holds unchanged."
+    }
+  ],
+  "unchanged": "SUP-2026-10-08-01 itself, whose words are corrected here and not edited; every other tree-bound digest; every exact file set; every in-scope record and register; and every claim and exception text. A change to any of them still fails tests/test_release_registers.py."
+}

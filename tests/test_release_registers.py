@@ -80,12 +80,15 @@ RELEASE_SHA256 = {
 #: supersession may only replace the CURRENT pin of a named tree-bound file whose frozen
 #: digest it quotes (a second supersession of the same file names the pin it replaces in
 #: sha256_superseded), add names to an exact file set, and declare a claim no longer true
-#: of this tree (claims_superseded). Every other binding is unchanged, and the frozen
-#: registers keep describing the frozen commit.
+#: of this tree (claims_superseded). It may also correct words of an EARLIER supersession
+#: (corrections), quoting them verbatim; the earlier record stays pinned and unedited.
+#: Every other binding is unchanged, and the frozen registers keep describing the frozen
+#: commit.
 SUPERSESSIONS = REPO_ROOT / "docs" / "release-supersessions"
 SUPERSESSION_SHA256 = {
     "SUP-2026-10-04-01-picogk-scaffold.json": "1260bce9c5c988683ec212417bef69f2f550776585e5310e1f7acc4f9a34f6ec",
     "SUP-2026-10-08-01-picogk-generator.json": "0c79f0e2b733756521e1bb0375191af8ef63385f1fde0f38076067acb5d1356a",
+    "SUP-2026-10-09-01-picogk-windows-correction.json": "40484b6c6abce9849e2587fb3ee6b8af192b8fb89f5a7cc3a8048fc373c83ac6",
 }
 
 #: Records in a release-scope family (PALACE-GOLDEN, PALACE-VERIFY, QUTIP-A) committed
@@ -198,6 +201,52 @@ def file_set_additions() -> dict[str, list[str]]:
         for directory, names in s["file_set_additions"].items():
             out.setdefault(directory, []).extend(names)
     return out
+
+
+FIELD_PATH = re.compile(r"[A-Za-z_]+(?:\[\d+\])?(?:\.[A-Za-z_]+(?:\[\d+\])?)*")
+
+
+def resolve_field(record: dict, field: str):
+    """The value at a field path such as 'claims_superseded[0].on_this_tree'."""
+    if not FIELD_PATH.fullmatch(field):
+        raise ValueError(f"malformed field path {field!r}")
+    value = record
+    for name, index in re.findall(r"([A-Za-z_]+)(?:\[(\d+)\])?", field):
+        value = value[name]
+        if index:
+            value = value[int(index)]
+    return value
+
+
+def correction_problems(records: list[dict]) -> list[str]:
+    """A supersession may correct words of an EARLIER pinned supersession, which stays
+    pinned and unedited. Each correction names that record and a field path resolving to
+    text, quotes at least 20 characters of that text verbatim, and says what was wrong and
+    what is correct instead. Records are in file-name (date) order."""
+    problems = []
+    for i, s in enumerate(records):
+        earlier = {r["id"]: r for r in records[:i]}
+        for c in s.get("corrections", []):
+            where = f"{s['id']} corrects {c.get('record')} {c.get('field')}"
+            target = earlier.get(c.get("record"))
+            if target is None:
+                problems.append(f"{where}: not an earlier pinned supersession")
+                continue
+            try:
+                text = resolve_field(target, c.get("field", ""))
+            except (KeyError, IndexError, TypeError, ValueError):
+                problems.append(f"{where}: the field does not resolve")
+                continue
+            if not isinstance(text, str):
+                problems.append(f"{where}: the field is not text")
+                continue
+            excerpt = c.get("original_excerpt", "")
+            if len(excerpt) < 20 or excerpt not in text:
+                problems.append(f"{where}: original_excerpt is not quoted verbatim")
+            for key in ("what_was_wrong", "corrected"):
+                if not str(c.get(key, "")).strip():
+                    problems.append(f"{where}: {key} is empty")
+    return problems
 
 
 def load(path: Path) -> dict:
@@ -797,6 +846,46 @@ def test_a_supersession_excuses_only_the_files_it_names(tmp_path: Path):
     (copied / "extra.cs").write_text("// not named by any supersession\n")
     assert [p.split(":")[0] for p in file_set_problems(claims, tmp_path)
             if p.startswith("geometry/package_picogk/")] == ["geometry/package_picogk/"]
+
+
+def test_corrections_quote_an_earlier_supersession_verbatim():
+    """SUP-2026-10-09-01 corrects the win-x64 statements of SUP-2026-10-08-01, which is
+    untouched: the generator's only recorded runs are on osx-arm64."""
+    records = supersessions()
+    assert correction_problems(records) == []
+    corrected = {(c["record"], c["field"]) for s in records for c in s.get("corrections", [])}
+    assert corrected == {("SUP-2026-10-08-01", "claims_superseded[0].on_this_tree"),
+                         ("SUP-2026-10-08-01", "exceptions_assessed[0].assessment")}
+
+
+def test_a_misquoted_or_misdirected_correction_is_refused():
+    records = supersessions()
+    i = next(n for n, s in enumerate(records) if s.get("corrections"))
+    good = records[i]["corrections"][0]
+    bad = {
+        "misquoted": dict(good, original_excerpt=good["original_excerpt"].replace("win-x64", "win-arm64")),
+        "a fragment": dict(good, original_excerpt="win-x64"),
+        "a missing field": dict(good, field="claims_superseded[5].on_this_tree"),
+        "a malformed path": dict(good, field="claims_superseded[0]..on_this_tree"),
+        "not text": dict(good, field="claims_superseded[0]"),
+        "its own record": dict(good, record=records[i]["id"]),
+        "an unpinned record": dict(good, record="SUP-2099-01-01-01"),
+        "no correction": dict(good, corrected=" "),
+        "no reason": {k: v for k, v in good.items() if k != "what_was_wrong"},
+    }
+    for name, correction in bad.items():
+        mutated = copy.deepcopy(records)
+        mutated[i]["corrections"] = [correction]
+        assert correction_problems(mutated), name
+
+
+def test_without_the_correction_supersession_the_corrected_readme_fails(monkeypatch):
+    """SUP-2026-10-09-01 is what pins the corrected PicoGK README; without it the README
+    is held to the SUP-2026-10-08-01 pin and fails."""
+    monkeypatch.delitem(SUPERSESSION_SHA256, "SUP-2026-10-09-01-picogk-windows-correction.json")
+    assert "geometry/package_picogk/README.md: changed since the frozen commit" \
+        in digest_problems(claim_register(), exception_register())
+    assert "REL-BD-03" in superseded_claims()   # still declared by SUP-2026-10-08-01 alone
 
 
 def test_the_registers_parse_strictly_and_are_well_formed():
