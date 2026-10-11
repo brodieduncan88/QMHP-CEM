@@ -169,6 +169,25 @@ def test_default_ci_runs_the_native_picogk_tests_where_the_runtime_exists():
     assert not any("palace" in str(s).lower() for s in job["steps"]), "the geometry job must not reach a solver"
 
 
+def test_default_ci_runs_the_native_picogk_tests_on_windows_too():
+    """PicoGK 2.3.0 also ships win-x64 native code. The Windows job runs the same tests with
+    the runtime required, keeps committed line endings (set before checkout), and must not
+    reach a solver."""
+    job = _load(CI)["jobs"]["picogk-native-windows"]
+    assert job["runs-on"] == "windows-latest"
+    assert job["defaults"] == {"run": {"shell": "bash"}}
+    names = [s.get("name") or s.get("uses", "") for s in job["steps"]]
+    assert names.index("Keep line endings as committed") < next(
+        i for i, n in enumerate(names) if n.startswith("actions/checkout@"))
+    assert "core.autocrlf false" in job["steps"][0]["run"]
+    test = next(s for s in job["steps"] if s.get("name") == "Test the geometry generator, native runtime required")
+    assert test["env"] == {"QMHP_REQUIRE_PICOGK_RUNTIME": "1"}
+    assert test["run"].startswith("dotnet test ") and "QmhpCem.Geometry.Tests.csproj" in test["run"]
+    generate = next(s for s in job["steps"] if s.get("name") == "Generate the Object 001 seed geometry")
+    assert "tests/fixtures/object001_seed.candidate.json" in generate["run"]
+    assert not any("palace" in str(s).lower() for s in job["steps"]), "the geometry job must not reach a solver"
+
+
 def test_repository_selects_dotnet_9_even_when_a_newer_sdk_is_installed():
     sdk = json.loads(GLOBAL_JSON.read_text())["sdk"]
     assert sdk == {
