@@ -21,12 +21,12 @@ import {
 } from "/static/vendor/three.min.js";
 
 const TONES = {
-  positive: 0x3fd09a, negative: 0xff7486, caution: 0xf1b551,
-  gated: 0xb8a2ff, neutral: 0xa9bdd4, muted: 0x9aa3b0,
+  positive: 0x4ec296, negative: 0xf18290, caution: 0xe1b161,
+  gated: 0xbdabf6, neutral: 0xadbdd0, muted: 0x9ca3ae,
 };
 const TONE_CSS = {
-  positive: "#3fd09a", negative: "#ff7486", caution: "#f1b551",
-  gated: "#b8a2ff", neutral: "#a9bdd4", muted: "#9aa3b0",
+  positive: "#4ec296", negative: "#f18290", caution: "#e1b161",
+  gated: "#bdabf6", neutral: "#adbdd0", muted: "#9ca3ae",
 };
 
 // Deterministic pseudo-random numbers from a string, so the same gate always gets
@@ -51,10 +51,10 @@ function studio(renderer) {
     p.position.copy(pos); p.rotation.set(rot.x, rot.y, rot.z);
     room.add(p);
   };
-  panel(12, 12, new Vector3(0, 9.8, 0), new Vector3(Math.PI / 2, 0, 0), 1.7, 0xffe2b4);
-  panel(12, 3, new Vector3(0, 5, -9.8), new Vector3(0, 0, 0), 1.6, 0xffd9a0);
-  panel(3, 12, new Vector3(-9.5, 1, 2), new Vector3(0, Math.PI / 2, 0), 3.2, 0xffd9a0);
-  panel(2, 12, new Vector3(9.5, 0, -3), new Vector3(0, -Math.PI / 2, 0), 2.4, 0xbfe8ff);
+  panel(12, 12, new Vector3(0, 9.8, 0), new Vector3(Math.PI / 2, 0, 0), 1.7, 0xf2f2ee);
+  panel(12, 3, new Vector3(0, 5, -9.8), new Vector3(0, 0, 0), 1.6, 0xf2f2ee);
+  panel(3, 12, new Vector3(-9.5, 1, 2), new Vector3(0, Math.PI / 2, 0), 3.2, 0xf2f2ee);
+  panel(2, 12, new Vector3(9.5, 0, -3), new Vector3(0, -Math.PI / 2, 0), 2.4, 0xd6e0ea);
   panel(10, 2, new Vector3(0, -3, 9.5), new Vector3(0, Math.PI, 0), 1.2, 0xffffff);
   const pmrem = new PMREMGenerator(renderer);
   const env = pmrem.fromScene(room, 0.035).texture;
@@ -67,15 +67,15 @@ function studio(renderer) {
 // An illustrative superconducting-circuit die, drawn procedurally: a coplanar
 // feedline, one cell per record (capacitor pads, a meandered superinductor and a
 // junction marker tinted by the record's status), couplers, meandered readout
-// resonators, flux lines and a bond-pad ring. Etched "ILLUSTRATIVE LAYOUT": the
-// repository contains no chip design.
+// resonators, flux lines and a bond-pad ring. The repository contains no chip design,
+// so the layout is illustrative only; the figure caption says so.
 function chipTexture(tones, anisotropy, small) {
   const S = small ? 1024 : 2048;
   const k = S / 1024;
   const cv = document.createElement("canvas");
   cv.width = cv.height = S;
   const g = cv.getContext("2d");
-  const metal = "#cfd4dc", gap = "#1d222c", sub = "#262c38";
+  const metal = "#cfd4dc", gap = "#1d222c", sub = "#1f2328";
   g.fillStyle = sub; g.fillRect(0, 0, S, S);
   g.fillStyle = metal; g.fillRect(26 * k, 26 * k, S - 52 * k, S - 52 * k);
   const path = (pts) => { g.beginPath(); g.moveTo(pts[0][0] * k, pts[0][1] * k); for (const p of pts.slice(1)) g.lineTo(p[0] * k, p[1] * k); };
@@ -151,10 +151,6 @@ function chipTexture(tones, anisotropy, small) {
     const edgeX = side < 0 ? 60 : 964;
     cpw([[edgeX, cy + P * 0.28], [cx + side * (P / 2 + 8), cy + P * 0.28]], 4, 3);
   }
-  // etched label
-  g.fillStyle = gap;
-  g.font = `${18 * k}px monospace`;
-  g.fillText("QMHP-CEM · ILLUSTRATIVE LAYOUT · NOT A DEVICE DESIGN", 90 * k, 1000 * k);
   const tex = new CanvasTexture(cv);
   tex.colorSpace = SRGBColorSpace;
   tex.anisotropy = anisotropy;
@@ -181,7 +177,7 @@ export function mountStack(container, data, options) {
   const o = options || {};
   const mode = o.mode || "hero";
   const coarse = window.matchMedia("(pointer: coarse)").matches;
-  const renderer = new WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+  const renderer = new WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, coarse ? 1.25 : 2));
   const minFrameMs = coarse ? 33 : 0;
   renderer.outputColorSpace = SRGBColorSpace;
@@ -195,21 +191,22 @@ export function mountStack(container, data, options) {
 
   const scene = new Scene();
   scene.environment = studio(renderer);
-  scene.add(new HemisphereLight(0xfff1dc, 0x10121a, 0.5));
-  const key = new DirectionalLight(0xffe2b0, 1.6); key.position.set(4, 7, 5); scene.add(key);
-  const rim = new DirectionalLight(0x9fdcff, 1.1); rim.position.set(-6, 2, -5); scene.add(rim);
+  scene.add(new HemisphereLight(0xf0f1ee, 0x10121a, 0.5));
+  const key = new DirectionalLight(0xf4f2ec, 1.2); key.position.set(4, 7, 5); scene.add(key);
+  const rim = new DirectionalLight(0xb7c4d4, 1.1); rim.position.set(-6, 2, -5); scene.add(rim);
 
   const camera = new PerspectiveCamera(30, 1, 0.02, 100);
   const disposables = [];
   const keep = (x) => { disposables.push(x); return x; };
 
   // materials
-  const gold = keep(new MeshPhysicalMaterial({ color: 0xd69634, metalness: 1, roughness: 0.28, clearcoat: 0.25, clearcoatRoughness: 0.25 }));
-  const goldSatin = keep(new MeshPhysicalMaterial({ color: 0xc99a45, metalness: 1, roughness: 0.42 }));
+  // Brass for fittings and connectors; anodised grey for the plates, rods, posts and package.
+  const brass = keep(new MeshPhysicalMaterial({ color: 0xa8926a, metalness: 1, roughness: 0.45 }));
+  const anodised = keep(new MeshPhysicalMaterial({ color: 0x3a414d, metalness: 0.55, roughness: 0.45 }));
   const gunmetal = keep(new MeshPhysicalMaterial({ color: 0x15171d, metalness: 0.7, roughness: 0.52, clearcoat: 0.12 }));
   const steel = keep(new MeshStandardMaterial({ color: 0xc5cad3, metalness: 0.95, roughness: 0.3 }));
   const braid = keep(new MeshStandardMaterial({ color: 0xaeb3bb, metalness: 0.8, roughness: 0.55 }));
-  const copper = keep(new MeshStandardMaterial({ color: 0xc8734a, metalness: 1, roughness: 0.32 }));
+  const copper = keep(new MeshStandardMaterial({ color: 0x8a929c, metalness: 1, roughness: 0.32 }));
   const hole = keep(new MeshStandardMaterial({ color: 0x14161b, metalness: 0.4, roughness: 0.8 }));
   const violet = keep(new MeshBasicMaterial({ color: new Color(TONES.gated).multiplyScalar(1.4) }));
 
@@ -231,7 +228,7 @@ export function mountStack(container, data, options) {
   // Semi-rigid coax: straight runs that jog slightly at each stage, a bulkhead
   // connector where each line crosses a plate, attenuators under some stages.
   const families = (data.families || []).slice(0, 16);
-  const lineCount = Math.max(families.length, coarse ? 10 : 16);
+  const lineCount = Math.max(families.length, 6);
   const lineDefs = [];
   for (let k = 0; k < lineCount; k += 1) {
     const rnd = seeded(`line-${k}`);
@@ -248,8 +245,8 @@ export function mountStack(container, data, options) {
   // -------------------------------------------------------------- plates
   const stack = new Group();
   scene.add(stack);
+  const signalCount = lineDefs.filter((ln) => ln.family).length;
   const plates = [];
-  const componentGeo = keep(new BoxGeometry(0.22, 0.14, 0.34));
   const holeGeo = keep(new CylinderGeometry(0.035, 0.035, thick * 1.1, 10));
   const bulkGeo = keep(new CylinderGeometry(0.034, 0.034, 0.12, 12));
   const nutGeo = keep(new CylinderGeometry(0.05, 0.05, 0.03, 6));
@@ -258,47 +255,39 @@ export function mountStack(container, data, options) {
   gates.forEach((g, i) => {
     const r = radius(i);
     const plate = new Group();
-    plate.add(new Mesh(cyl(r, thick, coarse ? 64 : 112), g.hardware ? gunmetal : gold));
+    plate.add(new Mesh(cyl(r, thick, coarse ? 64 : 112), g.hardware ? gunmetal : anodised));
     // bolt circle
-    const bolts = new InstancedMesh(holeGeo, hole, 28);
-    for (let k = 0; k < 28; k += 1) {
-      const a = (k / 28) * Math.PI * 2;
+    const bolts = new InstancedMesh(holeGeo, hole, 12);
+    for (let k = 0; k < 12; k += 1) {
+      const a = (k / 12) * Math.PI * 2;
       dummy.position.set(Math.cos(a) * (r - 0.13), 0.004, Math.sin(a) * (r - 0.13));
       dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix();
       bolts.setMatrixAt(k, dummy.matrix);
     }
     plate.add(bolts);
-    // bulkhead connectors and hex nuts where every line crosses this plate
-    const bulk = new InstancedMesh(bulkGeo, goldSatin, lineCount);
-    const nuts = new InstancedMesh(nutGeo, gold, lineCount * 2);
+    // bulkhead connectors where every line crosses this plate, and a nut on each signal line
+    const bulk = new InstancedMesh(bulkGeo, brass, lineCount);
+    const nuts = new InstancedMesh(nutGeo, brass, signalCount);
+    let nut = 0;
     lineDefs.forEach((ln, k) => {
       const [x, z] = ln.at[i];
       dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1);
       dummy.position.set(x, 0, z); dummy.updateMatrix(); bulk.setMatrixAt(k, dummy.matrix);
-      dummy.position.set(x, thick / 2 + 0.018, z); dummy.updateMatrix(); nuts.setMatrixAt(2 * k, dummy.matrix);
-      dummy.position.set(x, -thick / 2 - 0.018, z); dummy.updateMatrix(); nuts.setMatrixAt(2 * k + 1, dummy.matrix);
+      if (ln.family) {
+        dummy.position.set(x, thick / 2 + 0.018, z); dummy.updateMatrix(); nuts.setMatrixAt(nut, dummy.matrix); nut += 1;
+      }
     });
     plate.add(bulk, nuts);
     // attenuators hanging under every third stage, on alternate lines
     if (i < n - 1 && i % 3 === 1) {
       const lines = lineDefs.filter((_, k) => k % 2 === 0);
-      const att = new InstancedMesh(attGeo, goldSatin, lines.length);
+      const att = new InstancedMesh(attGeo, brass, lines.length);
       lines.forEach((ln, k) => {
         const [x, z] = ln.at[i];
         dummy.rotation.set(0, -ln.a, 0); dummy.scale.set(1, 1, 1);
         dummy.position.set(x, -thick / 2 - 0.11, z); dummy.updateMatrix(); att.setMatrixAt(k, dummy.matrix);
       });
       plate.add(att);
-    }
-    // components mounted on the plate, placed deterministically from the gate id
-    const rnd = seeded(g.id);
-    const count = 3 + Math.floor(rnd() * 4);
-    for (let k = 0; k < count; k += 1) {
-      const a = rnd() * Math.PI * 2, d = 1.15 + rnd() * Math.max(0.05, r - 1.45);
-      const box = new Mesh(componentGeo, rnd() > 0.35 ? goldSatin : steel);
-      box.position.set(Math.cos(a) * d, thick / 2 + 0.07, Math.sin(a) * d);
-      box.rotation.y = -a;
-      plate.add(box);
     }
     let ring = null;
     if (g.hardware) {
@@ -318,7 +307,7 @@ export function mountStack(container, data, options) {
   const rodR = rBottom - 0.2;
   for (let k = 0; k < 4; k += 1) {
     const a = Math.PI / 4 + (k * Math.PI) / 2;
-    const rod = new Mesh(cyl(0.045, Math.max(0.01, span), 18), gold);
+    const rod = new Mesh(cyl(0.045, Math.max(0.01, span), 18), anodised);
     rod.position.set(Math.cos(a) * rodR, -span / 2, Math.sin(a) * rodR);
     stretch.add(rod);
   }
@@ -337,7 +326,7 @@ export function mountStack(container, data, options) {
     ln.curve = new CatmullRomCurve3(pts, false, "centripetal");
     stretch.add(new Mesh(keep(new TubeGeometry(ln.curve, Math.max(24, (n - 1) * (coarse ? 6 : 10)), 0.016, coarse ? 6 : 8, false)), ln.copper ? copper : steel));
     // a thermalisation coil on some lines
-    if (k % 4 === 0 && n > 2) {
+    if (k % 8 === 0 && n > 2) {
       const coilPts = [];
       const c = ln.curve.getPoint(0.36);
       for (let s = 0; s <= 48; s += 1) {
@@ -357,13 +346,13 @@ export function mountStack(container, data, options) {
   const postGeo = cyl(0.032, 0.9, 16);
   const footGeo = cyl(0.07, 0.04, 24);
   for (const [px, pz] of [[-0.54, -0.54], [0.54, -0.54], [-0.54, 0.54], [0.54, 0.54]]) {
-    const post = new Mesh(postGeo, gold);
+    const post = new Mesh(postGeo, anodised);
     post.position.set(px, 0.58, pz);
-    const foot = new Mesh(footGeo, goldSatin);
+    const foot = new Mesh(footGeo, brass);
     foot.position.set(px, 0.15, pz);
     pkg.add(post, foot);
   }
-  pkg.add(new Mesh(keep(new BoxGeometry(1.2, 0.26, 1.2)), goldSatin));
+  pkg.add(new Mesh(keep(new BoxGeometry(1.2, 0.26, 1.2)), anodised));
   const pocket = new Mesh(keep(new BoxGeometry(0.66, 0.02, 0.66)), hole);
   pocket.position.y = 0.125;
   pkg.add(pocket);
@@ -378,8 +367,8 @@ export function mountStack(container, data, options) {
   const smaGeo = keep(new CylinderGeometry(0.045, 0.045, 0.24, 16));
   const hexGeo = keep(new CylinderGeometry(0.072, 0.072, 0.06, 6));
   const traceGeo = keep(new BoxGeometry(0.34, 0.006, 0.022));
-  const smas = new InstancedMesh(smaGeo, gold, 16);
-  const hexes = new InstancedMesh(hexGeo, goldSatin, 16);
+  const smas = new InstancedMesh(smaGeo, brass, 16);
+  const hexes = new InstancedMesh(hexGeo, brass, 16);
   const traces = new InstancedMesh(traceGeo, steel, 16);
   const smaTips = [];
   const wire = [];
@@ -429,6 +418,7 @@ export function mountStack(container, data, options) {
   pkg.add(new LineSegments(wireGeo, keep(new LineBasicMaterial({ color: 0xe8c47a }))));
   // braided flex cables from the bottom stage's connectors down into the launches
   lineDefs.forEach((ln, k) => {
+    if (!ln.family) return;
     const [x, z] = ln.at[n - 1];
     const tip = smaTips[k % smaTips.length].clone().add(pkg.position);
     const dir = tip.clone().setY(0).normalize();
@@ -449,7 +439,7 @@ export function mountStack(container, data, options) {
     if (!line.family) return;
     line.family.records.forEach((rec) => {
       if (!beadMats.has(rec.tone)) {
-        beadMats.set(rec.tone, keep(new MeshStandardMaterial({ color: TONES[rec.tone] || TONES.neutral, emissive: TONES[rec.tone] || TONES.neutral, emissiveIntensity: 0.85, roughness: 0.3, metalness: 0.1 })));
+        beadMats.set(rec.tone, keep(new MeshStandardMaterial({ color: TONES[rec.tone] || TONES.neutral, emissive: TONES[rec.tone] || TONES.neutral, emissiveIntensity: 0.3, roughness: 0.3, metalness: 0.1 })));
       }
       const bead = new Mesh(beadGeo, beadMats.get(rec.tone));
       bead.userData.record = rec;
@@ -488,7 +478,6 @@ export function mountStack(container, data, options) {
   resize();
 
   // interaction
-  const pointer = new Vector2(0, 0), aim = new Vector2(0, 0);
   const ray = new Raycaster();
   let hovered = null;
   const toNdc = (e) => {
@@ -501,7 +490,6 @@ export function mountStack(container, data, options) {
     return hit ? hit.object : null;
   };
   const onMove = (e) => {
-    pointer.copy(toNdc(e));
     if (e.pointerType !== "mouse") return;
     const b = pick(e);
     if (b !== hovered) {
@@ -512,14 +500,15 @@ export function mountStack(container, data, options) {
       o.onHover(b.userData.record, e.clientX, e.clientY);
     }
   };
-  const onLeave = () => { pointer.set(0, 0); if (hovered && o.onHover) o.onHover(null); hovered = null; canvas.style.cursor = ""; };
+  const onLeave = () => { if (hovered && o.onHover) o.onHover(null); hovered = null; canvas.style.cursor = ""; };
   const onClick = (e) => { const b = pick(e); if (b && o.onSelect) o.onSelect(b.userData.record); };
   canvas.addEventListener("pointermove", onMove);
   canvas.addEventListener("pointerleave", onLeave);
   canvas.addEventListener("click", onClick);
 
   // render loop, only while on screen and the tab is visible
-  let raf = 0, visible = true, running = false, spin = 0, last = performance.now(), lastClose = -1;
+  let raf = 0, visible = true, running = false, last = performance.now(), lastClose = -1;
+  let lastKey = "";
   const io = new IntersectionObserver((entries) => { visible = entries[0].isIntersecting; if (visible) start(); }, { threshold: 0 });
   io.observe(container);
   const onVis = () => { if (!document.hidden) start(); };
@@ -531,17 +520,14 @@ export function mountStack(container, data, options) {
       if (visible && !document.hidden) raf = requestAnimationFrame(frame); else running = false;
       return;
     }
-    const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     const raw = clamp01(o.progress ? o.progress() : 0);
     const p = ease(mode === "hero" ? raw : raw / 0.55);
     const close = mode === "section" ? ease((raw - 0.55) / 0.4) : 0;
-    spin += dt * (mode === "hero" ? 0.12 : 0.08) * (1 - close);
-    aim.lerp(pointer, 0.06);
     const sep = mode === "hero" ? p * 0.75 : 0.35 + p * 0.65;
     layout(sep);
-    stack.rotation.y = (spin + p * (mode === "hero" ? 1.1 : 1.6) + aim.x * 0.35) * (1 - close) + close * 0.04;
-    stack.rotation.x = (0.16 + aim.y * -0.08) * (1 - close);
+    stack.rotation.y = p * (mode === "hero" ? 1.1 : 1.6) * (1 - close) + close * 0.04;
+    stack.rotation.x = 0.16 * (1 - close);
     stack.updateMatrixWorld(true);
     const height = (n - 1) * baseGap * (1 + sep) + 1.6;
     const tanHalf = Math.tan((camera.fov * Math.PI) / 360);
@@ -563,10 +549,10 @@ export function mountStack(container, data, options) {
       camera.lookAt(center);
     }
     if (o.onCloseUp && Math.abs(close - lastClose) > 0.01) { lastClose = close; o.onCloseUp(close); }
-    const pulse = 0.75 + Math.sin(now / 600) * 0.25;
-    violet.color.setHex(TONES.gated).multiplyScalar(1.1 + pulse * 0.6);
     for (const b of beads) b.scale.setScalar(b === hovered ? 1.8 : 1);
-    renderer.render(scene, camera);
+    // Render only when something the picture depends on has changed.
+    const key = [sep.toFixed(4), p.toFixed(4), close.toFixed(4), hovered ? hovered.userData.record.id : "", canvas.width, canvas.height].join("|");
+    if (key !== lastKey) { lastKey = key; renderer.render(scene, camera); }
     if (visible && !document.hidden) raf = requestAnimationFrame(frame);
     else running = false;
   }

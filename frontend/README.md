@@ -21,14 +21,7 @@ network access. It binds to the loopback interface unless `--host` says otherwis
 
 ## Design
 
-An editorial layout: a compact hero on the overview with a "Now" strip of the
-latest verdicts directly beneath it, numbered section eyebrows, display type,
-spec-table rows, alternating light and dark bands, a hardware-boundary ticker with
-a pause control, scroll reveals, count-up figures, magnetic buttons and
-cross-fading page transitions (View Transitions API where available). It follows
-the system colour scheme; every text colour meets WCAG AA contrast on the surface
-it sits on, including the dark bands in light mode. All motion stops under
-`prefers-reduced-motion`, and the ticker starts paused.
+An editorial specification layout: a dark masthead and hero, a static hardware-boundary strip under the header, a short "Latest records" strip, plain section headings, one light content ground with a dark stage section and footer, tables with status badges, and one bronze accent for the active section. It follows the system colour scheme; every text colour meets WCAG AA contrast on the surface it sits on, including the dark bands in light mode. Motion is limited to the 3-D stage's scroll-driven separation, a skeleton loading state and a 200 ms page fade. All motion stops under `prefers-reduced-motion`. The boundary strip is static.
 
 **Artwork is original and drawn from the data.** There are no photographs. The
 figures are SVG built in the browser from this checkout's own records, and each
@@ -36,29 +29,24 @@ caption says which data drew it:
 
 | Figure | Where | Drawn from |
 |---|---|---|
-| Evidence lattice | Records (and the overview hero where 3-D is unavailable) | one row per record family, x = recorded time, shape = evidence basis, colour = most severe headline status, gold curves = records naming records; each mark opens its record |
+| Evidence lattice | Records (and the overview hero where 3-D is unavailable) | one row per record family, x = recorded time, shape = evidence basis, colour = most severe headline status, a curve joins two records, one naming the other; each mark opens its record |
 | Stage stack (SVG) | Gates, Experiments (and the overview where 3-D is unavailable) | one plate per gate (or contract group / experiment); hatched = hardware-gated, PASS not permitted |
-| Digest sigil | Provenance | a master file's SHA-256, re-measured on load: one tick per hex digit |
+| Digest sigil | Provenance | a master file's SHA-256, recomputed on load: one tick per hex digit |
 | Result matrix | Candidates | candidate x gate, coloured by the recorded status; each mark shows its reason |
 
 **The live 3-D stage stack** (`static/scene3d.js`) is an original real-time
-three.js model on the overview: one plate per frozen gate (gold = computational,
-dark with a pulsing violet rim = hardware-gated, PASS not permitted), one bead per
+three.js model on the overview: one plate per frozen gate (anodised grey = computational,
+dark with a steady violet rim = hardware-gated, PASS not permitted), one bead per
 record, placed by recorded time and coloured by its headline status. Hover a bead
 for its record, click to open it. Scrolling separates and turns the stack (hero).
 
 The wiring and the sample stage are drawn in detail but are illustrative: semi-rigid
 coax lines (one per record family carries its beads; the rest are unlabelled) with
-bulkhead connectors and nuts at every plate, attenuators, copper thermalisation
-coils, and braided flex lines into a gold sample package with SMA launches, launch
+bulkhead connectors at every plate, nuts on each signal line, attenuators, thermalisation coils, and braided flex lines into an anodised sample package with SMA launches, launch
 traces and bond wires. The chip on it is a procedural texture (feedline, qubit
 cells with meandered inductors, couplers, readout resonators, flux lines, bond-pad
-ring), printed "ILLUSTRATIVE LAYOUT · NOT A DEVICE DESIGN"; its only data is that
-each junction marker is tinted by one record's headline status. In "Gates only
-hardware can close" the stage pins on wide screens while the stack separates and
-the camera descends to the chip, where a callout repeats that it is artwork, not a
-QMHP design and not a measurement. Everything is labelled on the page as not a
-model of QMHP or of any real hardware.
+ring). It carries no printed label; the figure caption states that it is illustrative artwork, not a QMHP device design and not a measurement. Its only data is that
+each junction marker is tinted by one record's headline status. In the section on gates that only measured hardware evidence can close, the stage pins on wide screens while the section scrolls: the stack separates and the camera descends to the chip, where a label on the figure says it is illustrative artwork, not a QMHP design and not a measurement. Everything is labelled on the page as not a model of QMHP or of any real hardware.
 
 It renders only while on screen and the tab is visible, runs at 30 fps on touch
 devices, is disposed on every page change, and is skipped - the SVG figure is shown
@@ -77,9 +65,7 @@ behind a basis, a gate's reason) open in a popover on hover, keyboard focus or
 tap; Escape closes it. On phones every table except the gate matrix becomes a
 stack of labelled cards, and touch targets are at least 24 px.
 
-**Type** is Geist, Geist Mono and Instrument Serif, SIL Open Font License 1.1,
-vendored as WOFF2 under `static/fonts/` with their licence texts (OFL requires
-the licence to travel with the fonts). No font is fetched from a third party.
+**Type** is Geist and Geist Mono, SIL Open Font License 1.1, vendored as WOFF2 under `static/fonts/` with their licence texts (OFL requires the licence to travel with the fonts). The Instrument Serif files and licence remain vendored but are no longer referenced. No font is fetched from a third party.
 
 ## What it will not do
 
@@ -117,14 +103,14 @@ browser ──GET──▶ server.py ──▶ adapter.py ──▶ repo_fs.py �
 | Section | Shows | Source |
 |---|---|---|
 | Overview | Checkout, counts by evidence basis and status family, latest record per family, hardware-gated gates, frozen-master status and open provenance questions | everything below |
-| Experiments & contracts | Spec, `master/`, `contracts/`, `config/`, `sweeps/`; each `experiments/<id>/` with its files by role, execution state as its own files state it, approvals, linked records | `experiments/**`, `master/**` |
-| Evidence records | Every `results/<id>/`, filterable by basis, status family and family; per-record statement, headline statuses with their JSON paths, report, primary JSON tree, all status statements, files and links | `results/*/summary.json`, `execution_record.json`, `batch_report.json`, `corrective_analysis.json`, `report.md` |
-| Candidates & runs | Candidate gate evaluations and named runs | `results/*/<candidate>/gate_report.json`, `summary.runs` |
-| Gate status | Frozen gate definitions (hardware gates omit PASS), result matrix, distinct recorded reasons, record verdicts | `master/validation_gates.yaml`, gate reports |
-| Provenance & hashes | Master digests re-measured; per-record byte manifests re-measured on request; declared digests shown separately from measured ones | `master/provenance.json`, `results/*/manifest.sha256` |
-| Execution & audit trail | Experiment states, approval files with state (ON FILE / DRAFT / CONSUMED), timeline of records, approvals, executions, spent attempts and withdrawals | timestamps inside the files |
+| Experiments | Spec, `master/`, `contracts/`, `config/`, `sweeps/`; each `experiments/<id>/` with its files by role, execution state as its own files state it, approvals, linked records | `experiments/**`, `master/**` |
+| Records | Every `results/<id>/`, filterable by basis, status family and family; per-record statement, headline statuses with their JSON paths, report, primary JSON tree, all status statements, files and links | `results/*/summary.json`, `execution_record.json`, `batch_report.json`, `corrective_analysis.json`, `report.md` |
+| Candidates | Candidate gate evaluations and named runs | `results/*/<candidate>/gate_report.json`, `summary.runs` |
+| Gates | Frozen gate definitions (hardware gates omit PASS), result matrix, distinct recorded reasons, record verdicts | `master/validation_gates.yaml`, gate reports |
+| Provenance | Master digests recomputed; per-record byte manifests recomputed on request; declared digests shown separately from measured ones | `master/provenance.json`, `results/*/manifest.sha256` |
+| Audit trail | Experiment states, approval files with state (ON FILE / DRAFT / CONSUMED), timeline of records, approvals, executions, spent attempts and withdrawals | timestamps inside the files |
 | Corrections | Corrective records, `supersedes` / `correction` / `withdrawn_claims` fields, WITHDRAWN records, correction headings in `docs/` | JSON fields and markdown headings |
-| Evidence classification | The basis rules, the status families and what they mean, records grouped by basis | `classify.py` |
+| Classification | The basis rules, the status families and what they mean, records grouped by basis | `classify.py` |
 
 When a directory such as `experiments/` is absent from the checked-out commit,
 the viewer says so; it never reaches into other branches.
@@ -156,8 +142,7 @@ BLOCKED, TIMEOUT, INCONCLUSIVE, WITHDRAWN, PREPARED, ...) only picks the colour
 and the filter facet. Unknown tokens are shown as recorded, in a neutral colour.
 The badge text is always the original token; hovering shows its JSON path.
 
-**Hashes.** Only files named `*manifest.sha256` are byte manifests and are
-re-measured (MATCH / MISMATCH / ABSENT FROM CHECKOUT). Other `.sha256` files
+**Hashes.** Only files named `*manifest.sha256` are byte manifests and are recomputed (MATCH / MISMATCH / ABSENT FROM CHECKOUT). Other `.sha256` files
 are shown as declared digests and never byte-compared, because what they
 digest is defined by the code that wrote them: `PALACE-VERIFY-*/campaign.sha256`,
 for example, digests the campaign definition's canonical JSON form, not the

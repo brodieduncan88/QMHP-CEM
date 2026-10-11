@@ -9,6 +9,7 @@
   <meta name="color-scheme" content="light dark">
   <title>QMHP-CEM Evidence Viewer</title>
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 </head>
 <body>
   <a class="skip" href="#view">Skip to content</a>
@@ -19,36 +20,28 @@
       <span class="brand-sub">Evidence Viewer</span>
     </a>
     <nav class="nav" id="nav" aria-label="Sections">
-      <a href="#/overview" data-r="overview"><span>01</span>Overview</a>
-      <a href="#/experiments" data-r="experiments"><span>02</span>Experiments</a>
-      <a href="#/records" data-r="records"><span>03</span>Records</a>
-      <a href="#/candidates" data-r="candidates"><span>04</span>Candidates</a>
-      <a href="#/gates" data-r="gates"><span>05</span>Gates</a>
-      <a href="#/provenance" data-r="provenance"><span>06</span>Provenance</a>
-      <a href="#/audit" data-r="audit"><span>07</span>Audit trail</a>
-      <a href="#/corrections" data-r="corrections"><span>08</span>Corrections</a>
-      <a href="#/classification" data-r="classification"><span>09</span>Classification</a>
-      <a class="minor" href="#/documents" data-r="documents"><span>10</span>Documents</a>
-      <a class="minor" href="#/unavailable" data-r="unavailable"><span>11</span>Unavailable</a>
+      <a href="#/overview" data-r="overview">Overview</a>
+      <a href="#/experiments" data-r="experiments">Experiments</a>
+      <a href="#/records" data-r="records">Records</a>
+      <a href="#/candidates" data-r="candidates">Candidates</a>
+      <a href="#/gates" data-r="gates">Gates</a>
+      <a href="#/provenance" data-r="provenance">Provenance</a>
+      <a href="#/audit" data-r="audit">Audit trail</a>
+      <a href="#/corrections" data-r="corrections">Corrections</a>
+      <a href="#/classification" data-r="classification">Classification</a>
+      <a class="minor" href="#/documents" data-r="documents">Documents</a>
+      <a class="minor" href="#/unavailable" data-r="unavailable">Unavailable</a>
     </nav>
     <div class="head-tools">
       <span class="chip readonly" title="GET and HEAD only. No execution, approval or write path exists."><span class="dot"></span>Read-only</span>
       <div class="search" role="search">
-        <label class="sr" for="global-search">Search the repository</label>
-        <input id="global-search" type="search" placeholder="Search evidence" autocomplete="off">
+        <label class="sr" for="global-search">Search checked-out files</label>
+        <input id="global-search" type="search" placeholder="Search" autocomplete="off">
       </div>
     </div>
   </header>
 
-  <div class="ticker" role="note" aria-label="Hardware boundary">
-    <div class="ticker-window">
-      <div class="ticker-track">
-        <p class="ticker-item"><strong>Hardware boundary</strong> A computational PASS is not hardware validation <span class="sep">/</span> SOLVED and SYNTHETIC evidence never closes a HARDWARE-GATED gate <span class="sep">/</span> <span class="measured-text">Loading measured-evidence status</span> <span class="sep">/</span> <span class="checkout-text">checkout</span></p>
-        <p class="ticker-item" aria-hidden="true"><strong>Hardware boundary</strong> A computational PASS is not hardware validation <span class="sep">/</span> SOLVED and SYNTHETIC evidence never closes a HARDWARE-GATED gate <span class="sep">/</span> <span class="measured-text">Loading measured-evidence status</span> <span class="sep">/</span> <span class="checkout-text">checkout</span></p>
-      </div>
-    </div>
-    <button class="ticker-toggle" id="ticker-toggle" type="button" aria-pressed="false" aria-label="Pause or play the moving hardware-boundary banner"><span class="ico" aria-hidden="true"></span><span class="lbl">Pause</span></button>
-  </div>
+  <div class="ticker" role="note" aria-label="Hardware boundary"><p class="ticker-item"><strong>Hardware boundary</strong> A computational PASS is not hardware validation <span class="sep">/</span> SOLVED and SYNTHETIC evidence never closes a HARDWARE-GATED gate <span class="sep">/</span> <span class="measured-text">Loading measured-evidence status</span> <span class="sep">/</span> <span class="checkout-text">checkout</span></p></div>
 
   <main id="view" tabindex="-1" aria-live="polite"><p class="loading wrap">Loading&hellip;</p></main>
 
@@ -56,7 +49,7 @@
     <div class="wrap foot-grid">
       <div class="foot-lead">
         <p class="eyebrow">Read-only by construction</p>
-        <p class="foot-statement">This viewer displays what the repository's own files state and re-measures hashes on request. It does not execute, approve, edit, commit or push <em>anything</em>.</p>
+        <p class="foot-statement">This viewer displays what the repository's own files state and recomputes hashes on request. It does not execute, approve, edit, commit or push <em>anything</em>.</p>
       </div>
       <div class="foot-cols">
         <div>
@@ -65,7 +58,7 @@
         </div>
         <div>
           <p class="eyebrow">Integrity</p>
-          <a href="#/provenance">Provenance</a><a href="#/audit">Audit trail</a><a href="#/corrections">Corrections</a><a href="#/unavailable">Unavailable actions</a>
+          <a href="#/provenance">Provenance</a><a href="#/audit">Audit trail</a><a href="#/corrections">Corrections</a><a href="#/unavailable">Unavailable</a>
         </div>
         <div>
           <p class="eyebrow">Reference</p>
@@ -73,9 +66,9 @@
         </div>
       </div>
     </div>
-    <div class="wrap foot-word" aria-hidden="true">QMHP<span>—</span>CEM</div>
     <div class="wrap foot-base">
-      <span>Every figure is drawn from this checkout's own records. Type: Geist, Geist Mono and Instrument Serif (SIL OFL 1.1).</span>
+      <span>Data figures are drawn from this checkout's records. The chip, wiring and sample package are illustrative artwork.</span>
+      <span>Typeface: Geist and Geist Mono (SIL OFL 1.1).</span>
       <span class="checkout-text">checkout</span>
     </div>
   </footer>

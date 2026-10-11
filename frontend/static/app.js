@@ -39,6 +39,8 @@ function getCached(path) {
 }
 
 // ---------------------------------------------------------------------- DOM
+// A long hex digest is broken into 8-character groups, so a wrap never leaves one orphan character.
+const hashGroups = (s) => (/^[0-9a-f]{16,}$/i.test(s) ? (s.match(/.{1,8}/g) || [s]).flatMap((g, i) => (i ? [el("wbr"), document.createTextNode(g)] : [document.createTextNode(g)])) : null);
 function el(tag, props, ...kids) {
   const node = document.createElement(tag);
   if (props) {
@@ -50,16 +52,29 @@ function el(tag, props, ...kids) {
       else node.setAttribute(k, v === true ? "" : String(v));
     }
   }
+  const hashy = node.classList.contains("hash");
   for (const kid of kids.flat(Infinity)) {
     if (kid === null || kid === undefined || kid === false) continue;
+    const grouped = hashy && typeof kid === "string" ? hashGroups(kid) : null;
+    if (grouped) { node.append(...grouped); continue; }
     node.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
   }
   return node;
 }
 const txt = (s) => document.createTextNode(s == null ? "" : String(s));
 function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+// Marks each table that is wider than its box, so the scroll cues show only where columns are hidden.
+function markScrollTables(root) {
+  root.querySelectorAll(".table-wrap").forEach((w) => w.classList.toggle("is-scrollable", w.scrollWidth > w.clientWidth + 1));
+}
 function link(href, label, cls) { return el("a", { href, class: cls }, label); }
 const fileHref = (path) => `#/file?path=${q(path)}`;
+// A repository path as link text. A break opportunity follows each "_", "-", "." and "/",
+// so a long name wraps at a separator instead of mid-word. The text itself is unchanged.
+const pathLabel = (path) => el("span", null, String(path).split(/(?<=[_\-./])/).flatMap((seg, i) => (i ? [el("wbr"), seg] : [seg])));
+// Prose that names identifiers or files ("base_v1_5_8e_provenance.pdf"): a break opportunity
+// after "_" and before a letter that follows "." so the text wraps at a separator.
+const softBreaks = (text) => String(text == null ? "" : text).split(/(?<=_)|(?<=\.)(?=[A-Za-z])/).flatMap((seg, i) => (i ? [el("wbr"), seg] : [seg]));
 const recordHref = (id) => `#/records/${q(id)}`;
 function fmtSize(n) {
   if (n == null) return "";
@@ -70,6 +85,15 @@ function fmtSize(n) {
 function fmtTs(ts) { return ts ? ts.replace("T", " ").replace("Z", " UTC") : "undated"; }
 function shortSha(s) { return s ? String(s).slice(0, 12) : ""; }
 function trunc(s, n) { s = s == null ? "" : String(s); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+function plural(n, one, many = one + "s") { return n === 1 ? one : many; }
+// Long repository text is shown in full. Past n characters it opens at a word boundary:
+// the cut is the summary, and the complete text sits in the disclosure beneath it.
+function excerpt(s, n) {
+  s = s == null ? "" : String(s);
+  if (s.length <= n) return softBreaks(s);
+  const at = s.lastIndexOf(" ", n);
+  return el("details", { class: "more" }, el("summary", null, softBreaks(s.slice(0, at > 0 ? at : n)), " … Show full text"), softBreaks(s));
+}
 
 // ------------------------------------------------------------------- badges
 // A badge that carries detail is a button: hover, focus or tap shows the detail in
@@ -90,7 +114,7 @@ function statusBadges(items, max, plain) {
   const out = [];
   for (const item of items || []) {
     item.tokens.forEach((tok, i) => {
-      out.push(plain ? badge(tok, item.tones[i]) : badge(tok, item.tones[i], { k: item.path, v: `“${trunc(item.raw, 300)}”` }));
+      out.push(plain ? badge(tok, item.tones[i]) : badge(tok, item.tones[i], { k: item.path, v: `“${item.raw}”` }));
     });
   }
   return max && out.length > max ? [...out.slice(0, max), el("span", { class: "muted small" }, ` +${out.length - max}`)] : out;
@@ -114,8 +138,18 @@ function computationalNotice(basis) {
 }
 function lockedAction(label, reason) {
   return el("div", { class: "item" },
-    el("button", { type: "button", disabled: true, "aria-disabled": "true", title: "Unavailable in the read-only viewer" }, label),
-    el("div", { class: "small muted" }, reason));
+    el("div", { class: "action" }, label),
+    reason ? el("div", { class: "small muted" }, reason) : null);
+}
+// A list of unavailable actions. A reason that two or more rows share is shown once above
+// the list; a row shows its own reason only when it differs from that shared one.
+function lockedList(items) {
+  const counts = new Map();
+  for (const [, reason] of items) counts.set(reason, (counts.get(reason) || 0) + 1);
+  let shared = null, most = 1;
+  for (const [reason, n] of counts) if (n > most) { most = n; shared = reason; }
+  return [shared ? el("p", { class: "small muted" }, shared) : null,
+    ...items.map(([label, reason]) => lockedAction(label, reason === shared ? null : reason))];
 }
 
 // ----------------------------------------------------------------- tables
@@ -298,19 +332,11 @@ function head(title, lead, crumbs, extra) {
 }
 
 // ---------------------------------------------------------- editorial
-function lines(text, cls) {
-  return el("h1", { class: cls }, String(text).split("\n").map((ln) => el("span", { class: "line" }, el("span", null, ln))));
-}
 function eyebrow(n, label) {
   return el("p", { class: "eyebrow" }, n ? el("span", { class: "num" }, n) : null, label);
 }
-const SECTION_NAMES = {
-  "02": "Experiments & contracts", "03": "Evidence records", "04": "Candidates & runs", "05": "Gate status",
-  "06": "Provenance & hashes", "07": "Execution & audit trail", "08": "Corrections", "09": "Evidence classification",
-  "10": "Documents", "11": "Unavailable actions",
-};
-function pageHero(n, title, lead, art) {
-  const copy = el("div", null, eyebrow(n, SECTION_NAMES[n] || ""), lines(title, "title"), lead ? el("p", { class: "lead" }, lead) : null);
+function pageHero(title, lead, art) {
+  const copy = el("div", null, el("h1", { class: "title" }, title), lead ? el("p", { class: "lead" }, lead) : null);
   return el("header", { class: `page-hero${art ? " has-art" : ""}` }, copy, art || null);
 }
 function arrow() { return el("span", { class: "arr", "aria-hidden": "true" }, "→"); }
@@ -344,6 +370,9 @@ function worstTone(headline) {
 function artFigure(svgNode, caption, cls) {
   return el("figure", { class: `art reveal${cls ? " " + cls : ""}` }, svgNode, caption ? el("figcaption", null, caption) : null);
 }
+// Joins optional figure classes; figures with small labels pass "fig-scroll" so that on
+// phones they scroll sideways inside their box instead of shrinking the text.
+const figClass = (...parts) => parts.filter(Boolean).join(" ") || undefined;
 function nodeShape(basis, cx, cy, tone) {
   const fill = `node tone-fill-${tone}`, ring = `node ring tone-stroke-${tone}`;
   const diamond = (r) => `${cx},${cy - r} ${cx + r},${cy} ${cx},${cy + r} ${cx - r},${cy}`;
@@ -357,10 +386,12 @@ function nodeShape(basis, cx, cy, tone) {
   }
 }
 // The evidence lattice: one row per record family, x = recorded time, shape = basis,
-// colour = the record's most severe headline tone, gold curves = records naming records.
+// colour = the record's most severe headline tone, curves = records naming records.
 function artLattice(records, opts) {
   const o = opts || {};
-  const W = 640, rowH = o.rowH || 54, padL = 132, padR = 22, padT = 18;
+  // The left gutter holds family names at the figure's label size, so it is wide enough
+  // that a name never runs into the first mark of its row.
+  const W = 640, rowH = o.rowH || 54, padL = 190, padR = 22, padT = 18;
   const fams = [...new Set(records.map((r) => r.family))].sort();
   const H = padT + Math.max(1, fams.length) * rowH + 34;
   const times = records.map((r) => Date.parse(r.timestamp || "")).filter(Number.isFinite);
@@ -381,7 +412,7 @@ function artLattice(records, opts) {
   fams.forEach((f, i) => {
     const y = padT + i * rowH + rowH / 2;
     grid.append(sv("line", { x1: padL - 10, x2: W - padR + 8, y1: y, y2: y, class: "rule-soft" }),
-      sv("text", { x: 0, y: y + 3.5, class: "lbl", text: trunc(f, 18) }));
+      sv("text", { x: 0, y: y + 5.5, class: "lbl", text: trunc(f, 16) }));
   });
   const axisY = padT + fams.length * rowH + 16;
   if (o.grid) {
@@ -412,10 +443,10 @@ function artLattice(records, opts) {
     nodesG.append(sv("a", { href: recordHref(r.id), "data-tip-k": r.id, "data-tip": `${r.basis.basis}${toks ? " · " + toks : ""} · ${fmtTs(r.timestamp)}`, "aria-label": `${r.id}: ${r.basis.basis}${toks ? ", " + toks : ""}` },
       sv("circle", { cx, cy, r: 22, class: "node-hit" }), shape));
   });
-  const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, role: "group", "aria-label": `Evidence lattice of ${records.length} records` }, grid, linksG, nodesG);
+  const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, class: "fig-lattice", role: "group", "aria-label": `Evidence lattice of ${records.length} records` }, grid, linksG, nodesG);
   return artFigure(svg, o.caption === undefined
-    ? `Drawn from ${records.length} records in this checkout · row = family · x = recorded time · shape = evidence basis · colour = most severe headline status · gold = one record naming another · select a mark to open it`
-    : o.caption, o.cls);
+    ? `Drawn from ${records.length} records in this checkout · row = family · x = recorded time · shape = evidence basis · colour = most severe headline status · a curve joins two records, one naming the other · select a mark to open it`
+    : o.caption, figClass("fig-scroll", o.cls));
 }
 // A stage stack: one plate per row, hatched and locked when only hardware can close it.
 function artPlates(rows, opts) {
@@ -446,7 +477,8 @@ function artPlates(rows, opts) {
     plates.append(row.href && !o.compact ? sv("a", { href: row.href, "data-tip-k": row.label, "data-tip": row.tip || row.value || "", "aria-label": `${row.label}: ${row.value || ""}` }, g) : g);
   });
   const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, role: "group", "aria-label": o.label || "Stage stack" }, defs, rods, plates);
-  return artFigure(svg, o.caption, o.cls);
+  // labelled plates scroll sideways on phones; the compact stack has no text to protect
+  return artFigure(svg, o.caption, figClass(o.compact ? null : "fig-scroll", o.cls));
 }
 // A digest drawn as a ring: 64 ticks, one per hex digit, length = the digit's value.
 function artSigil(hex, label, sub, opts) {
@@ -483,7 +515,7 @@ function artMatrix(rows, cols, opts) {
       const res = row.cells[c];
       const cx = padL + j * cell + cell / 2, cy = padT + i * cell + cell / 2;
       const mark = res ? stagger(sv("circle", { cx, cy, r: 6.5, class: `node tone-fill-${res.tone}` }), k++) : sv("circle", { cx, cy, r: 1.5, class: "tone-fill-muted" });
-      g.append(res ? sv("a", { href: recordHref(row.record), "data-tip-k": `${c} · ${row.label}`, "data-tip": `${res.status}${res.reason ? " — " + trunc(res.reason, 180) : ""}`, "aria-label": `${row.label}, ${c}: ${res.status}` }, sv("circle", { cx, cy, r: 12, class: "node-hit" }), mark) : mark);
+      g.append(res ? sv("a", { href: recordHref(row.record), "data-tip-k": `${c} · ${row.label}`, "data-tip": `${res.status}${res.reason ? " — " + res.reason : ""}`, "aria-label": `${row.label}, ${c}: ${res.status}` }, sv("circle", { cx, cy, r: 12, class: "node-hit" }), mark) : mark);
     });
   });
   return artFigure(sv("svg", { viewBox: `0 0 ${W} ${H}`, role: "group", "aria-label": o.label || "Gate matrix" }, g), o.caption, o.cls);
@@ -520,10 +552,11 @@ function stage(fallback, dataPromise, opts) {
   const o = opts || {};
   if (reducedMotion || !webglOK()) return fallback();
   const box = el("div", { class: `stage stage-${o.mode || "hero"} loading` });
-  // The close-up callout: a plain-language label that appears when the camera reaches the chip.
-  const callout = o.callout ? el("p", { class: "stage-callout", "aria-hidden": "true" }, o.callout) : null;
-  if (callout) box.append(callout);
-  const fig = el("figure", { class: "art stage-fig reveal" }, box, el("figcaption", null, o.caption));
+  // an optional close-up label sits on top of the live canvas
+  if (o.callout) box.append(o.callout);
+  const fig = el("figure", { class: "art stage-fig reveal" }, box, el("figcaption", null, o.caption),
+    // the records on the stage, for screen readers; the canvas itself is aria-hidden
+    o.records ? el("ul", { class: "sr", "aria-label": "Records on this stage" }, o.records.map((r) => el("li", null, link(recordHref(r.id), r.id)))) : null);
   Promise.all([stageModule || (stageModule = import("/static/scene3d.js")), dataPromise]).then(([mod, data]) => {
     if (!box.isConnected) return;
     const ctl = mod.mountStack(box, data, {
@@ -531,7 +564,7 @@ function stage(fallback, dataPromise, opts) {
       progress: o.progress,
       onHover: (rec, x, y) => (rec ? showTipPoint(x, y, rec.id, rec.label) : hideTip()),
       onSelect: (rec) => { location.hash = recordHref(rec.id); },
-      onCloseUp: o.callout ? (a) => callout.classList.toggle("show", a > 0.8) : null,
+      onCloseUp: o.onCloseUp || null,
     });
     activeStages.push(ctl);
     box.classList.remove("loading");
@@ -560,65 +593,29 @@ function sectionStage(hw, records) {
   const fallback = () => artPlates(hw.map((g) => ({ label: g.gate_id, value: "hardware only", locked: true, tone: "gated", href: "#/gates", tip: g.title })),
     { label: "Hardware-gated gates", caption: "Drawn from master/validation_gates.yaml · one plate per gate that omits PASS · hatched = closable only by measured hardware evidence" });
   const holder = el("div", { class: "stage-holder" });
+  // The close-up label: it appears once the camera has reached the chip (amount above 0.8).
+  const callout = el("p", { class: "stage-callout", "aria-hidden": "true" }, SECTION_CALLOUT);
   holder.append(stage(fallback, getCached("/api/gates").then((g) => stageData(g.definitions.gates || [], records)),
-    { mode: "section", caption: SECTION_CAPTION, progress: sectionProgress(holder),
-      callout: "Illustrative chip · procedural artwork, not a QMHP device design and not a measurement",
+    { mode: "section", caption: SECTION_CAPTION, progress: sectionProgress(holder), records,
+      callout,
+      onCloseUp: (a) => callout.classList.toggle("show", a > 0.8),
+      // the section pins its stage on wide screens once the live stack is running
       onLive: () => { const sec = holder.closest("section"); if (sec) sec.classList.add("pinned-scene"); } }));
   return holder;
 }
-const SECTION_CAPTION = "The same stack: keep scrolling and it separates, then the camera descends to the sample stage · the chip, its bond wires, coax and flex lines are illustrative artwork; each junction marker is tinted by one record's headline status · violet-rimmed plates are the gates only measured hardware evidence can close · not a model of QMHP or any real hardware";
-const STAGE_CAPTION = "Original 3-D illustration, drawn live from this checkout · one plate per frozen gate (dark with a violet rim = hardware-gated) · one coax line per record family (the remaining lines are unlabelled wiring), with connectors, attenuators and thermalisation coils · one bead per record, coloured by its headline status · the chip at the bottom is illustrative artwork · not a model of QMHP or any real hardware";
+const SECTION_CALLOUT = "Illustrative chip: procedural artwork, not a QMHP device design and not a measurement.";
+const SECTION_CAPTION = "The same stack, separated, with the camera descending to the sample package. The chip, bond wires, coax and flex lines are illustrative artwork, not a QMHP device design and not a measurement. Each junction marker is tinted by one record's headline status. Violet-rimmed plates are gates that only measured hardware evidence can close. This is not a model of QMHP or any real hardware.";
+const STAGE_CAPTION = "Original 3-D illustration, drawn live from this checkout. Plates are frozen gates; a violet rim marks a hardware-gated gate. One coax line per record family; the other lines are unlabelled wiring. Beads are records, coloured by headline status. The chip is illustrative artwork, not a QMHP device design and not a measurement. This is not a model of QMHP or any real hardware.";
 
-// Motion: reveal on scroll, count up, header state and magnetic buttons. All of it is
-// presentation; it reads nothing and requests nothing.
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-function countUp(node) {
-  const target = Number(node.dataset.count);
-  if (!Number.isFinite(target) || reducedMotion || target === 0) { node.textContent = String(target); return; }
-  const t0 = performance.now(), dur = 1400;
-  const tick = (t) => {
-    const k = Math.min(1, (t - t0) / dur);
-    node.textContent = String(Math.round(target * (1 - Math.pow(1 - k, 4))));
-    if (k < 1) requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
-}
-let revealObserver = null;
-function enhance(root) {
-  const targets = root.querySelectorAll(".reveal, [data-count]");
-  if (!("IntersectionObserver" in window) || reducedMotion) {
-    targets.forEach((t) => { t.classList.add("in"); if (t.dataset.count) countUp(t); });
-  } else {
-    if (revealObserver) revealObserver.disconnect();
-    revealObserver = new IntersectionObserver((entries) => {
-      for (const e of entries) {
-        if (!e.isIntersecting) continue;
-        e.target.classList.add("in");
-        if (e.target.dataset.count) countUp(e.target);
-        revealObserver.unobserve(e.target);
-      }
-    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.12 });
-    targets.forEach((t) => revealObserver.observe(t));
-  }
-  if (!reducedMotion && window.matchMedia("(pointer: fine)").matches) {
-    root.querySelectorAll(".btn").forEach((b) => {
-      b.addEventListener("pointermove", (e) => {
-        const r = b.getBoundingClientRect();
-        b.style.setProperty("--mx", `${((e.clientX - r.left) / r.width - 0.5) * 10}px`);
-        b.style.setProperty("--my", `${((e.clientY - r.top) / r.height - 0.5) * 8}px`);
-      });
-      b.addEventListener("pointerleave", () => { b.style.setProperty("--mx", "0px"); b.style.setProperty("--my", "0px"); });
-    });
-  }
-}
+// Reduced motion is read at load and kept current if the setting changes. The header
+// gains its background once the page has scrolled; nothing else reacts to scrolling.
+const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+let reducedMotion = motionQuery.matches;
+motionQuery.addEventListener("change", (e) => { reducedMotion = e.matches; });
 function onScroll() {
-  let last = window.scrollY, ticking = false;
+  let ticking = false;
   const update = () => {
-    const y = window.scrollY;
-    document.body.classList.toggle("scrolled", y > 40);
-    document.body.classList.toggle("head-hidden", y > 480 && y > last + 2);
-    if (y < last - 2 || y < 480) document.body.classList.remove("head-hidden");
-    last = y;
+    document.body.classList.toggle("scrolled", window.scrollY > 40);
     ticking = false;
   };
   window.addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
@@ -692,8 +689,8 @@ function provenanceArt(m) {
   const c = m && m.present ? (m.checks || []).find((x) => x.measured) || (m.checks || [])[0] : null;
   if (!c) return null;
   const name = c.path.split("/").pop();
-  return artSigil(c.measured || c.declared, name, `re-measured: ${c.status}`,
-    { caption: `Drawn from the SHA-256 of ${c.path}, re-measured when this page loaded · one tick per hex digit · tick length = digit value` });
+  return artSigil(c.measured || c.declared, name, `recomputed: ${c.status}`,
+    { caption: `Drawn from the SHA-256 of ${c.path}, recomputed when this page loaded · one tick per hex digit · tick length = digit value` });
 }
 
 // ================================================================== views
@@ -707,27 +704,26 @@ async function viewOverview() {
   out.push(el("section", { class: "hero bleed" }, el("div", { class: "wrap" },
     el("div", { class: "hero-grid" },
       el("div", null,
-        eyebrow("(01)", "QMHP-CEM — Computational Engineering Model"),
+        eyebrow(null, "QMHP-CEM — Computational Engineering Model"),
         el("h1", { class: "display" },
-          el("span", { class: "line" }, el("span", null, "Evidence,")),
-          el("span", { class: "line" }, el("span", null, "not")),
-          el("span", { class: "line" }, el("span", null, el("em", null, "assertion.")))),
-        el("p", { class: "hero-lead" }, "A read-only window onto every record, gate and hash in this checkout: what was computed, what was only declared, and what still waits on hardware. Each label names the rule that put it there."),
+          el("span", { class: "line" }, "Evidence in"), " ",
+          el("span", { class: "line" }, "this checkout")),
+        el("p", { class: "hero-lead" }, "This page lists every evidence record, gate and recorded digest in this checkout. It separates what was computed from what was only declared, and what still requires hardware evidence. Each evidence basis states the rule that assigned it."),
         el("div", { class: "hero-ctas" },
           el("a", { class: "btn solid", href: "#/records" }, "Explore evidence records", arrow()),
           el("a", { class: "btn", href: "#/classification" }, "How labels are assigned", arrow()))),
       recs.records.length ? stage(
         () => artLattice(recs.records, { rowH: Math.max(40, Math.min(150, 380 / Math.max(1, new Set(recs.records.map((r) => r.family)).size))), grid: true }),
         getCached("/api/gates").then((g) => stageData(g.definitions.gates || [], recs.records)),
-        { mode: "hero", caption: STAGE_CAPTION, progress: () => Math.min(1, window.scrollY / (window.innerHeight * 0.9)) }) : null),
+        { mode: "hero", caption: STAGE_CAPTION, progress: () => Math.min(1, window.scrollY / (window.innerHeight * 0.9)), records: recs.records }) : null),
     el("div", { class: "hero-stats" },
-      [[d.counts.records, "Result records", "#/records"], [d.counts.candidates, "Candidates evaluated", "#/candidates"],
+      [[d.counts.records, "Records", "#/records"], [d.counts.candidates, "Candidates evaluated", "#/candidates"],
         [d.hardware_gated_gates.length, "Hardware-gated gates", "#/gates"], [measuredCount, "Measured records", "#/classification"]]
-        .map(([v, k, href]) => el("a", { href }, el("span", { class: "v", "data-count": String(v) }, String(v)), el("span", { class: "k" }, k)))))));
+        .map(([v, k, href]) => el("a", { href }, el("span", { class: "v" }, String(v)), el("span", { class: "k" }, k)))))));
 
   // 02 - now: the latest verdicts, before anything else
   out.push(el("section", { class: "now bleed", "aria-label": "Latest status" }, el("div", { class: "wrap now-inner" },
-    el("div", null, eyebrow("(02)", "Now"), el("p", { class: "small muted" }, "The newest record in each family, with its own headline status.")),
+    el("div", null, el("h2", null, "Latest records"), el("p", { class: "small muted" }, "The newest record in each family, with its own headline status.")),
     el("div", { class: "now-rows" }, d.latest_by_family.map((r) => el("a", { class: "now-row", href: recordHref(r.id) },
       el("span", { class: "fam" }, r.family),
       el("span", { class: "rid" }, r.id, el("small", null, fmtTs(r.timestamp))),
@@ -737,9 +733,9 @@ async function viewOverview() {
   // 03 - the boundary, stated
   const basisRows = Object.entries(d.by_basis).map(([b, n]) => el("a", { class: "spec-row", href: `#/records?basis=${b}` },
     el("span", { class: "k" }, basisBadge(b, false, true)), el("span", { class: "v" }, (cls.bases.find((x) => x.basis === b) || {}).explanation || ""),
-    el("span", { class: "n", "data-count": String(n) }, String(n))));
+    el("span", { class: "n" }, String(n))));
   out.push(el("section", { class: "section bleed" }, el("div", { class: "wrap split" },
-    el("div", { class: "reveal" }, eyebrow("(03)", "The hardware boundary"),
+    el("div", { class: "reveal" }, eyebrow(null, "The hardware boundary"),
       el("h2", { class: "statement" }, "A computational PASS is ", el("em", null, "not"), " hardware validation.")),
     el("div", { class: "reveal d1" },
       el("p", { class: "copy" }, d.measured_statement, " Every record carries an evidence basis assigned by an explicit, ordered rule, and every status badge quotes the record's own words."),
@@ -753,16 +749,16 @@ async function viewOverview() {
     el("span", null, badge("HARDWARE-GATED", "gated", { k: g.gate_id, v: g.pass_permitted ? "PASS permitted" : "PASS is not in this gate's frozen allowed statuses." }))));
   out.push(el("section", { class: "section band-dark bleed" }, el("div", { class: "wrap split media-left" },
     hw.length ? sectionStage(hw, recs.records) : el("div"),
-    el("div", { class: "reveal d1" }, eyebrow("(04)", "Gates only hardware can close"),
-      el("h2", { class: "statement" }, "Some questions only a ", el("em", null, "cold"), " measurement answers."),
-      el("p", { class: "copy mt" }, "These gates omit PASS from their frozen allowed statuses, so no simulated or model-derived result in this repository can close them."),
+    el("div", { class: "reveal d1" }, eyebrow(null, "Hardware-gated gates"),
+      el("h2", { class: "statement" }, "Gates that only measured hardware evidence can close"),
+      el("p", { class: "copy mt" }, "These gates do not allow PASS in their frozen allowed statuses. No simulated or model-derived result in this repository can close them."),
       el("div", { class: "spec mt" }, hwRows.length ? hwRows : el("p", { class: "empty" }, "No frozen gate definitions in this checkout."))))));
 
   // 05 - status families as figures
   const figs = Object.entries(d.by_status_family).map(([f, n]) => el("a", { class: "figure", href: `#/records?status=${q(f)}`, "aria-label": `${n} records: ${f}. ${(legend[f] || {}).meaning || ""}` },
-    el("div", { class: "v", "data-count": String(n) }, String(n)), el("div", { class: "k" }, badge(f, (legend[f] || {}).tone))));
-  out.push(el("section", { class: "section tight band-plate bleed" }, el("div", { class: "wrap" },
-    el("div", { class: "sec-head reveal" }, el("div", null, eyebrow("(05)", "Status at a glance"), el("h2", null, "Headline status families")),
+    el("div", { class: "v" }, String(n)), el("div", { class: "k" }, badge(f, (legend[f] || {}).tone))));
+  out.push(el("section", { class: "section tight bleed" }, el("div", { class: "wrap" },
+    el("div", { class: "sec-head reveal" }, el("div", null, el("h2", null, "Headline status families")),
       el("p", null, "Records whose own headline fields carry a token in that family. A family only picks the colour; the token is always the record's.")),
     el("div", { class: "figures reveal d1" }, figs))));
 
@@ -770,32 +766,31 @@ async function viewOverview() {
   const m = d.master || {};
   const co = d.checkout;
   out.push(el("section", { class: "section bleed" }, el("div", { class: "wrap split" },
-    el("div", { class: "reveal" }, eyebrow("(06)", "Frozen master"),
+    el("div", { class: "reveal" }, eyebrow(null, "Frozen master"),
       el("div", { class: "spec" },
         [["Revision", m.revision], ["Status", m.status], ["Date", m.date]].map(([k, v]) => el("div", { class: "spec-row" }, el("span", { class: "k" }, k), el("span", { class: "v" }, v || "—"), el("span"))),
-        (m.issues || []).map((iss) => el("div", { class: "spec-row" }, el("span", { class: "k" }, String(iss.field).replace(/_/g, " ")), el("span", { class: "v small" }, trunc(iss.statement, 220)), badge(iss.status || "?", "caution")))),
-      el("p", { class: "mt" }, link("#/provenance", "Master digests, re-measured →", "link"))),
-    el("div", { class: "reveal d1" }, eyebrow("(07)", "This checkout"),
+        (m.issues || []).map((iss) => el("div", { class: "spec-row" }, el("span", { class: "k" }, String(iss.field).replace(/_/g, " ")), el("span", { class: "v small" }, excerpt(iss.statement, 220)), badge(iss.status || "?", "caution")))),
+      el("p", { class: "mt" }, link("#/provenance", "Master digests, recomputed →", "link"))),
+    el("div", { class: "reveal d1" }, eyebrow(null, "This checkout"),
       el("div", { class: "spec" },
         co.available ? [["Branch", co.branch || (co.detached ? "(detached HEAD)" : "?")], ["HEAD", el("span", { class: "hash" }, co.head_sha)],
           ["Read from", "git's own HEAD and ref files; no git command is run"]].map(([k, v]) => el("div", { class: "spec-row" }, el("span", { class: "k" }, k), el("span", { class: "v" }, v), el("span")))
           : el("p", { class: "muted" }, `Commit identity unavailable: ${co.reason || "no git metadata"}.`))))));
 
   // 08 - what the viewer will never do
-  out.push(el("section", { class: "section band-dark bleed" }, el("div", { class: "wrap split" },
-    el("div", { class: "reveal" }, eyebrow("(08)", "Unavailable by design"),
-      el("h2", { class: "statement" }, "What this viewer will ", el("em", null, "never"), " do."),
-      el("p", { class: "copy mt" }, "Not hidden, not behind a flag, not an admin mode. The code for these actions does not exist."),
+  out.push(el("section", { class: "section bleed" }, el("div", { class: "wrap split" }, el("div", { class: "reveal" }, eyebrow(null, "Unavailable by design"),
+      el("h2", null, "Actions this viewer does not provide."),
+      el("p", { class: "copy mt" }, "These actions are not implemented, so there is no hidden mode, flag or admin path."),
       el("a", { class: "btn mt", href: "#/unavailable" }, "All unavailable actions", arrow())),
-    el("div", { class: "locked reveal d1" }, d.capabilities.unavailable.map((u) => lockedAction(u.action, u.reason))))));
+    el("div", { class: "locked reveal d1" }, lockedList(d.capabilities.unavailable.map((u) => [u.action, u.reason]))))));
   return out;
 }
 
 async function viewUnavailable() {
   const c = await get("/api/capabilities");
-  return [pageHero("11", "Unavailable\nby design.", "This viewer is a display surface only. Anything below would change scientific or repository state, or start an execution, so it is not implemented - not hidden, not behind a flag, not an admin mode."),
+  return [pageHero("Unavailable", "This viewer only displays records. The actions below would change scientific or repository state, or start an execution, so they are not implemented. There is no hidden mode, flag or admin path."),
     el("div", { class: "panel" }, kv([["HTTP methods served", c.http_methods.join(", ")], ["Writes", c.writes]])),
-    el("div", { class: "panel locked" }, c.unavailable.map((u) => lockedAction(u.action, u.reason)))];
+    el("div", { class: "panel locked" }, lockedList(c.unavailable.map((u) => [u.action, u.reason])))];
 }
 
 // -------------------------------------------------------------- records
@@ -830,12 +825,13 @@ async function viewRecords(params) {
         el("td", { class: "id" }, link(recordHref(r.id), r.id)),
         el("td", { class: "nowrap small" }, fmtTs(r.timestamp)),
         el("td", null, basisBadge(r.basis)),
-        el("td", null, el("div", { class: "row" }, statusBadges(r.headline, 6)), r.statement ? el("div", { class: "small muted" }, trunc(r.statement, 160)) : null),
+        el("td", null, el("div", { class: "row" }, statusBadges(r.headline, 6)), r.statement ? el("div", { class: "small muted" }, excerpt(r.statement, 160)) : null),
         el("td", { class: "small nowrap" }, `${r.candidate_count} / ${r.run_count}`),
-        el("td", { class: "small" }, r.manifests.length ? `${r.manifests.length} manifest` : el("span", { class: "muted" }, "none"))))));
+        el("td", { class: "small nowrap" }, r.manifests.length ? `${r.manifests.length} ${plural(r.manifests.length, "manifest", "manifests")}` : el("span", { class: "muted" }, "none"))))));
+    markScrollTables(holder);
   }
   render();
-  return [pageHero("03", "Evidence\nrecords.", "Every directory under results/, newest first. Status badges are tokens quoted from each record's own headline fields; hover, focus or tap one for its JSON path and full text.", d.records.length ? artLattice(d.records, { rowH: 40 }) : null),
+  return [pageHero("Records", "Every directory under results/, newest first. Status badges are tokens quoted from each record's own headline fields; hover, focus or tap one for its JSON path and full text.", d.records.length ? artLattice(d.records, { rowH: 40 }) : null),
     el("div", { class: "filters" }, input, sel("basis", ["SYNTHETIC", "SOLVED", "MEASURED", "ANALYSIS", "DECLARATION", "UNCLASSIFIED"], "bases"),
       sel("status", statusFams, "status families"), sel("family", families, "families"), count),
     holder];
@@ -872,7 +868,7 @@ async function viewRecord(id) {
   };
   const statusesPane = () => table(["File", "JSON path", "Tokens", "Recorded text"], r.statuses.map((s) => el("tr", null,
     el("td", { class: "id" }, s.file), el("td", { class: "id" }, s.path), el("td", null, el("div", { class: "row" }, statusBadges([s]))),
-    el("td", { class: "reason" }, trunc(s.raw, 300)))));
+    el("td", { class: "reason" }, excerpt(s.raw, 300)))));
   const filesPane = () => table(["Path"], r.files.map((p) => el("tr", null, el("td", { class: "id" }, link(fileHref(p), p)))));
   const provPane = () => provenancePanel(r);
   const candPane = () => el("div", null,
@@ -889,9 +885,9 @@ async function viewRecord(id) {
     r.report && { label: "Report", render: reportPane },
     r.primary && { label: "Primary JSON", render: primaryPane },
     { label: `All status statements (${r.statuses.length})`, render: statusesPane },
-    { label: "Provenance & hashes", render: provPane },
-    (r.candidates.length || r.runs.length) && { label: `Candidates & runs (${r.candidates.length}/${r.runs.length})`, render: candPane },
-    { label: "Links", render: linksPane },
+    { label: "Provenance and hashes", render: provPane },
+    (r.candidates.length || r.runs.length) && { label: `Candidates (${r.candidates.length}) and runs (${r.runs.length})`, render: candPane },
+    { label: "Related records", render: linksPane },
     { label: `Files (${r.file_count})`, render: filesPane },
   ]));
   return out;
@@ -900,7 +896,7 @@ async function viewRecord(id) {
 function provenancePanel(r) {
   const res = el("div");
   const button = el("button", { type: "button", class: "chip", title: "Recomputes SHA-256 of the checked-out files. A read; nothing is written." },
-    "Re-measure manifest hashes (read-only)");
+    "Recompute manifest hashes (read-only)");
   button.addEventListener("click", async () => {
     button.disabled = true;
     clear(res);
@@ -920,7 +916,7 @@ function provenancePanel(r) {
       (r.digest_files || []).length ? el("p", { class: "small muted" }, `Other declared digest files (not byte-compared): ${r.digest_files.join(", ")}`) : null,
       r.manifests.length || (r.digest_files || []).length ? button : null, res),
     el("div", { class: "panel" }, el("h3", null, `Digests declared inside ${r.primary || "the record"} (${digests.length})`),
-      el("p", { class: "small muted" }, "Declared by the record. Not re-measured here: many name files outside this record or bytes that are not committed."),
+      el("p", { class: "small muted" }, "Declared by the record. Not recomputed here: many name files outside this record or bytes that are not committed."),
       table(["JSON path", "SHA-256 (declared)"], digests.map((x) => el("tr", null, el("td", { class: "id" }, x.path), el("td", { class: "hash" }, x.sha256))))));
 }
 
@@ -931,14 +927,14 @@ function verifyResult(v) {
     box.append(el("h4", null, m.manifest), el("div", { class: "row" }, counts), m.error ? el("p", { class: "error" }, m.error) : null);
     const bad = (m.entries || []).filter((e) => e.status !== "MATCH");
     if (bad.length) {
-      box.append(table(["File", "Status", "Declared", "Measured now"], bad.map((e) => el("tr", null,
+      box.append(table(["File", "Status", "Declared", "Recomputed now"], bad.map((e) => el("tr", null,
         el("td", { class: "id" }, e.path || `line ${e.line}`), el("td", { class: `st-${(e.status || "").split(" ")[0]}` }, e.status),
         el("td", { class: "hash" }, e.declared || ""), el("td", { class: "hash" }, e.measured || "")))));
     }
     const ok = (m.entries || []).filter((e) => e.status === "MATCH");
     if (ok.length) {
       box.append(el("details", null, el("summary", { class: "small" }, `${ok.length} matching files`),
-        table(["File", "SHA-256 (declared = measured)"], ok.map((e) => el("tr", null, el("td", { class: "id" }, e.path), el("td", { class: "hash" }, e.declared))))));
+        table(["File", "SHA-256 (declared = recomputed)"], ok.map((e) => el("tr", null, el("td", { class: "id" }, e.path), el("td", { class: "hash" }, e.declared))))));
     }
   }
   for (const f of v.declared_digest_files || []) {
@@ -946,10 +942,10 @@ function verifyResult(v) {
       el("div", { class: "body" }, el("div", { class: "mono small" }, f.path), el("pre", { class: "code" }, f.content), el("div", { class: "small" }, f.note))));
   }
   if (v.unlisted_count) {
-    box.append(el("details", null, el("summary", { class: "small" }, `${v.unlisted_count} file(s) in the record are not listed in any byte manifest`),
+    box.append(el("details", null, el("summary", { class: "small" }, `${v.unlisted_count} ${plural(v.unlisted_count, "file")} in the record ${v.unlisted_count === 1 ? "is" : "are"} not listed in any byte manifest`),
       el("ul", null, v.unlisted_files.map((p) => el("li", { class: "mono small" }, p)))));
   }
-  box.append(el("p", { class: "small muted" }, `Measured ${fmtTs(v.measured_utc)}. ${v.note}`));
+  box.append(el("p", { class: "small muted" }, `Recomputed ${fmtTs(v.measured_utc)}. ${v.note}`));
   return box;
 }
 
@@ -964,7 +960,7 @@ function candidateTable(cands) {
         el("td", { class: "id" }, link(recordHref(c.record_id), c.record_id)),
         el("td", { class: "id" }, link(fileHref(c.path), c.candidate_id)),
         el("td", null, basisBadge(c.basis)),
-        el("td", null, c.classification ? badge(c.classification, "muted", "Candidate dimensions are ENGINEERING-SEED: never experimentally validated") : ""),
+        el("td", null, c.classification ? badge(c.classification, "muted", "ENGINEERING-SEED: a bootstrap assumption where the frozen master is silent, not a QMHP requirement; never experimentally validated.") : ""),
         el("td", { class: "small" }, c.solver ? `${c.solver.name || "?"} ${c.solver.version || ""}` : "", c.solver && c.solver.classification ? el("div", { class: "muted" }, c.solver.classification) : null),
         el("td", null, c.convergence ? badge(c.convergence, c.convergence === "CONVERGED" ? "positive" : "caution") : ""),
         el("td", null, c.overall_status ? badge(c.overall_status, c.overall_tone) : ""),
@@ -979,7 +975,7 @@ function runTable(runs) {
 }
 async function viewCandidates() {
   const d = await get("/api/candidates");
-  return [pageHero("04", "Candidates\n& runs.", "Candidates evaluated against the frozen gates, and the named runs each record lists. Candidate geometry is ENGINEERING-SEED throughout.", candidateArt(d.candidates)),
+  return [pageHero("Candidates", "Candidates evaluated against the frozen gates, and the named runs each record lists. Dimensions the frozen master does not define are labelled ENGINEERING-SEED: a bootstrap assumption set by this software, not a QMHP requirement.", candidateArt(d.candidates)),
     ...computationalNotice("SOLVED"),
     el("h2", null, `Candidates (${d.candidates.length})`), candidateTable(d.candidates),
     el("h2", null, `Runs (${d.runs.length})`), runTable(d.runs)];
@@ -989,7 +985,7 @@ async function viewCandidates() {
 async function viewGates() {
   const d = await get("/api/gates");
   const defs = d.definitions.gates || [];
-  const out = [pageHero("05", "Gates and\ntheir reasons.", "The frozen gate definitions, every gate result the records carry with its recorded reason, and each record's own headline verdicts.", defs.length ? artPlates(defs.map((g) => ({ label: g.gate_id, value: g.hardware_required ? "hardware only" : (g.required_evidence || []).join(", "), locked: g.hardware_required, tone: g.hardware_required ? "gated" : "neutral", tip: g.title })), { compact: true, label: "Frozen gate definitions", caption: "Drawn from master/validation_gates.yaml \u00b7 one plate per gate, in file order \u00b7 hatched = hardware-gated, PASS not permitted" }) : null), ...computationalNotice("SOLVED")];
+  const out = [pageHero("Gates", "The frozen gate definitions, every gate result the records carry with its recorded reason, and each record's own headline verdicts.", defs.length ? artPlates(defs.map((g) => ({ label: g.gate_id, value: g.hardware_required ? "hardware only" : (g.required_evidence || []).join(", "), locked: g.hardware_required, tone: g.hardware_required ? "gated" : "neutral", tip: g.title })), { compact: true, label: "Frozen gate definitions", caption: "Drawn from master/validation_gates.yaml \u00b7 one plate per gate, in file order \u00b7 hatched = hardware-gated, PASS not permitted" }) : null), ...computationalNotice("SOLVED")];
   out.push(el("h2", null, "Frozen gate definitions"),
     el("p", { class: "muted" }, d.definitions.path ? ["From ", link(fileHref(d.definitions.path), d.definitions.path), ". Allowed statuses are frozen data; hardware gates omit PASS."] : "master/validation_gates.yaml is not present in this checkout."),
     table(["Gate", "Title", "Kind", "Severity", "Required evidence", "Allowed statuses", "Hardware"], defs.map((g) => el("tr", null,
@@ -1042,26 +1038,26 @@ async function viewGates() {
 async function viewProvenance() {
   const d = await get("/api/provenance");
   const m = d.master;
-  const out = [pageHero("06", "Provenance\n& hashes.", d.note, provenanceArt(d.master))];
+  const out = [pageHero("Provenance", d.note, provenanceArt(d.master))];
   if (m.present) {
     out.push(el("h2", null, "Frozen master layer"),
-      el("div", { class: "panel" }, kv([["Revision", m.revision], ["Status", m.status], ["Date", m.date], ["Provenance file", link(fileHref(m.path), m.path)]]),
+      el("div", { class: "panel" }, kv([["Revision", m.revision], ["Status", m.status], ["Date", m.date], ["Provenance file", link(fileHref(m.path), pathLabel(m.path))]]),
         m.evidence_boundary ? el("div", { class: "notice comp mt-s" }, el("span", { class: "ico" }, "BOUNDARY"),
           el("div", { class: "body" }, `measured_evidence_objects_present = ${m.evidence_boundary.measured_evidence_objects_present}; hardware_gates_closable = ${m.evidence_boundary.hardware_gates_closable}. ${m.evidence_boundary.statement || ""}`)) : null),
-      table(["File", "Declared SHA-256", "Measured now", "Result"], m.checks.map((c) => el("tr", null,
-        el("td", { class: "id" }, link(fileHref(c.path), c.path)), el("td", { class: "hash" }, c.declared), el("td", { class: "hash" }, c.measured || ""),
+      table(["File", "Declared SHA-256", "Recomputed now", "Result"], m.checks.map((c) => el("tr", null,
+        el("td", { class: "id" }, link(fileHref(c.path), pathLabel(c.path))), el("td", { class: "hash" }, c.declared), el("td", { class: "hash" }, c.measured || ""),
         el("td", { class: `st-${c.status.split(" ")[0]}` }, c.status)))));
     if (m.issues.length) {
       out.push(el("h3", null, "Open provenance questions recorded in the master"),
         table(["Field", "Recorded status", "Statement"], m.issues.map((i) => el("tr", null, el("td", { class: "id" }, i.field),
-          el("td", null, badge(i.status || "?", "caution")), el("td", { class: "reason" }, i.statement || "")))));
+          el("td", null, badge(i.status || "?", "caution")), el("td", { class: "reason" }, softBreaks(i.statement))))));
     }
   }
   const holder = new Map();
   out.push(el("h2", null, "Records"), table(["Record", "Basis", "Manifests", "Recorded environment and digests", ""], d.records.map((r) => {
     const res = el("div");
     holder.set(r.record_id, res);
-    const btn = r.manifests.length ? el("button", { type: "button", class: "chip", title: "Read-only re-hash" }, "Re-measure") : null;
+    const btn = r.manifests.length ? el("button", { type: "button", class: "chip", title: "Read-only re-hash" }, "Recompute") : null;
     if (btn) btn.addEventListener("click", async () => {
       btn.disabled = true; clear(res); res.append(el("span", { class: "loading small" }, "hashing…"));
       try { const v = await get(`/api/records/${q(r.record_id)}/verify`); clear(res); res.append(verifyResult(v)); }
@@ -1070,14 +1066,14 @@ async function viewProvenance() {
     });
     const env = Object.entries(r.environment).map(([k, v]) => el("div", { class: "small" }, el("span", { class: "muted" }, `${k}: `), el("span", { class: "hash" }, String(v))));
     return el("tr", null, el("td", { class: "id" }, link(recordHref(r.record_id), r.record_id)), el("td", null, basisBadge(r.basis)),
-      el("td", { class: "small" }, r.manifests.length ? r.manifests.map((x) => el("div", null, link(fileHref(x), x.split("/").pop()))) : el("span", { class: "muted" }, "none")),
+      el("td", { class: "small" }, r.manifests.length ? r.manifests.map((x) => el("div", null, link(fileHref(x), pathLabel(x.split("/").pop())))) : el("span", { class: "muted" }, "none")),
       el("td", null, env.length ? env : el("span", { class: "muted small" }, "none recorded in the primary document"), res),
       el("td", null, btn));
   })));
   if (d.approvals.length) {
-    out.push(el("h2", null, "Approval files (digests measured now)"),
+    out.push(el("h2", null, "Approval files (digests recomputed now)"),
       table(["Approval file", "State", "SHA-256"], d.approvals.map((a) => el("tr", null,
-        el("td", { class: "id" }, link(fileHref(a.path), a.path)), el("td", null, badge(a.state, "muted")), el("td", { class: "hash" }, a.sha256)))));
+        el("td", { class: "id" }, link(fileHref(a.path), pathLabel(a.path))), el("td", null, badge(a.state, "muted")), el("td", { class: "hash" }, a.sha256)))));
   }
   return out;
 }
@@ -1085,7 +1081,7 @@ async function viewProvenance() {
 // ------------------------------------------------------------ experiments
 async function viewExperiments() {
   const d = await get("/api/experiments");
-  const out = [pageHero("02", "Experiments &\nfrozen contracts.", "The frozen requirements layer and data contracts, then each experiment directory with its execution state as its own files state it.", d.frozen_contracts.length ? artPlates([...d.frozen_contracts.map((g) => ({ label: g.group, value: `${g.files.length} file${g.files.length === 1 ? "" : "s"}`, tone: "neutral", tip: g.label })), ...d.experiments.map((e) => ({ label: e.id, value: e.state.label, tone: e.state.tone, href: `#/experiments/${q(e.id)}`, tip: e.state.reason }))].slice(0, 12), { compact: true, label: "Frozen contracts and experiments", caption: `Drawn from this checkout \u00b7 one plate per frozen-contract group${d.experiments.length ? " and experiment" : ""} \u00b7 value = file count or stated execution state` }) : null)];
+  const out = [pageHero("Experiments", "Frozen requirements and data contracts, then each experiment directory with the execution state its own files report.", d.frozen_contracts.length ? artPlates([...d.frozen_contracts.map((g) => ({ label: g.group, value: `${g.files.length} file${g.files.length === 1 ? "" : "s"}`, tone: "neutral", tip: g.label })), ...d.experiments.map((e) => ({ label: e.id, value: e.state.label, tone: e.state.tone, href: `#/experiments/${q(e.id)}`, tip: e.state.reason }))].slice(0, 12), { compact: true, label: "Frozen contracts and experiments", caption: `Drawn from this checkout \u00b7 one plate per frozen-contract group${d.experiments.length ? " and experiment" : ""} \u00b7 value = file count or stated execution state` }) : null)];
   out.push(el("h2", null, "Frozen contracts"), el("div", { class: "grid cols-2" }, d.frozen_contracts.map((g) => el("div", { class: "panel" },
     el("h3", null, g.label), el("ul", null, g.files.map((f) => el("li", null, link(fileHref(f.path), f.path, "mono"), el("span", { class: "muted small" }, `  ${fmtSize(f.size)}`))))))));
   out.push(el("h2", null, `Experiments (${d.experiments.length})`));
@@ -1097,8 +1093,8 @@ async function viewExperiments() {
   out.push(table(["Experiment", "Basis", "Execution state (as stated)", "Question / linked records", "Files"], d.experiments.map((e) => el("tr", null,
     el("td", { class: "id" }, link(`#/experiments/${q(e.id)}`, e.id)), el("td", null, basisBadge(e.basis)),
     el("td", null, badge(e.state.label, e.state.tone, e.state.reason), e.state.source ? el("div", { class: "small muted" }, e.state.source.split("/").pop()) : null),
-    el("td", { class: "reason" }, e.question ? trunc(e.question, 220) : null,
-      e.linked_records.length ? el("div", { class: "small" }, `${e.linked_records.length} linked record(s)`) : null),
+    el("td", { class: "reason" }, e.question ? excerpt(e.question, 220) : null,
+      e.linked_records.length ? el("div", { class: "small" }, `${e.linked_records.length} linked ${plural(e.linked_records.length, "record")}`) : null),
     el("td", { class: "small" }, `${e.file_count}`, el("div", { class: "muted" }, e.roles.join(", ")))))));
   return out;
 }
@@ -1117,8 +1113,8 @@ async function viewExperiment(id) {
       el("div", { class: "body" }, "These files declare synthetic or fixture content; they are not evidence about the QMHP candidate: ",
         e.synthetic_files.map((s) => el("span", { class: "mono small" }, ` ${s.file} (${s.path})`)))));
   }
-  out.push(el("div", { class: "panel locked" }, lockedAction(`Execute ${e.id}`, "Unavailable. Execution needs the repository's approved launcher and a scoped human approval, outside this viewer."),
-    lockedAction("Create or edit an approval", "Unavailable. Approval files are displayed, never written.")));
+  out.push(el("div", { class: "panel locked" }, lockedList([[`Execute ${e.id}`, "Unavailable. Execution needs the repository's approved launcher and a scoped human approval, outside this viewer."],
+    ["Create or edit an approval", "Unavailable. Approval files are displayed, never written."]])));
   out.push(el("h2", null, "Linked results records"), e.linked_records.length ? table(["Record", "Basis", "Headline status"], e.linked_records.map((rid) => {
     const r = recById[rid] || {};
     return el("tr", null, el("td", { class: "id" }, link(recordHref(rid), rid)), el("td", null, r.basis ? basisBadge(r.basis) : ""), el("td", null, el("div", { class: "row" }, statusBadges(r.headline, 6))));
@@ -1126,10 +1122,10 @@ async function viewExperiment(id) {
   if (e.approvals.length) {
     out.push(el("h2", null, "Approval files"), el("p", { class: "muted" }, "Displayed only. The viewer cannot validate whether an approval authorises anything."),
       ...e.approvals.map((a) => el("div", { class: "panel" }, el("div", { class: "row" }, badge(a.state, a.tone), link(fileHref(a.path), a.path, "mono")),
-        kv([["Authorises", a.authorises != null ? trunc(typeof a.authorises === "string" ? a.authorises : JSON.stringify(a.authorises), 600) : null],
-          ["Scope", a.scope != null ? trunc(typeof a.scope === "string" ? a.scope : JSON.stringify(a.scope), 600) : null],
-          ["Run label", a.run_label], ["Does not authorise", a.does_not_authorise != null ? trunc(JSON.stringify(a.does_not_authorise), 600) : null],
-          ["SHA-256 (measured now)", el("span", { class: "hash" }, a.sha256)]]))));
+        kv([["Authorises", a.authorises != null ? excerpt(typeof a.authorises === "string" ? a.authorises : JSON.stringify(a.authorises), 600) : null],
+          ["Scope", a.scope != null ? excerpt(typeof a.scope === "string" ? a.scope : JSON.stringify(a.scope), 600) : null],
+          ["Run label", a.run_label], ["Does not authorise", a.does_not_authorise != null ? excerpt(JSON.stringify(a.does_not_authorise), 600) : null],
+          ["SHA-256 (recomputed now)", el("span", { class: "hash" }, a.sha256)]]))));
   }
   const groups = {};
   for (const f of e.files) (groups[f.role] = groups[f.role] || []).push(f);
@@ -1150,17 +1146,17 @@ async function viewExperiment(id) {
 // ------------------------------------------------------------------ audit
 async function viewAudit() {
   const [d, ap] = await Promise.all([get("/api/audit"), get("/api/approvals")]);
-  const out = [pageHero("07", "Execution &\naudit trail.", d.note)];
+  const out = [pageHero("Audit trail", d.note)];
   if (d.experiment_states.length) {
     out.push(el("h2", null, "Execution state by experiment"), table(["Experiment", "State (as stated)", "Why", "Source"], d.experiment_states.map((s) => el("tr", null,
       el("td", { class: "id" }, link(`#/experiments/${q(s.experiment)}`, s.experiment)), el("td", null, badge(s.label, s.tone)),
       el("td", { class: "reason" }, s.reason), el("td", { class: "small" }, s.source ? link(fileHref(s.source), s.source.split("/").pop()) : "")))));
   }
   out.push(el("h2", null, `Approval files (${ap.approvals.length})`), el("div", { class: "notice info" }, el("span", { class: "ico" }, "DISPLAY ONLY"), el("div", { class: "body" }, ap.statement)),
-    table(["File", "State", "Approved by / when", "What it names", "SHA-256 now"], ap.approvals.map((a) => el("tr", null,
+    table(["File", "State", "Approved by / when", "What it names", "SHA-256 (recomputed now)"], ap.approvals.map((a) => el("tr", null,
       el("td", { class: "id" }, link(fileHref(a.path), a.path)), el("td", null, badge(a.state, a.tone)),
-      el("td", { class: "small" }, a.approved_by ? trunc(a.approved_by, 140) : "", a.approved_utc ? el("div", { class: "muted" }, a.approved_utc) : null),
-      el("td", { class: "reason" }, trunc(typeof a.authorises === "string" ? a.authorises : (a.what || a.run_label || JSON.stringify(a.authorises || a.scope || "")), 260),
+      el("td", { class: "small" }, a.approved_by ? excerpt(a.approved_by, 140) : "", a.approved_utc ? el("div", { class: "muted" }, a.approved_utc) : null),
+      el("td", { class: "reason" }, excerpt(typeof a.authorises === "string" ? a.authorises : (a.what || a.run_label || JSON.stringify(a.authorises || a.scope || "")), 260),
         a.one_attempt ? el("div", { class: "small muted" }, `one attempt: run ${a.one_attempt.run_number}, attempt ${a.one_attempt.run_attempt}`) : null),
       el("td", { class: "hash" }, shortSha(a.sha256))))));
 
@@ -1175,7 +1171,7 @@ async function viewAudit() {
         el("div", { class: "what" }, ev.kind, "  ", ev.basis ? basisBadge(ev.basis) : null, " ",
           ev.record_id ? link(recordHref(ev.record_id), ev.ref, "mono") : link(fileHref(ev.ref), ev.ref, "mono")),
         ev.headline ? el("div", { class: "row" }, statusBadges(ev.headline, 6)) : null,
-        ev.summary ? el("div", { class: "small muted" }, trunc(ev.summary, 300)) : null));
+        ev.summary ? el("div", { class: "small muted" }, excerpt(ev.summary, 300)) : null));
     }
   };
   sel.addEventListener("change", render);
@@ -1205,7 +1201,7 @@ async function viewCorrections() {
   };
   sel.addEventListener("change", render);
   render();
-  return [pageHero("08", "Corrections,\non the record.", "Corrections in this repository are made as new linked records; the originals are preserved."),
+  return [pageHero("Corrections", "Corrections in this repository are made as new linked records; the originals are preserved."),
     el("div", { class: "notice info" }, el("span", { class: "ico" }, "SCOPE"), el("div", { class: "body" }, d.statement)),
     el("div", { class: "filters mt" }, sel, el("span", { class: "count" }, `${d.items.length} entries`)), holder];
 }
@@ -1213,23 +1209,29 @@ async function viewCorrections() {
 // --------------------------------------------------------- classification
 async function viewClassification() {
   const d = await get("/api/classification");
-  const out = [pageHero("09", "Synthetic, solved,\nmeasured.", "Two questions are kept apart: what kind of evidence a record is (its basis), and what the record says about itself (its status tokens). Neither is invented by the viewer.")];
+  const out = [pageHero("Classification", "Two questions are kept apart: what kind of evidence a record is (its basis), and what the record says about itself (its status tokens). Neither is invented by the viewer.")];
   out.push(...computationalNotice("SOLVED"));
   out.push(el("div", { class: "notice info" }, el("span", { class: "ico" }, "MEASURED"), el("div", { class: "body" }, d.measured_statement)));
   out.push(el("div", { class: "grid cols-3 mt" }, d.bases.map((b) => el("div", { class: "panel" },
-    el("div", { class: "row" }, basisBadge(b.basis, true), el("span", { class: "count" }, `${b.count} record(s)`)),
+    el("div", { class: "row" }, basisBadge(b.basis, true), el("span", { class: "count" }, `${b.count} ${plural(b.count, "record")}`)),
     el("p", { class: "small mt-s" }, b.explanation)))));
   out.push(el("h2", null, "How a results record's basis is assigned"), el("p", { class: "muted" }, "Rules are tried in order; the first match wins. Each record page shows which rule fired and why."),
     table(["Rule", "Basis", "Condition"], d.record_rules.map((r) => el("tr", null, el("td", { class: "id" }, r.id), el("td", null, basisBadge(r.basis)), el("td", { class: "reason" }, r.rule)))),
     el("h3", null, "Experiments"),
     table(["Rule", "Basis", "Condition"], d.experiment_rules.map((r) => el("tr", null, el("td", { class: "id" }, r.id), el("td", null, basisBadge(r.basis)), el("td", { class: "reason" }, r.rule)))));
   out.push(el("h2", null, "Status families"), el("p", { class: "muted" }, "A family only chooses a colour and a filter. The badge text is always the token the record wrote."),
-    table(["Family", "Tone", "Meaning"], d.families.map((f) => el("tr", null, el("td", null, badge(f.family, f.tone)), el("td", { class: "small" }, f.tone), el("td", { class: "reason" }, f.meaning)))));
+    table(["Family", "Meaning"], d.families.map((f) => el("tr", null, el("td", null, badge(f.family, f.tone)), el("td", { class: "reason" }, f.meaning)))));
+  out.push(el("h2", null, "Terms used"), kv([
+    ["Frozen", "Fixed by a released master file, such as master/validation_gates.yaml. This viewer never changes it."],
+    ["Headline status", "The record's own status tokens, quoted as written in its JSON. The viewer does not assign them."],
+    ["ENGINEERING-SEED", "A bootstrap assumption where the frozen master is silent, per the specification. Not a QMHP requirement; never experimentally validated."],
+    ["HARDWARE-GATED", "A gate whose frozen definition does not allow PASS. Computational and synthetic evidence never closes it."],
+  ]));
   out.push(el("h2", null, "Records by basis"));
   for (const b of d.bases) {
     const recs = d.records_by_basis[b.basis] || [];
     out.push(el("details", { class: "panel", open: recs.length && recs.length < 12 ? true : null },
-      el("summary", null, basisBadge(b.basis), `  ${recs.length} record(s)`),
+      el("summary", null, basisBadge(b.basis), `  ${recs.length} ${plural(recs.length, "record")}`),
       recs.length ? el("ul", null, recs.map((r) => el("li", null, link(recordHref(r.id), r.id, "mono"), "  ",
         el("span", { class: "small muted" }, `${r.basis.rule}: ${r.basis.reason}`)))) : el("p", { class: "empty" }, "None.")));
   }
@@ -1249,7 +1251,7 @@ async function viewDocuments() {
   };
   input.addEventListener("input", render);
   render();
-  return [pageHero("10", "Documents.", "Markdown documents and record reports in this checkout, rendered as text."), el("div", { class: "filters" }, input), holder];
+  return [pageHero("Documents", "Markdown documents and record reports in this checkout. Each opens formatted, with the raw source one tab away."), el("div", { class: "filters" }, input), holder];
 }
 
 // ------------------------------------------------------------------ files
@@ -1272,7 +1274,7 @@ async function viewFile(params) {
   const crumbs = parts.map((p, i) => i < parts.length - 1 ? [link(fileHref(parts.slice(0, i + 1).join("/")), p), " / "] : p);
   return [head(parts[parts.length - 1] || path, null, crumbs),
     el("div", { class: "panel" }, kv([["Path", el("span", { class: "mono" }, f.path)], ["Kind", f.kind], ["Size", f.size != null ? fmtSize(f.size) : null],
-      ["SHA-256 (measured now)", f.sha256_measured ? el("span", { class: "hash" }, f.sha256_measured) : null],
+      ["SHA-256 (recomputed now)", f.sha256_measured ? el("span", { class: "hash" }, f.sha256_measured) : null],
       ["Part of record", f.in_record ? link(recordHref(f.in_record.slice(8)), f.in_record) : null],
       ["Access", "Read-only. Displayed as text; it cannot be edited here."]]),
       f.parse_error ? el("p", { class: "error small" }, `Parse error: ${f.parse_error}`) : null),
@@ -1298,7 +1300,9 @@ async function viewSearch(params) {
   document.getElementById("global-search").value = query;
   const d = await get(`/api/search?q=${q(query)}`);
   const needle = query.toLowerCase();
-  const out = [head(`Search: “${query}”`, d.note || `${d.files_matched || 0} file(s) matched${d.truncated ? " (first 200 shown)" : ""}. Solver output directories and files over 1 MB are not searched.`)];
+  const n = d.files_matched || 0;
+  const found = n ? `${n} ${plural(n, "file")} matched${d.truncated ? " (first 200 shown)" : ""}.` : `No files match “${query}”.`;
+  const out = [head(`Search: “${query}”`, d.note || `${found} Solver output directories and files over 1 MB are not searched.`)];
   if (d.records && d.records.length) {
     out.push(el("h2", null, "Records"), table(["Record", "Basis", "Headline"], d.records.map((r) => el("tr", null,
       el("td", { class: "id" }, link(recordHref(r.id), r.id)), el("td", null, basisBadge(r.basis)), el("td", null, el("div", { class: "row" }, statusBadges(r.headline, 5)))))));
@@ -1335,6 +1339,8 @@ async function route() {
   const params = new URLSearchParams(rawQuery || "");
   const section = path.split("/")[0];
   for (const a of document.querySelectorAll("#nav a")) a.classList.toggle("active", a.dataset.r === section);
+  const navItem = document.querySelector(`#nav a[data-r="${section}"]`);
+  document.title = navItem ? `${navItem.textContent} · QMHP-CEM Evidence Viewer` : "QMHP-CEM Evidence Viewer";
   const seq = ++routeSeq;
   for (const [re, fn] of ROUTES) {
     const m = re.exec(path);
@@ -1367,7 +1373,6 @@ function render(nodes, onHero) {
     clear(view);
     window.scrollTo(0, 0);
     document.body.classList.toggle("on-hero", onHero);
-    document.body.classList.remove("head-hidden");
     hideTip();
     let column = null;
     for (const node of nodes) {
@@ -1379,7 +1384,7 @@ function render(nodes, onHero) {
         column.append(node);
       }
     }
-    enhance(view);
+    markScrollTables(view);
     const h1 = view.querySelector("h1");
     if (h1) { h1.setAttribute("tabindex", "-1"); h1.focus({ preventScroll: true }); } else view.focus({ preventScroll: true });
   };
@@ -1390,19 +1395,11 @@ function render(nodes, onHero) {
 
 async function boot() {
   setupTips();
+  window.addEventListener("resize", () => markScrollTables(view), { passive: true });
   const search = document.getElementById("global-search");
   search.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); location.hash = `#/search?q=${q(search.value.trim())}`; }
   });
-  const ticker = document.querySelector(".ticker");
-  const toggle = document.getElementById("ticker-toggle");
-  const setPaused = (p) => {
-    ticker.classList.toggle("paused", p);
-    toggle.setAttribute("aria-pressed", String(p));
-    toggle.querySelector(".lbl").textContent = p ? "Play" : "Pause";
-  };
-  toggle.addEventListener("click", () => setPaused(!ticker.classList.contains("paused")));
-  if (reducedMotion) setPaused(true);
   try {
     const co = await getCached("/api/checkout");
     const where = co.available ? `Checkout ${co.branch || "detached"} @ ${shortSha(co.head_sha)}` : "Checkout: no git metadata";
