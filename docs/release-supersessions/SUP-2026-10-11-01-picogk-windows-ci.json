@@ -1,0 +1,32 @@
+{
+  "schema": "qmhp-cem.release-supersession/1",
+  "id": "SUP-2026-10-11-01",
+  "status": "SUPERSEDES THE TREE BINDING OF ONE FILE TO RECORD THE FIRST WINDOWS RUN. Corrects nothing and supersedes no claim; edits no register, record, claim text or earlier supersession.",
+  "supersedes": {
+    "register": "docs/release/CLAIM-REGISTER.json",
+    "register_sha256": "1a03d8dc793089f4029a9d8abc439e58fbabf84187ddb3e25610b78e7f1e39c9",
+    "register_revision": 1,
+    "frozen_from_commit": "ba076d9d972077a7a3e256a6404ab455fd748461",
+    "frozen_release_branch_head": "1ebc07ad67e0af6ff2d790c4d181b0558d632d62"
+  },
+  "decision_ref": "Owner instruction, working session 2026-10-11: 'Ok get it done', in reply to the offer to add a Windows job to CI so that the win-x64 path is tested.",
+  "cause": "Commit f05f3e0 added the picogk-native-windows CI job. Its first run, CI run 38099769539 (commit 61472b5, job 114353102688) on windows-latest (Windows 10.0.26100), loaded the PicoGK 2.3.0 win-x64 native runtime, passed the C# tests with QMHP_REQUIRE_PICOGK_RUNTIME=1, and generated the seed geometry with 27 of 27 acceptance checks passing: body 657540 triangles, STL volume 3288.147844291003 mm^3 against the exact 3289.4140725707866 mm^3; lid 501204 triangles, 3017.8802065834143 mm^3 against 3019.469383113251 mm^3; both watertight. These equal the macos-26 job of the same run (job 114353102695) in triangle count, STL size and volume. This is a change of state, not a correction: SUP-2026-10-09-01 was true when written ('untested on win-x64'); from this run on, the win-x64 path has one recorded CI execution.",
+  "changed_bound_files": [
+    {
+      "path": "geometry/package_picogk/README.md",
+      "sha256_at_frozen_commit": "cfbd527602adcf1f328fe85150f1970393fbf22c1223203320caac1034f0272e",
+      "sha256_superseded": "58c0ab275ce3539f46dfac2636efda851d65e5ecb297c817b6334f7e5469a0ca",
+      "sha256_superseding": "f3c1a065fa927767ccfd91821d280bde5940834c224a1e62a297abf1f8f4697f",
+      "introduced_by": "this commit",
+      "change": "The win-x64 row now says 'Yes, in CI' and cites the first Windows run; the CI paragraph names the Windows job and its artifact. Nothing else in the file changes. Supersedes the pin installed by SUP-2026-10-09-01."
+    }
+  ],
+  "file_set_additions": {},
+  "claims_assessed": [
+    {
+      "id": "REL-BD-03",
+      "assessment": "STILL NO LONGER HOLDS ON THIS TREE, as SUP-2026-10-08-01 declares; this record supersedes no claim. At the frozen commit REL-BD-03 holds unchanged."
+    }
+  ],
+  "unchanged": "SUP-2026-10-08-01 and SUP-2026-10-09-01, which stay pinned and unedited; every other tree-bound digest; every exact file set; every in-scope record and register; and every claim and exception text. A change to any of them still fails tests/test_release_registers.py."
+}

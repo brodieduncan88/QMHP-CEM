@@ -89,6 +89,7 @@ SUPERSESSION_SHA256 = {
     "SUP-2026-10-04-01-picogk-scaffold.json": "1260bce9c5c988683ec212417bef69f2f550776585e5310e1f7acc4f9a34f6ec",
     "SUP-2026-10-08-01-picogk-generator.json": "0c79f0e2b733756521e1bb0375191af8ef63385f1fde0f38076067acb5d1356a",
     "SUP-2026-10-09-01-picogk-windows-correction.json": "40484b6c6abce9849e2587fb3ee6b8af192b8fb89f5a7cc3a8048fc373c83ac6",
+    "SUP-2026-10-11-01-picogk-windows-ci.json": "166e5cfdadf15eef0d68550ae25c0a8cfe02bbc0c99c809d9353e1358e254e21",
 }
 
 #: Records in a release-scope family (PALACE-GOLDEN, PALACE-VERIFY, QUTIP-A) committed
@@ -880,12 +881,19 @@ def test_a_misquoted_or_misdirected_correction_is_refused():
 
 
 def test_without_the_correction_supersession_the_corrected_readme_fails(monkeypatch):
-    """SUP-2026-10-09-01 is what pins the corrected PicoGK README; without it the README
-    is held to the SUP-2026-10-08-01 pin and fails."""
+    """SUP-2026-10-09-01 links the PicoGK README's chain; without it the later pin
+    (SUP-2026-10-11-01) no longer continues the chain, so the README fails."""
     monkeypatch.delitem(SUPERSESSION_SHA256, "SUP-2026-10-09-01-picogk-windows-correction.json")
     assert "geometry/package_picogk/README.md: changed since the frozen commit" \
         in digest_problems(claim_register(), exception_register())
     assert "REL-BD-03" in superseded_claims()   # still declared by SUP-2026-10-08-01 alone
+
+
+def test_without_the_windows_ci_supersession_the_current_readme_fails(monkeypatch):
+    """SUP-2026-10-11-01 pins the README that records the first Windows run."""
+    monkeypatch.delitem(SUPERSESSION_SHA256, "SUP-2026-10-11-01-picogk-windows-ci.json")
+    assert "geometry/package_picogk/README.md: changed since the frozen commit" \
+        in digest_problems(claim_register(), exception_register())
 
 
 def test_the_registers_parse_strictly_and_are_well_formed():
