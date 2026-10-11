@@ -29,7 +29,7 @@ it claims nothing beyond `docs/release/CLAIM-REGISTER.json`.
 | QuTiP fixed-point cross-check | executed once, on the owner's Mac | QuTiP is not a declared dependency; the one assembly test skips without it | REL-QT-01 to -10 |
 | openEMS | **unsupported**; `preflight()` always raises, and the CLI exits 4 | pinned by `tests/test_release_registers.py` | REL-BD-01 |
 | planar chip geometry (gdsfactory) | **unsupported**; every cell raises | pinned | REL-BD-02 |
-| PicoGK package geometry (.NET) | **unsupported**; builds in CI, never run | pinned | REL-BD-03 |
+| PicoGK package geometry (.NET) | **unsupported** at `cd5c1b2`; builds in CI, never run. On the development branch since 8 October the generator is implemented and runs natively in CI; see [`geometry/package_picogk/README.md`](../geometry/package_picogk/README.md) | pinned at `cd5c1b2`; superseded on the development tree by `SUP-2026-10-08-01` | REL-BD-03 |
 | CLI verification of every record | partial: `cem verify-results` covers the 16 manifested Palace records only | the QuTiP and quarantined records are verified by the tests in §3 | EXC-R05 |
 
 ## 2. Tier 0: set up
